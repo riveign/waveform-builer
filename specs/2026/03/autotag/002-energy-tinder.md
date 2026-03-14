@@ -55,7 +55,62 @@ You are a senior AI engineer building an interactive music review tool. The UI m
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+### Affected Files & Components
+
+| Layer | File | Relevance |
+|-------|------|-----------|
+| **ML engine** | `src/djsetbuilder/analysis/autotag.py` | `train_energy_model(include_approved=True)`, `predict_energy()`, `extract_features()` — 17-dim RF classifier mapping 9 tags → 3 zones (warmup/build/peak). `ZONE_MAP` defines mappings. Feature importance available for teaching moments. |
+| **DB models** | `src/djsetbuilder/db/models.py:57-59` | Track columns: `energy_predicted` (String), `energy_confidence` (Float), `energy_source` (String: "manual"/"auto"/"approved") |
+| **Audio streaming** | `src/djsetbuilder/api/routes/audio.py` | `GET /api/audio/{track_id}` — HTTP Range support, FFmpeg transcoding for AIFF/FLAC → MP3. Already usable by wavesurfer.js. |
+| **Waveform player** | `frontend/src/lib/components/waveform/WavesurferPlayer.svelte` | Props: trackId, peaks (base64), duration, beats. Uses `${API_BASE}/api/audio/${trackId}`. Emits timeupdate/play/pause. Reusable directly in tinder cards. |
+| **Track view** | `frontend/src/lib/components/waveform/TrackView.svelte` | Loads waveform detail + features via `$effect` on track.id change. Reference for loading pattern. |
+| **Workspace tabs** | `frontend/src/lib/components/Workspace.svelte` | 3 tabs (Track/Set/DNA) with keyboard shortcuts 1-3. Tab type defined in `ui.svelte.ts`. Add `'tinder'` tab with key=4. |
+| **UI store** | `frontend/src/lib/stores/ui.svelte.ts` | `Tab` type union, `activeTab` state, `selectedTrack`. Extend Tab type with `'tinder'`. |
+| **Track store** | `frontend/src/lib/stores/tracks.svelte.ts` | `search()` with paginated response. Reference for tinder queue store pattern. |
+| **API schemas** | `src/djsetbuilder/api/schemas.py` | `TrackResponse` (has energy field), `TrackFeaturesResponse` (has all mood fields). Need new tinder-specific schemas. |
+| **Stats API** | `src/djsetbuilder/api/routes/stats.py` | 5 endpoints for DNA viz. Reference for new tinder stats endpoint. |
+| **Types** | `frontend/src/lib/types/index.ts` | `Track`, `TrackFeatures`, `MoodPoint` — need new `TinderTrack`, `TinderDecision`, `TinderSession` types. |
+| **API clients** | `frontend/src/lib/api/tracks.ts` | `searchTracks()`, `getTrackFeatures()`, `suggestNext()`. Need new tinder API client. |
+| **CLI** | `src/djsetbuilder/cli.py:763+` | `djset autotag energy --retrain` — calls same `train_energy_model()`. No changes needed. |
+| **Tests** | `tests/test_autotag.py` | MagicMock AudioFeatures, `tmp_path` for model I/O, zone mapping tests. Pattern to follow. |
+| **API tests** | `tests/api/conftest.py` | In-memory SQLite + TestClient with DI override. Seed data with 20 tracks. |
+
+### Key Observations
+
+1. **Queue query is straightforward** — `WHERE energy_predicted IS NOT NULL AND energy_source = 'auto' ORDER BY energy_confidence ASC` maps directly to SQLAlchemy.
+2. **Audio already works** — `GET /api/audio/{track_id}` with Range headers. WavesurferPlayer.svelte can be reused as-is for card playback.
+3. **Feature importance exists** — `train_energy_model()` returns `feature_importance` list. This powers the teaching moment: "Model saw high loudness → predicted build. You said warmup."
+4. **Mood data available** — `TrackFeaturesResponse` already includes `mood_happy/sad/aggressive/relaxed`. No new analysis needed — just a radar chart component.
+5. **No session tracking table** — Decisions are stored on the Track row itself (energy_source → "approved"). Session stats need either a new table or computed from Track timestamps.
+6. **Retraining is synchronous** — `train_energy_model()` runs in-process. With ~4K tracks and 17 features, RF training takes <2 seconds. No async/SSE needed.
+
+### Strategy
+
+**Backend (3 new endpoints + 1 store function):**
+1. `GET /api/tinder/queue` — paginated queue of unreviewed tracks (energy_source="auto") with features + waveform data, ordered by confidence ASC. Query params: genre_family, bpm_min, bpm_max, limit.
+2. `POST /api/tinder/decide` — body: `{track_id, decision: "confirm"|"override"|"skip", override_zone?: string}`. Updates Track row. Returns next track in queue for prefetch.
+3. `POST /api/tinder/retrain` — triggers `train_energy_model(include_approved=True)`. Returns metrics + feature importance for before/after comparison.
+4. `GET /api/tinder/stats` — session summary: total reviewed, confirmed %, overridden %, skip rate, queue remaining.
+5. New store function `get_tinder_queue()` in `store.py` for the queue query.
+
+**Frontend (4 new components + 1 store + 1 API client):**
+1. `EnergyTinder.svelte` — main container, manages queue state and card transitions
+2. `TinderCard.svelte` — single track card: waveform (reuse WavesurferPlayer), metadata, prediction display, mood radar, action buttons
+3. `MoodRadar.svelte` — 4-axis SVG radar chart (happy/sad/aggressive/relaxed)
+4. `TinderSummary.svelte` — end-of-session summary with retrain button and accuracy comparison
+5. `tinder.svelte.ts` — store managing queue, current card index, session decisions
+6. `frontend/src/lib/api/tinder.ts` — API client for all tinder endpoints
+
+**Integration:**
+- Add `'tinder'` to Tab type in `ui.svelte.ts`
+- Add tab in `Workspace.svelte` with keyboard shortcut `4`
+- Teaching moment: on override, show top-2 feature importances from model metadata with one-sentence explanation
+
+**Testing:**
+- `tests/api/test_tinder_api.py` — queue ordering, decide confirm/override/skip, retrain trigger, stats computation
+- Seed conftest with tracks having `energy_predicted` + `energy_source="auto"` at various confidence levels
+- Frontend: manual testing (no Vitest setup exists yet)
 
 ## Plan
 <!-- Filled by /spec PLAN -->
