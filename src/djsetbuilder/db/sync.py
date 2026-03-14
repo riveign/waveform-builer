@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -62,7 +63,7 @@ def _sync_playlist_tags(db, session: Session) -> None:
     console.print(f"  Tagged {updated} tracks with playlist membership")
 
 
-def sync_rekordbox(compute_hashes: bool = False) -> dict:
+def sync_rekordbox(compute_hashes: bool = False, db_path: str | None = None) -> dict:
     """Import tracks from Rekordbox master.db into local database.
 
     Returns dict with sync stats.
@@ -70,12 +71,19 @@ def sync_rekordbox(compute_hashes: bool = False) -> dict:
     try:
         from pyrekordbox import Rekordbox6Database
     except ImportError:
-        console.print("[red]pyrekordbox not installed. Run: pip install pyrekordbox[/]")
+        console.print("[red]pyrekordbox not installed. Run: pip install 'dj-set-builder[rekordbox]'[/]")
         return {"error": "pyrekordbox not installed"}
 
     console.print("[bold]Opening Rekordbox database...[/]")
     try:
-        db = Rekordbox6Database()
+        kwargs = {"path": db_path} if db_path else {}
+        if not db_path and sys.platform != "darwin":
+            console.print(
+                "[yellow]Rekordbox auto-discovery only works on macOS.\n"
+                "Use --db-path to specify the master.db location.[/]"
+            )
+            return {"error": "Rekordbox auto-discovery not supported on this platform"}
+        db = Rekordbox6Database(**kwargs)
     except Exception as e:
         console.print(f"[red]Failed to open Rekordbox database: {e}[/]")
         return {"error": str(e)}

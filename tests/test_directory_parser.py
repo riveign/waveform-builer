@@ -19,7 +19,7 @@ def test_full_format_no_energy():
 
 def test_hardgroove_mid():
     meta = parse_directory_name("06 - 2023 - HardGroove Mid")
-    assert meta.genre == "HardGroove"
+    assert meta.genre == "Hard Groove"
     assert meta.energy == "Mid"
 
 

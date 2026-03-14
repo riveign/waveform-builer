@@ -8,14 +8,19 @@ version = "0.1.0"
 description = "CLI toolkit for building optimized DJ sets from a Rekordbox library"
 requires-python = ">=3.9"
 dependencies = [
-    "pyrekordbox>=0.3.1",
     "sqlalchemy>=2.0",
     "click>=8.0",
     "rich>=13.0",
     "numpy>=1.21",
+    "mutagen>=1.45",
+    "tomli_w>=1.0",
+    "alembic>=1.12",
 ]
 
 [project.optional-dependencies]
+rekordbox = [
+    "pyrekordbox>=0.3.1",
+]
 analysis = [
     "essentia>=2.1b6.dev1110",
     "essentia-tensorflow>=2.1b6.dev1110",
@@ -25,9 +30,9 @@ analysis = [
 visualizer = [
     "dash>=2.14",
     "plotly>=5.18",
-    "plotly-resampler>=0.10",
 ]
 dev = [
+    "dj-set-builder[rekordbox]",
     "pytest>=7.0",
     "pytest-cov",
 ]

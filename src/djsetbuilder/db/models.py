@@ -15,8 +15,14 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from djsetbuilder.config import get_db_url
+
+# Module-level singletons — initialized once per process
+_engine = None
+_SessionFactory = None
+_schema_initialized = False
 
 
 class Base(DeclarativeBase):
@@ -83,6 +89,15 @@ class AudioFeatures(Base):
     waveform_sr = Column(Integer)             # Sample rate used (22050)
     waveform_hop = Column(Integer)            # Hop length used (512)
     beat_positions = Column(LargeBinary)      # float32 array of beat timestamps in seconds
+    # Frequency band envelopes (4 bands × detail + overview)
+    band_low = Column(LargeBinary)              # 20–250 Hz RMS detail
+    band_midlow = Column(LargeBinary)           # 250–1000 Hz RMS detail
+    band_midhigh = Column(LargeBinary)          # 1000–4000 Hz RMS detail
+    band_high = Column(LargeBinary)             # 4000–11025 Hz RMS detail
+    band_low_overview = Column(LargeBinary)     # 20–250 Hz RMS overview
+    band_midlow_overview = Column(LargeBinary)  # 250–1000 Hz RMS overview
+    band_midhigh_overview = Column(LargeBinary) # 1000–4000 Hz RMS overview
+    band_high_overview = Column(LargeBinary)    # 4000–11025 Hz RMS overview
 
     track = relationship("Track", back_populates="audio_features")
 
@@ -132,11 +147,17 @@ class TransitionCue(Base):
 
 
 def get_engine():
-    return create_engine(get_db_url())
+    global _engine
+    if _engine is None:
+        _engine = create_engine(get_db_url(), poolclass=NullPool)
+    return _engine
 
 
 def _migrate_schema(engine):
-    """Add new columns to existing tables if they don't exist (SQLite)."""
+    """Add new columns to existing tables if they don't exist (SQLite).
+
+    NOTE: Deprecated — will be replaced by Alembic migrations.
+    """
     from sqlalchemy import inspect, text
 
     inspector = inspect(engine)
@@ -150,6 +171,14 @@ def _migrate_schema(engine):
             "waveform_sr": "INTEGER",
             "waveform_hop": "INTEGER",
             "beat_positions": "BLOB",
+            "band_low": "BLOB",
+            "band_midlow": "BLOB",
+            "band_midhigh": "BLOB",
+            "band_high": "BLOB",
+            "band_low_overview": "BLOB",
+            "band_midlow_overview": "BLOB",
+            "band_midhigh_overview": "BLOB",
+            "band_high_overview": "BLOB",
         }
         with engine.begin() as conn:
             for col_name, col_type in new_cols.items():
@@ -159,8 +188,20 @@ def _migrate_schema(engine):
                     ))
 
 
-def get_session() -> Session:
+def _init_schema():
+    """Create tables and run migrations once per process."""
+    global _schema_initialized
+    if _schema_initialized:
+        return
     engine = get_engine()
     Base.metadata.create_all(engine)
     _migrate_schema(engine)
-    return sessionmaker(bind=engine)()
+    _schema_initialized = True
+
+
+def get_session() -> Session:
+    global _SessionFactory
+    _init_schema()
+    if _SessionFactory is None:
+        _SessionFactory = sessionmaker(bind=get_engine())
+    return _SessionFactory()

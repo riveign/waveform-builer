@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 
-from dash import Input, Output, State, callback_context, html, no_update
+from dash import ClientsideFunction, Input, Output, State, callback_context, html, no_update
 
 from djsetbuilder.db.models import AudioFeatures, Set, SetTrack, Track, TransitionCue, get_session
 from djsetbuilder.db.store import get_track_by_title, search_tracks
 from djsetbuilder.visualization.figures import (
     build_overview_figure,
     build_set_timeline_figure,
+    build_staircase_figure,
     build_track_figure,
     build_transition_figure,
 )
@@ -184,9 +185,13 @@ def register_callbacks(app):
             Output("transition-label", "children"),
             Output("selected-transition", "data"),
         ],
-        Input("set-selector", "value"),
+        [
+            Input("set-selector", "value"),
+            Input("timeline-view-toggle", "value"),
+            Input("track-offsets", "data"),
+        ],
     )
-    def load_set_timeline(set_id):
+    def load_set_timeline(set_id, view_mode, track_offsets):
         if not set_id:
             return no_update, no_update, no_update, no_update
 
@@ -199,12 +204,22 @@ def register_callbacks(app):
         energy_profile = None
         if set_.energy_profile:
             try:
-                from djsetbuilder.setbuilder.constraints import parse_energy_string
-                energy_profile = parse_energy_string(set_.energy_profile)
+                from djsetbuilder.setbuilder.constraints import parse_energy_json
+                energy_profile = parse_energy_json(set_.energy_profile)
             except Exception:
                 pass
 
-        timeline_fig = build_set_timeline_figure(set_.tracks, energy_profile=energy_profile)
+        if view_mode == "staircase":
+            timeline_fig = build_staircase_figure(
+                set_.tracks, energy_profile=energy_profile,
+                track_offsets=track_offsets or {},
+            )
+        else:
+            timeline_fig = build_set_timeline_figure(set_.tracks, energy_profile=energy_profile)
+
+        # uirevision: keep same value while nudging so Plotly preserves zoom/pan.
+        # Changes when set or view mode changes (reset zoom is appropriate then).
+        timeline_fig.update_layout(uirevision=f"{set_id}-{view_mode}")
 
         # Default to first transition
         tracks_sorted = sorted(set_.tracks, key=lambda s: s.position)
@@ -213,6 +228,174 @@ def register_callbacks(app):
             return timeline_fig, set_id, label, 0
         return timeline_fig, set_id, "No transitions", None
 
+    # --- Click on staircase to select a track ---
+    @app.callback(
+        [
+            Output("selected-staircase-track", "data"),
+            Output("track-nudge-panel", "style"),
+            Output("nudge-track-label", "children"),
+            Output("nudge-offset-display", "value"),
+        ],
+        Input("timeline-graph", "clickData"),
+        [
+            State("timeline-view-toggle", "value"),
+            State("track-offsets", "data"),
+            State("current-set-id", "data"),
+        ],
+        prevent_initial_call=True,
+    )
+    def select_staircase_track(click_data, view_mode, offsets, set_id):
+        if view_mode != "staircase" or not click_data:
+            return no_update, {"display": "none"}, "", ""
+
+        points = click_data.get("points", [])
+        if not points:
+            return no_update, {"display": "none"}, "", ""
+
+        # Each track has 2 traces (waveform line + fill area), so track_idx = curve // 2
+        curve = points[0].get("curveNumber", 0)
+        track_idx = curve // 2
+
+        # Resolve actual track info from set
+        session = get_session()
+        set_ = session.query(Set).get(set_id) if set_id else None
+        if not set_:
+            return no_update, {"display": "none"}, "", ""
+
+        tracks_sorted = sorted(set_.tracks, key=lambda s: s.position)
+        if track_idx >= len(tracks_sorted):
+            return no_update, {"display": "none"}, "", ""
+
+        st = tracks_sorted[track_idx]
+        offsets = offsets or {}
+        current_offset = offsets.get(str(st.position), 0)
+
+        return (
+            track_idx,
+            {"display": "block"},
+            f"{st.position}. {st.track.title or '?'} ({st.track.bpm:.0f} BPM)" if st.track.bpm else f"{st.position}. {st.track.title or '?'}",
+            f"{current_offset:+.1f}s",
+        )
+
+    # --- Nudge track offset ---
+    @app.callback(
+        [
+            Output("track-offsets", "data"),
+            Output("nudge-offset-display", "value", allow_duplicate=True),
+        ],
+        [
+            Input("btn-nudge-left-big", "n_clicks"),
+            Input("btn-nudge-left", "n_clicks"),
+            Input("btn-nudge-right", "n_clicks"),
+            Input("btn-nudge-right-big", "n_clicks"),
+            Input("btn-nudge-reset", "n_clicks"),
+            Input("btn-nudge-reset-all", "n_clicks"),
+        ],
+        [
+            State("selected-staircase-track", "data"),
+            State("track-offsets", "data"),
+            State("current-set-id", "data"),
+        ],
+        prevent_initial_call=True,
+    )
+    def nudge_track(left_big, left, right, right_big, reset, reset_all,
+                    track_idx, offsets, set_id):
+        if track_idx is None:
+            return no_update, no_update
+
+        offsets = dict(offsets or {})
+        triggered = callback_context.triggered_id
+
+        if triggered == "btn-nudge-reset-all":
+            return {}, "+0.0s"
+
+        # Get BPM for beat-based nudge
+        session = get_session()
+        set_ = session.query(Set).get(set_id) if set_id else None
+        bpm = 120
+        if set_:
+            tracks_sorted = sorted(set_.tracks, key=lambda s: s.position)
+            if track_idx < len(tracks_sorted):
+                bpm = tracks_sorted[track_idx].track.bpm or 120
+
+        beat_sec = 60 / bpm  # 1 beat in seconds
+        pos_key = str(tracks_sorted[track_idx].position) if set_ and track_idx < len(tracks_sorted) else str(track_idx)
+        current = offsets.get(pos_key, 0)
+
+        if triggered == "btn-nudge-reset":
+            offsets[pos_key] = 0
+        elif triggered == "btn-nudge-left-big":
+            offsets[pos_key] = current - beat_sec * 8
+        elif triggered == "btn-nudge-left":
+            offsets[pos_key] = current - beat_sec
+        elif triggered == "btn-nudge-right":
+            offsets[pos_key] = current + beat_sec
+        elif triggered == "btn-nudge-right-big":
+            offsets[pos_key] = current + beat_sec * 8
+
+        new_offset = offsets.get(pos_key, 0)
+        return offsets, f"{new_offset:+.1f}s"
+
+    # --- Transition B-track nudge ---
+    @app.callback(
+        [
+            Output("transition-b-offsets", "data"),
+            Output("trans-nudge-display", "value"),
+        ],
+        [
+            Input("btn-trans-nudge-left-big", "n_clicks"),
+            Input("btn-trans-nudge-left", "n_clicks"),
+            Input("btn-trans-nudge-right", "n_clicks"),
+            Input("btn-trans-nudge-right-big", "n_clicks"),
+            Input("btn-trans-nudge-reset", "n_clicks"),
+        ],
+        [
+            State("transition-b-offsets", "data"),
+            State("selected-transition", "data"),
+            State("current-set-id", "data"),
+        ],
+        prevent_initial_call=True,
+    )
+    def nudge_transition_b(left_big, left, right, right_big, reset,
+                           offsets, current_idx, set_id):
+        if current_idx is None or not set_id:
+            return no_update, no_update
+
+        offsets = dict(offsets or {})
+        triggered = callback_context.triggered_id
+
+        # Get target BPM for beat-based nudge
+        session = get_session()
+        set_ = session.query(Set).get(set_id)
+        if not set_ or len(set_.tracks) < 2:
+            return no_update, no_update
+
+        tracks_sorted = sorted(set_.tracks, key=lambda s: s.position)
+        if current_idx + 1 >= len(tracks_sorted):
+            return no_update, no_update
+
+        bpm_a = tracks_sorted[current_idx].track.bpm or 120
+        bpm_b = tracks_sorted[current_idx + 1].track.bpm or 120
+        target_bpm = (bpm_a + bpm_b) / 2
+        beat_sec = 60 / target_bpm
+
+        key = str(current_idx)
+        current = offsets.get(key, 0)
+
+        if triggered == "btn-trans-nudge-reset":
+            offsets[key] = 0
+        elif triggered == "btn-trans-nudge-left-big":
+            offsets[key] = current - beat_sec * 8
+        elif triggered == "btn-trans-nudge-left":
+            offsets[key] = current - beat_sec
+        elif triggered == "btn-trans-nudge-right":
+            offsets[key] = current + beat_sec
+        elif triggered == "btn-trans-nudge-right-big":
+            offsets[key] = current + beat_sec * 8
+
+        new_offset = offsets.get(key, 0)
+        return offsets, f"{new_offset:+.1f}s"
+
     # --- Transition navigation ---
     @app.callback(
         [
@@ -220,11 +403,15 @@ def register_callbacks(app):
             Output("transition-label", "children", allow_duplicate=True),
             Output("selected-transition", "data", allow_duplicate=True),
             Output("set-cue-list", "children"),
+            Output("player-state", "data"),
+            Output("player-a-label", "children"),
+            Output("player-b-label", "children"),
         ],
         [
             Input("btn-prev-transition", "n_clicks"),
             Input("btn-next-transition", "n_clicks"),
             Input("set-selector", "value"),
+            Input("transition-b-offsets", "data"),
         ],
         [
             State("selected-transition", "data"),
@@ -232,14 +419,14 @@ def register_callbacks(app):
         ],
         prevent_initial_call=True,
     )
-    def navigate_transition(prev_clicks, next_clicks, set_value, current_idx, set_id):
+    def navigate_transition(prev_clicks, next_clicks, set_value, b_offsets, current_idx, set_id):
         if not set_id:
-            return no_update, no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
         session = get_session()
         set_ = session.query(Set).get(set_id)
         if not set_ or len(set_.tracks) < 2:
-            return no_update, "No transitions", None, no_update
+            return no_update, "No transitions", None, no_update, None, "", ""
 
         tracks_sorted = sorted(set_.tracks, key=lambda s: s.position)
         n_transitions = len(tracks_sorted) - 1
@@ -260,10 +447,14 @@ def register_callbacks(app):
         cues_a = _get_cue_dicts(session, set_id, track_a.id)
         cues_b = _get_cue_dicts(session, set_id, track_b.id)
 
+        b_offsets = b_offsets or {}
+        b_offset = b_offsets.get(str(idx), 0)
+
         fig = build_transition_figure(
             track_a, track_a.audio_features,
             track_b, track_b.audio_features,
             cues_a=cues_a, cues_b=cues_b,
+            b_offset=b_offset,
         )
 
         label = (
@@ -276,7 +467,33 @@ def register_callbacks(app):
         # Cue list for both tracks at this transition
         cue_html = _build_transition_cue_list(session, set_id, track_a.id, track_b.id)
 
-        return fig, label, idx, cue_html
+        # Compute player-state for audio positioning
+        from djsetbuilder.visualization.figures import _compute_transition_timeline
+        af_a, af_b = track_a.audio_features, track_b.audio_features
+        overlap_seconds = 30.0
+        view_window = overlap_seconds * 2
+        tl = _compute_transition_timeline(
+            af_a, af_b, track_a, track_b,
+            overlap_seconds, b_offset, view_window,
+        )
+        (_mapped_a, _mask_a, show_from_raw_a, _a_end_time,
+         _mapped_b, _mask_b, _show_until_raw_b, b_start_on_timeline,
+         scale_a, scale_b, _target_bpm) = tl
+
+        player_state = {
+            "track_a_id": track_a.id,
+            "track_b_id": track_b.id,
+            "start_a": show_from_raw_a or 0,
+            "start_b": 0,
+            "scale_a": scale_a,
+            "scale_b": scale_b,
+            "b_start_on_timeline": b_start_on_timeline,
+        }
+
+        label_a = f"{track_a.title or '?'} — {track_a.artist or '?'}"
+        label_b = f"{track_b.title or '?'} — {track_b.artist or '?'}"
+
+        return fig, label, idx, cue_html, player_state, label_a, label_b
 
     # --- Export to Rekordbox ---
     @app.callback(
@@ -360,6 +577,140 @@ def register_callbacks(app):
             }
             for t in tracks
         ]
+
+    # --- Clientside: load audio sources from player-state ---
+    # Re-seeks both players whenever player-state changes (new transition OR nudge).
+    app.clientside_callback(
+        """
+        function(playerState) {
+            if (!playerState) return [null, null];
+            var audioA = document.getElementById('audio-player-a');
+            var audioB = document.getElementById('audio-player-b');
+            var srcA = '/audio/' + playerState.track_a_id;
+            var srcB = '/audio/' + playerState.track_b_id;
+
+            if (audioA) {
+                var newTrackA = (audioA.src !== location.origin + srcA);
+                if (newTrackA) {
+                    audioA.src = srcA;
+                    audioA.addEventListener('canplay', function onCanPlay() {
+                        audioA.currentTime = playerState.start_a;
+                        audioA.removeEventListener('canplay', onCanPlay);
+                    });
+                } else {
+                    // Same track, just re-seek (nudge changed the view)
+                    audioA.currentTime = playerState.start_a;
+                }
+            }
+            if (audioB) {
+                var newTrackB = (audioB.src !== location.origin + srcB);
+                if (newTrackB) {
+                    audioB.src = srcB;
+                    audioB.addEventListener('canplay', function onCanPlay() {
+                        audioB.currentTime = playerState.start_b;
+                        audioB.removeEventListener('canplay', onCanPlay);
+                    });
+                } else {
+                    audioB.currentTime = playerState.start_b;
+                }
+            }
+            return [srcA, srcB];
+        }
+        """,
+        [Output("audio-player-a", "src"), Output("audio-player-b", "src")],
+        Input("player-state", "data"),
+        prevent_initial_call=True,
+    )
+
+    # --- Clientside: Play Both / Stop Both / Reset A ---
+    app.clientside_callback(
+        """
+        function(playClicks, stopClicks, resetAClicks, playerState) {
+            var triggered = dash_clientside.callback_context.triggered;
+            if (!triggered || triggered.length === 0) return true;
+            var triggeredId = triggered[0].prop_id.split('.')[0];
+
+            var audioA = document.getElementById('audio-player-a');
+            var audioB = document.getElementById('audio-player-b');
+
+            if (triggeredId === 'btn-play-both') {
+                if (audioA && audioA.src) audioA.play();
+                if (audioB && audioB.src) audioB.play();
+                return false;
+            } else if (triggeredId === 'btn-stop-both') {
+                if (audioA) audioA.pause();
+                if (audioB) audioB.pause();
+                return true;
+            } else if (triggeredId === 'btn-reset-a') {
+                if (audioA && playerState) {
+                    audioA.currentTime = playerState.start_a;
+                }
+                // Keep interval in current state
+                return dash_clientside.no_update;
+            }
+            return true;
+        }
+        """,
+        Output("playhead-interval", "disabled"),
+        [
+            Input("btn-play-both", "n_clicks"),
+            Input("btn-stop-both", "n_clicks"),
+            Input("btn-reset-a", "n_clicks"),
+        ],
+        State("player-state", "data"),
+        prevent_initial_call=True,
+    )
+
+    # --- Clientside: playhead tick → inject vertical line shapes ---
+    app.clientside_callback(
+        """
+        function(nIntervals, figure, playerState) {
+            if (!figure || !playerState) return dash_clientside.no_update;
+
+            var audioA = document.getElementById('audio-player-a');
+            var audioB = document.getElementById('audio-player-b');
+            if (!audioA && !audioB) return dash_clientside.no_update;
+
+            var newFig = Object.assign({}, figure);
+            var layout = Object.assign({}, newFig.layout || {});
+
+            // Preserve existing shapes (overlap zones, markers) — filter out old playheads
+            var existingShapes = (layout.shapes || []).filter(function(s) {
+                return !s._playhead;
+            });
+            var playheadShapes = [];
+
+            if (audioA && audioA.src && !audioA.paused) {
+                var tA = audioA.currentTime;
+                var xA = (tA - playerState.start_a) * playerState.scale_a;
+                playheadShapes.push({
+                    type: 'line', _playhead: true,
+                    x0: xA, x1: xA, y0: 0, y1: 1,
+                    xref: 'x', yref: 'paper',
+                    line: {color: '#00d2ff', width: 2}
+                });
+            }
+            if (audioB && audioB.src && !audioB.paused) {
+                var tB = audioB.currentTime;
+                var xB = tB * playerState.scale_b + playerState.b_start_on_timeline;
+                playheadShapes.push({
+                    type: 'line', _playhead: true,
+                    x0: xB, x1: xB, y0: 0, y1: 1,
+                    xref: 'x', yref: 'paper',
+                    line: {color: '#e94560', width: 2}
+                });
+            }
+
+            layout.shapes = existingShapes.concat(playheadShapes);
+            newFig.layout = layout;
+            return newFig;
+        }
+        """,
+        Output("transition-graph", "figure", allow_duplicate=True),
+        Input("playhead-interval", "n_intervals"),
+        [State("transition-graph", "figure"), State("player-state", "data")],
+        prevent_initial_call=True,
+    )
 
 
 def _get_cue_dicts(session, set_id: int | None, track_id: int) -> list[dict]:

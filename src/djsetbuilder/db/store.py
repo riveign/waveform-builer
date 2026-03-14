@@ -28,6 +28,10 @@ def search_tracks(
     bpm_min: float | None = None,
     bpm_max: float | None = None,
     energy: str | None = None,
+    *,
+    key: str | None = None,
+    rating_min: int | None = None,
+    limit: int = 50,
 ) -> list[Track]:
     """Search tracks with multiple filters."""
     q = session.query(Track)
@@ -46,7 +50,11 @@ def search_tracks(
         q = q.filter(Track.bpm <= bpm_max)
     if energy:
         q = q.filter(Track.dir_energy.ilike(f"%{energy}%"))
-    return q.all()
+    if key:
+        q = q.filter(Track.key.ilike(f"%{key}%"))
+    if rating_min is not None:
+        q = q.filter(Track.rating >= rating_min)
+    return q.limit(limit).all()
 
 
 def get_tracks_with_features(session: Session) -> list[Track]:
@@ -64,6 +72,20 @@ def get_unanalyzed_tracks(session: Session) -> list[Track]:
         session.query(Track)
         .outerjoin(AudioFeatures)
         .filter(AudioFeatures.track_id.is_(None))
+        .all()
+    )
+
+
+def get_partially_analyzed_tracks(session: Session) -> list[Track]:
+    """Get tracks that have an audio_features row but are missing core features.
+
+    This catches tracks processed by --waveform-only that still need
+    full Essentia/Librosa analysis (energy, danceability, MFCCs).
+    """
+    return (
+        session.query(Track)
+        .join(AudioFeatures)
+        .filter(AudioFeatures.energy.is_(None))
         .all()
     )
 

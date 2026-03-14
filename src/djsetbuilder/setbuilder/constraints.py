@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 
@@ -61,6 +62,24 @@ def parse_energy_string(s: str) -> EnergyProfile:
     return EnergyProfile(segments=segments)
 
 
+def parse_energy_json(s: str) -> EnergyProfile:
+    """Parse energy profile from JSON stored by planner.
+
+    Expects a JSON string like:
+    [{"name":"warmup","duration_min":30,"target_energy":0.3}, ...]
+    """
+    data = json.loads(s)
+    segments = [
+        EnergySegment(
+            name=d["name"],
+            duration_min=int(d["duration_min"]),
+            target_energy=float(d["target_energy"]),
+        )
+        for d in data
+    ]
+    return EnergyProfile(segments=segments)
+
+
 # Map directory energy tags to approximate numeric values
 ENERGY_TAG_VALUES = {
     "low": 0.2,
@@ -73,6 +92,32 @@ ENERGY_TAG_VALUES = {
     "fast": 0.8,
     "peak": 0.9,
 }
+
+
+# ── Energy Presets ──────────────────────────────────────────────────────
+
+DEFAULT_ENERGY_PRESETS: dict[str, str] = {
+    "warmup": "warmup:40:0.3,build:30:0.5,groove:30:0.6",
+    "peak-time": "hype:20:0.7,peak:50:0.9,sustain:30:0.8",
+    "journey": "warmup:30:0.3,build:20:0.6,peak:40:0.9,cooldown:20:0.4",
+    "afterhours": "deep:30:0.3,hypno:40:0.4,drift:30:0.25",
+}
+
+
+def get_energy_presets() -> dict[str, str]:
+    """Return energy presets merged from defaults + TOML config."""
+    from djsetbuilder.config import _load_toml
+
+    toml = _load_toml()
+    toml_presets = toml.get("energy_presets", {})
+    return {**DEFAULT_ENERGY_PRESETS, **toml_presets}
+
+
+def resolve_energy(energy_str: str) -> EnergyProfile:
+    """Resolve an energy string — checks presets first, then raw format."""
+    presets = get_energy_presets()
+    raw = presets.get(energy_str.lower(), energy_str)
+    return parse_energy_string(raw)
 
 
 def dir_energy_to_numeric(tag: str | None) -> float | None:

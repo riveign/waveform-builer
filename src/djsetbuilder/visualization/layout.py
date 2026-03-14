@@ -122,10 +122,51 @@ def build_set_tab() -> html.Div:
             ], style={"display": "flex", "alignItems": "center"}),
         ], className="panel"),
 
-        # Set timeline
+        # View toggle + Set timeline
         html.Div([
-            html.Div("Timeline", className="panel-title"),
+            html.Div([
+                html.Div("Timeline", className="panel-title", style={"flex": 1}),
+                dcc.RadioItems(
+                    id="timeline-view-toggle",
+                    options=[
+                        {"label": "Linear", "value": "linear"},
+                        {"label": "Staircase", "value": "staircase"},
+                    ],
+                    value="linear",
+                    inline=True,
+                    style={"color": "#e0e0e0", "fontSize": "0.85rem"},
+                    inputStyle={"marginRight": "4px"},
+                    labelStyle={"marginRight": "12px"},
+                ),
+            ], style={"display": "flex", "alignItems": "center"}),
             dcc.Graph(id="timeline-graph", config={"scrollZoom": True}),
+
+            # Track nudge controls (visible in staircase mode after clicking a track)
+            html.Div(id="track-nudge-panel", style={"display": "none"}, children=[
+                html.Div([
+                    html.Span(id="nudge-track-label", style={"color": "#e0e0e0", "fontWeight": "600",
+                                                               "marginRight": "12px", "minWidth": "200px"}),
+                    html.Button("-8 beats", id="btn-nudge-left-big", className="btn btn-secondary",
+                                style={"fontSize": "0.8rem", "padding": "4px 8px"}),
+                    html.Button("-1 beat", id="btn-nudge-left", className="btn btn-secondary",
+                                style={"fontSize": "0.8rem", "padding": "4px 8px", "marginLeft": "4px"}),
+                    dcc.Input(id="nudge-offset-display", type="text", readOnly=True,
+                              style={"width": "80px", "textAlign": "center", "margin": "0 8px",
+                                     "backgroundColor": "#0f3460", "color": "#00d2ff",
+                                     "border": "1px solid #2a2a4a", "borderRadius": "4px",
+                                     "padding": "4px"}),
+                    html.Button("+1 beat", id="btn-nudge-right", className="btn btn-secondary",
+                                style={"fontSize": "0.8rem", "padding": "4px 8px"}),
+                    html.Button("+8 beats", id="btn-nudge-right-big", className="btn btn-secondary",
+                                style={"fontSize": "0.8rem", "padding": "4px 8px", "marginLeft": "4px"}),
+                    html.Button("Reset", id="btn-nudge-reset", className="btn btn-secondary",
+                                style={"fontSize": "0.8rem", "padding": "4px 8px", "marginLeft": "12px"}),
+                    html.Button("Reset All", id="btn-nudge-reset-all", className="btn btn-secondary",
+                                style={"fontSize": "0.8rem", "padding": "4px 8px", "marginLeft": "4px"}),
+                ], style={"display": "flex", "alignItems": "center", "padding": "8px 0"}),
+            ]),
+            dcc.Store(id="track-offsets", data={}),
+            dcc.Store(id="selected-staircase-track", data=None),
         ], className="panel"),
 
         # Transition detail
@@ -136,7 +177,63 @@ def build_set_tab() -> html.Div:
                 html.Span(id="transition-label", style={"padding": "0 16px", "color": "#e0e0e0"}),
                 html.Button("Next >", id="btn-next-transition", className="btn btn-secondary"),
             ], style={"display": "flex", "alignItems": "center", "marginBottom": "8px"}),
-            dcc.Graph(id="transition-graph"),
+            dcc.Graph(id="transition-graph", config={"scrollZoom": True}),
+
+            # Audio players
+            html.Div([
+                html.Div([
+                    html.Div([
+                        html.Span("A: ", style={"color": "#00d2ff", "fontWeight": "600"}),
+                        html.Span(id="player-a-label", style={"color": "#e0e0e0"}),
+                    ], style={"marginBottom": "4px"}),
+                    html.Audio(id="audio-player-a", controls=True,
+                               style={"width": "100%"}),
+                ], style={"flex": 1}),
+                html.Div([
+                    html.Div([
+                        html.Span("B: ", style={"color": "#e94560", "fontWeight": "600"}),
+                        html.Span(id="player-b-label", style={"color": "#e0e0e0"}),
+                    ], style={"marginBottom": "4px"}),
+                    html.Audio(id="audio-player-b", controls=True,
+                               style={"width": "100%"}),
+                ], style={"flex": 1}),
+            ], style={"display": "flex", "gap": "16px", "padding": "8px 0"}),
+
+            html.Div([
+                html.Button("Play Both", id="btn-play-both", className="btn btn-primary",
+                            style={"fontSize": "0.85rem", "padding": "6px 16px"}),
+                html.Button("Stop Both", id="btn-stop-both", className="btn btn-secondary",
+                            style={"fontSize": "0.85rem", "padding": "6px 16px", "marginLeft": "8px"}),
+                html.Button("Reset A", id="btn-reset-a", className="btn btn-secondary",
+                            title="Seek player A back to start of section",
+                            style={"fontSize": "0.85rem", "padding": "6px 16px", "marginLeft": "8px",
+                                   "borderColor": "#00d2ff", "color": "#00d2ff"}),
+            ], style={"display": "flex", "alignItems": "center", "padding": "4px 0"}),
+
+            dcc.Store(id="player-state", data=None),
+            dcc.Interval(id="playhead-interval", interval=200, disabled=True),
+
+            # Track B nudge controls
+            html.Div([
+                html.Span("Move Track B:", style={"color": "#e94560", "fontWeight": "600",
+                                                    "marginRight": "12px"}),
+                html.Button("-8 beats", id="btn-trans-nudge-left-big", className="btn btn-secondary",
+                            style={"fontSize": "0.8rem", "padding": "4px 8px"}),
+                html.Button("-1 beat", id="btn-trans-nudge-left", className="btn btn-secondary",
+                            style={"fontSize": "0.8rem", "padding": "4px 8px", "marginLeft": "4px"}),
+                dcc.Input(id="trans-nudge-display", type="text", readOnly=True, value="+0.0s",
+                          style={"width": "80px", "textAlign": "center", "margin": "0 8px",
+                                 "backgroundColor": "#0f3460", "color": "#e94560",
+                                 "border": "1px solid #2a2a4a", "borderRadius": "4px",
+                                 "padding": "4px"}),
+                html.Button("+1 beat", id="btn-trans-nudge-right", className="btn btn-secondary",
+                            style={"fontSize": "0.8rem", "padding": "4px 8px"}),
+                html.Button("+8 beats", id="btn-trans-nudge-right-big", className="btn btn-secondary",
+                            style={"fontSize": "0.8rem", "padding": "4px 8px", "marginLeft": "4px"}),
+                html.Button("Reset", id="btn-trans-nudge-reset", className="btn btn-secondary",
+                            style={"fontSize": "0.8rem", "padding": "4px 8px", "marginLeft": "12px"}),
+            ], style={"display": "flex", "alignItems": "center", "padding": "8px 0"}),
+            dcc.Store(id="transition-b-offsets", data={}),
         ], className="panel"),
 
         # Set cue points

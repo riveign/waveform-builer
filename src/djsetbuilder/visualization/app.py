@@ -5,12 +5,24 @@ from __future__ import annotations
 from pathlib import Path
 
 from dash import Dash
+from flask import abort, send_file
 
 from djsetbuilder.config import VISUALIZER_PORT
+from djsetbuilder.db.models import Track, get_session
 from djsetbuilder.visualization.callbacks import register_callbacks
 from djsetbuilder.visualization.layout import build_main_layout
 
 ASSETS_DIR = Path(__file__).parent / "assets"
+
+MIME_TYPES = {
+    ".mp3": "audio/mpeg",
+    ".flac": "audio/flac",
+    ".aiff": "audio/aiff",
+    ".aif": "audio/aiff",
+    ".m4a": "audio/mp4",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+}
 
 
 def create_app(debug: bool = False) -> Dash:
@@ -24,8 +36,27 @@ def create_app(debug: bool = False) -> Dash:
 
     app.layout = build_main_layout()
     register_callbacks(app)
+    _register_audio_route(app)
 
     return app
+
+
+def _register_audio_route(app: Dash) -> None:
+    """Add /audio/<track_id> streaming route to the underlying Flask server."""
+
+    @app.server.route("/audio/<int:track_id>")
+    def serve_audio(track_id: int):
+        session = get_session()
+        track = session.query(Track).get(track_id)
+        if not track or not track.file_path:
+            abort(404)
+
+        path = Path(track.file_path)
+        if not path.exists():
+            abort(404)
+
+        mimetype = MIME_TYPES.get(path.suffix.lower(), "application/octet-stream")
+        return send_file(path, mimetype=mimetype, conditional=True)
 
 
 def run_visualizer(

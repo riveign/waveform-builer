@@ -2,21 +2,79 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from pathlib import Path
 
+import numpy as np
 
-def extract_essentia_features(file_path: str | Path) -> dict:
+# Suppress TF/CUDA warnings before any TensorFlow import
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+
+logger = logging.getLogger(__name__)
+
+# RMS normalization anchors (measured from library)
+_RMS_FLOOR = 0.02   # silence / near-silent recordings
+_RMS_CEIL = 0.50    # loudest mastered tracks (~-5 LUFS)
+
+
+def _rms_to_energy(rms_val: float) -> float:
+    """Map RMS to 0-1 energy using log scale.
+
+    Log-scale spreads the musically relevant range (-20 to -5 LUFS)
+    across 0-1 instead of cramming 90% of tracks into 1.0.
+    """
+    if rms_val <= _RMS_FLOOR:
+        return 0.0
+    if rms_val >= _RMS_CEIL:
+        return 1.0
+    import math
+    log_val = math.log(rms_val)
+    log_floor = math.log(_RMS_FLOOR)
+    log_ceil = math.log(_RMS_CEIL)
+    return (log_val - log_floor) / (log_ceil - log_floor)
+
+
+def _resolve_model_path(filename: str) -> str | None:
+    """Find an Essentia .pb model file."""
+    # Project models/ directory (preferred)
+    project_models = Path(__file__).resolve().parents[3] / "models" / filename
+    if project_models.exists():
+        return str(project_models)
+
+    try:
+        import essentia
+        for base in essentia.__path__:
+            candidate = Path(base) / filename
+            if candidate.exists():
+                return str(candidate)
+            candidate = Path(base) / "models" / filename
+            if candidate.exists():
+                return str(candidate)
+    except (ImportError, AttributeError):
+        pass
+
+    if Path(filename).exists():
+        return filename
+    return None
+
+
+def extract_essentia_features(
+    file_path: str | Path,
+    audio: np.ndarray | None = None,
+) -> dict:
     """Extract audio features using Essentia.
+
+    When *audio* (float32 array at 44100 Hz) is provided, the file is
+    not re-decoded from disk.
 
     Returns a dict with keys matching AudioAnalysisResult fields.
     """
     import essentia.standard as es
 
-    path = str(file_path)
-
-    # Load audio
-    loader = es.MonoLoader(filename=path, sampleRate=44100)
-    audio = loader()
+    if audio is None:
+        loader = es.MonoLoader(filename=str(file_path), sampleRate=44100)
+        audio = loader()
 
     if len(audio) == 0:
         return {}
@@ -34,12 +92,10 @@ def extract_essentia_features(file_path: str | Path) -> dict:
     camelot = _to_camelot(key, scale)
     results["verified_key"] = camelot
 
-    # Energy (RMS-based, normalized)
-    energy_extractor = es.Energy()
+    # Energy (RMS-based, log-scaled)
     rms = es.RMS()
     energy_val = float(rms(audio))
-    # Normalize to 0-1 range (typical RMS for music: 0.01-0.3)
-    results["energy"] = min(1.0, max(0.0, energy_val / 0.25))
+    results["energy"] = _rms_to_energy(energy_val)
 
     # Danceability
     dance = es.Danceability()
@@ -49,7 +105,6 @@ def extract_essentia_features(file_path: str | Path) -> dict:
     # Loudness
     loudness = es.LoudnessEBUR128(sampleRate=44100)
     try:
-        import numpy as np
         stereo = np.column_stack([audio, audio])
         momentary, short_term, integrated, loudness_range = loudness(stereo)
         results["loudness_lufs"] = float(integrated)
@@ -69,15 +124,21 @@ def extract_essentia_features(file_path: str | Path) -> dict:
     intro_end = int(total * 0.15)
     outro_start = int(total * 0.85)
 
-    results["energy_intro"] = min(1.0, float(rms(audio[:intro_end])) / 0.25) if intro_end > 0 else 0.0
-    results["energy_body"] = min(1.0, float(rms(audio[intro_end:outro_start])) / 0.25)
-    results["energy_outro"] = min(1.0, float(rms(audio[outro_start:])) / 0.25) if outro_start < total else 0.0
+    results["energy_intro"] = _rms_to_energy(float(rms(audio[:intro_end]))) if intro_end > 0 else 0.0
+    results["energy_body"] = _rms_to_energy(float(rms(audio[intro_end:outro_start])))
+    results["energy_outro"] = _rms_to_energy(float(rms(audio[outro_start:]))) if outro_start < total else 0.0
 
     return results
 
 
-def extract_essentia_mood(file_path: str | Path) -> dict:
+def extract_essentia_mood(
+    file_path: str | Path,
+    audio: np.ndarray | None = None,
+) -> dict:
     """Extract mood features using Essentia TensorFlow models.
+
+    When *audio* (float32 array at 16000 Hz) is provided, the file is
+    not re-decoded from disk.
 
     Returns dict with mood_happy, mood_sad, mood_aggressive, mood_relaxed.
     """
@@ -92,18 +153,27 @@ def extract_essentia_mood(file_path: str | Path) -> dict:
 
     # Mood models may not be available — return empty if they fail
     try:
-        audio = MonoLoader(filename=str(file_path), sampleRate=16000)()
+        embedding_pb = _resolve_model_path("msd-musicnn-1.pb")
+        if not embedding_pb:
+            logger.warning("Model msd-musicnn-1.pb not found — skipping mood extraction")
+            return {}
+
+        if audio is None:
+            audio = MonoLoader(filename=str(file_path), sampleRate=16000)()
         embedding_model = TensorflowPredictMusiCNN(
-            graphFilename="msd-musicnn-1.pb", output="model/dense/BiasAdd"
+            graphFilename=embedding_pb, output="model/dense/BiasAdd"
         )
         embeddings = embedding_model(audio)
 
         moods = {}
         for mood_name in ["happy", "sad", "aggressive", "relaxed"]:
+            mood_pb = _resolve_model_path(f"mood_{mood_name}-msd-musicnn-1.pb")
+            if not mood_pb:
+                logger.warning("Model mood_%s-msd-musicnn-1.pb not found — skipping", mood_name)
+                moods[f"mood_{mood_name}"] = None
+                continue
             try:
-                model = TensorflowPredict2D(
-                    graphFilename=f"mood_{mood_name}-musicnn-msd-2.pb"
-                )
+                model = TensorflowPredict2D(graphFilename=mood_pb)
                 pred = model(embeddings)
                 moods[f"mood_{mood_name}"] = float(pred.mean())
             except Exception:

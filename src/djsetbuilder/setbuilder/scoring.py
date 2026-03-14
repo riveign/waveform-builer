@@ -54,7 +54,8 @@ def genre_coherence(genre_a: str | None, genre_b: str | None) -> float:
     # Define genre families
     families = {
         "techno": ["techno", "hard techno", "rumble techno", "acid techno",
-                    "dub techno", "techno groove", "hypno", "hypno techno"],
+                    "dub techno", "techno groove", "hypno", "hypno techno",
+                    "classic techno", "deep techno", "hardstyle techno"],
         "house": ["house", "deep house", "tech house", "afro house",
                   "funky house", "hard house", "speed house"],
         "groove": ["hard groove", "hardgroove", "light groove", "ghetto groove"],

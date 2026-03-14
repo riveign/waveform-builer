@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from urllib.parse import quote
 
 from djsetbuilder.config import DATA_DIR
 from djsetbuilder.db.models import Set
@@ -39,8 +38,7 @@ def _track_to_xml(
     }
 
     if track.file_path:
-        encoded = quote(track.file_path, safe="/:")
-        attrs["Location"] = f"file://localhost{encoded}"
+        attrs["Location"] = Path(track.file_path).as_uri()
 
     elem = ET.Element("TRACK", attrs)
 
