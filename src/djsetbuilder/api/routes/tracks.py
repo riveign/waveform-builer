@@ -1,12 +1,19 @@
-"""Track search and detail endpoints."""
+"""Track search, detail, and suggest-next endpoints."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from djsetbuilder.api.deps import get_db
-from djsetbuilder.api.schemas import TrackFeaturesResponse, TrackResponse
+from djsetbuilder.api.schemas import (
+    PaginatedTracksResponse,
+    SuggestNextItem,
+    SuggestNextResponse,
+    TrackFeaturesResponse,
+    TrackResponse,
+    TransitionScoreBreakdown,
+)
 from djsetbuilder.db.models import Track
 from djsetbuilder.db.store import search_tracks
 
@@ -32,7 +39,7 @@ def _track_to_response(t: Track) -> TrackResponse:
     )
 
 
-@router.get("/search", response_model=list[TrackResponse])
+@router.get("/search", response_model=PaginatedTracksResponse)
 def track_search(
     title: str | None = None,
     artist: str | None = None,
@@ -43,9 +50,10 @@ def track_search(
     energy: str | None = None,
     rating_min: int | None = None,
     limit: int = 50,
+    offset: int = 0,
     db: Session = Depends(get_db),
 ):
-    tracks = search_tracks(
+    tracks, total = search_tracks(
         db,
         title=title,
         artist=artist,
@@ -56,21 +64,80 @@ def track_search(
         key=key,
         rating_min=rating_min,
         limit=limit,
+        offset=offset,
     )
-    return [_track_to_response(t) for t in tracks]
+    return PaginatedTracksResponse(
+        items=[_track_to_response(t) for t in tracks],
+        total=total,
+        offset=offset,
+        limit=limit,
+    )
 
 
 @router.get("/{track_id}", response_model=TrackResponse)
 def track_detail(track_id: int, db: Session = Depends(get_db)):
-    track = db.query(Track).get(track_id)
+    track = db.get(Track, track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     return _track_to_response(track)
 
 
+@router.get("/{track_id}/suggest-next", response_model=SuggestNextResponse)
+def suggest_next(
+    track_id: int,
+    n: int = Query(default=10, ge=1, le=50),
+    genre_filter: str | None = Query(default=None, description="Comma-separated genre filter"),
+    db: Session = Depends(get_db),
+):
+    """Suggest best next tracks based on transition scoring."""
+    from djsetbuilder.config import SCORING_WEIGHTS
+    from djsetbuilder.setbuilder.camelot import harmonic_score
+    from djsetbuilder.setbuilder.scoring import (
+        bpm_compatibility,
+        energy_fit,
+        genre_coherence,
+        score_transitions,
+        track_quality,
+    )
+
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    genres = [g.strip() for g in genre_filter.split(",")] if genre_filter else None
+    scored = score_transitions(db, track, n=n, genre_filter=genres)
+
+    w = SCORING_WEIGHTS
+    suggestions = []
+    for cand, total_score in scored:
+        h = harmonic_score(track.key, cand.key)
+        e = energy_fit(cand, 0.5)
+        b = bpm_compatibility(track.bpm, cand.bpm)
+        g = genre_coherence(
+            track.dir_genre or track.rb_genre,
+            cand.dir_genre or cand.rb_genre,
+        )
+        q = track_quality(cand)
+
+        suggestions.append(SuggestNextItem(
+            track=_track_to_response(cand),
+            score=round(total_score, 3),
+            breakdown=TransitionScoreBreakdown(
+                harmonic=round(h, 3),
+                energy_fit=round(e, 3),
+                bpm_compat=round(b, 3),
+                genre_coherence=round(g, 3),
+                track_quality=round(q, 3),
+                total=round(total_score, 3),
+            ),
+        ))
+
+    return SuggestNextResponse(source_track_id=track_id, suggestions=suggestions)
+
+
 @router.get("/{track_id}/features", response_model=TrackFeaturesResponse)
 def track_features(track_id: int, db: Session = Depends(get_db)):
-    track = db.query(Track).get(track_id)
+    track = db.get(Track, track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     af = track.audio_features

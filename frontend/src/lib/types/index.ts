@@ -163,3 +163,58 @@ export interface MoodPoint {
 	energy: number;
 	genre_family: string;
 }
+
+// ── Set mutation types ──
+
+export interface SetBuildParams {
+	name: string;
+	duration_min?: number;
+	energy_preset?: string;
+	genre_filter?: string[] | null;
+	bpm_min?: number | null;
+	bpm_max?: number | null;
+	seed_track_id?: number | null;
+	beam_width?: number;
+	playlist_preference?: string[] | null;
+}
+
+export interface SetBuildComplete {
+	set_id: number;
+	name: string;
+	track_count: number;
+	duration_min: number;
+}
+
+export interface SetCreateParams {
+	name: string;
+	energy_profile?: string | null;
+	genre_filter?: string[] | null;
+}
+
+export interface SetUpdateParams {
+	name?: string | null;
+	energy_profile?: string | null;
+	genre_filter?: string[] | null;
+}
+
+// ── Suggest-next types ──
+
+export interface SuggestNextItem {
+	track: Track;
+	score: number;
+	breakdown: TransitionScoreBreakdown;
+}
+
+export interface SuggestNextResponse {
+	source_track_id: number;
+	suggestions: SuggestNextItem[];
+}
+
+// ── Paginated response ──
+
+export interface PaginatedTracks {
+	items: Track[];
+	total: number;
+	offset: number;
+	limit: number;
+}

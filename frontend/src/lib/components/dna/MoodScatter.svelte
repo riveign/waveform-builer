@@ -179,7 +179,7 @@
 			})
 			.catch((err) => {
 				if (!cancelled) {
-					error = err instanceof Error ? err.message : 'Failed to load mood data';
+					error = err instanceof Error ? err.message : "Couldn't load mood data — try refreshing";
 					loading = false;
 				}
 			});
@@ -214,7 +214,7 @@
 	{:else if error}
 		<div class="error-state">{error}</div>
 	{:else if !data || data.length === 0}
-		<div class="empty-state">No mood data available</div>
+		<div class="empty-state">No mood data yet</div>
 	{:else}
 		<div class="chart-wrapper">
 			<canvas bind:this={canvas}></canvas>

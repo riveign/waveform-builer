@@ -1,5 +1,5 @@
 {
-	"name": "frontend",
+	"name": "kiku",
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
@@ -23,6 +23,7 @@
 	"dependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
 		"chart.js": "^4.5.1",
+		"svelte-dnd-action": "^0.9.69",
 		"wavesurfer.js": "^7.12.2"
 	}
 }

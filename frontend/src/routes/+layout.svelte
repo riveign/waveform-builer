@@ -5,7 +5,7 @@
 
 <div class="app-shell">
 	<header class="app-header">
-		<h1 class="app-title">DJ Set Builder</h1>
+		<h1 class="app-title">Kiku</h1>
 	</header>
 	<div class="app-body">
 		{@render children()}

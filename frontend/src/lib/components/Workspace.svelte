@@ -1,19 +1,17 @@
 <script lang="ts">
-	import type { Track } from '$lib/types';
 	import TrackView from './waveform/TrackView.svelte';
 	import SetView from './set/SetView.svelte';
 	import DnaView from './dna/DnaView.svelte';
+	import { getUiStore } from '$lib/stores/ui.svelte';
 
-	let { track }: { track: Track | null } = $props();
-
-	let tab = $state('track');
+	const ui = getUiStore();
 
 	function handleKeydown(e: KeyboardEvent) {
 		const target = e.target as HTMLElement;
 		if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
-		if (e.key === '1') { tab = 'track'; e.preventDefault(); }
-		else if (e.key === '2') { tab = 'set'; e.preventDefault(); }
-		else if (e.key === '3') { tab = 'dna'; e.preventDefault(); }
+		if (e.key === '1') { ui.activeTab = 'track'; e.preventDefault(); }
+		else if (e.key === '2') { ui.activeTab = 'set'; e.preventDefault(); }
+		else if (e.key === '3') { ui.activeTab = 'dna'; e.preventDefault(); }
 	}
 </script>
 
@@ -21,28 +19,28 @@
 
 <div class="workspace">
 	<div class="tab-bar">
-		<button class="tab" class:active={tab === 'track'} onclick={() => tab = 'track'}>
+		<button class="tab" class:active={ui.activeTab === 'track'} onclick={() => ui.activeTab = 'track'}>
 			Track View <span class="shortcut">1</span>
 		</button>
-		<button class="tab" class:active={tab === 'set'} onclick={() => tab = 'set'}>
+		<button class="tab" class:active={ui.activeTab === 'set'} onclick={() => ui.activeTab = 'set'}>
 			Set Timeline <span class="shortcut">2</span>
 		</button>
-		<button class="tab" class:active={tab === 'dna'} onclick={() => tab = 'dna'}>
+		<button class="tab" class:active={ui.activeTab === 'dna'} onclick={() => ui.activeTab = 'dna'}>
 			Taste DNA <span class="shortcut">3</span>
 		</button>
 	</div>
 	<div class="tab-content">
-		{#if tab === 'track'}
-			{#if track}
-				<TrackView {track} />
+		{#if ui.activeTab === 'track'}
+			{#if ui.selectedTrack}
+				<TrackView track={ui.selectedTrack} />
 			{:else}
 				<div class="empty-state">
 					<p>Select a track from the library to view its waveform and features</p>
 				</div>
 			{/if}
-		{:else if tab === 'set'}
+		{:else if ui.activeTab === 'set'}
 			<SetView />
-		{:else if tab === 'dna'}
+		{:else if ui.activeTab === 'dna'}
 			<DnaView />
 		{/if}
 	</div>

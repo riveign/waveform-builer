@@ -67,7 +67,7 @@
 			})
 			.catch((err) => {
 				if (!cancelled) {
-					error = err instanceof Error ? err.message : 'Failed to load energy-genre data';
+					error = err instanceof Error ? err.message : "Couldn't load energy-genre data — try refreshing";
 					loading = false;
 				}
 			});
@@ -84,7 +84,7 @@
 	{:else if error}
 		<div class="error-state">{error}</div>
 	{:else if families.length === 0}
-		<div class="empty-state">No energy-genre data available</div>
+		<div class="empty-state">No energy-genre data yet</div>
 	{:else}
 		<div class="heatmap-grid" style="grid-template-columns: 100px repeat({ENERGY_LEVELS.length}, 1fr)">
 			<!-- Header row -->

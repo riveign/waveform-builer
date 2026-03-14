@@ -1,10 +1,13 @@
 import type { Track } from '$lib/types';
 
-type Tab = 'track' | 'set' | 'dna';
+export type Tab = 'track' | 'set' | 'dna';
+export type TimelineViewMode = 'linear' | 'staircase';
 
 let activeTab = $state<Tab>('track');
 let selectedTrack = $state<Track | null>(null);
 let selectedSetId = $state<number | null>(null);
+let selectedTrackInSet = $state<number | null>(null);
+let timelineViewMode = $state<TimelineViewMode>('linear');
 
 export function getUiStore() {
 	return {
@@ -14,5 +17,9 @@ export function getUiStore() {
 		set selectedTrack(v: Track | null) { selectedTrack = v; },
 		get selectedSetId() { return selectedSetId; },
 		set selectedSetId(v: number | null) { selectedSetId = v; },
+		get selectedTrackInSet() { return selectedTrackInSet; },
+		set selectedTrackInSet(v: number | null) { selectedTrackInSet = v; },
+		get timelineViewMode() { return timelineViewMode; },
+		set timelineViewMode(v: TimelineViewMode) { timelineViewMode = v; },
 	};
 }

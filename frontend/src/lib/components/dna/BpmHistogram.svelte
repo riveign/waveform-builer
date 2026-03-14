@@ -130,7 +130,7 @@
 				});
 			} catch (e) {
 				if (!destroyed) {
-					error = e instanceof Error ? e.message : 'Failed to load BPM data';
+					error = e instanceof Error ? e.message : "Couldn't read your tempo data — try refreshing";
 				}
 			} finally {
 				if (!destroyed) loading = false;
@@ -150,7 +150,7 @@
 <div class="bpm-histogram">
 	<h3 class="chart-title">BPM Distribution</h3>
 	{#if loading}
-		<div class="loading">Loading BPM data...</div>
+		<div class="loading">Measuring your tempos...</div>
 	{:else if error}
 		<div class="error">{error}</div>
 	{/if}

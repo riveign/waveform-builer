@@ -32,8 +32,12 @@ def search_tracks(
     key: str | None = None,
     rating_min: int | None = None,
     limit: int = 50,
-) -> list[Track]:
-    """Search tracks with multiple filters."""
+    offset: int = 0,
+) -> tuple[list[Track], int]:
+    """Search tracks with multiple filters.
+
+    Returns (tracks, total_count) to support pagination.
+    """
     q = session.query(Track)
     if title:
         q = q.filter(Track.title.ilike(f"%{title}%"))
@@ -54,7 +58,9 @@ def search_tracks(
         q = q.filter(Track.key.ilike(f"%{key}%"))
     if rating_min is not None:
         q = q.filter(Track.rating >= rating_min)
-    return q.limit(limit).all()
+    total = q.count()
+    tracks = q.offset(offset).limit(limit).all()
+    return tracks, total
 
 
 def get_tracks_with_features(session: Session) -> list[Track]:
@@ -193,7 +199,7 @@ def save_cue(
 
 def delete_cue(session: Session, cue_id: int) -> bool:
     """Delete a cue point by ID."""
-    cue = session.query(TransitionCue).get(cue_id)
+    cue = session.get(TransitionCue, cue_id)
     if cue:
         session.delete(cue)
         session.commit()
@@ -201,11 +207,137 @@ def delete_cue(session: Session, cue_id: int) -> bool:
     return False
 
 
+def add_track_to_set(
+    session: Session, set_id: int, track_id: int, position: int | None = None
+) -> list:
+    """Add a track to a set at a given position (or at the end).
+
+    Returns the updated list of SetTrack objects sorted by position.
+    """
+    from djsetbuilder.db.models import Set, SetTrack
+
+    set_ = session.get(Set, set_id)
+    if not set_:
+        raise ValueError("Set not found")
+
+    track = session.get(Track, track_id)
+    if not track:
+        raise ValueError("Track not found")
+
+    existing = sorted(set_.tracks, key=lambda st: st.position)
+
+    if position is None:
+        position = len(existing)
+
+    # Clamp position to valid range
+    position = max(0, min(position, len(existing)))
+
+    # Shift positions of tracks at or after the insertion point
+    for st in existing:
+        if st.position >= position:
+            st.position = st.position + 1
+
+    session.flush()
+
+    new_st = SetTrack(set_id=set_id, position=position, track_id=track_id)
+    session.add(new_st)
+    session.commit()
+    session.refresh(set_)
+
+    return sorted(set_.tracks, key=lambda st: st.position)
+
+
+def remove_track_from_set(session: Session, set_id: int, track_id: int) -> bool:
+    """Remove a track from a set and recompact positions.
+
+    Returns True if removed, False if not found.
+    """
+    from djsetbuilder.db.models import Set, SetTrack
+
+    set_ = session.get(Set, set_id)
+    if not set_:
+        raise ValueError("Set not found")
+
+    # Find the SetTrack entry for this track
+    target = None
+    for st in set_.tracks:
+        if st.track_id == track_id:
+            target = st
+            break
+
+    if target is None:
+        return False
+
+    removed_pos = target.position
+    session.delete(target)
+    session.flush()
+
+    # Recompact: shift down tracks that were after the removed one
+    remaining = [st for st in set_.tracks if st.track_id != track_id]
+    for st in remaining:
+        if st.position > removed_pos:
+            st.position = st.position - 1
+
+    session.commit()
+    return True
+
+
+def reorder_set_tracks(
+    session: Session, set_id: int, track_ids: list[int]
+) -> list:
+    """Reorder tracks in a set to match the given track_ids order.
+
+    Returns the updated list of SetTrack objects sorted by position.
+    Raises ValueError if track_ids don't match the set's tracks.
+    """
+    from djsetbuilder.db.models import Set, SetTrack
+
+    set_ = session.get(Set, set_id)
+    if not set_:
+        raise ValueError("Set not found")
+
+    existing = {st.track_id: st for st in set_.tracks}
+    existing_ids = set(existing.keys())
+    provided_ids = set(track_ids)
+
+    if existing_ids != provided_ids:
+        missing = existing_ids - provided_ids
+        extra = provided_ids - existing_ids
+        parts = []
+        if missing:
+            parts.append(f"missing: {sorted(missing)}")
+        if extra:
+            parts.append(f"unknown: {sorted(extra)}")
+        raise ValueError(f"track_ids mismatch: {', '.join(parts)}")
+
+    if len(track_ids) != len(set(track_ids)):
+        raise ValueError("Duplicate track IDs in reorder list")
+
+    # Delete all existing SetTrack rows and recreate with new positions
+    for st in list(set_.tracks):
+        session.delete(st)
+    session.flush()
+
+    for pos, tid in enumerate(track_ids):
+        new_st = SetTrack(
+            set_id=set_id,
+            position=pos,
+            track_id=tid,
+            transition_score=existing[tid].transition_score,
+        )
+        session.add(new_st)
+
+    session.commit()
+    session.refresh(set_)
+
+    return sorted(set_.tracks, key=lambda st: st.position)
+
+
 def get_set_waveform_data(session: Session, set_id: int) -> list[dict]:
     """Bulk load waveform overviews for all tracks in a set."""
     from djsetbuilder.db.models import Set, SetTrack
 
-    set_ = session.query(Set).get(set_id)
+    set_ = session.get(Set, set_id)
     if not set_:
         return []
 

@@ -47,7 +47,7 @@ def _register_audio_route(app: Dash) -> None:
     @app.server.route("/audio/<int:track_id>")
     def serve_audio(track_id: int):
         session = get_session()
-        track = session.query(Track).get(track_id)
+        track = session.get(Track, track_id)
         if not track or not track.file_path:
             abort(404)
 

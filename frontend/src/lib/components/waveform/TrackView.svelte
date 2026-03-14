@@ -72,7 +72,7 @@
 	{/if}
 
 	{#if loadingWaveform}
-		<div class="loading">Loading waveform...</div>
+		<div class="loading">Drawing the waveform...</div>
 	{:else if waveformData}
 		<WavesurferPlayer
 			trackId={track.id}
@@ -82,13 +82,13 @@
 		/>
 	{:else if !track.has_waveform}
 		<div class="no-data">
-			No waveform data. Run <code>djset analyze</code> to generate.
+			No waveform yet — run <code>kiku analyze</code> to unlock it
 		</div>
 	{/if}
 
 	{#if features}
 		<div class="features-panel">
-			<h3 class="section-title">Audio Features</h3>
+			<h3 class="section-title">What Kiku hears</h3>
 			<div class="feature-grid">
 				<div class="feature">
 					<span class="feature-label">Energy</span>

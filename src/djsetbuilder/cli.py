@@ -895,7 +895,7 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
     skipped = 0
 
     for p in predictions:
-        track = session.query(Track).get(p["track_id"])
+        track = session.get(Track, p["track_id"])
         if not track:
             continue
 

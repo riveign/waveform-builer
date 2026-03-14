@@ -101,7 +101,7 @@ def register_callbacks(app):
             return no_update, {"display": "none"}, no_update, no_update, no_update, no_update
 
         session = get_session()
-        track = session.query(Track).get(track_id)
+        track = session.get(Track, track_id)
         if not track:
             return no_update, {"display": "none"}, no_update, no_update, no_update, no_update
 
@@ -219,7 +219,7 @@ def register_callbacks(app):
             return no_update, no_update, no_update, no_update
 
         session = get_session()
-        set_ = session.query(Set).get(set_id)
+        set_ = session.get(Set, set_id)
         if not set_:
             return no_update, no_update, no_update, no_update
 
@@ -281,7 +281,7 @@ def register_callbacks(app):
 
         # Resolve actual track info from set
         session = get_session()
-        set_ = session.query(Set).get(set_id) if set_id else None
+        set_ = session.get(Set, set_id) if set_id else None
         if not set_:
             return no_update, {"display": "none"}, "", ""
 
@@ -334,7 +334,7 @@ def register_callbacks(app):
 
         # Get BPM for beat-based nudge
         session = get_session()
-        set_ = session.query(Set).get(set_id) if set_id else None
+        set_ = session.get(Set, set_id) if set_id else None
         bpm = 120
         if set_:
             tracks_sorted = sorted(set_.tracks, key=lambda s: s.position)
@@ -389,7 +389,7 @@ def register_callbacks(app):
 
         # Get target BPM for beat-based nudge
         session = get_session()
-        set_ = session.query(Set).get(set_id)
+        set_ = session.get(Set, set_id)
         if not set_ or len(set_.tracks) < 2:
             return no_update, no_update
 
@@ -447,7 +447,7 @@ def register_callbacks(app):
             return no_update, no_update, no_update, no_update, no_update, no_update, no_update
 
         session = get_session()
-        set_ = session.query(Set).get(set_id)
+        set_ = session.get(Set, set_id)
         if not set_ or len(set_.tracks) < 2:
             return no_update, "No transitions", None, no_update, None, "", ""
 
@@ -530,7 +530,7 @@ def register_callbacks(app):
             return html.Div("No set selected.", style={"color": "#f39c12"})
 
         session = get_session()
-        set_ = session.query(Set).get(set_id)
+        set_ = session.get(Set, set_id)
         if not set_:
             return html.Div("Set not found.", style={"color": "#e74c3c"})
 
@@ -570,7 +570,7 @@ def register_callbacks(app):
             return no_update
 
         session = get_session()
-        track = session.query(Track).get(compare_id)
+        track = session.get(Track, compare_id)
         if not track or not track.audio_features:
             return no_update
 

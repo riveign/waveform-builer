@@ -2,11 +2,12 @@
 	import type { Track } from '$lib/types';
 	import LibraryBrowser from '$lib/components/library/LibraryBrowser.svelte';
 	import Workspace from '$lib/components/Workspace.svelte';
+	import { getUiStore } from '$lib/stores/ui.svelte';
 
-	let selectedTrack = $state<Track | null>(null);
+	const ui = getUiStore();
 
 	function handleTrackSelect(track: Track) {
-		selectedTrack = track;
+		ui.selectedTrack = track;
 	}
 </script>
 
@@ -15,7 +16,7 @@
 		<LibraryBrowser onselect={handleTrackSelect} />
 	</aside>
 	<main class="panel-right">
-		<Workspace track={selectedTrack} />
+		<Workspace />
 	</main>
 </div>
 

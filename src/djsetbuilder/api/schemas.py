@@ -192,3 +192,63 @@ class MoodPoint(BaseModel):
     y: float
     energy: float
     genre_family: str
+
+
+# ── Set mutation request models ──
+
+
+class SetBuildRequest(BaseModel):
+    name: str
+    duration_min: int = 120
+    energy_preset: str = "journey"
+    genre_filter: list[str] | None = None
+    bpm_min: float | None = None
+    bpm_max: float | None = None
+    seed_track_id: int | None = None
+    beam_width: int = 5
+    playlist_preference: list[str] | None = None
+
+
+class SetCreateRequest(BaseModel):
+    name: str
+    energy_profile: str | None = None
+    genre_filter: list[str] | None = None
+
+
+class SetUpdateRequest(BaseModel):
+    name: str | None = None
+    energy_profile: str | None = None
+    genre_filter: list[str] | None = None
+
+
+class SetAddTrackRequest(BaseModel):
+    track_id: int
+    position: int | None = None  # defaults to end
+
+
+class SetReorderTracksRequest(BaseModel):
+    track_ids: list[int]
+
+
+# ── Suggest-next response models ──
+
+
+class SuggestNextItem(BaseModel):
+    track: TrackResponse
+    score: float
+    breakdown: TransitionScoreBreakdown
+
+
+class SuggestNextResponse(BaseModel):
+    source_track_id: int
+    suggestions: list[SuggestNextItem]
+
+
+# ── Paginated tracks response ──
+
+
+class PaginatedTracksResponse(BaseModel):
+    items: list[TrackResponse]
+    total: int
+    offset: int
+    limit: int

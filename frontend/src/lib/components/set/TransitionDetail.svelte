@@ -19,7 +19,7 @@
 
 	<div class="tracks-comparison">
 		<div class="track-card">
-			<div class="track-label">A (Outgoing)</div>
+			<div class="track-label">Playing</div>
 			<div class="track-name">{a.title ?? '?'}</div>
 			<div class="track-meta-row">
 				<span class="artist">{a.artist ?? '?'}</span>
@@ -43,7 +43,7 @@
 		</div>
 
 		<div class="track-card">
-			<div class="track-label">B (Incoming)</div>
+			<div class="track-label">Coming up</div>
 			<div class="track-name">{b.title ?? '?'}</div>
 			<div class="track-meta-row">
 				<span class="artist">{b.artist ?? '?'}</span>

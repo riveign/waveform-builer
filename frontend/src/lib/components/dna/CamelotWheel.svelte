@@ -104,7 +104,7 @@
 				});
 			} catch (e) {
 				if (!destroyed) {
-					error = e instanceof Error ? e.message : 'Failed to load Camelot data';
+					error = e instanceof Error ? e.message : "Couldn't read your key data — try refreshing";
 				}
 			} finally {
 				if (!destroyed) loading = false;
@@ -124,7 +124,7 @@
 <div class="camelot-wheel">
 	<h3 class="chart-title">Camelot Key Distribution</h3>
 	{#if loading}
-		<div class="loading">Loading key data...</div>
+		<div class="loading">Mapping your keys...</div>
 	{:else if error}
 		<div class="error">{error}</div>
 	{/if}

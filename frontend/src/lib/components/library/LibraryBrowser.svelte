@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { Track } from '$lib/types';
 	import type { SearchParams } from '$lib/api/tracks';
 	import { getTrackStore } from '$lib/stores/tracks.svelte';
@@ -19,8 +20,8 @@
 		onselect(track);
 	}
 
-	// Load initial tracks on mount
-	$effect(() => {
+	// Load initial tracks once on mount (not $effect which re-runs on every render)
+	onMount(() => {
 		store.search({});
 	});
 </script>
@@ -29,13 +30,13 @@
 	<SearchFilters onsearch={handleSearch} />
 
 	{#if store.loading}
-		<div class="status">Loading...</div>
+		<div class="status">Reading your library...</div>
 	{:else if store.error}
 		<div class="status error">{store.error}</div>
 	{:else if store.tracks.length === 0}
-		<div class="status">No tracks found</div>
+		<div class="status">Nothing matched those filters. Try loosening the search?</div>
 	{:else}
-		<div class="track-count">{store.tracks.length} tracks</div>
+		<div class="track-count">{store.tracks.length} of {store.total} tracks</div>
 		<TrackTable tracks={store.tracks} {selectedId} onselect={handleSelect} />
 	{/if}
 </div>

@@ -1,14 +1,14 @@
 <script lang="ts">
-	import type { DJSet, SetWaveformTrack, TransitionDetail as TransitionData } from '$lib/types';
-	import { getSetWaveforms, getTransition, exportRekordbox } from '$lib/api/sets';
+	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData } from '$lib/types';
+	import { getSet, getSetWaveforms, getTransition, exportRekordbox } from '$lib/api/sets';
 	import SetPicker from './SetPicker.svelte';
 	import SetTimeline from './SetTimeline.svelte';
 	import TransitionDetail from './TransitionDetail.svelte';
 
 	let selectedSet = $state<DJSet | null>(null);
+	let setDetail = $state<SetDetailType | null>(null);
 	let waveformTracks = $state<SetWaveformTrack[]>([]);
 	let transition = $state<TransitionData | null>(null);
-	let timelineMode = $state<'linear' | 'staircase'>('linear');
 	let loading = $state(false);
 	let loadingTransition = $state(false);
 	let exporting = $state(false);
@@ -41,19 +41,34 @@
 		}
 	}
 
-	async function handleSetSelect(set: DJSet) {
-		selectedSet = set;
-		transition = null;
+	async function loadSetData(setId: number) {
 		loading = true;
 		error = null;
+		transition = null;
 		try {
-			waveformTracks = await getSetWaveforms(set.id);
+			const [detail, waveforms] = await Promise.all([
+				getSet(setId),
+				getSetWaveforms(setId),
+			]);
+			setDetail = detail;
+			waveformTracks = waveforms;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			waveformTracks = [];
+			setDetail = null;
 		} finally {
 			loading = false;
 		}
+	}
+
+	async function handleSetSelect(set: DJSet) {
+		selectedSet = set;
+		await loadSetData(set.id);
+	}
+
+	async function handleTracksChanged() {
+		if (!selectedSet) return;
+		await loadSetData(selectedSet.id);
 	}
 
 	async function handleTransitionClick(index: number) {
@@ -77,18 +92,6 @@
 		<div class="timeline-controls">
 			<span class="set-name">{selectedSet.name}</span>
 			<span class="set-meta">{selectedSet.track_count} tracks, {selectedSet.duration_min}min</span>
-			<div class="mode-toggle">
-				<button
-					class="mode-btn"
-					class:active={timelineMode === 'linear'}
-					onclick={() => timelineMode = 'linear'}
-				>Linear</button>
-				<button
-					class="mode-btn"
-					class:active={timelineMode === 'staircase'}
-					onclick={() => timelineMode = 'staircase'}
-				>Staircase</button>
-			</div>
 			<button class="export-btn" onclick={handleExport} disabled={exporting}>
 				{exporting ? 'Exporting...' : 'Export XML'}
 			</button>
@@ -98,31 +101,31 @@
 		</div>
 
 		{#if loading}
-			<div class="status">Loading timeline...</div>
+			<div class="status">Building your timeline...</div>
 		{:else if error}
 			<div class="status error">{error}</div>
 		{:else if waveformTracks.length > 0}
-			<div class="timeline-container" style="height: {timelineMode === 'staircase' ? Math.max(300, waveformTracks.length * 80 + 20) : 280}px">
+			<div class="timeline-container">
 				<SetTimeline
 					tracks={waveformTracks}
-					mode={timelineMode}
+					setId={selectedSet.id}
+					energyProfile={setDetail?.energy_profile}
 					onTransitionClick={handleTransitionClick}
+					onTracksChanged={handleTracksChanged}
 				/>
 			</div>
 
-			<div class="hint">Click a transition boundary to see score breakdown</div>
-
 			{#if loadingTransition}
-				<div class="status">Loading transition...</div>
+				<div class="status">Analyzing the transition...</div>
 			{:else if transition}
 				<TransitionDetail {transition} />
 			{/if}
 		{:else}
-			<div class="status">No tracks in this set</div>
+			<div class="status">An empty set — your story starts here</div>
 		{/if}
 	{:else}
 		<div class="empty-state">
-			Select a set to view its timeline
+			Choose a set to see your journey
 		</div>
 	{/if}
 </div>
@@ -151,26 +154,7 @@
 	.set-meta {
 		font-size: 12px;
 		color: var(--text-dim);
-	}
-
-	.mode-toggle {
-		margin-left: auto;
-		display: flex;
-		background: var(--bg-tertiary);
-		border-radius: 4px;
-		overflow: hidden;
-	}
-
-	.mode-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		color: var(--text-secondary);
-		transition: all 0.15s;
-	}
-
-	.mode-btn.active {
-		background: var(--accent);
-		color: #000;
+		margin-right: auto;
 	}
 
 	.export-btn {
@@ -200,14 +184,9 @@
 	}
 
 	.timeline-container {
-		flex-shrink: 0;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.hint {
-		padding: 4px 16px;
-		font-size: 11px;
-		color: var(--text-dim);
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
 		border-bottom: 1px solid var(--border);
 	}
 

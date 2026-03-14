@@ -21,16 +21,16 @@
 
 <div class="set-picker">
 	{#if loading}
-		<span class="dim">Loading sets...</span>
+		<span class="dim">Finding your sets...</span>
 	{:else if sets.length === 0}
-		<span class="dim">No sets found. Run <code>djset build</code> first.</span>
+		<span class="dim">No sets yet — run <code>kiku build</code> to create your first journey</span>
 	{:else}
 		<select onchange={(e) => {
 			const id = Number((e.target as HTMLSelectElement).value);
 			const s = sets.find(s => s.id === id);
 			if (s) onselect(s);
 		}}>
-			<option value="">Select a set...</option>
+			<option value="">Choose a set...</option>
 			{#each sets as s (s.id)}
 				<option value={s.id}>
 					{s.name} ({s.track_count} tracks, {s.duration_min}min)

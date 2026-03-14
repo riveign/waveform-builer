@@ -231,5 +231,5 @@ def build_set(
     session.commit()
 
     # Reload with relationships
-    set_ = session.query(Set).get(set_.id)
+    set_ = session.get(Set, set_.id)
     return set_

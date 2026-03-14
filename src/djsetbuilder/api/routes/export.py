@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/sets", tags=["export"])
 
 @router.post("/{set_id}/export/rekordbox")
 def export_rekordbox(set_id: int, db: Session = Depends(get_db)):
-    s = db.query(Set).get(set_id)
+    s = db.get(Set, set_id)
     if not s:
         raise HTTPException(status_code=404, detail="Set not found")
 

@@ -156,64 +156,13 @@ def get_engine():
     return _engine
 
 
-def _migrate_schema(engine):
-    """Add new columns to existing tables if they don't exist (SQLite).
-
-    NOTE: Deprecated — will be replaced by Alembic migrations.
-    """
-    from sqlalchemy import inspect, text
-
-    inspector = inspect(engine)
-
-    # Track autotag columns
-    if "tracks" in inspector.get_table_names():
-        existing_tracks = {c["name"] for c in inspector.get_columns("tracks")}
-        track_new_cols = {
-            "energy_predicted": "TEXT",
-            "energy_confidence": "REAL",
-            "energy_source": "TEXT",
-        }
-        with engine.begin() as conn:
-            for col_name, col_type in track_new_cols.items():
-                if col_name not in existing_tracks:
-                    conn.execute(text(
-                        f"ALTER TABLE tracks ADD COLUMN {col_name} {col_type}"
-                    ))
-
-    # AudioFeatures waveform columns
-    if "audio_features" in inspector.get_table_names():
-        existing = {c["name"] for c in inspector.get_columns("audio_features")}
-        new_cols = {
-            "waveform_overview": "BLOB",
-            "waveform_detail": "BLOB",
-            "waveform_sr": "INTEGER",
-            "waveform_hop": "INTEGER",
-            "beat_positions": "BLOB",
-            "band_low": "BLOB",
-            "band_midlow": "BLOB",
-            "band_midhigh": "BLOB",
-            "band_high": "BLOB",
-            "band_low_overview": "BLOB",
-            "band_midlow_overview": "BLOB",
-            "band_midhigh_overview": "BLOB",
-            "band_high_overview": "BLOB",
-        }
-        with engine.begin() as conn:
-            for col_name, col_type in new_cols.items():
-                if col_name not in existing:
-                    conn.execute(text(
-                        f"ALTER TABLE audio_features ADD COLUMN {col_name} {col_type}"
-                    ))
-
-
 def _init_schema():
-    """Create tables and run migrations once per process."""
+    """Create tables once per process. Schema migrations handled by Alembic."""
     global _schema_initialized
     if _schema_initialized:
         return
     engine = get_engine()
     Base.metadata.create_all(engine)
-    _migrate_schema(engine)
     _schema_initialized = True
 
 
