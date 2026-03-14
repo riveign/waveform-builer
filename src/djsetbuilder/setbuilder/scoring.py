@@ -11,6 +11,41 @@ from djsetbuilder.db.models import Track
 from djsetbuilder.setbuilder.camelot import harmonic_score
 from djsetbuilder.setbuilder.constraints import dir_energy_to_numeric
 
+# ── Genre Families ──────────────────────────────────────────────────────
+GENRE_FAMILIES: dict[str, list[str]] = {
+    "techno": ["techno", "hard techno", "rumble techno", "acid techno",
+                "dub techno", "techno groove", "hypno", "hypno techno",
+                "classic techno", "deep techno", "hardstyle techno"],
+    "house": ["house", "deep house", "tech house", "afro house",
+              "funky house", "hard house", "speed house"],
+    "groove": ["hard groove", "hardgroove", "light groove", "ghetto groove"],
+    "trance": ["trance", "hard trance"],
+    "breaks": ["breaks", "dnb", "garage"],
+    "electronic": ["electro", "acid", "bounce", "nu disco", "indie dance"],
+    "other": ["dub", "new wave", "post punk", "nacional"],
+}
+
+# Reverse lookup: genre name → family name
+_GENRE_TO_FAMILY: dict[str, str] = {
+    genre: family
+    for family, members in GENRE_FAMILIES.items()
+    for genre in members
+}
+
+COMPATIBLE_FAMILIES: set[frozenset[str]] = {
+    frozenset({"techno", "groove"}),
+    frozenset({"techno", "electronic"}),
+    frozenset({"house", "groove"}),
+    frozenset({"house", "electronic"}),
+}
+
+
+def genre_to_family(genre: str | None) -> str:
+    """Map a genre name to its family. Returns 'other' if unrecognized."""
+    if not genre:
+        return "other"
+    return _GENRE_TO_FAMILY.get(genre.lower().strip(), "other")
+
 
 def bpm_compatibility(bpm_a: float | None, bpm_b: float | None) -> float:
     """Score BPM compatibility (0-1). Allows ±6% and double/half time."""
@@ -51,39 +86,13 @@ def genre_coherence(genre_a: str | None, genre_b: str | None) -> float:
     if ga == gb:
         return 1.0
 
-    # Define genre families
-    families = {
-        "techno": ["techno", "hard techno", "rumble techno", "acid techno",
-                    "dub techno", "techno groove", "hypno", "hypno techno",
-                    "classic techno", "deep techno", "hardstyle techno"],
-        "house": ["house", "deep house", "tech house", "afro house",
-                  "funky house", "hard house", "speed house"],
-        "groove": ["hard groove", "hardgroove", "light groove", "ghetto groove"],
-        "trance": ["trance", "hard trance"],
-        "breaks": ["breaks", "dnb", "garage"],
-        "electronic": ["electro", "acid", "bounce", "nu disco", "indie dance"],
-        "other": ["dub", "new wave", "post punk", "nacional"],
-    }
-
-    family_a = None
-    family_b = None
-    for family, members in families.items():
-        if ga in members:
-            family_a = family
-        if gb in members:
-            family_b = family
+    family_a = _GENRE_TO_FAMILY.get(ga)
+    family_b = _GENRE_TO_FAMILY.get(gb)
 
     if family_a and family_b:
         if family_a == family_b:
             return 0.8
-        # Some families are more compatible
-        compatible = {
-            frozenset({"techno", "groove"}),
-            frozenset({"techno", "electronic"}),
-            frozenset({"house", "groove"}),
-            frozenset({"house", "electronic"}),
-        }
-        if frozenset({family_a, family_b}) in compatible:
+        if frozenset({family_a, family_b}) in COMPATIBLE_FAMILIES:
             return 0.5
         return 0.2
 

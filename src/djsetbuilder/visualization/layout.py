@@ -23,6 +23,7 @@ def build_main_layout() -> html.Div:
         dcc.Tabs(id="main-tabs", value="track-tab", children=[
             dcc.Tab(label="Track View", value="track-tab", style=_tab_style(), selected_style=_tab_selected()),
             dcc.Tab(label="Set Timeline", value="set-tab", style=_tab_style(), selected_style=_tab_selected()),
+            dcc.Tab(label="Taste DNA", value="dna-tab", style=_tab_style(), selected_style=_tab_selected()),
         ], style={"marginTop": "8px"}),
 
         # Tab content
@@ -244,6 +245,35 @@ def build_set_tab() -> html.Div:
 
         # Export status
         html.Div(id="export-status", style={"padding": "8px"}),
+    ])
+
+
+def build_dna_tab() -> html.Div:
+    """Build the Taste DNA library intelligence tab."""
+    graph_style = {"height": "400px"}
+    return html.Div([
+        html.Div([
+            html.Div([
+                html.Div([
+                    html.Div("Key Distribution", className="panel-title"),
+                    dcc.Graph(id="dna-camelot-radar", config={"displayModeBar": False}, style=graph_style),
+                ], className="panel", style={"flex": 1}),
+                html.Div([
+                    html.Div("BPM Distribution", className="panel-title"),
+                    dcc.Graph(id="dna-bpm-histogram", config={"displayModeBar": False}, style=graph_style),
+                ], className="panel", style={"flex": 1}),
+            ], style={"display": "flex", "gap": "8px"}),
+            html.Div([
+                html.Div([
+                    html.Div("Energy x Genre", className="panel-title"),
+                    dcc.Graph(id="dna-energy-heatmap", config={"displayModeBar": False}, style=graph_style),
+                ], className="panel", style={"flex": 1}),
+                html.Div([
+                    html.Div("Mood Quadrant", className="panel-title"),
+                    dcc.Graph(id="dna-mood-scatter", config={"displayModeBar": False}, style=graph_style),
+                ], className="panel", style={"flex": 1}),
+            ], style={"display": "flex", "gap": "8px"}),
+        ]),
     ])
 
 

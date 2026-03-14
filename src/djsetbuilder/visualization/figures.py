@@ -1,4 +1,4 @@
-"""Plotly figure builders for waveform visualization."""
+"""Plotly figure builders for waveform and library visualization."""
 
 from __future__ import annotations
 
@@ -6,6 +6,17 @@ import numpy as np
 import plotly.graph_objects as go
 
 from djsetbuilder.analysis.waveform import envelope_to_time_axis
+
+# Genre family color map (shared across Taste DNA charts)
+FAMILY_COLORS: dict[str, str] = {
+    "Techno": "#00d2ff",
+    "House": "#e94560",
+    "Groove": "#2ecc71",
+    "Trance": "#f39c12",
+    "Breaks": "#9b59b6",
+    "Electronic": "#1abc9c",
+    "Other": "#8892b0",
+}
 
 # Cue type colors
 CUE_COLORS = {
@@ -914,3 +925,233 @@ def add_cue_markers(
                 fillcolor=f"rgba({','.join(str(int(color.lstrip('#')[i:i+2], 16)) for i in (0, 2, 4))}, 0.15)",
                 line=dict(width=0),
             )
+
+
+# ── Taste DNA Figures ───────────────────────────────────────────────────
+
+
+def build_camelot_radar(data: dict[int, dict[str, int]]) -> go.Figure:
+    """Build a polar bar chart of Camelot key distribution.
+
+    data: {1: {"A": 45, "B": 32}, ...} from camelot_distribution().
+    """
+    positions = list(range(1, 13))
+    theta = [str(n) for n in positions]
+
+    a_counts = [data.get(n, {}).get("A", 0) for n in positions]
+    b_counts = [data.get(n, {}).get("B", 0) for n in positions]
+
+    fig = go.Figure()
+    fig.add_trace(go.Barpolar(
+        r=a_counts,
+        theta=theta,
+        name="Minor (A)",
+        marker_color="#00d2ff",
+        opacity=0.8,
+    ))
+    fig.add_trace(go.Barpolar(
+        r=b_counts,
+        theta=theta,
+        name="Major (B)",
+        marker_color="#e94560",
+        opacity=0.8,
+    ))
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#16213e",
+        plot_bgcolor="#0f3460",
+        font=dict(color="#e0e0e0", size=11),
+        title=dict(text="Camelot Key Distribution", font=dict(size=14)),
+        polar=dict(
+            bgcolor="#0f3460",
+            radialaxis=dict(showticklabels=True, gridcolor="#2a2a4a"),
+            angularaxis=dict(direction="clockwise", gridcolor="#2a2a4a"),
+        ),
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.1),
+        margin=dict(l=40, r=40, t=50, b=40),
+    )
+    return fig
+
+
+def build_camelot_bar(data: dict[int, dict[str, int]]) -> go.Figure:
+    """Build a grouped bar chart of Camelot key distribution.
+
+    data: {1: {"A": 45, "B": 32}, ...} from camelot_distribution().
+    """
+    positions = list(range(1, 13))
+    labels = [str(n) for n in positions]
+    a_counts = [data.get(n, {}).get("A", 0) for n in positions]
+    b_counts = [data.get(n, {}).get("B", 0) for n in positions]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=labels, y=a_counts, name="Minor (A)",
+        marker_color="#00d2ff", opacity=0.85,
+    ))
+    fig.add_trace(go.Bar(
+        x=labels, y=b_counts, name="Major (B)",
+        marker_color="#e94560", opacity=0.85,
+    ))
+
+    fig.update_layout(
+        **DARK_LAYOUT,
+        barmode="group",
+        title=dict(text="Camelot Key Distribution", font=dict(size=14)),
+        yaxis_title="Tracks",
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.15),
+    )
+    fig.update_xaxes(title="Camelot Position", dtick=1)
+    return fig
+
+
+def build_bpm_histogram(data: list[dict]) -> go.Figure:
+    """Build a stacked BPM histogram colored by genre family.
+
+    data: [{"bin_center": 124.0, "family": "Techno", "count": 12}, ...]
+    """
+    # Group by family
+    families: dict[str, tuple[list[float], list[int]]] = {}
+    for row in data:
+        fam = row["family"]
+        if fam not in families:
+            families[fam] = ([], [])
+        families[fam][0].append(row["bin_center"])
+        families[fam][1].append(row["count"])
+
+    fig = go.Figure()
+    for family in sorted(families.keys()):
+        centers, counts = families[family]
+        color = FAMILY_COLORS.get(family, "#8892b0")
+        fig.add_trace(go.Bar(
+            x=centers,
+            y=counts,
+            name=family,
+            marker_color=color,
+            opacity=0.85,
+        ))
+
+    fig.update_layout(
+        **DARK_LAYOUT,
+        barmode="stack",
+        title=dict(text="BPM Distribution by Genre Family", font=dict(size=14)),
+        yaxis_title="Tracks",
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.15),
+    )
+    fig.update_xaxes(title="BPM", range=[88, 202], dtick=10)
+    return fig
+
+
+def build_energy_genre_heatmap(data: dict[str, dict[str, int]]) -> go.Figure:
+    """Build a heatmap of energy levels x genre families.
+
+    data: {"Techno": {"low": 5, "warmup": 12, ...}, ...}
+    """
+    from djsetbuilder.setbuilder.constraints import ENERGY_TAG_VALUES
+
+    energy_levels = list(ENERGY_TAG_VALUES.keys())
+    families = sorted(data.keys())
+
+    z = []
+    annotations = []
+    for i, family in enumerate(families):
+        row = []
+        for j, level in enumerate(energy_levels):
+            count = data.get(family, {}).get(level, 0)
+            row.append(count)
+            if count > 0:
+                annotations.append(dict(
+                    x=j, y=i, text=str(count),
+                    showarrow=False,
+                    font=dict(color="white" if count > 5 else "#8892b0", size=11),
+                ))
+        z.append(row)
+
+    fig = go.Figure(go.Heatmap(
+        z=z,
+        x=energy_levels,
+        y=families,
+        colorscale=[[0, "#0f3460"], [0.5, "#533483"], [1, "#e94560"]],
+        showscale=True,
+        colorbar=dict(title="Tracks"),
+    ))
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#16213e",
+        plot_bgcolor="#0f3460",
+        font=dict(color="#e0e0e0", size=11),
+        title=dict(text="Energy x Genre Family", font=dict(size=14)),
+        xaxis_title="Energy Level",
+        yaxis_title="Genre Family",
+        annotations=annotations,
+        margin=dict(l=80, r=20, t=50, b=60),
+    )
+    return fig
+
+
+def build_mood_scatter(data: list[dict]) -> go.Figure:
+    """Build a mood quadrant scatter plot.
+
+    data: [{"title": ..., "x": happy-sad, "y": aggressive-relaxed,
+            "energy": float, "genre_family": str}, ...]
+    """
+    # Group by family for separate traces
+    by_family: dict[str, list[dict]] = {}
+    for point in data:
+        fam = point["genre_family"]
+        by_family.setdefault(fam, []).append(point)
+
+    fig = go.Figure()
+    for family in sorted(by_family.keys()):
+        points = by_family[family]
+        color = FAMILY_COLORS.get(family, "#8892b0")
+        fig.add_trace(go.Scatter(
+            x=[p["x"] for p in points],
+            y=[p["y"] for p in points],
+            mode="markers",
+            name=family,
+            marker=dict(
+                color=color,
+                size=[max(4, p["energy"] * 14) for p in points],
+                opacity=0.7,
+                line=dict(width=0.5, color="#16213e"),
+            ),
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br>"
+                "%{customdata[1]}<br>"
+                "Happy-Sad: %{x:.2f}<br>"
+                "Aggressive-Relaxed: %{y:.2f}<extra></extra>"
+            ),
+            customdata=[[p["title"], p["artist"]] for p in points],
+        ))
+
+    # Quadrant lines
+    fig.add_hline(y=0, line=dict(color="#2a2a4a", width=1, dash="dash"))
+    fig.add_vline(x=0, line=dict(color="#2a2a4a", width=1, dash="dash"))
+
+    # Quadrant labels
+    for text, x, y in [
+        ("Happy + Aggressive", 0.5, 0.5),
+        ("Happy + Relaxed", 0.5, -0.5),
+        ("Sad + Aggressive", -0.5, 0.5),
+        ("Sad + Relaxed", -0.5, -0.5),
+    ]:
+        fig.add_annotation(
+            x=x, y=y, text=text, showarrow=False,
+            font=dict(size=10, color="#4a4a6a"),
+            xref="x", yref="y",
+        )
+
+    fig.update_layout(
+        **DARK_LAYOUT,
+        title=dict(text="Mood Quadrant (size = energy)", font=dict(size=14)),
+        xaxis_title="Happy ← → Sad",
+        yaxis_title="Relaxed ← → Aggressive",
+        showlegend=True,
+        legend=dict(orientation="h", y=-0.15),
+    )
+    return fig

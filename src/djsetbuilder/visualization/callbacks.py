@@ -9,6 +9,11 @@ from dash import ClientsideFunction, Input, Output, State, callback_context, htm
 from djsetbuilder.db.models import AudioFeatures, Set, SetTrack, Track, TransitionCue, get_session
 from djsetbuilder.db.store import get_track_by_title, search_tracks
 from djsetbuilder.visualization.figures import (
+    build_bpm_histogram,
+    build_camelot_bar,
+    build_camelot_radar,
+    build_energy_genre_heatmap,
+    build_mood_scatter,
     build_overview_figure,
     build_set_timeline_figure,
     build_staircase_figure,
@@ -31,7 +36,25 @@ def register_callbacks(app):
             return build_track_tab()
         elif tab == "set-tab":
             return build_set_tab()
+        elif tab == "dna-tab":
+            return _build_dna_tab_with_data()
         return html.Div()
+
+    # --- Camelot view toggle ---
+    app.clientside_callback(
+        """
+        function(view) {
+            if (view === 'bar') {
+                return [{display: 'none'}, {display: 'block'}];
+            }
+            return [{display: 'block'}, {display: 'none'}];
+        }
+        """,
+        [Output("camelot-wheel-container", "style"),
+         Output("camelot-bar-container", "style")],
+        Input("camelot-view-toggle", "value"),
+        prevent_initial_call=True,
+    )
 
     # --- Track selector options ---
     @app.callback(
@@ -711,6 +734,67 @@ def register_callbacks(app):
         [State("transition-graph", "figure"), State("player-state", "data")],
         prevent_initial_call=True,
     )
+
+
+def _build_dna_tab_with_data():
+    """Build the DNA tab with pre-computed figures baked into the layout."""
+    from dash import dcc, html
+
+    from djsetbuilder.analysis.insights import (
+        bpm_histogram as bpm_hist_data,
+        camelot_distribution,
+        energy_genre_heatmap as heatmap_data,
+        mood_quadrant,
+    )
+
+    session = get_session()
+    cam_data = camelot_distribution(session)
+    wheel_fig = build_camelot_radar(cam_data)
+    bar_fig = build_camelot_bar(cam_data)
+    bpm_fig = build_bpm_histogram(bpm_hist_data(session))
+    heatmap_fig = build_energy_genre_heatmap(heatmap_data(session))
+    mood_fig = build_mood_scatter(mood_quadrant(session))
+
+    graph_style = {"height": "400px"}
+    return html.Div([
+        html.Div([
+            html.Div([
+                html.Div([
+                    html.Span("Key Distribution", className="panel-title", style={"flex": 1}),
+                    dcc.RadioItems(
+                        id="camelot-view-toggle",
+                        options=[
+                            {"label": "Wheel", "value": "wheel"},
+                            {"label": "Bar", "value": "bar"},
+                        ],
+                        value="wheel",
+                        inline=True,
+                        style={"color": "#e0e0e0", "fontSize": "0.85rem"},
+                        inputStyle={"marginRight": "4px"},
+                        labelStyle={"marginRight": "12px"},
+                    ),
+                ], style={"display": "flex", "alignItems": "center"}),
+                html.Div(id="camelot-wheel-container",
+                         children=dcc.Graph(figure=wheel_fig, config={"displayModeBar": False}, style=graph_style)),
+                html.Div(id="camelot-bar-container", style={"display": "none"},
+                         children=dcc.Graph(figure=bar_fig, config={"displayModeBar": False}, style=graph_style)),
+            ], className="panel", style={"flex": 1}),
+            html.Div([
+                html.Div("BPM Distribution", className="panel-title"),
+                dcc.Graph(figure=bpm_fig, config={"displayModeBar": False}, style=graph_style),
+            ], className="panel", style={"flex": 1}),
+        ], style={"display": "flex", "gap": "8px"}),
+        html.Div([
+            html.Div([
+                html.Div("Energy x Genre", className="panel-title"),
+                dcc.Graph(figure=heatmap_fig, config={"displayModeBar": False}, style=graph_style),
+            ], className="panel", style={"flex": 1}),
+            html.Div([
+                html.Div("Mood Quadrant", className="panel-title"),
+                dcc.Graph(figure=mood_fig, config={"displayModeBar": False}, style=graph_style),
+            ], className="panel", style={"flex": 1}),
+        ], style={"display": "flex", "gap": "8px"}),
+    ])
 
 
 def _get_cue_dicts(session, set_id: int | None, track_id: int) -> list[dict]:

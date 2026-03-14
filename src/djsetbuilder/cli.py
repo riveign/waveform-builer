@@ -221,6 +221,121 @@ def stats():
             table.add_row(artist, str(count))
         console.print(table)
 
+    # ── Enhanced stats ──
+    from djsetbuilder.analysis.insights import enhanced_stats
+
+    es = enhanced_stats(session)
+
+    # BPM per genre
+    if es["bpm_per_genre"]:
+        console.print()
+        table = Table(title="BPM per Genre Family")
+        table.add_column("Family", style="cyan")
+        table.add_column("Tracks", justify="right")
+        table.add_column("Avg", justify="right", style="bold")
+        table.add_column("Min", justify="right")
+        table.add_column("Max", justify="right")
+        for family, info in es["bpm_per_genre"].items():
+            table.add_row(
+                family, str(info["count"]),
+                str(info["avg"]), str(info["min"]), str(info["max"]),
+            )
+        console.print(table)
+
+    # Energy zones
+    if es["energy_zones"]:
+        console.print()
+        table = Table(title="Energy Zone Breakdown")
+        table.add_column("Zone", style="magenta")
+        table.add_column("Tracks", justify="right")
+        table.add_column("Top Genres")
+        for zone, info in es["energy_zones"].items():
+            top = ", ".join(f"{g['family']} ({g['count']})" for g in info["top_genres"])
+            table.add_row(zone.capitalize(), str(info["count"]), top)
+        console.print(table)
+
+    # Most played
+    if es["most_played"]:
+        console.print()
+        table = Table(title="Most Played (top 10)")
+        table.add_column("Title", style="cyan")
+        table.add_column("Artist")
+        table.add_column("Genre")
+        table.add_column("Plays", justify="right", style="green")
+        for t in es["most_played"]:
+            table.add_row(t["title"], t["artist"], t["genre"], str(t["plays"]))
+        console.print(table)
+
+    # Hidden gems
+    if es["hidden_gems"]:
+        console.print()
+        table = Table(title="Hidden Gems (rated but unplayed)")
+        table.add_column("Title", style="cyan")
+        table.add_column("Artist")
+        table.add_column("Genre")
+        table.add_column("Rating", justify="right", style="yellow")
+        for t in es["hidden_gems"]:
+            table.add_row(t["title"], t["artist"], t["genre"], "★" * t["rating"])
+        console.print(table)
+
+    # Coverage
+    cov = es["coverage"]
+    if cov["total"] > 0:
+        console.print()
+        console.print(f"[bold]Coverage[/] ({cov['total']} tracks)")
+        console.print(f"  Key: {cov['key']}% | BPM: {cov['bpm']}% | Rating: {cov['rating']}% | Audio features: {cov['features']}%")
+
+
+@cli.command()
+def gaps():
+    """Identify gaps in your library (Camelot, BPM, energy)."""
+    from rich.panel import Panel
+
+    from djsetbuilder.analysis.insights import library_gaps
+    from djsetbuilder.db.models import get_session
+
+    session = get_session()
+    g = library_gaps(session)
+
+    # Camelot gaps
+    if g["camelot_gaps"]:
+        table = Table(title="Camelot Key Gaps (by impact)")
+        table.add_column("Position", style="green")
+        table.add_column("Tracks", justify="right")
+        table.add_column("Impact", justify="right", style="yellow")
+        table.add_column("Why it matters")
+        for gap in g["camelot_gaps"][:10]:
+            table.add_row(
+                gap["position"],
+                str(gap["count"]),
+                str(gap["impact"]),
+                gap["explanation"],
+            )
+        console.print(table)
+        console.print()
+
+    # BPM gaps
+    if g["bpm_gaps"]:
+        table = Table(title="Thin BPM Ranges")
+        table.add_column("BPM Range", style="cyan")
+        table.add_column("Tracks", justify="right")
+        for gap in g["bpm_gaps"][:10]:
+            table.add_row(gap["range"], str(gap["count"]))
+        console.print(table)
+        console.print()
+
+    # Energy gaps
+    if g["energy_gaps"]:
+        table = Table(title="Energy Level Gaps")
+        table.add_column("Level", style="magenta")
+        table.add_column("Tracks", justify="right")
+        for gap in g["energy_gaps"]:
+            table.add_row(gap["level"], str(gap["count"]))
+        console.print(table)
+
+    if not any(g.values()):
+        console.print("[green]No significant gaps found. Your library is well-rounded.[/]")
+
 
 @cli.command()
 @click.argument("query")
