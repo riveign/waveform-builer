@@ -15,6 +15,8 @@ Auto-classify energy zones (warmup/build/peak) for untagged tracks using audio f
   - `--auto`: write all predictions above a confidence threshold
   - `--threshold 0.7`: minimum confidence to suggest (default 0.7)
 - STORE predicted energy tags in a way that distinguishes them from manual tags (e.g., `dir_energy_predicted` column or a `predicted` flag)
+- SUPPORT incremental retraining: when the DJ approves/corrects predictions or adds new manual tags, `djset autotag --energy --retrain` retrains the model incorporating all current tags (manual + approved predictions) as ground truth
+- TRACK training lineage: store training metadata (date, sample count per class, accuracy, feature importance) alongside the model so the DJ can see how the model evolves over time
 
 ## Details (DT)
 
@@ -37,6 +39,12 @@ A 125 BPM track can be peak energy (heavy kicks, distorted bass, aggressive mood
 - Random Forest or Gradient Boosting — interpretable, handles mixed feature types
 - Model should be serialized to `data/` directory for reuse without retraining
 - Include feature importance output so the DJ can understand what drives predictions
+
+### Retraining loop
+- The model improves through a feedback cycle: predict → DJ reviews → approvals become new training data → retrain → better predictions
+- `--retrain` rebuilds the model from scratch using all tracks that have a confirmed energy tag (manual `dir_energy` + approved predictions)
+- Report delta: "Model v2: trained on 1,847 tracks (was 975). Accuracy improved from 78% to 84%"
+- Old model is backed up before overwriting (e.g., `data/energy_model.v1.pkl`)
 
 ### CLI UX
 - `djset autotag --energy --dry-run` shows a Rich table: Title, Artist, Current Tag (if any), Predicted Tag, Confidence, with color coding by confidence level
