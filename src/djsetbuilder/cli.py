@@ -530,6 +530,30 @@ def export(set_name: str, fmt: str, output: str | None, with_cues: bool):
 
 
 @cli.command()
+@click.option("--port", default=8000, help="HTTP port for the API server")
+@click.option("--host", default="0.0.0.0", help="Host to bind to")
+@click.option("--reload", is_flag=True, help="Enable auto-reload for development")
+def serve(port: int, host: str, reload: bool):
+    """Launch the FastAPI backend for the SvelteKit UI."""
+    try:
+        import uvicorn
+    except ImportError:
+        console.print("[red]API dependencies not installed.[/]")
+        console.print("Install with: [cyan]pip install '.[api]'[/]")
+        return
+
+    console.print(f"\n  DJ Set Builder API running at http://localhost:{port}\n")
+    console.print("  Docs: [cyan]http://localhost:{port}/docs[/]\n")
+    uvicorn.run(
+        "djsetbuilder.api.main:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        reload=reload,
+    )
+
+
+@cli.command()
 @click.option("--track", "track_query", default=None, help="Pre-load a specific track")
 @click.option("--set", "set_name", default=None, help="Pre-load a specific set")
 @click.option("--port", default=8050, help="HTTP port for the web server")

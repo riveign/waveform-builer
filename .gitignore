@@ -35,6 +35,11 @@ tmp/
 # Claude config (user-specific)
 .claude/
 
+# Frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+
 # Agentic config
 .agentic-config.backup.*
 .agentic-config.conf.yml
