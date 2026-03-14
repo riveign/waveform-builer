@@ -734,3 +734,171 @@ def analyze(force: bool, workers: int, track_name: str | None, waveform_only: bo
         force=force, workers=workers, single_track=track_name,
         waveform_only=waveform_only, bands_only=bands, recompute=recompute,
     )
+
+
+@cli.group("autotag")
+def autotag_group():
+    """Auto-classify tracks using ML models trained on your tags."""
+
+
+@autotag_group.command("energy")
+@click.option("--dry-run", "mode", flag_value="dry-run", default=True, help="Show predictions without writing (default)")
+@click.option("--approve", "mode", flag_value="approve", help="Review and approve predictions interactively")
+@click.option("--auto", "mode", flag_value="auto", help="Write all predictions above threshold automatically")
+@click.option("--retrain", is_flag=True, help="Retrain the model before predicting")
+@click.option("--threshold", default=0.7, type=float, help="Minimum confidence to suggest (0-1)")
+@click.option("--force", is_flag=True, help="Overwrite existing manual dir_energy tags")
+def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
+    """Classify energy zones using your tagged tracks as training data."""
+    from rich.panel import Panel
+
+    from djsetbuilder.analysis.autotag import (
+        load_model,
+        predict_energy,
+        save_model,
+        train_energy_model,
+    )
+    from djsetbuilder.db.models import Track, get_session
+
+    session = get_session()
+
+    # Train or load model
+    if retrain or mode == "dry-run":
+        try:
+            # Always train fresh for dry-run to show current metrics
+            console.print("[cyan]Training energy classifier...[/]")
+            result = train_energy_model(session)
+
+            # Show training report
+            metrics = result["metrics"]
+            console.print(f"\n[bold]Training Report[/] ({result['training_samples']} samples)")
+
+            if result["warnings"]:
+                for w in result["warnings"]:
+                    console.print(f"  [yellow]Warning: {w}[/]")
+
+            table = Table(title="Cross-Validation Results")
+            table.add_column("Zone", style="cyan")
+            table.add_column("Precision", justify="right")
+            table.add_column("Recall", justify="right")
+            table.add_column("F1", justify="right", style="green")
+            table.add_column("Support", justify="right", style="dim")
+
+            for zone in ["warmup", "build", "peak"]:
+                if zone in metrics:
+                    m = metrics[zone]
+                    table.add_row(
+                        zone.capitalize(),
+                        f"{m['precision']:.2f}",
+                        f"{m['recall']:.2f}",
+                        f"{m['f1-score']:.2f}",
+                        str(m.get("support", "")),
+                    )
+
+            acc = metrics.get("accuracy", 0)
+            table.add_row("", "", "", f"[bold]{acc:.2f}[/]", "", end_section=True)
+            console.print(table)
+
+            # Feature importance
+            console.print("\n[bold]What drives predictions:[/]")
+            for name, imp in result["feature_importance"][:5]:
+                bar = "█" * int(30 * imp / result["feature_importance"][0][1])
+                console.print(f"  {name:20s} {bar} {imp:.3f}")
+
+            if retrain:
+                path = save_model(result)
+                console.print(f"\n[green]Model saved to {path}[/]")
+
+            model = result["model"]
+
+        except ValueError as e:
+            console.print(f"[red]{e}[/]")
+            return
+    else:
+        try:
+            model, meta = load_model()
+            if meta:
+                console.print(f"[dim]Loaded model trained on {meta.get('training_samples', '?')} samples "
+                              f"(accuracy: {meta.get('accuracy', '?'):.2f})[/]")
+        except FileNotFoundError as e:
+            console.print(f"[red]{e}[/]")
+            return
+
+    # Predict
+    console.print(f"\n[cyan]Predicting energy zones (threshold={threshold:.2f})...[/]")
+    predictions = predict_energy(session, model, threshold=threshold)
+
+    if not predictions:
+        console.print("[yellow]No predictions above threshold. Try lowering --threshold.[/]")
+        return
+
+    # Display predictions
+    table = Table(title=f"Energy Predictions ({len(predictions)} tracks)")
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Title", style="cyan")
+    table.add_column("Artist")
+    table.add_column("Predicted", style="bold")
+    table.add_column("Confidence", justify="right")
+
+    for i, p in enumerate(predictions, 1):
+        conf = p["confidence"]
+        if conf >= 0.8:
+            conf_style = "[green]"
+        elif conf >= 0.6:
+            conf_style = "[yellow]"
+        else:
+            conf_style = "[red]"
+        table.add_row(
+            str(i),
+            p["title"],
+            p["artist"],
+            p["predicted"].capitalize(),
+            f"{conf_style}{conf:.2f}[/]",
+        )
+        if i >= 50 and mode == "dry-run":
+            console.print(table)
+            console.print(f"[dim]... and {len(predictions) - 50} more. Use --approve or --auto to process all.[/]")
+            return
+
+    console.print(table)
+
+    # Apply predictions based on mode
+    if mode == "dry-run":
+        console.print("\n[dim]Dry run — no changes written. Use --approve or --auto to apply.[/]")
+        return
+
+    applied = 0
+    skipped = 0
+
+    for p in predictions:
+        track = session.query(Track).get(p["track_id"])
+        if not track:
+            continue
+
+        if track.dir_energy and not force:
+            skipped += 1
+            continue
+
+        if mode == "approve":
+            answer = click.prompt(
+                f"  {p['title']} — {p['artist']} → {p['predicted']} ({p['confidence']:.2f})",
+                type=click.Choice(["y", "n", "q"], case_sensitive=False),
+                default="y",
+            )
+            if answer == "q":
+                break
+            if answer == "n":
+                skipped += 1
+                continue
+            track.energy_source = "approved"
+        else:
+            # auto mode
+            track.energy_source = "auto"
+
+        track.energy_predicted = p["predicted"]
+        track.energy_confidence = p["confidence"]
+        applied += 1
+
+    session.commit()
+    console.print(f"\n[green]Applied {applied} predictions[/]" +
+                  (f" [dim](skipped {skipped} with existing tags)[/]" if skipped else ""))

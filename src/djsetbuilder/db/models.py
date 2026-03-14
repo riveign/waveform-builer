@@ -54,6 +54,9 @@ class Track(Base):
     acquired_month = Column(String)
     playlist_tags = Column(Text)  # JSON list of playlist names this track belongs to
     last_synced = Column(String)
+    energy_predicted = Column(String)   # Predicted energy tag from autotag classifier
+    energy_confidence = Column(Float)   # Prediction confidence 0-1
+    energy_source = Column(String)      # "manual", "auto", or "approved"
 
     audio_features = relationship(
         "AudioFeatures", back_populates="track", uselist=False, cascade="all, delete-orphan"
@@ -161,6 +164,21 @@ def _migrate_schema(engine):
     from sqlalchemy import inspect, text
 
     inspector = inspect(engine)
+
+    # Track autotag columns
+    if "tracks" in inspector.get_table_names():
+        existing_tracks = {c["name"] for c in inspector.get_columns("tracks")}
+        track_new_cols = {
+            "energy_predicted": "TEXT",
+            "energy_confidence": "REAL",
+            "energy_source": "TEXT",
+        }
+        with engine.begin() as conn:
+            for col_name, col_type in track_new_cols.items():
+                if col_name not in existing_tracks:
+                    conn.execute(text(
+                        f"ALTER TABLE tracks ADD COLUMN {col_name} {col_type}"
+                    ))
 
     # AudioFeatures waveform columns
     if "audio_features" in inspector.get_table_names():
