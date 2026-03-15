@@ -45,6 +45,11 @@ router = APIRouter(prefix="/api/sets", tags=["sets"])
 def _set_track_response(st) -> SetTrackResponse:
     t = st.track
     af = t.audio_features if t else None
+    conflict = t.energy_conflict if t else None
+    conflict_resp = None
+    if conflict:
+        from kiku.api.schemas import EnergyConflictResponse
+        conflict_resp = EnergyConflictResponse(**conflict)
     return SetTrackResponse(
         position=st.position,
         track_id=st.track_id,
@@ -57,6 +62,8 @@ def _set_track_response(st) -> SetTrackResponse:
         duration_sec=t.duration_sec if t else None,
         transition_score=st.transition_score,
         has_waveform=af is not None and af.waveform_detail is not None,
+        energy_source=t.energy_source if t else None,
+        energy_conflict=conflict_resp,
     )
 
 
@@ -287,6 +294,11 @@ def set_waveforms(set_id: int, db: Session = Depends(get_db)):
         wf_b64 = None
         if af and af.waveform_overview:
             wf_b64 = base64.b64encode(af.waveform_overview).decode("ascii")
+        conflict = t.energy_conflict if t else None
+        conflict_resp = None
+        if conflict:
+            from kiku.api.schemas import EnergyConflictResponse
+            conflict_resp = EnergyConflictResponse(**conflict)
         result.append(SetWaveformTrackResponse(
             position=st.position,
             track_id=st.track_id,
@@ -299,6 +311,8 @@ def set_waveforms(set_id: int, db: Session = Depends(get_db)):
             duration_sec=t.duration_sec if t else None,
             transition_score=st.transition_score,
             waveform_overview=wf_b64,
+            energy_source=t.energy_source if t else None,
+            energy_conflict=conflict_resp,
         ))
     return result
 

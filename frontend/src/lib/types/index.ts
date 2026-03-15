@@ -1,3 +1,9 @@
+export interface EnergyConflict {
+	dir_energy: string;
+	predicted: string;
+	message: string;
+}
+
 export interface Track {
 	id: number;
 	title: string | null;
@@ -12,6 +18,10 @@ export interface Track {
 	play_count: number | null;
 	has_waveform: boolean;
 	has_features: boolean;
+	resolved_energy: string | null;
+	energy_source: string | null;
+	energy_confidence: number | null;
+	energy_conflict: EnergyConflict | null;
 }
 
 export interface TrackFeatures {
@@ -85,6 +95,8 @@ export interface SetTrack {
 	duration_sec: number | null;
 	transition_score: number | null;
 	has_waveform: boolean;
+	energy_source: string | null;
+	energy_conflict: EnergyConflict | null;
 }
 
 export interface SetWaveformTrack {
@@ -99,6 +111,8 @@ export interface SetWaveformTrack {
 	duration_sec: number | null;
 	transition_score: number | null;
 	waveform_overview: string | null;
+	energy_source: string | null;
+	energy_conflict: EnergyConflict | null;
 }
 
 export interface TransitionScoreBreakdown {
@@ -162,6 +176,73 @@ export interface MoodPoint {
 	y: number;
 	energy: number;
 	genre_family: string;
+}
+
+// ── Library gaps & enhanced stats ──
+
+export interface CamelotGap {
+	position: string;
+	count: number;
+	impact: number;
+	explanation: string;
+}
+
+export interface BpmGap {
+	range: string;
+	count: number;
+}
+
+export interface EnergyGap {
+	level: string;
+	count: number;
+}
+
+export interface LibraryGapsResponse {
+	camelot_gaps: CamelotGap[];
+	bpm_gaps: BpmGap[];
+	energy_gaps: EnergyGap[];
+}
+
+export interface GenreBpmStats {
+	avg: number;
+	min: number;
+	max: number;
+	count: number;
+}
+
+export interface EnergyZoneStats {
+	count: number;
+	top_genres: { family: string; count: number }[];
+}
+
+export interface PlayedTrack {
+	title: string | null;
+	artist: string | null;
+	plays: number;
+	genre: string;
+}
+
+export interface HiddenGem {
+	title: string | null;
+	artist: string | null;
+	rating: number;
+	genre: string;
+}
+
+export interface CoverageStats {
+	key: number;
+	bpm: number;
+	rating: number;
+	features: number;
+	total: number;
+}
+
+export interface EnhancedStatsResponse {
+	bpm_per_genre: Record<string, GenreBpmStats>;
+	energy_zones: Record<string, EnergyZoneStats>;
+	most_played: PlayedTrack[];
+	hidden_gems: HiddenGem[];
+	coverage: CoverageStats;
 }
 
 // ── Set mutation types ──

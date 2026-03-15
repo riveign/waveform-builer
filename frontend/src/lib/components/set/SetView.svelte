@@ -6,6 +6,8 @@
 	import SetTimeline from './SetTimeline.svelte';
 	import TransitionDetail from './TransitionDetail.svelte';
 	import EnergyFlowChart from './EnergyFlowChart.svelte';
+	import SuggestNextPanel from './SuggestNextPanel.svelte';
+	import SetEnergyReview from './SetEnergyReview.svelte';
 	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
 
 	const ui = getUiStore();
@@ -33,8 +35,15 @@
 	let loadingTransition = $state(false);
 	let exporting = $state(false);
 	let exportMsg = $state<string | null>(null);
+	let showSuggest = $state(false);
+	let showEnergyReview = $state(false);
 	let error = $state<string | null>(null);
 	let timelineContainerEl = $state<HTMLDivElement>(null!);
+
+	/** Tracks that need energy review (not yet approved) */
+	let tracksNeedingReview = $derived(
+		waveformTracks.filter((t) => t.energy_source !== 'approved' && t.energy_source !== 'tag')
+	);
 
 	/** Derive chart selectedIndex from ui.selectedTrackInSet (track ID) */
 	let selectedChartIndex = $derived.by(() => {
@@ -146,6 +155,20 @@
 		<div class="timeline-controls">
 			<span class="set-name">{selectedSet.name}</span>
 			<span class="set-meta">{selectedSet.track_count} tracks, {selectedSet.duration_min}min</span>
+			{#if ui.selectedTrackInSet !== null}
+				<button
+					class="suggest-btn"
+					class:active={showSuggest}
+					onclick={() => { showSuggest = !showSuggest; }}
+				>
+					Suggest Next
+				</button>
+			{/if}
+			{#if tracksNeedingReview.length > 0}
+				<button class="review-energy-btn" onclick={() => { showEnergyReview = true; }}>
+					Review energy ({tracksNeedingReview.length})
+				</button>
+			{/if}
 			<button class="export-btn" onclick={handleExport} disabled={exporting}>
 				{exporting ? 'Exporting...' : 'Export XML'}
 			</button>
@@ -216,6 +239,16 @@
 					onNext={() => handleTransitionClick(activeTransitionIndex + 1)}
 				/>
 			{/if}
+
+			{#if showSuggest && ui.selectedTrackInSet !== null && selectedSet}
+				{#key ui.selectedTrackInSet}
+					<SuggestNextPanel
+						trackId={ui.selectedTrackInSet}
+						setId={selectedSet.id}
+						onAdd={() => { if (selectedSet) loadSetData(selectedSet.id); }}
+					/>
+				{/key}
+			{/if}
 		{:else}
 			<div class="status">An empty set — your story starts here</div>
 		{/if}
@@ -223,6 +256,16 @@
 		<div class="empty-state">
 			Choose a set to see your journey
 		</div>
+	{/if}
+
+	{#if showEnergyReview}
+		<SetEnergyReview
+			trackIds={tracksNeedingReview.map((t) => t.track_id)}
+			onclose={(reviewed) => {
+				showEnergyReview = false;
+				if (reviewed && selectedSet) loadSetData(selectedSet.id);
+			}}
+		/>
 	{/if}
 </div>
 
@@ -251,6 +294,43 @@
 		font-size: 12px;
 		color: var(--text-dim);
 		margin-right: auto;
+	}
+
+	.suggest-btn {
+		padding: 4px 12px;
+		font-size: 12px;
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		transition: all 0.15s;
+	}
+
+	.suggest-btn:hover {
+		background: var(--accent);
+		color: #000;
+		border-color: var(--accent);
+	}
+
+	.suggest-btn.active {
+		background: var(--accent);
+		color: #000;
+		border-color: var(--accent);
+	}
+
+	.review-energy-btn {
+		padding: 4px 12px;
+		font-size: 12px;
+		color: #000;
+		background: var(--accent);
+		border: 1px solid var(--accent);
+		border-radius: 4px;
+		font-weight: 600;
+		transition: all 0.15s;
+	}
+
+	.review-energy-btn:hover {
+		opacity: 0.85;
 	}
 
 	.export-btn {

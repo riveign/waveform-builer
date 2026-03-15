@@ -62,6 +62,18 @@ class Track(Base):
         "AudioFeatures", back_populates="track", uselist=False, cascade="all, delete-orphan"
     )
 
+    @property
+    def resolved_energy_zone(self) -> tuple[str | None, str, float]:
+        """Resolved energy as (zone, source, confidence) via cascading trust."""
+        from kiku.analysis.autotag import resolve_energy
+        return resolve_energy(self)
+
+    @property
+    def energy_conflict(self) -> dict | None:
+        """Conflict between dir_energy and predicted energy, or None if they agree."""
+        from kiku.analysis.autotag import detect_energy_conflict
+        return detect_energy_conflict(self)
+
 
 class AudioFeatures(Base):
     __tablename__ = "audio_features"

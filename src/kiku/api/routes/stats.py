@@ -9,6 +9,8 @@ from kiku.analysis.insights import (
     bpm_histogram,
     camelot_distribution,
     energy_genre_heatmap,
+    enhanced_stats,
+    library_gaps,
     mood_quadrant,
 )
 from kiku.api.deps import get_db
@@ -64,5 +66,23 @@ def stats_mood_scatter(db: Session = Depends(get_db)):
     try:
         points = mood_quadrant(db)
         return [MoodPoint(**p) for p in points]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/gaps")
+def stats_gaps(db: Session = Depends(get_db)):
+    """Library gaps: underrepresented keys, BPM ranges, and energy levels."""
+    try:
+        return library_gaps(db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/enhanced")
+def stats_enhanced(db: Session = Depends(get_db)):
+    """Extended stats: BPM per genre, energy zones, most played, hidden gems, coverage."""
+    try:
+        return enhanced_stats(db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

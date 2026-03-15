@@ -91,6 +91,10 @@ ENERGY_TAG_VALUES = {
     "fast": 0.85,
     "peak": 0.9,
     "closing": 0.35,
+    # Canonical zone names (resolve_energy returns these)
+    "build": 0.55,
+    "drive": 0.72,
+    "close": 0.35,
 }
 
 
@@ -125,3 +129,10 @@ def dir_energy_to_numeric(tag: str | None) -> float | None:
     if not tag:
         return None
     return ENERGY_TAG_VALUES.get(tag.lower())
+
+
+def zone_to_numeric(zone: str | None) -> float | None:
+    """Convert a canonical zone name or raw tag to a 0-1 numeric value."""
+    if not zone:
+        return None
+    return ENERGY_TAG_VALUES.get(zone.lower())

@@ -1,4 +1,4 @@
-import type { LibraryStats, BpmBin, MoodPoint } from '$lib/types';
+import type { LibraryStats, BpmBin, MoodPoint, LibraryGapsResponse, EnhancedStatsResponse } from '$lib/types';
 import { fetchJson } from './client';
 
 export async function getLibraryStats(): Promise<LibraryStats> {
@@ -19,4 +19,12 @@ export async function getEnergyGenre(): Promise<Record<string, Record<string, nu
 
 export async function getMoodScatter(): Promise<MoodPoint[]> {
 	return fetchJson<MoodPoint[]>('/api/stats/mood-scatter');
+}
+
+export async function getLibraryGaps(): Promise<LibraryGapsResponse> {
+	return fetchJson<LibraryGapsResponse>('/api/stats/gaps');
+}
+
+export async function getEnhancedStats(): Promise<EnhancedStatsResponse> {
+	return fetchJson<EnhancedStatsResponse>('/api/stats/enhanced');
 }

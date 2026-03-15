@@ -364,17 +364,44 @@ def get_tinder_queue(
     genre_family: str | None = None,
     bpm_min: float | None = None,
     bpm_max: float | None = None,
+    include_conflicts: bool = False,
+    track_ids: list[int] | None = None,
     limit: int = 20,
     offset: int = 0,
 ) -> tuple[list[Track], int]:
     """Get unreviewed auto-predicted tracks ordered by confidence ASC.
 
+    When include_conflicts=True, also includes tracks where dir_energy and
+    energy_predicted map to different zones (regardless of energy_source).
+
     Returns (tracks, total_count) for pagination.
     """
-    q = session.query(Track).filter(
-        Track.energy_predicted.isnot(None),
-        Track.energy_source == "auto",
-    )
+    if track_ids is not None:
+        # Set-scoped review: include any track that isn't approved yet
+        # (auto-predicted, no prediction, or conflicts)
+        q = session.query(Track).filter(
+            Track.id.in_(track_ids),
+            or_(
+                Track.energy_source == "auto",
+                Track.energy_source.is_(None),
+            ),
+        )
+    elif include_conflicts:
+        # Include auto-predicted AND conflict tracks
+        from kiku.analysis.autotag import ZONE_MAP
+        q = session.query(Track).filter(
+            Track.energy_predicted.isnot(None),
+            or_(
+                Track.energy_source == "auto",
+                # Tracks with both dir_energy and predicted set (potential conflicts)
+                Track.dir_energy.isnot(None),
+            ),
+        )
+    else:
+        q = session.query(Track).filter(
+            Track.energy_predicted.isnot(None),
+            Track.energy_source == "auto",
+        )
     if genre_family:
         from kiku.setbuilder.scoring import GENRE_FAMILIES
         genres = GENRE_FAMILIES.get(genre_family.lower(), [])

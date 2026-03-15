@@ -14,6 +14,7 @@
 		progressColor = '#00A8AB',
 		autoplay = false,
 		onfinish,
+		onready,
 	}: {
 		trackId: number;
 		peaks: string;
@@ -24,6 +25,7 @@
 		progressColor?: string;
 		autoplay?: boolean;
 		onfinish?: () => void;
+		onready?: (ws: WaveSurfer) => void;
 	} = $props();
 
 	let container: HTMLDivElement;
@@ -58,6 +60,8 @@
 		ws.on('play', () => { isPlaying = true; });
 		ws.on('pause', () => { isPlaying = false; });
 		ws.on('finish', () => { onfinish?.(); });
+
+		onready?.(ws);
 
 		if (autoplay) {
 			ws.once('ready', () => { ws?.play(); });

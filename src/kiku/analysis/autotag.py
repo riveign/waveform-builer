@@ -42,6 +42,55 @@ MODEL_FILENAME = "energy_model.pkl"
 META_FILENAME = "energy_model_meta.json"
 
 
+def resolve_energy(track: Track) -> tuple[str | None, str, float]:
+    """Resolve the best energy zone for a track using cascading trust.
+
+    Priority: approved > dir_energy > predicted > None.
+    Returns (zone, source, confidence).
+    """
+    # 1. Approved prediction (DJ reviewed)
+    if track.energy_source == "approved" and track.energy_predicted:
+        zone = ZONE_MAP.get(track.energy_predicted.lower(), track.energy_predicted.lower())
+        confidence = track.energy_confidence if track.energy_confidence is not None else 1.0
+        return (zone, "approved", confidence)
+
+    # 2. Directory energy tag (manual folder structure)
+    if track.dir_energy:
+        tag = track.dir_energy.lower()
+        zone = ZONE_MAP.get(tag)
+        if zone:
+            return (zone, "dir_energy", 1.0)
+
+    # 3. ML prediction (auto)
+    if track.energy_predicted and track.energy_source == "auto":
+        zone = ZONE_MAP.get(track.energy_predicted.lower(), track.energy_predicted.lower())
+        confidence = track.energy_confidence if track.energy_confidence is not None else 0.5
+        return (zone, "predicted", confidence)
+
+    return (None, "none", 0.0)
+
+
+def detect_energy_conflict(track: Track) -> dict | None:
+    """Detect disagreement between dir_energy and predicted energy.
+
+    Returns conflict dict when both exist and map to different zones, else None.
+    """
+    if not track.dir_energy or not track.energy_predicted:
+        return None
+
+    dir_zone = ZONE_MAP.get(track.dir_energy.lower())
+    pred_zone = ZONE_MAP.get(track.energy_predicted.lower(), track.energy_predicted.lower())
+
+    if not dir_zone or dir_zone == pred_zone:
+        return None
+
+    return {
+        "dir_energy": dir_zone,
+        "predicted": pred_zone,
+        "message": f"Folder says {dir_zone}, model says {pred_zone} — worth a listen.",
+    }
+
+
 def extract_features(af: AudioFeatures) -> np.ndarray | None:
     """Extract feature vector from an AudioFeatures row.
 

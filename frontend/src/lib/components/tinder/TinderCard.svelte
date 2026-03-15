@@ -3,6 +3,7 @@
 	import { getWaveformDetail } from '$lib/api/waveforms';
 	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
 	import MoodRadar from './MoodRadar.svelte';
+	import EnergyConflictBadge from '../set/EnergyConflictBadge.svelte';
 
 	let {
 		item,
@@ -70,6 +71,9 @@
 			<span>{item.track.bpm ? `${Math.round(item.track.bpm)} BPM` : ''}</span>
 			<span>{item.track.key ?? ''}</span>
 			<span>{item.track.genre ?? ''}</span>
+			{#if item.track.energy_conflict}
+				<EnergyConflictBadge conflict={item.track.energy_conflict} />
+			{/if}
 		</div>
 	</div>
 

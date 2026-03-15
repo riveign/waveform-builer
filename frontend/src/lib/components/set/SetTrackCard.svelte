@@ -1,7 +1,8 @@
 <script lang="ts">
-	import type { SetTrack } from '$lib/types';
+	import type { SetTrack, EnergyConflict } from '$lib/types';
 	import { getCamelotColor } from '$lib/utils/camelot';
 	import { getUiStore } from '$lib/stores/ui.svelte';
+	import EnergyConflictBadge from './EnergyConflictBadge.svelte';
 
 	let {
 		track,
@@ -9,6 +10,7 @@
 		isSelected = false,
 		isPlaying = false,
 		energyTarget,
+		energyConflict = null,
 		onplay,
 	}: {
 		track: SetTrack;
@@ -16,6 +18,7 @@
 		isSelected?: boolean;
 		isPlaying?: boolean;
 		energyTarget?: number;
+		energyConflict?: EnergyConflict | null;
 		onplay?: (trackId: number) => void;
 	} = $props();
 
@@ -111,6 +114,9 @@
 			<span class="title" title={track.title ?? ''}>{track.title ?? 'Untitled'}</span>
 			{#if track.genre}
 				<span class="genre-badge">{track.genre}</span>
+			{/if}
+			{#if energyConflict}
+				<EnergyConflictBadge conflict={energyConflict} />
 			{/if}
 		</div>
 		<span class="artist" title={track.artist ?? ''}>{track.artist ?? 'Unknown'}</span>

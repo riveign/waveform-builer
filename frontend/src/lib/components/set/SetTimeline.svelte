@@ -188,11 +188,14 @@
 										duration_sec: item.duration_sec,
 										transition_score: item.transition_score,
 										has_waveform: item.waveform_overview != null,
+										energy_source: item.energy_source,
+										energy_conflict: item.energy_conflict,
 									}}
 									position={i + 1}
 									isSelected={ui.selectedTrackInSet === item.track_id}
 									isPlaying={ui.playingTrackId === item.track_id}
 									energyTarget={typeof energyTargets[i] === 'number' ? energyTargets[i] : undefined}
+									energyConflict={item.energy_conflict}
 									onplay={onTrackPlay}
 								/>
 							</div>

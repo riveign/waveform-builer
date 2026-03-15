@@ -5,6 +5,12 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
+class EnergyConflictResponse(BaseModel):
+    dir_energy: str
+    predicted: str
+    message: str
+
+
 class TrackResponse(BaseModel):
     id: int
     title: str | None = None
@@ -19,6 +25,10 @@ class TrackResponse(BaseModel):
     play_count: int | None = None
     has_waveform: bool = False
     has_features: bool = False
+    resolved_energy: str | None = None
+    energy_source: str | None = None
+    energy_confidence: float | None = None
+    energy_conflict: EnergyConflictResponse | None = None
 
     model_config = {"from_attributes": True}
 
@@ -88,6 +98,8 @@ class SetTrackResponse(BaseModel):
     duration_sec: float | None = None
     transition_score: float | None = None
     has_waveform: bool = False
+    energy_source: str | None = None
+    energy_conflict: EnergyConflictResponse | None = None
 
 
 class SetDetailResponse(BaseModel):
@@ -140,6 +152,8 @@ class SetWaveformTrackResponse(BaseModel):
     duration_sec: float | None = None
     transition_score: float | None = None
     waveform_overview: str | None = None  # base64 float32
+    energy_source: str | None = None
+    energy_conflict: EnergyConflictResponse | None = None
 
 
 class TransitionScoreBreakdown(BaseModel):

@@ -1,10 +1,12 @@
 <script lang="ts">
+	import type WaveSurfer from 'wavesurfer.js';
 	import type { TransitionDetail as TransitionData } from '$lib/types';
 	import { getCamelotColor } from '$lib/utils/camelot';
 	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
 	import ScoreBreakdown from './ScoreBreakdown.svelte';
 	import HarmonicBadge from './HarmonicBadge.svelte';
 	import BpmBadge from './BpmBadge.svelte';
+	import CrossfadePreview from './CrossfadePreview.svelte';
 
 	let {
 		transition,
@@ -22,6 +24,9 @@
 
 	let a = $derived(transition.track_a);
 	let b = $derived(transition.track_b);
+
+	let wsA = $state<WaveSurfer | null>(null);
+	let wsB = $state<WaveSurfer | null>(null);
 </script>
 
 <div class="transition-detail">
@@ -63,6 +68,7 @@
 					height={80}
 					waveColor="#00CED1"
 					progressColor="#00A8AB"
+					onready={(ws) => { wsA = ws; }}
 				/>
 			{/if}
 		</div>
@@ -87,10 +93,13 @@
 					height={80}
 					waveColor="#FF6B6B"
 					progressColor="#CC5555"
+					onready={(ws) => { wsB = ws; }}
 				/>
 			{/if}
 		</div>
 	</div>
+
+	<CrossfadePreview {wsA} {wsB} bpmA={transition.bpm_a} bpmB={transition.bpm_b} />
 </div>
 
 <style>

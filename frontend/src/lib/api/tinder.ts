@@ -5,6 +5,8 @@ export interface TinderQueueParams {
 	genre_family?: string;
 	bpm_min?: number;
 	bpm_max?: number;
+	include_conflicts?: boolean;
+	track_ids?: number[];
 	limit?: number;
 	offset?: number;
 }
@@ -12,7 +14,10 @@ export interface TinderQueueParams {
 export async function getTinderQueue(params: TinderQueueParams = {}): Promise<TinderQueueResponse> {
 	const qs = new URLSearchParams();
 	for (const [k, v] of Object.entries(params)) {
-		if (v !== undefined && v !== null && v !== '') {
+		if (v === undefined || v === null || v === '') continue;
+		if (k === 'track_ids' && Array.isArray(v)) {
+			qs.set(k, v.join(','));
+		} else {
 			qs.set(k, String(v));
 		}
 	}

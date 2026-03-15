@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from kiku.config import BPM_TOLERANCE, SCORING_WEIGHTS
 from kiku.db.models import Track
 from kiku.setbuilder.camelot import harmonic_score
-from kiku.setbuilder.constraints import dir_energy_to_numeric
+from kiku.setbuilder.constraints import dir_energy_to_numeric, zone_to_numeric
 
 # ── Genre Families ──────────────────────────────────────────────────────
 GENRE_FAMILIES: dict[str, list[str]] = {
@@ -100,12 +100,17 @@ def genre_coherence(genre_a: str | None, genre_b: str | None) -> float:
 
 
 def energy_fit(track: Track, target_energy: float) -> float:
-    """Score how well a track's energy matches the target."""
+    """Score how well a track's energy matches the target.
+
+    Priority: audio_features.energy (numeric) > resolved zone > 0.5 (neutral).
+    """
     # Prefer audio-analyzed energy if available
     if track.audio_features and track.audio_features.energy is not None:
         track_energy = track.audio_features.energy
     else:
-        track_energy = dir_energy_to_numeric(track.dir_energy)
+        # Use resolved zone (approved > dir_energy > predicted)
+        resolved_zone, _source, _conf = track.resolved_energy_zone
+        track_energy = zone_to_numeric(resolved_zone)
 
     if track_energy is None:
         return 0.5  # Unknown — neutral
