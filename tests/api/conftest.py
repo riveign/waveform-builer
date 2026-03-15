@@ -46,6 +46,13 @@ def db_session(tmp_path):
     for pos in range(1, 6):
         session.add(SetTrack(set_id=1, position=pos, track_id=pos, transition_score=0.75))
 
+    # Seed tinder queue: tracks 1-10 have auto predictions at varying confidence
+    for i in range(1, 11):
+        t = session.get(Track, i)
+        t.energy_predicted = "build" if i <= 5 else "peak"
+        t.energy_confidence = i * 0.1  # 0.1 to 1.0
+        t.energy_source = "auto"
+
     session.commit()
     yield session
     session.close()

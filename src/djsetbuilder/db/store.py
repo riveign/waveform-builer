@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from djsetbuilder.db.models import AudioFeatures, Track, TransitionCue
@@ -357,3 +357,63 @@ def get_set_waveform_data(session: Session, set_id: int) -> list[dict]:
             "has_waveform": af is not None and af.waveform_overview is not None,
         })
     return result
+
+
+def get_tinder_queue(
+    session: Session,
+    genre_family: str | None = None,
+    bpm_min: float | None = None,
+    bpm_max: float | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[list[Track], int]:
+    """Get unreviewed auto-predicted tracks ordered by confidence ASC.
+
+    Returns (tracks, total_count) for pagination.
+    """
+    q = session.query(Track).filter(
+        Track.energy_predicted.isnot(None),
+        Track.energy_source == "auto",
+    )
+    if genre_family:
+        from djsetbuilder.setbuilder.scoring import GENRE_FAMILIES
+        genres = GENRE_FAMILIES.get(genre_family.lower(), [])
+        if genres:
+            conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genres]
+            q = q.filter(or_(*conditions))
+    if bpm_min is not None:
+        q = q.filter(Track.bpm >= bpm_min)
+    if bpm_max is not None:
+        q = q.filter(Track.bpm <= bpm_max)
+    q = q.order_by(Track.energy_confidence.asc())
+    total = q.count()
+    tracks = q.offset(offset).limit(limit).all()
+    return tracks, total
+
+
+def save_tinder_decision(
+    session: Session,
+    track_id: int,
+    decision: str,
+    override_zone: str | None = None,
+) -> Track | None:
+    """Apply a tinder decision to a track.
+
+    - confirm: set energy_source = "approved"
+    - override: set energy_source = "approved", energy_predicted = override_zone, energy_confidence = 1.0
+    - skip: no-op (leave as "auto")
+
+    Returns updated Track or None if not found.
+    """
+    track = session.get(Track, track_id)
+    if not track:
+        return None
+    if decision == "confirm":
+        track.energy_source = "approved"
+    elif decision == "override":
+        track.energy_source = "approved"
+        track.energy_predicted = override_zone
+        track.energy_confidence = 1.0
+    # skip: do nothing
+    session.commit()
+    return track

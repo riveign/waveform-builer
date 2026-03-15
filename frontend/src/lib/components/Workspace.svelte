@@ -2,6 +2,7 @@
 	import TrackView from './waveform/TrackView.svelte';
 	import SetView from './set/SetView.svelte';
 	import DnaView from './dna/DnaView.svelte';
+	import EnergyTinder from './tinder/EnergyTinder.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 
 	const ui = getUiStore();
@@ -12,6 +13,7 @@
 		if (e.key === '1') { ui.activeTab = 'track'; e.preventDefault(); }
 		else if (e.key === '2') { ui.activeTab = 'set'; e.preventDefault(); }
 		else if (e.key === '3') { ui.activeTab = 'dna'; e.preventDefault(); }
+		else if (e.key === '4') { ui.activeTab = 'tinder'; e.preventDefault(); }
 	}
 </script>
 
@@ -28,6 +30,9 @@
 		<button class="tab" class:active={ui.activeTab === 'dna'} onclick={() => ui.activeTab = 'dna'}>
 			Taste DNA <span class="shortcut">3</span>
 		</button>
+		<button class="tab" class:active={ui.activeTab === 'tinder'} onclick={() => ui.activeTab = 'tinder'}>
+			Energy Tinder <span class="shortcut">4</span>
+		</button>
 	</div>
 	<div class="tab-content">
 		{#if ui.activeTab === 'track'}
@@ -35,13 +40,15 @@
 				<TrackView track={ui.selectedTrack} />
 			{:else}
 				<div class="empty-state">
-					<p>Select a track from the library to view its waveform and features</p>
+					<p>Choose a track to explore its sound</p>
 				</div>
 			{/if}
 		{:else if ui.activeTab === 'set'}
 			<SetView />
 		{:else if ui.activeTab === 'dna'}
 			<DnaView />
+		{:else if ui.activeTab === 'tinder'}
+			<EnergyTinder />
 		{/if}
 	</div>
 </div>

@@ -252,3 +252,55 @@ class PaginatedTracksResponse(BaseModel):
     total: int
     offset: int
     limit: int
+
+
+# ── Energy Tinder models ──
+
+
+class TinderQueueItem(BaseModel):
+    track: TrackResponse
+    energy_predicted: str | None = None
+    energy_confidence: float | None = None
+    mood_happy: float | None = None
+    mood_sad: float | None = None
+    mood_aggressive: float | None = None
+    mood_relaxed: float | None = None
+    has_waveform: bool = False
+
+
+class TinderQueueResponse(BaseModel):
+    items: list[TinderQueueItem]
+    total: int
+    offset: int
+    limit: int
+
+
+class TinderDecideRequest(BaseModel):
+    track_id: int
+    decision: str  # "confirm", "override", "skip"
+    override_zone: str | None = None  # required if decision == "override"
+
+
+class TinderDecideResponse(BaseModel):
+    track_id: int
+    decision: str
+    applied_zone: str | None = None
+    teaching_moment: str | None = None  # one-sentence explanation on override
+
+
+class TinderStatsResponse(BaseModel):
+    total_reviewed: int
+    confirmed: int
+    overridden: int
+    skipped: int
+    queue_remaining: int
+    confirmed_pct: float
+    overridden_pct: float
+    skip_pct: float
+
+
+class TinderRetrainResponse(BaseModel):
+    accuracy: float | None = None
+    class_counts: dict[str, int] = {}
+    feature_importance: list[tuple[str, float]] = []
+    training_samples: int = 0

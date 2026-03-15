@@ -218,3 +218,50 @@ export interface PaginatedTracks {
 	offset: number;
 	limit: number;
 }
+
+// ── Energy Tinder types ──
+
+export interface TinderQueueItem {
+	track: Track;
+	energy_predicted: string | null;
+	energy_confidence: number | null;
+	mood_happy: number | null;
+	mood_sad: number | null;
+	mood_aggressive: number | null;
+	mood_relaxed: number | null;
+	has_waveform: boolean;
+}
+
+export interface TinderQueueResponse {
+	items: TinderQueueItem[];
+	total: number;
+	offset: number;
+	limit: number;
+}
+
+export type TinderDecision = 'confirm' | 'override' | 'skip';
+
+export interface TinderDecideResult {
+	track_id: number;
+	decision: string;
+	applied_zone: string | null;
+	teaching_moment: string | null;
+}
+
+export interface TinderStats {
+	total_reviewed: number;
+	confirmed: number;
+	overridden: number;
+	skipped: number;
+	queue_remaining: number;
+	confirmed_pct: number;
+	overridden_pct: number;
+	skip_pct: number;
+}
+
+export interface TinderRetrainResult {
+	accuracy: number | null;
+	class_counts: Record<string, number>;
+	feature_importance: [string, number][];
+	training_samples: number;
+}

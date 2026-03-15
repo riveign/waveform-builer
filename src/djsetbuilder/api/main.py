@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from djsetbuilder.api.routes import audio, export, sets, stats, tracks, waveforms
+from djsetbuilder.api.routes import audio, export, sets, stats, tinder, tracks, waveforms
 from djsetbuilder.db.models import _init_schema
 
 
@@ -36,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(waveforms.router)
     app.include_router(sets.router)
     app.include_router(stats.router)
+    app.include_router(tinder.router)
     app.include_router(export.router)
 
     return app
