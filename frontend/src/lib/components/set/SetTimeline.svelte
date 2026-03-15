@@ -2,7 +2,7 @@
 	import { dndzone } from 'svelte-dnd-action';
 	import type { SetTrack, SetWaveformTrack } from '$lib/types';
 	import { getUiStore } from '$lib/stores/ui.svelte';
-	import { reorderSetTracks, removeTrackFromSet } from '$lib/api/sets';
+	import { reorderSetTracks, removeTrackFromSet, addTrackToSet } from '$lib/api/sets';
 	import SetTrackCard from './SetTrackCard.svelte';
 	import TransitionIndicator from './TransitionIndicator.svelte';
 
@@ -30,6 +30,8 @@
 	let items = $state<(SetWaveformTrack & { id: number })[]>([]);
 	let reordering = $state(false);
 	let removeInFlight = $state<number | null>(null);
+	let dropActive = $state(false);
+	let dropAdding = $state(false);
 
 	// Sync items when tracks prop changes (but not during drag)
 	$effect(() => {
@@ -123,11 +125,54 @@
 		if (!isNaN(n)) return (n - 1) / 8;
 		return ENERGY_LABEL_MAP[energy.toLowerCase()] ?? null;
 	}
+
+	function handleDragOver(e: DragEvent) {
+		if (!e.dataTransfer?.types.includes('application/x-kiku-track')) return;
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'copy';
+		dropActive = true;
+	}
+
+	function handleDragLeave() {
+		dropActive = false;
+	}
+
+	async function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		dropActive = false;
+		const raw = e.dataTransfer?.getData('application/x-kiku-track');
+		if (!raw) return;
+		try {
+			const { id } = JSON.parse(raw) as { id: number };
+			if (items.some((i) => i.track_id === id)) return; // already in set
+			dropAdding = true;
+			await addTrackToSet(setId, id);
+			onTracksChanged?.();
+		} catch (err) {
+			console.error('Failed to add track to set:', err);
+		} finally {
+			dropAdding = false;
+		}
+	}
 </script>
 
-<div class="set-timeline">
+<div
+	class="set-timeline"
+	class:drop-active={dropActive}
+	ondragover={handleDragOver}
+	ondragleave={handleDragLeave}
+	ondrop={handleDrop}
+	role="region"
+	aria-label="Set timeline"
+>
 	{#if items.length === 0}
-		<div class="empty">No tracks in this set</div>
+		<div class="empty">
+			{#if dropActive}
+				Drop a track here to start your set
+			{:else}
+				No tracks in this set — drag one from your library
+			{/if}
+		</div>
 	{:else}
 		<div class="timeline-content">
 			<!-- Energy sidebar -->
@@ -233,6 +278,16 @@
 				{/each}
 			</div>
 		</div>
+
+		{#if dropActive || dropAdding}
+			<div class="drop-indicator">
+				{#if dropAdding}
+					Adding track...
+				{:else}
+					Drop here to add to set
+				{/if}
+			</div>
+		{/if}
 	{/if}
 </div>
 
@@ -409,5 +464,26 @@
 
 	@keyframes spin {
 		to { transform: rotate(360deg); }
+	}
+
+	/* ── Drop zone ── */
+
+	.set-timeline.drop-active {
+		outline: 2px dashed var(--accent);
+		outline-offset: -2px;
+		background: color-mix(in srgb, var(--accent) 5%, transparent);
+	}
+
+	.drop-indicator {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 12px;
+		margin: 4px 22px 8px;
+		border: 1px dashed var(--accent);
+		border-radius: 6px;
+		color: var(--accent);
+		font-size: 12px;
+		font-weight: 500;
 	}
 </style>

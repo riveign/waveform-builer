@@ -33,6 +33,11 @@
 					class:selected={track.id === selectedId}
 					class:has-waveform={track.has_waveform}
 					onclick={() => onselect(track)}
+					draggable="true"
+					ondragstart={(e) => {
+						e.dataTransfer?.setData('application/x-kiku-track', JSON.stringify({ id: track.id, title: track.title }));
+						if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
+					}}
 				>
 					<td class="col-title" title={track.title ?? ''}>
 						{track.title ?? '?'}
@@ -103,8 +108,12 @@
 	}
 
 	.track-row {
-		cursor: pointer;
+		cursor: grab;
 		transition: background 0.1s;
+	}
+
+	.track-row:active {
+		cursor: grabbing;
 	}
 
 	.track-row:hover {

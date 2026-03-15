@@ -135,6 +135,8 @@ export interface TransitionDetail {
 	key_b: string | null;
 	waveform_a_overview: string | null;
 	waveform_b_overview: string | null;
+	beats_a: string | null;
+	beats_b: string | null;
 }
 
 export interface Cue {

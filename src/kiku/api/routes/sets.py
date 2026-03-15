@@ -357,6 +357,8 @@ def set_transition(set_id: int, index: int, db: Session = Depends(get_db)):
 
     wf_a = base64.b64encode(af_a.waveform_overview).decode("ascii") if af_a and af_a.waveform_overview else None
     wf_b = base64.b64encode(af_b.waveform_overview).decode("ascii") if af_b and af_b.waveform_overview else None
+    bt_a = base64.b64encode(af_a.beat_positions).decode("ascii") if af_a and af_a.beat_positions else None
+    bt_b = base64.b64encode(af_b.beat_positions).decode("ascii") if af_b and af_b.beat_positions else None
 
     return TransitionResponse(
         position=index,
@@ -376,6 +378,8 @@ def set_transition(set_id: int, index: int, db: Session = Depends(get_db)):
         key_b=t_b.key,
         waveform_a_overview=wf_a,
         waveform_b_overview=wf_b,
+        beats_a=bt_a,
+        beats_b=bt_b,
     )
 
 

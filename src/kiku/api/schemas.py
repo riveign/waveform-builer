@@ -176,6 +176,8 @@ class TransitionResponse(BaseModel):
     key_b: str | None = None
     waveform_a_overview: str | None = None  # base64 float32
     waveform_b_overview: str | None = None  # base64 float32
+    beats_a: str | None = None  # base64 float32 beat timestamps
+    beats_b: str | None = None  # base64 float32 beat timestamps
 
 
 class LibraryStatsResponse(BaseModel):

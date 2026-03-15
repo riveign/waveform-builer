@@ -3,6 +3,7 @@
 	import type { TransitionDetail as TransitionData } from '$lib/types';
 	import { getCamelotColor } from '$lib/utils/camelot';
 	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
+	import CueOverlay from '../waveform/CueOverlay.svelte';
 	import ScoreBreakdown from './ScoreBreakdown.svelte';
 	import HarmonicBadge from './HarmonicBadge.svelte';
 	import BpmBadge from './BpmBadge.svelte';
@@ -10,12 +11,14 @@
 
 	let {
 		transition,
+		setId,
 		hasPrev = false,
 		hasNext = false,
 		onPrev,
 		onNext,
 	}: {
 		transition: TransitionData;
+		setId: number;
 		hasPrev?: boolean;
 		hasNext?: boolean;
 		onPrev?: () => void;
@@ -70,6 +73,9 @@
 					progressColor="#00A8AB"
 					onready={(ws) => { wsA = ws; }}
 				/>
+				{#if wsA}
+					<CueOverlay ws={wsA} {setId} trackId={a.track_id} position={transition.position} beats={transition.beats_a} />
+				{/if}
 			{/if}
 		</div>
 
@@ -95,6 +101,9 @@
 					progressColor="#CC5555"
 					onready={(ws) => { wsB = ws; }}
 				/>
+				{#if wsB}
+					<CueOverlay ws={wsB} {setId} trackId={b.track_id} position={transition.position + 1} beats={transition.beats_b} />
+				{/if}
 			{/if}
 		</div>
 	</div>

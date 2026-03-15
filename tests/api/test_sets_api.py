@@ -101,3 +101,39 @@ def test_build_set_sse_bad_seed(client):
     body = resp.text
     assert "event: error" in body
     assert "Seed track not found" in body
+
+
+# ── Track mutation tests ──
+
+
+def test_add_track_to_set(client):
+    """POST track appends to end of set."""
+    # Set 1 has tracks 1-5 seeded at positions 1-5
+    resp = client.post("/api/sets/1/tracks", json={"track_id": 10})
+    assert resp.status_code == 200
+    tracks = resp.json()
+    assert len(tracks) == 6
+    # Track 10 should be present in the set
+    track_ids = [t["track_id"] for t in tracks]
+    assert 10 in track_ids
+
+
+def test_remove_track_from_set(client):
+    """DELETE track removes it and re-compacts positions."""
+    resp = client.delete("/api/sets/1/tracks/3")
+    assert resp.status_code in (200, 204)
+    # Verify track 3 is gone
+    detail = client.get("/api/sets/1").json()
+    track_ids = [t["track_id"] for t in detail["tracks"]]
+    assert 3 not in track_ids
+    assert len(detail["tracks"]) == 4
+
+
+def test_reorder_set_tracks(client):
+    """PUT reorder changes track order."""
+    new_order = [5, 4, 3, 2, 1]
+    resp = client.put("/api/sets/1/tracks/reorder", json={"track_ids": new_order})
+    assert resp.status_code == 200
+    tracks = resp.json()
+    result_ids = [t["track_id"] for t in sorted(tracks, key=lambda t: t["position"])]
+    assert result_ids == new_order

@@ -233,6 +233,7 @@
 			{:else if transition}
 				<TransitionDetail
 					{transition}
+					setId={selectedSet.id}
 					hasPrev={activeTransitionIndex > 0}
 					hasNext={activeTransitionIndex < waveformTracks.length - 2}
 					onPrev={() => handleTransitionClick(activeTransitionIndex - 1)}
