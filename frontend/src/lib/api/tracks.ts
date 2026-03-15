@@ -9,6 +9,7 @@ export interface SearchParams {
 	bpm_min?: number;
 	bpm_max?: number;
 	energy?: string;
+	energy_zone?: string;
 	rating_min?: number;
 	limit?: number;
 	offset?: number;

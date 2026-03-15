@@ -29,6 +29,7 @@ def search_tracks(
     bpm_max: float | None = None,
     energy: str | None = None,
     *,
+    energy_zone: str | None = None,
     key: str | None = None,
     rating_min: int | None = None,
     limit: int = 50,
@@ -54,6 +55,14 @@ def search_tracks(
         q = q.filter(Track.bpm <= bpm_max)
     if energy:
         q = q.filter(Track.dir_energy.ilike(f"%{energy}%"))
+    if energy_zone:
+        # Match tracks whose resolved energy maps to this zone:
+        # dir_energy tags that map to the zone, OR energy_predicted = zone
+        from kiku.analysis.autotag import ZONE_MAP
+        matching_tags = [tag for tag, z in ZONE_MAP.items() if z == energy_zone.lower()]
+        conditions = [Track.dir_energy.ilike(tag) for tag in matching_tags]
+        conditions.append(Track.energy_predicted == energy_zone.lower())
+        q = q.filter(or_(*conditions))
     if key:
         q = q.filter(Track.key.ilike(f"%{key}%"))
     if rating_min is not None:

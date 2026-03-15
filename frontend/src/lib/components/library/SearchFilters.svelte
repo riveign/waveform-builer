@@ -9,6 +9,7 @@
 	let key = $state('');
 	let bpmRange = $state('');
 	let energy = $state('');
+	let energyZone = $state('');
 	let ratingMin = $state('');
 
 	function handleSubmit(e: Event) {
@@ -19,6 +20,7 @@
 		if (genre) params.genre = genre;
 		if (key) params.key = key;
 		if (energy) params.energy = energy;
+		if (energyZone) params.energy_zone = energyZone;
 		if (ratingMin) params.rating_min = Number(ratingMin);
 		if (bpmRange) {
 			const parts = bpmRange.split('-');
@@ -40,6 +42,7 @@
 		key = '';
 		bpmRange = '';
 		energy = '';
+		energyZone = '';
 		ratingMin = '';
 		onsearch({});
 	}
@@ -57,7 +60,7 @@
 	</div>
 	<div class="filter-row">
 		<select bind:value={energy} class="filter-input">
-			<option value="">Energy...</option>
+			<option value="">Folder energy...</option>
 			<option value="Low">Low</option>
 			<option value="Warmup">Warmup</option>
 			<option value="Mid">Mid</option>
@@ -66,6 +69,14 @@
 			<option value="High">High</option>
 			<option value="Peak">Peak</option>
 			<option value="Fast">Fast</option>
+		</select>
+		<select bind:value={energyZone} class="filter-input">
+			<option value="">Energy zone...</option>
+			<option value="warmup">Warmup</option>
+			<option value="build">Build</option>
+			<option value="drive">Drive</option>
+			<option value="peak">Peak</option>
+			<option value="close">Close</option>
 		</select>
 		<select bind:value={ratingMin} class="filter-input narrow">
 			<option value="">Rating...</option>
