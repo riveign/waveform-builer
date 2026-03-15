@@ -77,6 +77,7 @@
 
 <div class="heatmap-container">
 	<h3 class="chart-title">Energy x Genre</h3>
+	<p class="teaching-note">How energy maps across genres — bright cells are your sweet spots</p>
 	{#if loading}
 		<div class="loading">
 			<div class="loading-pulse"></div>
@@ -137,7 +138,13 @@
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		color: var(--text-secondary);
-		margin-bottom: 12px;
+		margin-bottom: 2px;
+	}
+
+	.teaching-note {
+		font-size: 11px;
+		color: var(--text-dim);
+		margin-bottom: 8px;
 	}
 
 	.loading {

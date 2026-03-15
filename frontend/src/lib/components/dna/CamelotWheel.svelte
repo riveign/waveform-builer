@@ -123,6 +123,7 @@
 
 <div class="camelot-wheel">
 	<h3 class="chart-title">Camelot Key Distribution</h3>
+	<p class="teaching-note">Your harmonic coverage — gaps here mean fewer mix options in those keys</p>
 	{#if loading}
 		<div class="loading">Mapping your keys...</div>
 	{:else if error}
@@ -147,7 +148,13 @@
 		font-size: 14px;
 		font-weight: 600;
 		color: var(--text-primary);
-		margin-bottom: 12px;
+		margin-bottom: 2px;
+	}
+
+	.teaching-note {
+		font-size: 11px;
+		color: var(--text-dim);
+		margin-bottom: 8px;
 	}
 
 	.chart-container {

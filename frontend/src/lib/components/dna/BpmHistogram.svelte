@@ -149,6 +149,7 @@
 
 <div class="bpm-histogram">
 	<h3 class="chart-title">BPM Distribution</h3>
+	<p class="teaching-note">Where your tempos cluster — wider spread means more set variety</p>
 	{#if loading}
 		<div class="loading">Measuring your tempos...</div>
 	{:else if error}
@@ -173,7 +174,13 @@
 		font-size: 14px;
 		font-weight: 600;
 		color: var(--text-primary);
-		margin-bottom: 12px;
+		margin-bottom: 2px;
+	}
+
+	.teaching-note {
+		font-size: 11px;
+		color: var(--text-dim);
+		margin-bottom: 8px;
 	}
 
 	.chart-container {

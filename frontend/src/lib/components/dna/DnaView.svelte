@@ -1,8 +1,11 @@
 <script lang="ts">
+	import TasteRadar from './TasteRadar.svelte';
 	import CamelotWheel from './CamelotWheel.svelte';
 	import BpmHistogram from './BpmHistogram.svelte';
+	import GenreDistribution from './GenreDistribution.svelte';
 	import EnergyGenreHeatmap from './EnergyGenreHeatmap.svelte';
 	import MoodScatter from './MoodScatter.svelte';
+	import LibraryGaps from './LibraryGaps.svelte';
 </script>
 
 <div class="dna-view">
@@ -10,6 +13,11 @@
 		<h2 class="dna-title">Taste DNA</h2>
 		<p class="dna-subtitle">Your library's musical fingerprint</p>
 	</div>
+
+	<div class="dna-hero">
+		<TasteRadar />
+	</div>
+
 	<div class="dna-grid">
 		<div class="dna-card">
 			<CamelotWheel />
@@ -18,10 +26,16 @@
 			<BpmHistogram />
 		</div>
 		<div class="dna-card">
+			<GenreDistribution />
+		</div>
+		<div class="dna-card">
 			<EnergyGenreHeatmap />
 		</div>
 		<div class="dna-card">
 			<MoodScatter />
+		</div>
+		<div class="dna-card">
+			<LibraryGaps />
 		</div>
 	</div>
 </div>
@@ -47,6 +61,10 @@
 	.dna-subtitle {
 		font-size: 13px;
 		color: var(--text-secondary);
+	}
+
+	.dna-hero {
+		margin-bottom: 16px;
 	}
 
 	.dna-grid {

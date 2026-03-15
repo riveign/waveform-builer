@@ -207,6 +207,7 @@
 
 <div class="scatter-container">
 	<h3 class="chart-title">Mood Scatter</h3>
+	<p class="teaching-note">Emotional fingerprint — position shows mood, size shows energy</p>
 	{#if loading}
 		<div class="loading">
 			<div class="loading-pulse"></div>
@@ -235,7 +236,13 @@
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		color: var(--text-secondary);
-		margin-bottom: 12px;
+		margin-bottom: 2px;
+	}
+
+	.teaching-note {
+		font-size: 11px;
+		color: var(--text-dim);
+		margin-bottom: 8px;
 	}
 
 	.chart-wrapper {
