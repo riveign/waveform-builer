@@ -1442,8 +1442,24 @@ git add \
 
 Implementation commit: 44112c1
 
+### Post-Implementation Changes
+
+- **598e1f7**: Expanded energy zones from 3 (warmup/build/peak) to 5 (warmup/build/drive/peak/close)
+  - `drive`: between build and peak — maps from dir_energy tags "up", "high"
+  - `close`: post-peak wind-down — maps from dir_energy tag "closing"
+  - Updated `ZONE_MAP` in `autotag.py`, `ENERGY_TAG_VALUES` in `constraints.py`
+  - TinderCard override menu now shows 5 zones with distinct colors
+  - MoodRadar hidden when mood data is absent (no Essentia mood classifiers run)
+  - Test updated for 5-zone assertion
+
 ## Test Evidence & Outputs
-<!-- Filled by explicit testing after /spec IMPLEMENT -->
+
+- 72/72 tests passing (including 9 tinder API tests)
+- 0 TypeScript errors, 0 warnings (svelte-check)
+- DB verified: 31 approved decisions persisted, 1,939 tracks in queue
+- Confirm sets `energy_source="approved"`, keeps original confidence
+- Override sets `energy_source="approved"`, `energy_predicted=<zone>`, `energy_confidence=1.0`
+- Skip is a no-op (track stays in queue)
 
 ## Updated Doc
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
