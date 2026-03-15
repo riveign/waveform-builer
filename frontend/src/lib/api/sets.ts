@@ -94,6 +94,7 @@ export function buildSet(
 				const reader = res.body.getReader();
 				const decoder = new TextDecoder();
 				let buffer = '';
+				let settled = false;
 
 				function processChunk(chunk: string) {
 					buffer += chunk;
@@ -109,8 +110,10 @@ export function buildSet(
 							onEvent?.(currentEvent, data);
 
 							if (currentEvent === 'complete') {
+								settled = true;
 								resolve(data as SetBuildComplete);
 							} else if (currentEvent === 'error') {
+								settled = true;
 								reject(new Error((data as { detail: string }).detail));
 							}
 						}
@@ -121,7 +124,12 @@ export function buildSet(
 					reader
 						.read()
 						.then(({ done, value }) => {
-							if (done) return;
+							if (done) {
+								if (!settled) {
+									reject(new Error('SSE stream closed before build completed'));
+								}
+								return;
+							}
 							processChunk(decoder.decode(value, { stream: true }));
 							read();
 						})

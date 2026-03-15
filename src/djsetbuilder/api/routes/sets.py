@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import StreamingResponse
@@ -70,7 +71,11 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
     from djsetbuilder.setbuilder.planner import build_set
 
     def generate():
-        yield _sse_event("started", json.dumps({"name": body.name}))
+        yield _sse_event("started", json.dumps({
+            "name": body.name,
+            "total_duration_min": body.duration_min,
+            "energy_preset": body.energy_preset,
+        }))
 
         try:
             energy_profile = resolve_energy(body.energy_preset)
@@ -102,10 +107,30 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                 yield _sse_event("error", json.dumps({"detail": "Could not build set — no matching tracks or seed"}))
                 return
 
+            # Emit per-track progress events so the frontend can
+            # render tracks incrementally as they "appear".
+            ordered_tracks = sorted(result.tracks, key=lambda st: st.position)
+            total_tracks = len(ordered_tracks)
+            for st in ordered_tracks:
+                t = st.track
+                yield _sse_event("track_added", json.dumps({
+                    "track_id": st.track_id,
+                    "title": t.title if t else None,
+                    "artist": t.artist if t else None,
+                    "position": st.position,
+                    "bpm": t.bpm if t else None,
+                    "key": t.key if t else None,
+                    "energy": t.dir_energy if t else None,
+                    "score": round(st.transition_score, 3) if st.transition_score else None,
+                    "total_tracks_so_far": st.position,
+                    "total_tracks": total_tracks,
+                }))
+                time.sleep(0.05)
+
             yield _sse_event("complete", json.dumps({
                 "set_id": result.id,
                 "name": result.name,
-                "track_count": len(result.tracks),
+                "track_count": total_tracks,
                 "duration_min": result.duration_min,
             }))
 

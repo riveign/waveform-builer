@@ -304,3 +304,24 @@ class TinderRetrainResponse(BaseModel):
     class_counts: dict[str, int] = {}
     feature_importance: list[tuple[str, float]] = []
     training_samples: int = 0
+
+
+# ── Config endpoint response models ──
+
+
+class EnergySegmentResponse(BaseModel):
+    name: str
+    target_energy: float
+    duration_pct: float
+
+
+class EnergyPresetResponse(BaseModel):
+    name: str
+    description: str
+    segments: list[EnergySegmentResponse]
+
+
+class GenreFamilyResponse(BaseModel):
+    family_name: str
+    genres: list[str]
+    compatible_with: list[str]

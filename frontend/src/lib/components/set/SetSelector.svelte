@@ -4,7 +4,15 @@
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { onMount } from 'svelte';
 
-	let { onselect }: { onselect: (set: DJSet) => void } = $props();
+	let {
+		onselect,
+		refreshTrigger = 0,
+		selectSetId = null,
+	}: {
+		onselect: (set: DJSet) => void;
+		refreshTrigger?: number;
+		selectSetId?: number | null;
+	} = $props();
 
 	const ui = getUiStore();
 
@@ -25,6 +33,37 @@
 
 	onMount(async () => {
 		await fetchSets();
+	});
+
+	// Re-fetch sets when refreshTrigger changes (parent increments after build completes)
+	let lastTrigger = 0;
+	$effect(() => {
+		const trigger = refreshTrigger;
+		if (trigger > lastTrigger) {
+			lastTrigger = trigger;
+			fetchSets().then(() => {
+				// After refresh, auto-select the set if selectSetId is provided
+				if (selectSetId !== null) {
+					const target = sets.find((s) => s.id === selectSetId);
+					if (target) {
+						selectSet(target);
+					}
+				}
+			});
+		}
+	});
+
+	// Auto-detect when ui.selectedSetId points to a set not in the list (e.g. just built)
+	$effect(() => {
+		const currentId = ui.selectedSetId;
+		if (currentId !== null && !loading && sets.length > 0 && !sets.find((s) => s.id === currentId)) {
+			fetchSets().then(() => {
+				const target = sets.find((s) => s.id === currentId);
+				if (target) {
+					onselect(target);
+				}
+			});
+		}
 	});
 
 	async function fetchSets() {
