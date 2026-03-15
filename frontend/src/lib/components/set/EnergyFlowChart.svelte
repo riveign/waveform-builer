@@ -28,8 +28,8 @@
 
 	/** Map energy label or numeric string to normalized 0-1. */
 	const ENERGY_LABEL_MAP: Record<string, number> = {
-		low: 0.15, warmup: 0.3, closing: 0.35, mid: 0.5,
-		dance: 0.6, up: 0.7, high: 0.8, fast: 0.85, peak: 0.95,
+		low: 0.15, warmup: 0.3, close: 0.35, closing: 0.35, mid: 0.5,
+		build: 0.55, dance: 0.6, up: 0.7, drive: 0.75, high: 0.8, fast: 0.85, peak: 0.95,
 	};
 
 	function normalizeEnergy(energy: string | null): number | null {

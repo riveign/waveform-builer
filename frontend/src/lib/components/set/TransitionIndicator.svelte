@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { TransitionScoreBreakdown } from '$lib/types';
 	import { getTransition } from '$lib/api/sets';
-	import ScoreBreakdown from './ScoreBreakdown.svelte';
 
 	interface Props {
 		fromTrackId: number;
@@ -9,11 +8,12 @@
 		score?: number;
 		setId: number;
 		transitionIndex: number;
+		active?: boolean;
+		onclick?: (index: number) => void;
 	}
 
-	let { fromTrackId, toTrackId, score, setId, transitionIndex }: Props = $props();
+	let { fromTrackId, toTrackId, score, setId, transitionIndex, active = false, onclick }: Props = $props();
 
-	let expanded = $state(false);
 	let loading = $state(false);
 	let breakdown = $state<TransitionScoreBreakdown | null>(null);
 	let error = $state<string | null>(null);
@@ -48,10 +48,7 @@
 	}
 
 	function handleClick() {
-		expanded = !expanded;
-		if (expanded && !breakdown) {
-			fetchBreakdown();
-		}
+		onclick?.(transitionIndex);
 	}
 
 	// Lazy-fetch breakdown if no pre-computed score is provided
@@ -74,12 +71,12 @@
 	);
 </script>
 
-<div class="transition-indicator" class:expanded>
+<div class="transition-indicator" class:active>
 	<button
 		class="indicator-bar"
 		style="--score-color: {displayScore != null ? scoreColor(displayScore) : 'var(--border)'}"
 		onclick={handleClick}
-		title={tooltipDimensions ?? (loading ? 'Loading...' : 'Click to expand')}
+		title={tooltipDimensions ?? (loading ? 'Loading...' : 'Click to inspect transition')}
 	>
 		<div class="score-fill"></div>
 		<span class="score-text">
@@ -93,18 +90,6 @@
 			{/if}
 		</span>
 	</button>
-
-	{#if expanded}
-		<div class="breakdown-panel">
-			{#if loading}
-				<div class="breakdown-loading">Loading breakdown...</div>
-			{:else if error}
-				<div class="breakdown-error">{error}</div>
-			{:else if breakdown}
-				<ScoreBreakdown {breakdown} />
-			{/if}
-		</div>
-	{/if}
 </div>
 
 <style>
@@ -134,6 +119,10 @@
 		box-shadow: 0 0 0 1px var(--score-color);
 	}
 
+	.active .indicator-bar {
+		box-shadow: 0 0 0 2px var(--accent, var(--score-color));
+	}
+
 	.score-fill {
 		position: absolute;
 		inset: 0;
@@ -159,33 +148,5 @@
 		color: var(--text-secondary);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
-	}
-
-	.breakdown-panel {
-		margin-top: 4px;
-		animation: slide-down 0.15s ease-out;
-	}
-
-	.breakdown-loading,
-	.breakdown-error {
-		font-size: 11px;
-		color: var(--text-dim);
-		text-align: center;
-		padding: 8px;
-	}
-
-	.breakdown-error {
-		color: #FF6B6B;
-	}
-
-	@keyframes slide-down {
-		from {
-			opacity: 0;
-			transform: translateY(-4px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
 	}
 </style>

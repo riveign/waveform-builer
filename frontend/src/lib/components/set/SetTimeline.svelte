@@ -10,6 +10,7 @@
 		tracks,
 		setId,
 		energyProfile,
+		activeTransitionIndex = -1,
 		onTransitionClick,
 		onTracksChanged,
 		onTrackPlay,
@@ -17,6 +18,7 @@
 		tracks: SetWaveformTrack[];
 		setId: number;
 		energyProfile?: string | null;
+		activeTransitionIndex?: number;
 		onTransitionClick?: (index: number) => void;
 		onTracksChanged?: () => void;
 		onTrackPlay?: (trackId: number) => void;
@@ -110,11 +112,16 @@
 	}
 
 	// Energy bar sidebar data: normalized energy for each track (0-1)
+	const ENERGY_LABEL_MAP: Record<string, number> = {
+		low: 0.15, warmup: 0.3, close: 0.35, closing: 0.35, mid: 0.5,
+		build: 0.55, dance: 0.6, up: 0.7, drive: 0.75, high: 0.8, fast: 0.85, peak: 0.95,
+	};
+
 	function parseTrackEnergy(energy: string | null): number | null {
 		if (!energy) return null;
 		const n = parseInt(energy, 10);
-		if (isNaN(n)) return null;
-		return (n - 1) / 8;
+		if (!isNaN(n)) return (n - 1) / 8;
+		return ENERGY_LABEL_MAP[energy.toLowerCase()] ?? null;
 	}
 </script>
 
@@ -214,6 +221,8 @@
 									score={items[i + 1].transition_score ?? undefined}
 									{setId}
 									transitionIndex={i}
+								active={activeTransitionIndex === i}
+									onclick={handleTransitionClickInternal}
 								/>
 							</div>
 						{/if}

@@ -28,6 +28,7 @@
 	let setDetail = $state<SetDetailType | null>(null);
 	let waveformTracks = $state<SetWaveformTrack[]>([]);
 	let transition = $state<TransitionData | null>(null);
+	let activeTransitionIndex = $state(-1);
 	let loading = $state(false);
 	let loadingTransition = $state(false);
 	let exporting = $state(false);
@@ -90,6 +91,7 @@
 		loading = true;
 		error = null;
 		transition = null;
+		activeTransitionIndex = -1;
 		try {
 			const [detail, waveforms] = await Promise.all([
 				getSet(setId),
@@ -118,6 +120,13 @@
 
 	async function handleTransitionClick(index: number) {
 		if (!selectedSet) return;
+		// Toggle off if clicking the same transition
+		if (activeTransitionIndex === index) {
+			activeTransitionIndex = -1;
+			transition = null;
+			return;
+		}
+		activeTransitionIndex = index;
 		loadingTransition = true;
 		transition = null;
 		try {
@@ -188,6 +197,7 @@
 						tracks={waveformTracks}
 						setId={selectedSet.id}
 						energyProfile={setDetail?.energy_profile}
+						{activeTransitionIndex}
 						onTransitionClick={handleTransitionClick}
 						onTracksChanged={handleTracksChanged}
 						onTrackPlay={handleTrackPlay}
@@ -198,7 +208,13 @@
 			{#if loadingTransition}
 				<div class="status">Analyzing the transition...</div>
 			{:else if transition}
-				<TransitionDetail {transition} />
+				<TransitionDetail
+					{transition}
+					hasPrev={activeTransitionIndex > 0}
+					hasNext={activeTransitionIndex < waveformTracks.length - 2}
+					onPrev={() => handleTransitionClick(activeTransitionIndex - 1)}
+					onNext={() => handleTransitionClick(activeTransitionIndex + 1)}
+				/>
 			{/if}
 		{:else}
 			<div class="status">An empty set — your story starts here</div>

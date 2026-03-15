@@ -1,7 +1,35 @@
 <script lang="ts">
 	import type { TransitionScoreBreakdown } from '$lib/types';
+	import { harmonicRelationship } from '$lib/utils/camelot';
 
-	let { breakdown }: { breakdown: TransitionScoreBreakdown } = $props();
+	let {
+		breakdown,
+		keyA = null,
+		keyB = null,
+	}: {
+		breakdown: TransitionScoreBreakdown;
+		keyA?: string | null;
+		keyB?: string | null;
+	} = $props();
+
+	const TEACHING: Record<string, [string, string, string]> = {
+		harmonic:        ["Keys align naturally", "Some harmonic tension", "Clashing keys — bold move"],
+		energy_fit:      ["Right on the energy curve", "Drifting from your target", "Sharp energy jump"],
+		bpm_compat:      ["Seamless tempo", "Slight tempo shift", "Big tempo change"],
+		genre_coherence: ["Same sonic world", "Crossing genre boundaries", "Genre clash — make it count"],
+		track_quality:   ["Well-curated pick", "Decent selection", "Under-played — give it a chance"],
+	};
+
+	function getTeachingNote(key: string, value: number): string {
+		// For harmonic, use the richer relationship description if keys are available
+		if (key === 'harmonic' && (keyA || keyB)) {
+			return harmonicRelationship(keyA, keyB).description;
+		}
+		const [high, mid, low] = TEACHING[key] ?? ["", "", ""];
+		if (value >= 0.8) return high;
+		if (value >= 0.5) return mid;
+		return low;
+	}
 
 	const dimensions = [
 		{ key: 'harmonic' as const, label: 'Harmonic', weight: 0.25, color: '#9575CD' },
@@ -20,16 +48,19 @@
 	<div class="dimensions">
 		{#each dimensions as dim}
 			{@const value = breakdown[dim.key]}
-			<div class="dim-row">
-				<span class="dim-label">{dim.label}</span>
-				<div class="dim-bar">
-					<div
-						class="dim-fill"
-						style="width: {value * 100}%; background: {dim.color}"
-					></div>
+			<div class="dim-group">
+				<div class="dim-row">
+					<span class="dim-label">{dim.label}</span>
+					<div class="dim-bar">
+						<div
+							class="dim-fill"
+							style="width: {value * 100}%; background: {dim.color}"
+						></div>
+					</div>
+					<span class="dim-value">{value.toFixed(2)}</span>
+					<span class="dim-weight">x{dim.weight}</span>
 				</div>
-				<span class="dim-value">{value.toFixed(2)}</span>
-				<span class="dim-weight">x{dim.weight}</span>
+				<div class="dim-note">{getTeachingNote(dim.key, value)}</div>
 			</div>
 		{/each}
 	</div>
@@ -68,7 +99,20 @@
 	.dimensions {
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+		gap: 10px;
+	}
+
+	.dim-group {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.dim-note {
+		font-size: 10px;
+		color: var(--text-dim);
+		padding-left: 78px;
+		font-style: italic;
 	}
 
 	.dim-row {
