@@ -1422,7 +1422,25 @@ git add \
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+- [x] Task 1 — schemas.py: Add tinder Pydantic models — Status: Done
+- [x] Task 2 — store.py: Add tinder query helpers — Status: Done
+- [x] Task 3 — routes/tinder.py: New API route module — Status: Done
+- [x] Task 4 — main.py: Register tinder router — Status: Done
+- [x] Task 5 — types/index.ts: Add tinder TypeScript types — Status: Done
+- [x] Task 6 — api/tinder.ts: New API client — Status: Done
+- [x] Task 7 — stores/tinder.svelte.ts: New tinder store — Status: Done
+- [x] Task 8 — MoodRadar.svelte: 4-axis SVG radar chart — Status: Done
+- [x] Task 9 — TinderCard.svelte: Track review card — Status: Done
+- [x] Task 10 — TinderSummary.svelte: Session summary + retrain — Status: Done
+- [x] Task 11 — EnergyTinder.svelte: Main container — Status: Done
+- [x] Task 12 — ui.svelte.ts + Workspace.svelte: Add tinder tab — Status: Done
+- [x] Task 13 — Lint & type-check all modified files — Status: Done
+- [x] Task 14 — Unit tests: API test for tinder endpoints — Status: Done
+- [x] Task 15 — E2E validation: full test suite — Status: Done (67/67 passed, 0 TS errors)
+- [x] Task 16 — Commit — Status: Done
+
+Implementation commit: 44112c1
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
