@@ -6,31 +6,22 @@
 	import SetTimeline from './SetTimeline.svelte';
 	import TransitionDetail from './TransitionDetail.svelte';
 	import EnergyFlowChart from './EnergyFlowChart.svelte';
+	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
 
 	const ui = getUiStore();
 
-	let audioEl = $state<HTMLAudioElement>(null!);
+	/** The track currently loaded in the player (derived from playingTrackId) */
+	let playerTrack = $derived.by(() => {
+		if (ui.playingTrackId === null) return null;
+		return waveformTracks.find((t) => t.track_id === ui.playingTrackId) ?? null;
+	});
 
 	function handleTrackPlay(trackId: number) {
 		if (ui.playingTrackId === trackId) {
-			// Toggle pause
-			audioEl.pause();
 			ui.playingTrackId = null;
 			return;
 		}
 		ui.playingTrackId = trackId;
-		audioEl.src = `/api/audio/${trackId}`;
-		audioEl.play().catch(() => {
-			ui.playingTrackId = null;
-		});
-	}
-
-	function handleAudioEnded() {
-		ui.playingTrackId = null;
-	}
-
-	function handleAudioError() {
-		ui.playingTrackId = null;
 	}
 
 	let selectedSet = $state<DJSet | null>(null);
@@ -139,8 +130,6 @@
 	}
 </script>
 
-<audio bind:this={audioEl} onended={handleAudioEnded} onerror={handleAudioError}></audio>
-
 <div class="set-view">
 	<SetPicker onselect={handleSetSelect} />
 
@@ -162,13 +151,37 @@
 			<div class="status error">{error}</div>
 		{:else if waveformTracks.length > 0}
 			<div class="timeline-container" bind:this={timelineContainerEl}>
-				<div class="energy-chart-wrapper">
-					<EnergyFlowChart
-						tracks={waveformTracks}
-						energyProfile={setDetail?.energy_profile}
-						selectedIndex={selectedChartIndex}
-						onTrackClick={handleChartTrackClick}
-					/>
+				<div class="top-panel">
+					<div class="energy-chart-wrapper">
+						<EnergyFlowChart
+							tracks={waveformTracks}
+							energyProfile={setDetail?.energy_profile}
+							selectedIndex={selectedChartIndex}
+							onTrackClick={handleChartTrackClick}
+						/>
+					</div>
+					<div class="player-panel">
+						{#if playerTrack && playerTrack.waveform_overview && playerTrack.duration_sec}
+							<div class="player-track-info">
+								<span class="player-title" title={playerTrack.title ?? ''}>{playerTrack.title ?? 'Untitled'}</span>
+								<span class="player-artist" title={playerTrack.artist ?? ''}>{playerTrack.artist ?? 'Unknown'}</span>
+							</div>
+							{#key playerTrack.track_id}
+								<WavesurferPlayer
+									trackId={playerTrack.track_id}
+									peaks={playerTrack.waveform_overview}
+									duration={playerTrack.duration_sec}
+									height={80}
+									autoplay
+									onfinish={() => { ui.playingTrackId = null; }}
+								/>
+							{/key}
+						{:else if playerTrack}
+							<div class="player-empty">No waveform available</div>
+						{:else}
+							<div class="player-empty">Tap play on a track to preview</div>
+						{/if}
+					</div>
 				</div>
 				<div class="timeline-scroll">
 					<SetTimeline
@@ -258,9 +271,64 @@
 		border-bottom: 1px solid var(--border);
 	}
 
-	.energy-chart-wrapper {
+	.top-panel {
+		display: flex;
 		flex-shrink: 0;
 		border-bottom: 1px solid var(--border);
+		min-height: 0;
+	}
+
+	.energy-chart-wrapper {
+		flex: 3;
+		min-width: 0;
+	}
+
+	.player-panel {
+		flex: 1;
+		min-width: 200px;
+		border-left: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		padding: 8px;
+		gap: 6px;
+		background: var(--bg-secondary);
+	}
+
+	.player-track-info {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		padding: 0 4px;
+		min-width: 0;
+	}
+
+	.player-title {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.player-artist {
+		font-size: 11px;
+		color: var(--text-secondary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.player-empty {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
+		font-size: 12px;
+		color: var(--text-dim);
+		text-align: center;
+		padding: 12px;
 	}
 
 	.timeline-scroll {

@@ -12,6 +12,8 @@
 		height = 128,
 		waveColor = '#00CED1',
 		progressColor = '#00A8AB',
+		autoplay = false,
+		onfinish,
 	}: {
 		trackId: number;
 		peaks: string;
@@ -20,6 +22,8 @@
 		height?: number;
 		waveColor?: string;
 		progressColor?: string;
+		autoplay?: boolean;
+		onfinish?: () => void;
 	} = $props();
 
 	let container: HTMLDivElement;
@@ -53,6 +57,11 @@
 
 		ws.on('play', () => { isPlaying = true; });
 		ws.on('pause', () => { isPlaying = false; });
+		ws.on('finish', () => { onfinish?.(); });
+
+		if (autoplay) {
+			ws.once('ready', () => { ws?.play(); });
+		}
 
 		return () => {
 			ws?.destroy();
