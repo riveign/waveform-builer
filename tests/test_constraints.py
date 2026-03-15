@@ -1,6 +1,6 @@
 """Tests for energy profiles and constraints."""
 
-from djsetbuilder.setbuilder.constraints import (
+from kiku.setbuilder.constraints import (
     dir_energy_to_numeric,
     parse_energy_string,
 )

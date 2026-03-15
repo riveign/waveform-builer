@@ -1,12 +1,12 @@
-"""Alembic environment configuration for DJ Set Builder."""
+"""Alembic environment configuration for Kiku."""
 
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from djsetbuilder.config import get_db_url
-from djsetbuilder.db.models import Base
+from kiku.config import get_db_url
+from kiku.db.models import Base
 
 config = context.config
 if config.config_file_name is not None:

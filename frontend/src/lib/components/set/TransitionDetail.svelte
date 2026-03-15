@@ -32,8 +32,8 @@
 					peaks={transition.waveform_a_overview}
 					duration={a.duration_sec}
 					height={80}
-					waveColor="#00bcd4"
-					progressColor="#00838f"
+					waveColor="#00CED1"
+					progressColor="#00A8AB"
 				/>
 			{/if}
 		</div>
@@ -56,8 +56,8 @@
 					peaks={transition.waveform_b_overview}
 					duration={b.duration_sec}
 					height={80}
-					waveColor="#e94560"
-					progressColor="#b71c40"
+					waveColor="#FF6B6B"
+					progressColor="#CC5555"
 				/>
 			{/if}
 		</div>

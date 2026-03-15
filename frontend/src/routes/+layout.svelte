@@ -5,7 +5,10 @@
 
 <div class="app-shell">
 	<header class="app-header">
-		<h1 class="app-title">Kiku</h1>
+		<div class="app-logo">
+			<span class="app-kanji">聴</span>
+			<h1 class="app-title">Kiku</h1>
+		</div>
 	</header>
 	<div class="app-body">
 		{@render children()}
@@ -28,6 +31,20 @@
 		background: var(--bg-secondary);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
+	}
+
+	.app-logo {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		color: var(--accent);
+	}
+
+	.app-kanji {
+		font-size: 20px;
+		font-weight: 700;
+		line-height: 1;
+		color: var(--text-primary);
 	}
 
 	.app-title {

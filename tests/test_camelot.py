@@ -1,6 +1,6 @@
 """Tests for Camelot wheel harmonic scoring."""
 
-from djsetbuilder.setbuilder.camelot import harmonic_score, parse_camelot
+from kiku.setbuilder.camelot import harmonic_score, parse_camelot
 
 
 def test_parse_camelot():

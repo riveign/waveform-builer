@@ -10,9 +10,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
-from djsetbuilder.api.deps import get_db
-from djsetbuilder.api.main import create_app
-from djsetbuilder.db.models import Base, Set, SetTrack, Track
+from kiku.api.deps import get_db
+from kiku.api.main import create_app
+from kiku.db.models import Base, Set, SetTrack, Track
 
 
 @pytest.fixture()

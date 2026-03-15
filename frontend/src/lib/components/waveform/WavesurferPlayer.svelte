@@ -10,8 +10,8 @@
 		duration,
 		beats = null,
 		height = 128,
-		waveColor = '#00bcd4',
-		progressColor = '#00838f',
+		waveColor = '#00CED1',
+		progressColor = '#00A8AB',
 	}: {
 		trackId: number;
 		peaks: string;

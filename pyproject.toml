@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dj-set-builder"
+name = "kiku"
 version = "0.1.0"
-description = "CLI toolkit for building optimized DJ sets from a Rekordbox library"
+description = "Kiku (聴) — learn why your transitions work"
 requires-python = ">=3.9"
 dependencies = [
     "sqlalchemy>=2.0",
@@ -36,13 +36,13 @@ visualizer = [
     "plotly>=5.18",
 ]
 dev = [
-    "dj-set-builder[rekordbox]",
+    "kiku[rekordbox]",
     "pytest>=7.0",
     "pytest-cov",
 ]
 
 [project.scripts]
-djset = "djsetbuilder.cli:cli"
+kiku = "kiku.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]

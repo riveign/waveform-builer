@@ -14,12 +14,12 @@
 	Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
 	const FAMILY_COLORS: Record<string, string> = {
-		Techno: '#00d2ff',
-		House: '#e94560',
-		Groove: '#2ecc71',
-		Trance: '#9b59b6',
-		Breaks: '#f39c12',
-		Electronic: '#3498db',
+		Techno: '#40E0D0',
+		House: '#FF7F50',
+		Groove: '#66BB6A',
+		Trance: '#9575CD',
+		Breaks: '#FFB74D',
+		Electronic: '#42A5F5',
 		Other: '#95a5a6',
 	};
 
@@ -79,7 +79,7 @@
 								display: true,
 								position: 'bottom',
 								labels: {
-									color: '#e0e0e0',
+									color: '#F5F5F0',
 									font: { size: 11 },
 									padding: 12,
 									boxWidth: 12,
@@ -96,7 +96,7 @@
 						scales: {
 							x: {
 								stacked: true,
-								grid: { color: 'rgba(102, 102, 102, 0.2)' },
+								grid: { color: 'rgba(63, 65, 74, 0.4)' },
 								ticks: {
 									color: '#666',
 									font: { size: 10 },
@@ -107,13 +107,13 @@
 								title: {
 									display: true,
 									text: 'BPM',
-									color: '#999',
+									color: '#A0A1A7',
 									font: { size: 12 },
 								},
 							},
 							y: {
 								stacked: true,
-								grid: { color: 'rgba(102, 102, 102, 0.2)' },
+								grid: { color: 'rgba(63, 65, 74, 0.4)' },
 								ticks: {
 									color: '#666',
 									font: { size: 10 },
@@ -121,7 +121,7 @@
 								title: {
 									display: true,
 									text: 'Tracks',
-									color: '#999',
+									color: '#A0A1A7',
 									font: { size: 12 },
 								},
 							},

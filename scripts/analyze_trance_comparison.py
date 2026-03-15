@@ -13,9 +13,9 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress
 
-from djsetbuilder.db.models import AudioFeatures, Track, get_session
-from djsetbuilder.analysis.essentia_ext import extract_essentia_features
-from djsetbuilder.analysis.librosa_ext import extract_mfccs
+from kiku.db.models import AudioFeatures, Track, get_session
+from kiku.analysis.essentia_ext import extract_essentia_features
+from kiku.analysis.librosa_ext import extract_mfccs
 
 console = Console()
 

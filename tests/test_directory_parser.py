@@ -1,6 +1,6 @@
 """Tests for directory name parser."""
 
-from djsetbuilder.parsing.directory import parse_directory_name, parse_track_path
+from kiku.parsing.directory import parse_directory_name, parse_track_path
 
 
 def test_full_format_with_energy():

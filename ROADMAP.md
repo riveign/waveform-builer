@@ -1,4 +1,4 @@
-# DJ Set Builder — Product Roadmap
+# Kiku — Product Roadmap
 
 **Version:** 1.0
 **Date:** 2026-03-14

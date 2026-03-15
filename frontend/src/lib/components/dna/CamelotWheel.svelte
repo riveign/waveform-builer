@@ -41,18 +41,18 @@
 								label: 'Minor (A)',
 								data: minorCounts,
 								backgroundColor: CAMELOT_LABELS.map(
-									() => 'rgba(0, 210, 255, 0.6)'
+									() => 'rgba(64, 224, 208, 0.6)'
 								),
-								borderColor: 'rgba(0, 210, 255, 0.8)',
+								borderColor: 'rgba(64, 224, 208, 0.8)',
 								borderWidth: 1,
 							},
 							{
 								label: 'Major (B)',
 								data: majorCounts,
 								backgroundColor: CAMELOT_LABELS.map(
-									() => 'rgba(233, 69, 96, 1.0)'
+									() => 'rgba(255, 127, 80, 1.0)'
 								),
-								borderColor: 'rgba(233, 69, 96, 0.8)',
+								borderColor: 'rgba(255, 127, 80, 0.8)',
 								borderWidth: 1,
 							},
 						],
@@ -65,7 +65,7 @@
 								display: true,
 								position: 'bottom',
 								labels: {
-									color: '#e0e0e0',
+									color: '#F5F5F0',
 									font: { size: 12 },
 									padding: 16,
 								},
@@ -89,13 +89,13 @@
 						},
 						scales: {
 							r: {
-								grid: { color: 'rgba(102, 102, 102, 0.3)' },
+								grid: { color: 'rgba(63, 65, 74, 0.5)' },
 								ticks: {
 									color: '#666',
 									backdropColor: 'transparent',
 								},
 								pointLabels: {
-									color: '#999',
+									color: '#A0A1A7',
 									font: { size: 11 },
 								},
 							},

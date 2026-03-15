@@ -20,10 +20,10 @@
 	let displayScore = $derived(breakdown?.total ?? score ?? null);
 
 	function scoreColor(s: number): string {
-		if (s >= 0.8) return '#2ecc71';
-		if (s >= 0.6) return '#f39c12';
-		if (s >= 0.4) return '#e67e22';
-		return '#e94560';
+		if (s >= 0.8) return '#66BB6A';
+		if (s >= 0.6) return '#FFB74D';
+		if (s >= 0.4) return '#FF9800';
+		return '#FF6B6B';
 	}
 
 	function scoreLabel(s: number): string {
@@ -175,7 +175,7 @@
 	}
 
 	.breakdown-error {
-		color: #e94560;
+		color: #FF6B6B;
 	}
 
 	@keyframes slide-down {

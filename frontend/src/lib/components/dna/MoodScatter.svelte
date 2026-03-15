@@ -6,12 +6,12 @@
 	Chart.register(ScatterController, LinearScale, PointElement, Tooltip, Legend);
 
 	const FAMILY_COLORS: Record<string, string> = {
-		Techno: '#00d2ff',
-		House: '#e94560',
-		Groove: '#2ecc71',
-		Trance: '#9b59b6',
-		Breaks: '#f39c12',
-		Electronic: '#3498db',
+		Techno: '#40E0D0',
+		House: '#FF7F50',
+		Groove: '#66BB6A',
+		Trance: '#9575CD',
+		Breaks: '#FFB74D',
+		Electronic: '#42A5F5',
 		Other: '#95a5a6',
 	};
 
@@ -62,23 +62,23 @@
 						title: {
 							display: true,
 							text: 'Happy  \u2190\u2192  Sad',
-							color: '#999',
+							color: '#A0A1A7',
 							font: { size: 11 },
 						},
-						grid: { color: '#333' },
+						grid: { color: '#3F414A' },
 						ticks: { color: '#666', font: { size: 10 } },
-						border: { color: '#333' },
+						border: { color: '#3F414A' },
 					},
 					y: {
 						title: {
 							display: true,
 							text: 'Aggressive  \u2190\u2192  Relaxed',
-							color: '#999',
+							color: '#A0A1A7',
 							font: { size: 11 },
 						},
-						grid: { color: '#333' },
+						grid: { color: '#3F414A' },
 						ticks: { color: '#666', font: { size: 10 } },
-						border: { color: '#333' },
+						border: { color: '#3F414A' },
 					},
 				},
 				plugins: {
@@ -89,8 +89,8 @@
 								return `${raw.title} - ${raw.artist} (${raw.x.toFixed(2)}, ${raw.y.toFixed(2)})`;
 							},
 						},
-						backgroundColor: '#0d0d0d',
-						borderColor: '#333',
+						backgroundColor: '#0D0D0D',
+						borderColor: '#3F414A',
 						borderWidth: 1,
 						titleFont: { size: 12 },
 						bodyFont: { size: 11 },
@@ -99,7 +99,7 @@
 					legend: {
 						position: 'bottom' as const,
 						labels: {
-							color: '#999',
+							color: '#A0A1A7',
 							font: { size: 11 },
 							usePointStyle: true,
 							pointStyle: 'circle',

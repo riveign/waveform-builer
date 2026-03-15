@@ -4,11 +4,11 @@
 	let { breakdown }: { breakdown: TransitionScoreBreakdown } = $props();
 
 	const dimensions = [
-		{ key: 'harmonic' as const, label: 'Harmonic', weight: 0.25, color: '#9b59b6' },
-		{ key: 'energy_fit' as const, label: 'Energy Fit', weight: 0.20, color: '#e94560' },
-		{ key: 'bpm_compat' as const, label: 'BPM', weight: 0.20, color: '#00bcd4' },
-		{ key: 'genre_coherence' as const, label: 'Genre', weight: 0.15, color: '#2ecc71' },
-		{ key: 'track_quality' as const, label: 'Quality', weight: 0.20, color: '#f39c12' },
+		{ key: 'harmonic' as const, label: 'Harmonic', weight: 0.25, color: '#9575CD' },
+		{ key: 'energy_fit' as const, label: 'Energy Fit', weight: 0.20, color: '#FF7F50' },
+		{ key: 'bpm_compat' as const, label: 'BPM', weight: 0.20, color: '#40E0D0' },
+		{ key: 'genre_coherence' as const, label: 'Genre', weight: 0.15, color: '#66BB6A' },
+		{ key: 'track_quality' as const, label: 'Quality', weight: 0.20, color: '#FFB74D' },
 	];
 </script>
 

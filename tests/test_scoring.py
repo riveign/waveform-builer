@@ -1,6 +1,6 @@
 """Tests for transition scoring."""
 
-from djsetbuilder.setbuilder.scoring import bpm_compatibility, genre_coherence
+from kiku.setbuilder.scoring import bpm_compatibility, genre_coherence
 
 
 def test_bpm_same():

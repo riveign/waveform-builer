@@ -96,13 +96,15 @@
 			</div>
 			<div class="confidence-text">{((item.energy_confidence ?? 0) * 100).toFixed(0)}% confident</div>
 		</div>
-		<MoodRadar
-			happy={item.mood_happy ?? 0}
-			sad={item.mood_sad ?? 0}
-			aggressive={item.mood_aggressive ?? 0}
-			relaxed={item.mood_relaxed ?? 0}
-			size={100}
-		/>
+		{#if item.mood_happy != null || item.mood_sad != null || item.mood_aggressive != null || item.mood_relaxed != null}
+			<MoodRadar
+				happy={item.mood_happy ?? 0}
+				sad={item.mood_sad ?? 0}
+				aggressive={item.mood_aggressive ?? 0}
+				relaxed={item.mood_relaxed ?? 0}
+				size={100}
+			/>
+		{/if}
 	</div>
 
 	<!-- Teaching moment -->

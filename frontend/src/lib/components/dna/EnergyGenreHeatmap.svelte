@@ -4,12 +4,12 @@
 	const ENERGY_LEVELS = ['low', 'warmup', 'closing', 'mid', 'dance', 'up', 'high', 'fast', 'peak'] as const;
 
 	const FAMILY_COLORS: Record<string, string> = {
-		Techno: '#00d2ff',
-		House: '#e94560',
-		Groove: '#2ecc71',
-		Trance: '#9b59b6',
-		Breaks: '#f39c12',
-		Electronic: '#3498db',
+		Techno: '#40E0D0',
+		House: '#FF7F50',
+		Groove: '#66BB6A',
+		Trance: '#9575CD',
+		Breaks: '#FFB74D',
+		Electronic: '#42A5F5',
 		Other: '#95a5a6',
 	};
 

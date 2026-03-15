@@ -70,6 +70,7 @@
 <div
 	class="set-track-card"
 	class:selected={isSelected}
+	data-track-id={track.track_id}
 	onclick={handleClick}
 	role="button"
 	tabindex="0"

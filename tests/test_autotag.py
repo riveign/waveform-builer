@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from djsetbuilder.analysis.autotag import (
+from kiku.analysis.autotag import (
     ZONE_MAP,
     extract_features,
     feature_names,
@@ -76,7 +76,7 @@ class TestZoneMapping:
 
 class TestModelPersistence:
     def test_save_load_roundtrip(self, tmp_path):
-        from djsetbuilder.analysis.autotag import load_model, save_model
+        from kiku.analysis.autotag import load_model, save_model
 
         # Create a minimal mock model
         from sklearn.ensemble import RandomForestClassifier
