@@ -9,6 +9,30 @@
 
 	const ui = getUiStore();
 
+	let audioEl = $state<HTMLAudioElement>(null!);
+
+	function handleTrackPlay(trackId: number) {
+		if (ui.playingTrackId === trackId) {
+			// Toggle pause
+			audioEl.pause();
+			ui.playingTrackId = null;
+			return;
+		}
+		ui.playingTrackId = trackId;
+		audioEl.src = `/api/audio/${trackId}`;
+		audioEl.play().catch(() => {
+			ui.playingTrackId = null;
+		});
+	}
+
+	function handleAudioEnded() {
+		ui.playingTrackId = null;
+	}
+
+	function handleAudioError() {
+		ui.playingTrackId = null;
+	}
+
 	let selectedSet = $state<DJSet | null>(null);
 	let setDetail = $state<SetDetailType | null>(null);
 	let waveformTracks = $state<SetWaveformTrack[]>([]);
@@ -115,6 +139,8 @@
 	}
 </script>
 
+<audio bind:this={audioEl} onended={handleAudioEnded} onerror={handleAudioError}></audio>
+
 <div class="set-view">
 	<SetPicker onselect={handleSetSelect} />
 
@@ -151,6 +177,7 @@
 						energyProfile={setDetail?.energy_profile}
 						onTransitionClick={handleTransitionClick}
 						onTracksChanged={handleTracksChanged}
+						onTrackPlay={handleTrackPlay}
 					/>
 				</div>
 			</div>

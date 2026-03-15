@@ -84,13 +84,13 @@ def parse_energy_json(s: str) -> EnergyProfile:
 ENERGY_TAG_VALUES = {
     "low": 0.2,
     "warmup": 0.25,
-    "closing": 0.3,
     "mid": 0.5,
     "dance": 0.6,
     "up": 0.7,
-    "high": 0.8,
-    "fast": 0.8,
+    "high": 0.75,
+    "fast": 0.85,
     "peak": 0.9,
+    "closing": 0.35,
 }
 
 

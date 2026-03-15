@@ -12,12 +12,14 @@
 		energyProfile,
 		onTransitionClick,
 		onTracksChanged,
+		onTrackPlay,
 	}: {
 		tracks: SetWaveformTrack[];
 		setId: number;
 		energyProfile?: string | null;
 		onTransitionClick?: (index: number) => void;
 		onTracksChanged?: () => void;
+		onTrackPlay?: (trackId: number) => void;
 	} = $props();
 
 	const ui = getUiStore();
@@ -182,7 +184,9 @@
 									}}
 									position={i + 1}
 									isSelected={ui.selectedTrackInSet === item.track_id}
+									isPlaying={ui.playingTrackId === item.track_id}
 									energyTarget={typeof energyTargets[i] === 'number' ? energyTargets[i] : undefined}
+									onplay={onTrackPlay}
 								/>
 							</div>
 							<button

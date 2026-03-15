@@ -7,12 +7,16 @@
 		track,
 		position,
 		isSelected = false,
+		isPlaying = false,
 		energyTarget,
+		onplay,
 	}: {
 		track: SetTrack;
 		position: number;
 		isSelected?: boolean;
+		isPlaying?: boolean;
 		energyTarget?: number;
+		onplay?: (trackId: number) => void;
 	} = $props();
 
 	const ui = getUiStore();
@@ -65,11 +69,17 @@
 	function handleClick() {
 		ui.selectedTrackInSet = track.track_id;
 	}
+
+	function handlePlayClick(e: MouseEvent) {
+		e.stopPropagation();
+		onplay?.(track.track_id);
+	}
 </script>
 
 <div
 	class="set-track-card"
 	class:selected={isSelected}
+	class:playing={isPlaying}
 	data-track-id={track.track_id}
 	onclick={handleClick}
 	role="button"
@@ -77,6 +87,24 @@
 	onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
 >
 	<span class="position">{position}</span>
+
+	<button
+		class="play-btn"
+		class:active={isPlaying}
+		onclick={handlePlayClick}
+		aria-label={isPlaying ? 'Pause' : 'Play'}
+	>
+		{#if isPlaying}
+			<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+				<rect x="1" y="1" width="4" height="10" rx="1" />
+				<rect x="7" y="1" width="4" height="10" rx="1" />
+			</svg>
+		{:else}
+			<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+				<path d="M2 1.5v9l8.5-4.5L2 1.5z" />
+			</svg>
+		{/if}
+	</button>
 
 	<div class="track-info">
 		<div class="title-row">
@@ -135,6 +163,42 @@
 	.set-track-card.selected {
 		background: var(--bg-active);
 		border-color: var(--accent);
+	}
+
+	.set-track-card.playing {
+		border-color: var(--accent);
+		box-shadow: 0 0 6px rgba(var(--accent-rgb, 255, 190, 11), 0.25);
+	}
+
+	.play-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		flex-shrink: 0;
+		border: none;
+		background: none;
+		color: var(--text-dim);
+		cursor: pointer;
+		border-radius: 50%;
+		padding: 0;
+		opacity: 0;
+		transition: opacity 0.15s, background 0.1s, color 0.1s;
+	}
+
+	.set-track-card:hover .play-btn,
+	.play-btn.active {
+		opacity: 1;
+	}
+
+	.play-btn.active {
+		color: var(--accent);
+	}
+
+	.play-btn:hover {
+		background: var(--bg-tertiary);
+		color: var(--accent);
 	}
 
 	.position {

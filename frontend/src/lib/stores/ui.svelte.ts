@@ -8,6 +8,7 @@ let selectedTrack = $state<Track | null>(null);
 let selectedSetId = $state<number | null>(null);
 let selectedTrackInSet = $state<number | null>(null);
 let timelineViewMode = $state<TimelineViewMode>('linear');
+let playingTrackId = $state<number | null>(null);
 
 export function getUiStore() {
 	return {
@@ -21,5 +22,7 @@ export function getUiStore() {
 		set selectedTrackInSet(v: number | null) { selectedTrackInSet = v; },
 		get timelineViewMode() { return timelineViewMode; },
 		set timelineViewMode(v: TimelineViewMode) { timelineViewMode = v; },
+		get playingTrackId() { return playingTrackId; },
+		set playingTrackId(v: number | null) { playingTrackId = v; },
 	};
 }

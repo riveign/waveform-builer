@@ -18,12 +18,14 @@
 	let waveformDuration = $state(0);
 	let showOverrideMenu = $state(false);
 
-	const ZONES = ['warmup', 'build', 'peak'] as const;
+	const ZONES = ['warmup', 'build', 'drive', 'peak', 'close'] as const;
 
 	const zoneColors: Record<string, string> = {
 		warmup: '#4ecdc4',
 		build: '#ffe66d',
+		drive: '#f39c12',
 		peak: '#ff6b6b',
+		close: '#9b59b6',
 	};
 
 	$effect(() => {

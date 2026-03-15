@@ -15,9 +15,11 @@ from kiku.db.models import AudioFeatures, Track
 
 # Zone mapping: granular tag → zone
 ZONE_MAP: dict[str, str] = {
-    "low": "warmup", "warmup": "warmup", "closing": "warmup",
-    "mid": "build", "dance": "build", "up": "build",
-    "high": "peak", "fast": "peak", "peak": "peak",
+    "low": "warmup", "warmup": "warmup",
+    "mid": "build", "dance": "build",
+    "up": "drive", "high": "drive",
+    "fast": "peak", "peak": "peak",
+    "closing": "close",
 }
 
 # All valid granular energy tags

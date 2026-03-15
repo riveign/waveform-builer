@@ -71,7 +71,7 @@ class TestZoneMapping:
             assert tag in ZONE_MAP
 
     def test_zones_are_valid(self):
-        assert set(ZONE_MAP.values()) == {"warmup", "build", "peak"}
+        assert set(ZONE_MAP.values()) == {"warmup", "build", "drive", "peak", "close"}
 
 
 class TestModelPersistence:
