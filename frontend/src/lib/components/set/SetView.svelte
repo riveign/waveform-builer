@@ -1,9 +1,13 @@
 <script lang="ts">
 	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData } from '$lib/types';
 	import { getSet, getSetWaveforms, getTransition, exportRekordbox } from '$lib/api/sets';
+	import { getUiStore } from '$lib/stores/ui.svelte';
 	import SetPicker from './SetPicker.svelte';
 	import SetTimeline from './SetTimeline.svelte';
 	import TransitionDetail from './TransitionDetail.svelte';
+	import EnergyFlowChart from './EnergyFlowChart.svelte';
+
+	const ui = getUiStore();
 
 	let selectedSet = $state<DJSet | null>(null);
 	let setDetail = $state<SetDetailType | null>(null);
@@ -14,6 +18,32 @@
 	let exporting = $state(false);
 	let exportMsg = $state<string | null>(null);
 	let error = $state<string | null>(null);
+	let timelineContainerEl = $state<HTMLDivElement>(null!);
+
+	/** Derive chart selectedIndex from ui.selectedTrackInSet (track ID) */
+	let selectedChartIndex = $derived.by(() => {
+		if (ui.selectedTrackInSet === null) return undefined;
+		const idx = waveformTracks.findIndex((t) => t.track_id === ui.selectedTrackInSet);
+		return idx >= 0 ? idx : undefined;
+	});
+
+	/** Chart click handler: convert index to track ID, update store */
+	function handleChartTrackClick(index: number) {
+		if (index >= 0 && index < waveformTracks.length) {
+			ui.selectedTrackInSet = waveformTracks[index].track_id;
+		}
+	}
+
+	/** Scroll timeline to selected track when selection changes */
+	$effect(() => {
+		const trackId = ui.selectedTrackInSet;
+		if (trackId !== null && timelineContainerEl) {
+			const trackEl = timelineContainerEl.querySelector(
+				`[data-track-id="${trackId}"]`
+			);
+			trackEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		}
+	});
 
 	async function handleExport() {
 		if (!selectedSet || exporting) return;
@@ -105,14 +135,24 @@
 		{:else if error}
 			<div class="status error">{error}</div>
 		{:else if waveformTracks.length > 0}
-			<div class="timeline-container">
-				<SetTimeline
-					tracks={waveformTracks}
-					setId={selectedSet.id}
-					energyProfile={setDetail?.energy_profile}
-					onTransitionClick={handleTransitionClick}
-					onTracksChanged={handleTracksChanged}
-				/>
+			<div class="timeline-container" bind:this={timelineContainerEl}>
+				<div class="energy-chart-wrapper">
+					<EnergyFlowChart
+						tracks={waveformTracks}
+						energyProfile={setDetail?.energy_profile}
+						selectedIndex={selectedChartIndex}
+						onTrackClick={handleChartTrackClick}
+					/>
+				</div>
+				<div class="timeline-scroll">
+					<SetTimeline
+						tracks={waveformTracks}
+						setId={selectedSet.id}
+						energyProfile={setDetail?.energy_profile}
+						onTransitionClick={handleTransitionClick}
+						onTracksChanged={handleTracksChanged}
+					/>
+				</div>
 			</div>
 
 			{#if loadingTransition}
@@ -186,8 +226,20 @@
 	.timeline-container {
 		flex: 1;
 		min-height: 0;
-		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
 		border-bottom: 1px solid var(--border);
+	}
+
+	.energy-chart-wrapper {
+		flex-shrink: 0;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.timeline-scroll {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
 	}
 
 	.status {
