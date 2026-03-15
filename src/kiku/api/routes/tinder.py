@@ -83,12 +83,11 @@ def tinder_decide(body: TinderDecideRequest, db: Session = Depends(get_db)):
     if body.decision == "override" and not body.override_zone:
         raise HTTPException(status_code=400, detail="override_zone required when decision is override")
     if body.override_zone:
-        from kiku.analysis.autotag import ZONE_MAP
-        valid_zones = set(ZONE_MAP.values())
-        if body.override_zone not in valid_zones:
+        from kiku.analysis.autotag import ENERGY_ZONES
+        if body.override_zone not in ENERGY_ZONES:
             raise HTTPException(
                 status_code=400,
-                detail=f"override_zone must be one of: {sorted(valid_zones)}",
+                detail=f"override_zone must be one of: {ENERGY_ZONES}",
             )
 
     track = save_tinder_decision(db, body.track_id, body.decision, body.override_zone)

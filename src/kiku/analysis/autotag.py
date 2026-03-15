@@ -22,6 +22,9 @@ ZONE_MAP: dict[str, str] = {
     "closing": "close",
 }
 
+# Canonical list of energy zones (order: low → high energy, then close)
+ENERGY_ZONES: list[str] = ["warmup", "build", "drive", "peak", "close"]
+
 # All valid granular energy tags
 ENERGY_TAGS = list(ZONE_MAP.keys())
 
