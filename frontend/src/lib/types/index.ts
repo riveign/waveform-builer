@@ -348,3 +348,54 @@ export interface TinderRetrainResult {
 	feature_importance: [string, number][];
 	training_samples: number;
 }
+
+// ── Track Hunter types ──
+
+export interface HuntTrack {
+	id: number;
+	position: number;
+	artist: string | null;
+	title: string | null;
+	remix_info: string | null;
+	original_title: string | null;
+	confidence: number;
+	source: string | null;
+	timestamp_sec: number | null;
+	matched_track_id: number | null;
+	match_score: number | null;
+	acquisition_status: string;
+	purchase_links: Record<string, string>;
+	raw_text: string | null;
+}
+
+export interface HuntSession {
+	id: number;
+	url: string;
+	platform: string | null;
+	title: string | null;
+	uploader: string | null;
+	status: string;
+	track_count: number;
+	owned_count: number;
+	created_at: string | null;
+	tracks: HuntTrack[];
+}
+
+export interface HuntSessionSummary {
+	id: number;
+	url: string;
+	platform: string | null;
+	title: string | null;
+	uploader: string | null;
+	status: string;
+	track_count: number;
+	owned_count: number;
+	created_at: string | null;
+}
+
+export interface HuntListResponse {
+	items: HuntSessionSummary[];
+	total: number;
+	offset: number;
+	limit: number;
+}

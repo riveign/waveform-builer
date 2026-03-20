@@ -31,6 +31,12 @@ api = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
 ]
+hunting = [
+    "yt-dlp>=2024.0",
+    "beautifulsoup4>=4.12",
+    "thefuzz[speedup]>=0.22",
+    "musicbrainzngs>=0.7",
+]
 visualizer = [
     "dash>=2.14",
     "plotly>=5.18",

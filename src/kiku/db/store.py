@@ -24,13 +24,13 @@ def search_tracks(
     session: Session,
     title: str | None = None,
     artist: str | None = None,
-    genre: str | None = None,
+    genre: str | list[str] | None = None,
     bpm_min: float | None = None,
     bpm_max: float | None = None,
     energy: str | None = None,
     *,
     energy_zone: str | None = None,
-    key: str | None = None,
+    key: str | list[str] | None = None,
     rating_min: int | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -38,6 +38,7 @@ def search_tracks(
     """Search tracks with multiple filters.
 
     Returns (tracks, total_count) to support pagination.
+    genre/key accept a single string or list of strings (OR-matched).
     """
     q = session.query(Track)
     if title:
@@ -45,10 +46,12 @@ def search_tracks(
     if artist:
         q = q.filter(Track.artist.ilike(f"%{artist}%"))
     if genre:
-        q = q.filter(
-            (Track.dir_genre.ilike(f"%{genre}%"))
-            | (Track.rb_genre.ilike(f"%{genre}%"))
-        )
+        genres = [genre] if isinstance(genre, str) else genre
+        genre_conditions = []
+        for g in genres:
+            genre_conditions.append(Track.dir_genre.ilike(f"%{g}%"))
+            genre_conditions.append(Track.rb_genre.ilike(f"%{g}%"))
+        q = q.filter(or_(*genre_conditions))
     if bpm_min is not None:
         q = q.filter(Track.bpm >= bpm_min)
     if bpm_max is not None:
@@ -64,7 +67,9 @@ def search_tracks(
         conditions.append(Track.energy_predicted == energy_zone.lower())
         q = q.filter(or_(*conditions))
     if key:
-        q = q.filter(Track.key.ilike(f"%{key}%"))
+        keys = [key] if isinstance(key, str) else key
+        key_conditions = [Track.key.ilike(f"%{k}%") for k in keys]
+        q = q.filter(or_(*key_conditions))
     if rating_min is not None:
         q = q.filter(Track.rating >= rating_min)
     total = q.count()
@@ -454,3 +459,97 @@ def save_tinder_decision(
     # skip: do nothing
     session.commit()
     return track
+
+
+# ── Hunt session CRUD ─────────────────────────────────────────────────
+
+
+def create_hunt_session(
+    session: Session, url: str, platform: str, title: str | None = None,
+    uploader: str | None = None,
+) -> "HuntSession":
+    """Create a new hunt session."""
+    from kiku.db.models import HuntSession
+
+    hunt = HuntSession(url=url, platform=platform, title=title, uploader=uploader)
+    session.add(hunt)
+    session.flush()
+    return hunt
+
+
+def get_hunt_session(session: Session, hunt_id: int) -> "HuntSession | None":
+    """Get a hunt session by ID with tracks eagerly loaded."""
+    from kiku.db.models import HuntSession
+
+    return session.query(HuntSession).filter_by(id=hunt_id).first()
+
+
+def list_hunt_sessions(session: Session, limit: int = 20, offset: int = 0) -> tuple[list, int]:
+    """List hunt sessions ordered by creation date desc."""
+    from sqlalchemy import func
+
+    from kiku.db.models import HuntSession
+
+    total = session.query(func.count(HuntSession.id)).scalar() or 0
+    hunts = (
+        session.query(HuntSession)
+        .order_by(HuntSession.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return hunts, total
+
+
+def save_hunt_tracks(
+    session: Session, hunt_id: int, tracks: list[dict],
+) -> list:
+    """Save extracted tracks to a hunt session."""
+    import json
+
+    from kiku.db.models import HuntSession, HuntTrack
+
+    hunt = session.query(HuntSession).filter_by(id=hunt_id).first()
+    if not hunt:
+        return []
+
+    results = []
+    for t in tracks:
+        ht = HuntTrack(
+            session_id=hunt_id,
+            position=t.get("position", 0),
+            raw_text=t.get("raw_text"),
+            artist=t.get("artist"),
+            title=t.get("title"),
+            remix_info=t.get("remix_info"),
+            original_artist=t.get("original_artist"),
+            original_title=t.get("original_title"),
+            confidence=t.get("confidence", 0.0),
+            source=t.get("source"),
+            timestamp_sec=t.get("timestamp_sec"),
+            matched_track_id=t.get("matched_track_id"),
+            match_score=t.get("match_score"),
+            acquisition_status=t.get("acquisition_status", "unowned"),
+            purchase_links=json.dumps(t.get("purchase_links", {})),
+        )
+        session.add(ht)
+        results.append(ht)
+
+    hunt.track_count = len(tracks)
+    hunt.owned_count = sum(1 for t in tracks if t.get("acquisition_status") == "owned")
+    hunt.status = "complete"
+    session.flush()
+    return results
+
+
+def update_hunt_track_status(
+    session: Session, hunt_track_id: int, status: str,
+) -> "HuntTrack | None":
+    """Update acquisition status of a hunt track (e.g. 'wanted', 'owned')."""
+    from kiku.db.models import HuntTrack
+
+    ht = session.query(HuntTrack).filter_by(id=hunt_track_id).first()
+    if ht:
+        ht.acquisition_status = status
+        session.flush()
+    return ht

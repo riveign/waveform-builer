@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from kiku.api.routes import audio, config, export, sets, stats, tinder, tracks, waveforms
+from kiku.api.routes import audio, config, export, hunt, sets, stats, tinder, tracks, waveforms
 from kiku.db.models import _init_schema
 
 
@@ -39,5 +39,6 @@ def create_app() -> FastAPI:
     app.include_router(tinder.router)
     app.include_router(export.router)
     app.include_router(config.router)
+    app.include_router(hunt.router)
 
     return app

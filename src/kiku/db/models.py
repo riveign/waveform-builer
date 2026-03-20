@@ -162,6 +162,48 @@ class TransitionCue(Base):
     track = relationship("Track")
 
 
+class HuntSession(Base):
+    __tablename__ = "hunt_sessions"
+
+    id = Column(Integer, primary_key=True)
+    url = Column(String, nullable=False)
+    platform = Column(String)  # "youtube", "soundcloud", "mixcloud", "1001tracklists"
+    title = Column(String)  # Set/mix title from metadata
+    uploader = Column(String)  # DJ / channel name
+    status = Column(String, default="pending")  # "pending", "extracting", "matching", "complete", "error"
+    error_message = Column(Text)
+    track_count = Column(Integer, default=0)
+    owned_count = Column(Integer, default=0)
+    created_at = Column(String, default=lambda: datetime.now().isoformat())
+
+    tracks = relationship("HuntTrack", back_populates="session", cascade="all, delete-orphan",
+                          order_by="HuntTrack.position")
+
+
+class HuntTrack(Base):
+    __tablename__ = "hunt_tracks"
+
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("hunt_sessions.id", ondelete="CASCADE"), nullable=False)
+    position = Column(Integer, nullable=False)
+    raw_text = Column(String)  # Original text from description/comment
+    artist = Column(String)
+    title = Column(String)
+    remix_info = Column(String)  # e.g. "Artist Remix", "Original Mix"
+    original_artist = Column(String)  # Original artist if this is a remix
+    original_title = Column(String)  # Original title if this is a remix
+    confidence = Column(Float, default=0.0)  # 0-1 extraction confidence
+    source = Column(String)  # "description", "comment", "chapter", "1001tracklists", "copyright"
+    timestamp_sec = Column(Float)  # Position in the mix where this track appears
+    matched_track_id = Column(Integer, ForeignKey("tracks.id"))  # Link to owned track
+    match_score = Column(Float)  # Fuzzy match score 0-1
+    acquisition_status = Column(String, default="unowned")  # "owned", "unowned", "wanted"
+    purchase_links = Column(Text)  # JSON dict of {store: url}
+
+    session = relationship("HuntSession", back_populates="tracks")
+    matched_track = relationship("Track")
+
+
 def get_engine():
     global _engine
     if _engine is None:

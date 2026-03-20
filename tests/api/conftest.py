@@ -12,7 +12,7 @@ from sqlalchemy.pool import NullPool
 
 from kiku.api.deps import get_db
 from kiku.api.main import create_app
-from kiku.db.models import Base, Set, SetTrack, Track
+from kiku.db.models import Base, HuntSession, HuntTrack, Set, SetTrack, Track
 
 
 @pytest.fixture()
@@ -52,6 +52,30 @@ def db_session(tmp_path):
         t.energy_predicted = "build" if i <= 5 else "peak"
         t.energy_confidence = i * 0.1  # 0.1 to 1.0
         t.energy_source = "auto"
+
+    # Seed a hunt session
+    hs = HuntSession(
+        id=1, url="https://www.youtube.com/watch?v=test123",
+        platform="youtube", title="Test DJ Set", uploader="TestDJ",
+        status="complete", track_count=3, owned_count=1,
+    )
+    session.add(hs)
+    session.flush()
+    session.add(HuntTrack(
+        session_id=1, position=1, artist="Artist 1", title="Track 1",
+        confidence=0.9, source="description", acquisition_status="owned",
+        matched_track_id=1, match_score=0.95, purchase_links="{}",
+    ))
+    session.add(HuntTrack(
+        session_id=1, position=2, artist="Unknown Artist", title="Mystery Track",
+        confidence=0.7, source="description", acquisition_status="unowned",
+        purchase_links='{"beatport":"https://www.beatport.com/search?q=test"}',
+    ))
+    session.add(HuntTrack(
+        session_id=1, position=3, artist="Another One", title="Deep Cut",
+        confidence=0.6, source="comment", acquisition_status="wanted",
+        purchase_links='{"bandcamp":"https://bandcamp.com/search?q=test"}',
+    ))
 
     session.commit()
     yield session

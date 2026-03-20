@@ -928,3 +928,131 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
     session.commit()
     console.print(f"\n[green]Applied {applied} predictions[/]" +
                   (f" [dim](skipped {skipped} with existing tags)[/]" if skipped else ""))
+
+
+@cli.command()
+@click.argument("url")
+@click.option("--no-comments", is_flag=True, help="Skip fetching comments (faster)")
+@click.option("--json-output", "as_json", is_flag=True, help="Output results as JSON")
+def hunt(url: str, no_comments: bool, as_json: bool):
+    """Extract a tracklist from a DJ set URL and find where to buy the tracks.
+
+    Supports YouTube, SoundCloud, and Mixcloud URLs. Parses descriptions,
+    chapters, and comments to identify tracks, then matches against your library.
+    """
+    from kiku.db.models import get_session
+    from kiku.db.store import create_hunt_session, save_hunt_tracks
+    from kiku.hunting.extractor import detect_platform, extract_metadata
+    from kiku.hunting.matcher import match_tracks
+    from kiku.hunting.parsers.tracklist import (
+        merge_tracklists,
+        parse_chapters,
+        parse_comments,
+        parse_description,
+    )
+    from kiku.hunting.sources import generate_purchase_links
+
+    platform = detect_platform(url)
+    if not platform:
+        console.print("[red]Unsupported URL.[/] Try YouTube, SoundCloud, or Mixcloud.")
+        return
+
+    console.print(f"[cyan]Hunting tracks from {platform}...[/]")
+
+    metadata = extract_metadata(url, include_comments=not no_comments)
+    if metadata.error:
+        console.print(f"[red]Extraction failed:[/] {metadata.error}")
+        return
+
+    if metadata.title:
+        console.print(f"[bold]{metadata.title}[/]")
+    if metadata.uploader:
+        console.print(f"  by {metadata.uploader}")
+    console.print()
+
+    # Parse all sources
+    desc_tracks = parse_description(metadata.description)
+    chapter_tracks = parse_chapters(metadata.chapters)
+    comment_tracks = parse_comments(metadata.comments) if not no_comments else []
+
+    merged = merge_tracklists(chapter_tracks, desc_tracks, comment_tracks)
+
+    if not merged:
+        console.print("[yellow]Couldn't find a tracklist in this set.[/] "
+                      "The description may not contain track names.")
+        return
+
+    console.print(f"[bold]Found {len(merged)} tracks[/]\n")
+
+    # Convert to dicts and match
+    track_dicts = [
+        {
+            "position": t.position,
+            "artist": t.artist,
+            "title": t.title,
+            "remix_info": t.remix_info,
+            "original_title": t.original_title,
+            "confidence": t.confidence,
+            "source": t.source,
+            "timestamp_sec": t.timestamp_sec,
+            "raw_text": t.raw_text,
+        }
+        for t in merged
+    ]
+
+    session = get_session()
+    matched = match_tracks(session, track_dicts)
+
+    # Generate purchase links for unowned
+    for t in matched:
+        if t.get("acquisition_status") != "owned" and t.get("artist") and t.get("title"):
+            t["purchase_links"] = generate_purchase_links(t["artist"], t["title"])
+
+    # Save to DB
+    hunt_session = create_hunt_session(
+        session, url=url, platform=platform,
+        title=metadata.title, uploader=metadata.uploader,
+    )
+    save_hunt_tracks(session, hunt_session.id, matched)
+    session.commit()
+
+    if as_json:
+        import json as json_mod
+        console.print(json_mod.dumps(matched, indent=2, default=str))
+        return
+
+    # Display results
+    owned = sum(1 for t in matched if t.get("acquisition_status") == "owned")
+    unowned = len(matched) - owned
+
+    table = Table(title=f"Tracklist — {owned} owned, {unowned} to hunt")
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Artist", style="cyan")
+    table.add_column("Title")
+    table.add_column("Remix", style="dim")
+    table.add_column("Source", style="dim")
+    table.add_column("Status", justify="center")
+
+    for t in matched:
+        status = "[green]owned[/]" if t.get("acquisition_status") == "owned" else "[yellow]hunt[/]"
+        ts = ""
+        if t.get("timestamp_sec") is not None:
+            mins = int(t["timestamp_sec"] // 60)
+            secs = int(t["timestamp_sec"] % 60)
+            ts = f" @{mins}:{secs:02d}"
+        table.add_row(
+            str(t.get("position", "")),
+            t.get("artist", "?"),
+            t.get("title", "?"),
+            t.get("remix_info") or "",
+            (t.get("source", "") + ts),
+            status,
+        )
+
+    console.print(table)
+
+    if unowned > 0:
+        console.print(f"\n[bold]You're missing {unowned} of {len(matched)} tracks.[/]")
+        console.print("[dim]Hunt session saved. View purchase links in the UI or run with --json-output.[/]")
+    else:
+        console.print(f"\n[green]You own all {len(matched)} tracks![/] Time to learn from this set.")

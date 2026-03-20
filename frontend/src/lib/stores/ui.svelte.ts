@@ -1,6 +1,6 @@
 import type { Track } from '$lib/types';
 
-export type Tab = 'track' | 'set' | 'dna' | 'tinder';
+export type Tab = 'track' | 'set' | 'dna' | 'tinder' | 'hunt';
 export type TimelineViewMode = 'linear' | 'staircase';
 
 let activeTab = $state<Tab>('track');

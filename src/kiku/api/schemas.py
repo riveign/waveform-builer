@@ -342,3 +342,70 @@ class GenreFamilyResponse(BaseModel):
     family_name: str
     genres: list[str]
     compatible_with: list[str]
+
+
+# ── Track Hunter models ──
+
+
+class HuntRequest(BaseModel):
+    url: str
+    include_comments: bool = True
+
+
+class HuntTrackResponse(BaseModel):
+    id: int
+    position: int
+    artist: str | None = None
+    title: str | None = None
+    remix_info: str | None = None
+    original_title: str | None = None
+    confidence: float = 0.0
+    source: str | None = None
+    timestamp_sec: float | None = None
+    matched_track_id: int | None = None
+    match_score: float | None = None
+    acquisition_status: str = "unowned"
+    purchase_links: dict[str, str] = {}
+    raw_text: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class HuntSessionResponse(BaseModel):
+    id: int
+    url: str
+    platform: str | None = None
+    title: str | None = None
+    uploader: str | None = None
+    status: str = "pending"
+    track_count: int = 0
+    owned_count: int = 0
+    created_at: str | None = None
+    tracks: list[HuntTrackResponse] = []
+
+    model_config = {"from_attributes": True}
+
+
+class HuntSessionSummary(BaseModel):
+    id: int
+    url: str
+    platform: str | None = None
+    title: str | None = None
+    uploader: str | None = None
+    status: str = "pending"
+    track_count: int = 0
+    owned_count: int = 0
+    created_at: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class HuntListResponse(BaseModel):
+    items: list[HuntSessionSummary]
+    total: int
+    offset: int
+    limit: int
+
+
+class HuntTrackUpdateRequest(BaseModel):
+    acquisition_status: str  # "wanted", "owned", "unowned"
