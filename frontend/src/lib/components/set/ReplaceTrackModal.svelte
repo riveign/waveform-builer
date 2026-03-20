@@ -3,6 +3,11 @@
 	import { getReplacements, replaceTrackInSet } from '$lib/api/sets';
 	import { getCamelotColor } from '$lib/utils/camelot';
 	import { API_BASE } from '$lib/api/client';
+	import { getPlaybackStore } from '$lib/stores/playback.svelte';
+	import { getUiStore } from '$lib/stores/ui.svelte';
+
+	const playback = getPlaybackStore();
+	const ui = getUiStore();
 
 	let {
 		setId,
@@ -59,14 +64,23 @@
 		}
 	}
 
+	/** Stop any other audio playing in the app before starting our preview */
+	function stopOtherAudio() {
+		if (playback.isActive) {
+			playback.stop();
+		}
+		ui.playingTrackId = null;
+	}
+
 	function togglePreview(trackId: number) {
 		if (previewTrackId === trackId) {
 			stopPreview();
 			return;
 		}
 		stopPreview();
+		stopOtherAudio();
 		previewTrackId = trackId;
-		const audio = new Audio(`${API_BASE}/api/audio/${trackId}/stream`);
+		const audio = new Audio(`${API_BASE}/api/audio/${trackId}`);
 		audio.currentTime = 30; // start ~30s in for a representative snippet
 		audio.play().catch(() => {});
 		audioEl = audio;

@@ -6,26 +6,48 @@
 	import SetTimeline from './SetTimeline.svelte';
 	import TransitionDetail from './TransitionDetail.svelte';
 	import EnergyFlowChart from './EnergyFlowChart.svelte';
-	import SuggestNextPanel from './SuggestNextPanel.svelte';
 	import SetEnergyReview from './SetEnergyReview.svelte';
-	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
+	import { getPlayerStore } from '$lib/stores/player.svelte';
+	import type { Track } from '$lib/types';
 
 	const ui = getUiStore();
 	const pb = getPlaybackStore();
+	const player = getPlayerStore();
 
-	/** The track currently loaded in the player (derived from playingTrackId) */
-	let playerTrack = $derived.by(() => {
-		if (ui.playingTrackId === null) return null;
-		return waveformTracks.find((t) => t.track_id === ui.playingTrackId) ?? null;
-	});
+	/** Convert a SetWaveformTrack to the Track shape the player store expects */
+	function toTrack(swt: SetWaveformTrack): Track {
+		return {
+			id: swt.track_id,
+			title: swt.title,
+			artist: swt.artist,
+			album: null,
+			bpm: swt.bpm,
+			key: swt.key,
+			rating: null,
+			genre: swt.genre,
+			energy: swt.energy,
+			duration_sec: swt.duration_sec,
+			play_count: null,
+			has_waveform: swt.waveform_overview !== null,
+			has_features: false,
+			resolved_energy: swt.energy,
+			energy_source: swt.energy_source,
+			energy_confidence: null,
+			energy_conflict: swt.energy_conflict,
+		};
+	}
 
 	function handleTrackPlay(trackId: number) {
-		if (ui.playingTrackId === trackId) {
-			ui.playingTrackId = null;
+		// Toggle off if same track
+		if (player.isPlaying && player.currentTrack?.id === trackId) {
+			player.pause();
 			return;
 		}
-		ui.playingTrackId = trackId;
+		const swt = waveformTracks.find((t) => t.track_id === trackId);
+		if (swt) {
+			player.play(toTrack(swt));
+		}
 	}
 
 	let selectedSet = $state<DJSet | null>(null);
@@ -37,7 +59,6 @@
 	let loadingTransition = $state(false);
 	let exporting = $state(false);
 	let exportMsg = $state<string | null>(null);
-	let showSuggest = $state(false);
 	let showEnergyReview = $state(false);
 	let error = $state<string | null>(null);
 	let timelineContainerEl = $state<HTMLDivElement>(null!);
@@ -157,15 +178,6 @@
 		<div class="timeline-controls">
 			<span class="set-name">{selectedSet.name}</span>
 			<span class="set-meta">{selectedSet.track_count} tracks, {selectedSet.duration_min}min</span>
-			{#if ui.selectedTrackInSet !== null}
-				<button
-					class="suggest-btn"
-					class:active={showSuggest}
-					onclick={() => { showSuggest = !showSuggest; }}
-				>
-					Suggest Next
-				</button>
-			{/if}
 			{#if tracksNeedingReview.length > 0}
 				<button class="review-energy-btn" onclick={() => { showEnergyReview = true; }}>
 					Review energy ({tracksNeedingReview.length})
@@ -210,28 +222,6 @@
 							onTrackClick={handleChartTrackClick}
 						/>
 					</div>
-					<div class="player-panel">
-						{#if playerTrack && playerTrack.waveform_overview && playerTrack.duration_sec}
-							<div class="player-track-info">
-								<span class="player-title" title={playerTrack.title ?? ''}>{playerTrack.title ?? 'Untitled'}</span>
-								<span class="player-artist" title={playerTrack.artist ?? ''}>{playerTrack.artist ?? 'Unknown'}</span>
-							</div>
-							{#key playerTrack.track_id}
-								<WavesurferPlayer
-									trackId={playerTrack.track_id}
-									peaks={playerTrack.waveform_overview}
-									duration={playerTrack.duration_sec}
-									height={80}
-									autoplay
-									onfinish={() => { ui.playingTrackId = null; }}
-								/>
-							{/key}
-						{:else if playerTrack}
-							<div class="player-empty">No waveform available</div>
-						{:else}
-							<div class="player-empty">Tap play on a track to preview</div>
-						{/if}
-					</div>
 				</div>
 				<div class="timeline-scroll">
 					<SetTimeline
@@ -259,15 +249,6 @@
 				/>
 			{/if}
 
-			{#if showSuggest && ui.selectedTrackInSet !== null && selectedSet}
-				{#key ui.selectedTrackInSet}
-					<SuggestNextPanel
-						trackId={ui.selectedTrackInSet}
-						setId={selectedSet.id}
-						onAdd={() => { if (selectedSet) loadSetData(selectedSet.id); }}
-					/>
-				{/key}
-			{/if}
 		{:else}
 			<div class="status">An empty set — your story starts here</div>
 		{/if}
@@ -313,28 +294,6 @@
 		font-size: 12px;
 		color: var(--text-dim);
 		margin-right: auto;
-	}
-
-	.suggest-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.suggest-btn:hover {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.suggest-btn.active {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
 	}
 
 	.review-energy-btn {
@@ -428,54 +387,6 @@
 	.energy-chart-wrapper {
 		flex: 3;
 		min-width: 0;
-	}
-
-	.player-panel {
-		flex: 1;
-		min-width: 200px;
-		border-left: 1px solid var(--border);
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		padding: 8px;
-		gap: 6px;
-		background: var(--bg-secondary);
-	}
-
-	.player-track-info {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-		padding: 0 4px;
-		min-width: 0;
-	}
-
-	.player-title {
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--text-primary);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.player-artist {
-		font-size: 11px;
-		color: var(--text-secondary);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.player-empty {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		font-size: 12px;
-		color: var(--text-dim);
-		text-align: center;
-		padding: 12px;
 	}
 
 	.timeline-scroll {
