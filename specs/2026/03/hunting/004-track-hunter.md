@@ -78,7 +78,114 @@ You are building a feature that embodies Kiku's craft mentorship philosophy. The
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+### Codebase Analysis
+
+**Existing patterns to follow:**
+
+- **DB Models** (`src/kiku/db/models.py`): Track, Set, SetTrack, TransitionCue, AudioFeatures. New models (HuntSession, HuntTrack) follow same SQLAlchemy Base pattern.
+- **API Routes** (`src/kiku/api/routes/`): FastAPI routers with `Depends(get_db)`, Pydantic schemas in `schemas.py`. SSE pattern exists for long-running ops (set building). Hunt will use SSE for progressive results.
+- **CLI** (`src/kiku/cli.py`): Click commands, Rich console output. `kiku hunt <url>` follows existing patterns.
+- **Config** (`src/kiku/config.py`): TOML-based at `~/.kiku/config.toml`. API keys for YouTube, Discogs go here.
+- **Parsing** (`src/kiku/parsing/directory.py`): Regex-based tag extraction. New `src/kiku/parsing/tracklist.py` for description/comment parsing.
+- **Tests** (`tests/api/conftest.py`): In-memory SQLite with seed data, TestClient with overridden deps. Hunt tests follow same pattern with mocked external calls.
+- **Frontend**: Svelte 5 runes, `fetchJson()` client, stores in `*.svelte.ts`. New `hunting` tab + store.
+
+**Key integration points:**
+
+- `search_tracks()` in `store.py` for matching extracted tracks against local library (artist+title fuzzy match)
+- `Track.artist`, `Track.title` fields for library matching
+- `src/kiku/api/main.py` `create_app()` to register hunt router
+- `frontend/src/lib/types/index.ts` for new TypeScript interfaces
+
+### External API Research
+
+| Source | Access | Auth | Best For | Priority |
+|--------|--------|------|----------|----------|
+| **yt-dlp** | Free | None | Extract descriptions/chapters/comments from SC+YT+MC | **P0** |
+| **1001Tracklists** | Scraping | None | Pre-built tracklists with purchase links | **P0** |
+| **YouTube Data API v3** | Free, 10K units/day | API key | Structured comments (supplement yt-dlp) | **P1** |
+| **MusicBrainz** | Free, 1 req/sec | User-Agent header | Artist alias resolution, recording lookup | **P1** |
+| **Discogs** | Free, 60 req/min | API key+secret | Release/label ID, electronic music catalog | **P1** |
+| **Mixcloud API** | Free | None | Mix metadata (tracklists restricted by licensing) | **P2** |
+| **Beatport/Traxsource/Bandcamp/Juno** | No public API | N/A | Search URL generation only | **P3** |
+
+**Key findings:**
+
+1. **yt-dlp is the foundation.** No API keys needed. Extracts description, chapters, comments from SoundCloud, YouTube, and Mixcloud URLs via `yt_dlp.YoutubeDL({"skip_download": True, "getcomments": True})`. Python library: `pip install yt-dlp`.
+
+2. **1001Tracklists is the gold mine.** No official API — scraping required. Has crowd-sourced tracklists for thousands of sets with purchase links already attached. Python scrapers exist (`leandertolksdorf/1001-tracklists-api`). Anti-bot protections require rate limiting + user-agent rotation.
+
+3. **YouTube Content ID claims are NOT accessible** via public API. The Content ID API requires YouTube Partner status. However, YouTube's auto-generated "Music in this video" text appears in descriptions — parseable.
+
+4. **SoundCloud API is effectively closed** to new developers. yt-dlp handles extraction by emulating browser requests with a scraped client_id.
+
+5. **Mixcloud** exposes partial tracklists (timestamps restricted by licensing). REST API: replace `mixcloud.com/` with `api.mixcloud.com/`.
+
+6. **MusicBrainz** (`musicbrainzngs` library) is best for resolving artist aliases and finding original versions of remixes. Free, 1 req/sec rate limit handled by library.
+
+7. **Discogs** (`python3-discogs-client`) has outstanding electronic music coverage. 60 req/min authenticated. Ideal for label/release identification.
+
+8. **Purchase stores** (Beatport, Traxsource, Bandcamp, Juno) — no practical APIs available. **Generate search URLs instead** — zero dependencies, always works:
+   - Beatport: `https://www.beatport.com/search?q={artist}+{title}`
+   - Traxsource: `https://www.traxsource.com/search?term={query}`
+   - Bandcamp: `https://bandcamp.com/search?q={query}`
+   - Juno: `https://www.junodownload.com/search/?q%5Ball%5D%5B%5D={query}`
+
+### Dependencies Required
+
+```
+yt-dlp           # URL metadata extraction (SC, YT, MC)
+musicbrainzngs   # Artist/recording resolution
+beautifulsoup4   # 1001Tracklists scraping
+thefuzz          # Fuzzy string matching (artist+title)
+```
+
+Optional (P1+):
+```
+python3-discogs-client   # Discogs catalog (needs API key)
+google-api-python-client # YouTube Data API (needs API key)
+```
+
+### Strategy
+
+**Phase 1 — Extract (P0):**
+- New module `src/kiku/hunting/` with:
+  - `extractor.py` — URL router: detect platform (SC/YT/MC/1001TL), dispatch to platform-specific extractor
+  - `parsers/youtube.py` — Parse description tracklists (timestamp + "Artist - Title" patterns)
+  - `parsers/soundcloud.py` — Parse description + comments for track IDs
+  - `parsers/tracklist_1001.py` — Scrape 1001Tracklists search results
+  - `parsers/common.py` — Shared regex patterns for "Artist - Title", timestamp extraction, remix detection
+- New DB models: `HuntSession` (url, platform, status, created_at) and `HuntTrack` (session_id, position, raw_text, artist, title, remix_info, confidence, matched_track_id, acquisition_status)
+- CLI: `kiku hunt <url>` — runs extraction + matching
+- API: `POST /api/hunt` (SSE for progressive results), `GET /api/hunt/{id}`, `GET /api/hunts`
+
+**Phase 2 — Normalize & Match (P1):**
+- `resolver.py` — Normalize artist names (case, aliases via MusicBrainz), strip remix suffixes to find originals
+- Library matching: fuzzy match extracted tracks against `Track.artist` + `Track.title` using `thefuzz`
+- Mark tracks as `owned`, `unowned`, or `partial_match`
+
+**Phase 3 — Hunt Sources (P1):**
+- `sources.py` — Generate purchase search URLs for unowned tracks (Beatport, Traxsource, Bandcamp, Juno)
+- Optional Discogs integration for label/release context
+- "Want list" persistence in DB
+
+**Phase 4 — Teach (P2):**
+- Analyze extracted tracklist for energy arc, genre flow, key progression (using Kiku's existing scoring)
+- Present "what makes this set work" alongside the tracklist
+
+**Frontend:**
+- New tab "Hunt" (key 5) with URL input
+- HuntResults.svelte: tracklist table with confidence, owned badges, source links
+- HuntHistory.svelte: past hunt sessions
+- Store: `hunting.svelte.ts`
+
+**Testing strategy:**
+- Unit tests for each parser (canned descriptions/comments → expected tracklist)
+- Unit tests for artist/title normalization and fuzzy matching
+- Integration tests with mocked yt-dlp output and 1001TL HTML
+- API tests following existing `conftest.py` pattern with seeded hunt data
+- E2E: submit URL → verify extracted tracklist in UI
 
 ## Plan
 <!-- Filled by /spec PLAN -->
