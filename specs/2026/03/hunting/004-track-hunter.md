@@ -2546,7 +2546,23 @@ Frontend Hunt tab (key 5) with URL input, results table, history."
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+1. pyproject.toml: add hunting deps — Status: Done
+2. models.py: HuntSession + HuntTrack — Status: Done
+3. hunting module: __init__ + parsers/common.py — Status: Done
+4. extractor.py: URL detection + yt-dlp — Status: Done
+5. parsers/tracklist.py: description/comment/chapter parsing — Status: Done
+6. matcher.py: fuzzy library matching — Status: Done
+7. sources.py: purchase URL generation — Status: Done
+8. store.py: hunt CRUD functions — Status: Done
+9. schemas.py: Hunt request/response models — Status: Done
+10. API route hunt.py + register in main.py — Status: Done
+11. cli.py: kiku hunt command — Status: Done
+12. Frontend: types, API client, store, UI components — Status: Done
+13. Tests: unit + API tests — Status: Done
+14. Verify + commit — Status: Done
+
+Commit: 8c9162a
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
