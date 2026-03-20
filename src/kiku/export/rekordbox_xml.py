@@ -1,61 +1,56 @@
-"""Export sets as Rekordbox-compatible XML playlists with optional cue points."""
+"""Export sets as Rekordbox-compatible XML playlists with optional cue points.
+
+Uses pyrekordbox's RekordboxXml class for proper path encoding, rating
+mapping, and validated attribute types.
+"""
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
 from pathlib import Path
+
+from pyrekordbox.rbxml import RekordboxXml
 
 from kiku.config import DATA_DIR
 from kiku.db.models import Set
 
-# Cue type mapping: internal name -> Rekordbox POSITION_MARK Type attribute
-CUE_TYPE_MAP = {
-    "cue": "0",
-    "fadein": "1",
-    "fadeout": "2",
-    "load": "3",
-    "loop": "4",
+# Path aliases: (macOS prefix, Linux prefix).
+# Reverse of sync.py's _PATH_ALIASES — export converts Linux back to macOS.
+_PATH_ALIASES: list[tuple[str, str]] = [
+    ("/Volumes/", "/run/media/mantis/"),
+]
+
+# File extension -> Rekordbox Kind string
+_KIND_MAP: dict[str, str] = {
+    ".mp3": "MP3 File",
+    ".flac": "FLAC File",
+    ".wav": "WAV File",
+    ".aiff": "AIFF File",
+    ".aif": "AIFF File",
+    ".m4a": "M4A File",
+    ".ogg": "OGG File",
+    ".wma": "WMA File",
+    ".alac": "ALAC File",
 }
 
 
-def _track_to_xml(
-    track,
-    position: int,
-    cue_points: list[dict] | None = None,
-) -> ET.Element:
-    """Convert a Track to a Rekordbox XML TRACK element with optional cue points."""
-    attrs = {
-        "TrackID": str(track.id),
-        "Name": track.title or "",
-        "Artist": track.artist or "",
-        "Album": track.album or "",
-        "Genre": track.dir_genre or track.rb_genre or "",
-        "Kind": "MP3 File",
-        "TotalTime": str(int(track.duration_sec)) if track.duration_sec else "0",
-        "AverageBpm": f"{track.bpm:.2f}" if track.bpm else "0.00",
-        "Tonality": track.key or "",
-        "Rating": str(track.rating or 0),
-    }
+def _export_path(file_path: str, target_platform: str = "macos") -> str:
+    """Convert Kiku's stored path to the target platform format.
 
-    if track.file_path:
-        attrs["Location"] = Path(track.file_path).as_uri()
+    The database stores Linux-normalised paths (``/run/media/mantis/…``).
+    For Rekordbox on macOS these must be reversed to ``/Volumes/…``.
+    """
+    if target_platform == "macos":
+        for mac_prefix, linux_prefix in _PATH_ALIASES:
+            if file_path.startswith(linux_prefix):
+                return mac_prefix + file_path[len(linux_prefix):]
+    # Linux or unknown: keep as-is
+    return file_path
 
-    elem = ET.Element("TRACK", attrs)
 
-    # Add cue points as POSITION_MARK child elements
-    if cue_points:
-        for cue in cue_points:
-            mark_attrs = {
-                "Name": cue.get("name", ""),
-                "Type": CUE_TYPE_MAP.get(cue.get("type", "cue"), "0"),
-                "Start": f"{cue.get('start', 0):.3f}",
-                "Num": str(cue.get("num", -1)),
-            }
-            if cue.get("end") is not None:
-                mark_attrs["End"] = f"{cue['end']:.3f}"
-            ET.SubElement(elem, "POSITION_MARK", mark_attrs)
-
-    return elem
+def _detect_kind(file_path: str) -> str:
+    """Return the Rekordbox ``Kind`` string based on file extension."""
+    ext = Path(file_path).suffix.lower()
+    return _KIND_MAP.get(ext, "MP3 File")
 
 
 def export_set_to_xml(
@@ -68,56 +63,91 @@ def export_set_to_xml(
     Parameters
     ----------
     set_ : Set
-        The set to export
+        The set to export (with eager-loaded tracks).
     output_path : str, optional
-        Output file path (default: data/<set_name>.xml)
+        Output file path (default: data/<set_name>.xml).
     transition_cues : dict, optional
-        Cue points per track: {track_id: [{"name", "type", "start", "end", "num"}]}
+        Cue points per track: ``{track_id: [{"name", "type", "start", "end", "num"}]}``.
         When None, exports tracks without cue points (backward compatible).
 
     Returns
     -------
     str
-        Path to the written XML file
+        Path to the written XML file.
     """
-    root = ET.Element("DJ_PLAYLISTS", Version="1.0.0")
+    xml = RekordboxXml(name="Kiku", version="0.1.0", company="")
 
-    # Product info
-    ET.SubElement(root, "PRODUCT", Name="Kiku", Version="0.1.0")
-
-    # Collection: all tracks in the set
-    collection = ET.SubElement(root, "COLLECTION")
     tracks_in_set = sorted(set_.tracks, key=lambda st: st.position)
+    playlist = xml.add_playlist(set_.name or "DJ Set")
 
     for st in tracks_in_set:
         track = st.track
-        cues = transition_cues.get(track.id) if transition_cues else None
-        collection.append(_track_to_xml(track, st.position, cue_points=cues))
 
-    collection.set("Entries", str(len(tracks_in_set)))
+        # --- Gap 2: reverse path alias for macOS ---
+        location = _export_path(track.file_path, "macos") if track.file_path else ""
 
-    # Playlists
-    playlists = ET.SubElement(root, "PLAYLISTS")
-    root_node = ET.SubElement(playlists, "NODE", Type="0", Name="ROOT", Count="1")
+        # --- Gap 1: use rb_id when available ---
+        track_id = int(track.rb_id) if track.rb_id else track.id
 
-    playlist_node = ET.SubElement(root_node, "NODE", **{
-        "Name": set_.name or "DJ Set",
-        "Type": "1",
-        "KeyType": "0",
-        "Entries": str(len(tracks_in_set)),
-    })
+        # --- Gap 3: detect file format ---
+        kind = _detect_kind(track.file_path) if track.file_path else "MP3 File"
 
-    for st in tracks_in_set:
-        ET.SubElement(playlist_node, "TRACK", Key=str(st.track.id))
+        # Build kwargs — only include non-None values to avoid serialisation
+        # errors from pyrekordbox (None values crash xml.etree).
+        kwargs: dict = {
+            "TrackID": track_id,
+            "Name": track.title or "",
+            "Artist": track.artist or "",
+            "Kind": kind,
+            "TotalTime": int(track.duration_sec) if track.duration_sec else 0,
+            "AverageBpm": round(track.bpm, 2) if track.bpm else 0.0,
+            "Tonality": track.key or "",
+        }
+
+        # --- Gap 4: add missing fields ---
+        if track.album:
+            kwargs["Album"] = track.album
+        if track.label:
+            kwargs["Label"] = track.label
+
+        genre = track.dir_genre or track.rb_genre
+        if genre:
+            kwargs["Genre"] = genre
+
+        if track.play_count:
+            kwargs["PlayCount"] = track.play_count
+        if track.comment:
+            kwargs["Comments"] = track.comment
+
+        # --- Gap 5: use pyrekordbox's add_track for proper encoding ---
+        rb_track = xml.add_track(location, **kwargs)
+
+        # Rating must go through set() to trigger the SETTER mapping (0-5 → 0/51/102/153/204/255).
+        # add_track kwargs bypass the setter and store the raw value.
+        if track.rating is not None and track.rating > 0:
+            rb_track.set("Rating", track.rating)
+
+        # Add cue points
+        if transition_cues and track.id in transition_cues:
+            for cue in transition_cues[track.id]:
+                mark_kwargs: dict = {
+                    "Name": cue.get("name", ""),
+                    "Type": cue.get("type", "cue"),
+                    "Start": cue.get("start", 0.0),
+                    "Num": cue.get("num", -1),
+                }
+                if cue.get("end") is not None:
+                    mark_kwargs["End"] = cue["end"]
+                rb_track.add_mark(**mark_kwargs)
+
+        # Add track to playlist
+        playlist.add_track(rb_track.TrackID)
 
     # Write XML
-    tree = ET.ElementTree(root)
-    ET.indent(tree, space="  ")
-
     if output_path is None:
         output_path = str(DATA_DIR / f"{set_.name or 'set'}.xml")
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    tree.write(output_path, encoding="unicode", xml_declaration=True)
+    xml.save(output_path)
 
     return output_path
