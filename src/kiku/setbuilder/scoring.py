@@ -255,9 +255,14 @@ def transition_score(
     to_track: Track,
     target_energy: float = 0.5,
     prefer_playlists: list[str] | None = None,
+    weights: dict[str, float] | None = None,
 ) -> float:
-    """Compute overall transition score between two tracks."""
-    w = SCORING_WEIGHTS
+    """Compute overall transition score between two tracks.
+
+    Args:
+        weights: Optional per-request weight overrides. Falls back to global SCORING_WEIGHTS.
+    """
+    w = weights if weights is not None else SCORING_WEIGHTS
 
     h = harmonic_score(from_track.key, to_track.key)
     e = energy_fit(to_track, target_energy)
@@ -272,14 +277,68 @@ def transition_score(
             + w["genre_coherence"] * g + w["track_quality"] * q)
 
 
+def score_replacement(
+    candidate: Track,
+    prev_track: Track | None,
+    next_track: Track | None,
+    target_energy: float = 0.5,
+    weights: dict[str, float] | None = None,
+) -> tuple[float, dict | None, dict | None]:
+    """Score a candidate as a replacement considering both neighbors.
+
+    Returns (combined_score, incoming_breakdown, outgoing_breakdown).
+    Breakdowns are dicts with keys: harmonic, energy_fit, bpm_compat, genre_coherence, track_quality, total.
+    """
+    w = weights if weights is not None else SCORING_WEIGHTS
+
+    def _breakdown(from_t: Track, to_t: Track) -> dict:
+        h = harmonic_score(from_t.key, to_t.key)
+        e = energy_fit(to_t, target_energy)
+        b = bpm_compatibility(from_t.bpm, to_t.bpm)
+        g = genre_coherence(
+            from_t.dir_genre or from_t.rb_genre,
+            to_t.dir_genre or to_t.rb_genre,
+        )
+        q = track_quality(to_t)
+        total = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
+                 + w["genre_coherence"] * g + w["track_quality"] * q)
+        return {
+            "harmonic": round(h, 3),
+            "energy_fit": round(e, 3),
+            "bpm_compat": round(b, 3),
+            "genre_coherence": round(g, 3),
+            "track_quality": round(q, 3),
+            "total": round(total, 3),
+        }
+
+    incoming = _breakdown(prev_track, candidate) if prev_track else None
+    outgoing = _breakdown(candidate, next_track) if next_track else None
+
+    if incoming and outgoing:
+        combined = (incoming["total"] + outgoing["total"]) / 2
+    elif incoming:
+        combined = incoming["total"]
+    elif outgoing:
+        combined = outgoing["total"]
+    else:
+        combined = track_quality(candidate)
+
+    return round(combined, 3), incoming, outgoing
+
+
 def score_transitions(
     session: Session,
     from_track: Track,
     n: int = 10,
     genre_filter: list[str] | None = None,
+    weights: dict[str, float] | None = None,
+    exclude_ids: list[int] | None = None,
 ) -> list[tuple[Track, float]]:
     """Find and score best transitions from a given track."""
     q = session.query(Track).filter(Track.id != from_track.id)
+
+    if exclude_ids:
+        q = q.filter(Track.id.notin_(exclude_ids))
 
     # BPM pre-filter
     if from_track.bpm and from_track.bpm > 0:
@@ -300,7 +359,7 @@ def score_transitions(
 
     scored = []
     for track in candidates:
-        score = transition_score(from_track, track)
+        score = transition_score(from_track, track, weights=weights)
         scored.append((track, score))
 
     scored.sort(key=lambda x: x[1], reverse=True)

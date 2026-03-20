@@ -5,6 +5,7 @@
 	import { reorderSetTracks, removeTrackFromSet, addTrackToSet } from '$lib/api/sets';
 	import SetTrackCard from './SetTrackCard.svelte';
 	import TransitionIndicator from './TransitionIndicator.svelte';
+	import ReplaceTrackModal from './ReplaceTrackModal.svelte';
 
 	let {
 		tracks,
@@ -32,6 +33,7 @@
 	let removeInFlight = $state<number | null>(null);
 	let dropActive = $state(false);
 	let dropAdding = $state(false);
+	let replacePosition = $state<number | null>(null);
 
 	// Sync items when tracks prop changes (but not during drag)
 	$effect(() => {
@@ -245,7 +247,17 @@
 								/>
 							</div>
 							<button
-								class="remove-btn"
+								class="action-btn replace-btn"
+								onclick={() => { replacePosition = i; }}
+								title="Replace track"
+								aria-label="Replace track"
+							>
+								<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+									<path d="M1 5h10M8 2l3 3-3 3" /><path d="M13 9H3M6 12l-3-3 3-3" />
+								</svg>
+							</button>
+							<button
+								class="action-btn remove-btn"
 								onclick={() => handleRemoveTrack(item.track_id)}
 								disabled={removeInFlight !== null}
 								title="Remove from set"
@@ -290,6 +302,31 @@
 		{/if}
 	{/if}
 </div>
+
+{#if replacePosition !== null && items[replacePosition]}
+	{@const rItem = items[replacePosition]}
+	<ReplaceTrackModal
+		{setId}
+		position={replacePosition}
+		currentTrack={{
+			position: rItem.position,
+			track_id: rItem.track_id,
+			title: rItem.title,
+			artist: rItem.artist,
+			bpm: rItem.bpm,
+			key: rItem.key,
+			genre: rItem.genre,
+			energy: rItem.energy,
+			duration_sec: rItem.duration_sec,
+			transition_score: rItem.transition_score,
+			has_waveform: rItem.waveform_overview != null,
+			energy_source: rItem.energy_source,
+			energy_conflict: rItem.energy_conflict,
+		}}
+		onclose={() => { replacePosition = null; }}
+		onreplaced={() => { replacePosition = null; onTracksChanged?.(); }}
+	/>
+{/if}
 
 <style>
 	.set-timeline {
@@ -415,7 +452,7 @@
 		min-width: 0;
 	}
 
-	.remove-btn {
+	.action-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -432,16 +469,23 @@
 		padding: 0;
 	}
 
-	.card-row:hover .remove-btn {
+	.card-row:hover .action-btn {
 		opacity: 1;
 	}
 
-	.remove-btn:hover {
+	.action-btn:hover {
 		background: var(--bg-tertiary);
+	}
+
+	.action-btn.replace-btn:hover {
+		color: var(--accent);
+	}
+
+	.action-btn.remove-btn:hover {
 		color: var(--energy-high, #e94560);
 	}
 
-	.remove-btn:disabled {
+	.action-btn:disabled {
 		cursor: default;
 		opacity: 0.3;
 	}

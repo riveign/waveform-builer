@@ -32,6 +32,7 @@ class ExtractedMetadata:
     duration_sec: float | None = None
     chapters: list[dict] | None = None  # [{title, start_time, end_time}]
     comments: list[dict] | None = None  # [{text, timestamp, author}]
+    music_credits: list[dict] | None = None  # [{title, artist, album}] from Content ID
     error: str | None = None
 
 
@@ -43,6 +44,78 @@ def detect_platform(url: str) -> str | None:
         if pattern.search(host):
             return platform
     return None
+
+
+def extract_youtube_music_credits(url: str) -> list[dict]:
+    """Extract Content ID music credits from a YouTube video page.
+
+    YouTube's "Music in this video" / "Música" section contains structured
+    track data (title, artist, album) from Content ID matches. This data
+    isn't available via yt-dlp, so we scrape it from the page's ytInitialData.
+
+    Returns list of dicts: [{title, artist, album}, ...]
+    """
+    try:
+        import requests
+    except ImportError:
+        logger.debug("requests not installed, skipping music credits extraction")
+        return []
+
+    try:
+        import json as _json
+
+        headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.raise_for_status()
+
+        match = re.search(
+            r"var ytInitialData\s*=\s*({.*?});</script>", resp.text, re.DOTALL
+        )
+        if not match:
+            logger.debug("No ytInitialData found in page")
+            return []
+
+        data = _json.loads(match.group(1))
+
+        # Music credits live in engagementPanels → structuredDescriptionContentRenderer
+        # → horizontalCardListRenderer → cards[] → videoAttributeViewModel
+        credits: list[dict] = []
+        panels = data.get("engagementPanels", [])
+        for panel in panels:
+            renderer = (
+                panel
+                .get("engagementPanelSectionListRenderer", {})
+                .get("content", {})
+                .get("structuredDescriptionContentRenderer", {})
+                .get("items", [])
+            )
+            for item in renderer:
+                card_list = item.get("horizontalCardListRenderer", {}).get("cards", [])
+                for card in card_list:
+                    vm = card.get("videoAttributeViewModel", {})
+                    title = vm.get("title")
+                    artist = vm.get("subtitle")
+                    album = None
+                    secondary = vm.get("secondarySubtitle")
+                    if isinstance(secondary, dict):
+                        album = secondary.get("content")
+                    elif isinstance(secondary, str):
+                        album = secondary
+
+                    if title and artist:
+                        credits.append({
+                            "title": title,
+                            "artist": artist,
+                            "album": album,
+                        })
+
+        if credits:
+            logger.info("Found %d music credits from Content ID", len(credits))
+        return credits
+
+    except Exception:
+        logger.debug("Failed to extract YouTube music credits", exc_info=True)
+        return []
 
 
 def extract_metadata(url: str, include_comments: bool = True) -> ExtractedMetadata:
@@ -97,6 +170,11 @@ def extract_metadata(url: str, include_comments: bool = True) -> ExtractedMetada
                 for c in info["comments"]
             ]
 
+        # Extract Content ID music credits for YouTube
+        music_credits = None
+        if platform == "youtube":
+            music_credits = extract_youtube_music_credits(url) or None
+
         return ExtractedMetadata(
             url=url,
             platform=platform,
@@ -106,6 +184,7 @@ def extract_metadata(url: str, include_comments: bool = True) -> ExtractedMetada
             duration_sec=info.get("duration"),
             chapters=info.get("chapters"),
             comments=comments,
+            music_credits=music_credits,
         )
 
     except Exception as e:

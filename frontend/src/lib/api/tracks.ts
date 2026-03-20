@@ -1,16 +1,17 @@
-import type { Track, TrackFeatures, PaginatedTracks, SuggestNextResponse } from '$lib/types';
+import type { Track, TrackFeatures, PaginatedTracks, SuggestNextResponse, ScoringWeights } from '$lib/types';
 import { fetchJson } from './client';
 
 export interface SearchParams {
 	title?: string;
 	artist?: string;
-	genre?: string;
-	key?: string;
+	genre?: string[];
+	key?: string[];
 	bpm_min?: number;
 	bpm_max?: number;
 	energy?: string;
 	energy_zone?: string;
 	rating_min?: number;
+	sort?: string;
 	limit?: number;
 	offset?: number;
 }
@@ -18,7 +19,12 @@ export interface SearchParams {
 export async function searchTracks(params: SearchParams): Promise<PaginatedTracks> {
 	const qs = new URLSearchParams();
 	for (const [k, v] of Object.entries(params)) {
-		if (v !== undefined && v !== null && v !== '') {
+		if (v === undefined || v === null || v === '') continue;
+		if (Array.isArray(v)) {
+			for (const item of v) {
+				qs.append(k, String(item));
+			}
+		} else {
 			qs.set(k, String(v));
 		}
 	}
@@ -36,9 +42,19 @@ export async function getTrackFeatures(id: number): Promise<TrackFeatures> {
 export async function suggestNext(
 	trackId: number,
 	n = 10,
-	genreFilter?: string
+	genreFilter?: string,
+	weights?: ScoringWeights,
+	setId?: number
 ): Promise<SuggestNextResponse> {
 	const qs = new URLSearchParams({ n: String(n) });
+	if (setId !== undefined) qs.set('set_id', String(setId));
 	if (genreFilter) qs.set('genre_filter', genreFilter);
+	if (weights) {
+		qs.set('w_harmonic', String(weights.harmonic));
+		qs.set('w_energy_fit', String(weights.energy_fit));
+		qs.set('w_bpm_compat', String(weights.bpm_compat));
+		qs.set('w_genre_coherence', String(weights.genre_coherence));
+		qs.set('w_track_quality', String(weights.track_quality));
+	}
 	return fetchJson<SuggestNextResponse>(`/api/tracks/${trackId}/suggest-next?${qs}`);
 }

@@ -152,14 +152,15 @@ def sync(hashes: bool, db_path: str | None, dry_run: bool, yes: bool):
               help="Override MUSIC_ROOTS with a specific path")
 @click.option("--dry-run", is_flag=True, help="Show what would be imported without writing to DB")
 @click.option("--force", is_flag=True, help="Re-import even if track already exists")
-def scan(path: str | None, dry_run: bool, force: bool):
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation and scan immediately")
+def scan(path: str | None, dry_run: bool, force: bool, yes: bool):
     """Import tracks from filesystem (no Rekordbox required)."""
     from pathlib import Path as P
 
     from kiku.db.scan import scan_filesystem
 
     roots = [P(path)] if path else None
-    scan_filesystem(roots=roots, dry_run=dry_run, force=force)
+    scan_filesystem(roots=roots, dry_run=dry_run, force=force, yes=yes)
 
 
 @cli.command()
@@ -949,6 +950,7 @@ def hunt(url: str, no_comments: bool, as_json: bool):
         parse_chapters,
         parse_comments,
         parse_description,
+        parse_music_credits,
     )
     from kiku.hunting.sources import generate_purchase_links
 
@@ -974,8 +976,9 @@ def hunt(url: str, no_comments: bool, as_json: bool):
     desc_tracks = parse_description(metadata.description)
     chapter_tracks = parse_chapters(metadata.chapters)
     comment_tracks = parse_comments(metadata.comments) if not no_comments else []
+    credit_tracks = parse_music_credits(metadata.music_credits)
 
-    merged = merge_tracklists(chapter_tracks, desc_tracks, comment_tracks)
+    merged = merge_tracklists(credit_tracks, chapter_tracks, desc_tracks, comment_tracks)
 
     if not merged:
         console.print("[yellow]Couldn't find a tracklist in this set.[/] "

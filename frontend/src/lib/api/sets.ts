@@ -1,6 +1,7 @@
 import type {
 	Cue,
 	DJSet,
+	ReplacementSuggestionsResponse,
 	SetBuildComplete,
 	SetBuildParams,
 	SetCreateParams,
@@ -163,6 +164,31 @@ export async function reorderSetTracks(setId: number, trackIds: number[]): Promi
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ track_ids: trackIds }),
+	});
+}
+
+export async function getReplacements(
+	setId: number,
+	position: number,
+	n = 10,
+	genreFilter?: string
+): Promise<ReplacementSuggestionsResponse> {
+	const qs = new URLSearchParams({ n: String(n) });
+	if (genreFilter) qs.set('genre_filter', genreFilter);
+	return fetchJson<ReplacementSuggestionsResponse>(
+		`/api/sets/${setId}/tracks/${position}/replacements?${qs}`
+	);
+}
+
+export async function replaceTrackInSet(
+	setId: number,
+	position: number,
+	newTrackId: number
+): Promise<SetTrack[]> {
+	return fetchJson<SetTrack[]>(`/api/sets/${setId}/tracks/${position}/replace`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ new_track_id: newTrackId }),
 	});
 }
 

@@ -54,13 +54,14 @@ def _track_to_response(t: Track) -> TrackResponse:
 def track_search(
     title: str | None = None,
     artist: str | None = None,
-    genre: str | None = None,
-    key: str | None = None,
+    genre: list[str] | None = Query(None),
+    key: list[str] | None = Query(None),
     bpm_min: float | None = None,
     bpm_max: float | None = None,
     energy: str | None = None,
     energy_zone: str | None = None,
     rating_min: int | None = None,
+    sort: str | None = None,
     limit: int = 50,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -76,6 +77,7 @@ def track_search(
         energy_zone=energy_zone,
         key=key,
         rating_min=rating_min,
+        sort=sort,
         limit=limit,
         offset=offset,
     )
@@ -99,11 +101,18 @@ def track_detail(track_id: int, db: Session = Depends(get_db)):
 def suggest_next(
     track_id: int,
     n: int = Query(default=10, ge=1, le=50),
+    set_id: int | None = Query(default=None, description="Exclude tracks already in this set"),
     genre_filter: str | None = Query(default=None, description="Comma-separated genre filter"),
+    w_harmonic: float | None = Query(default=None, description="Harmonic weight override"),
+    w_energy_fit: float | None = Query(default=None, description="Energy fit weight override"),
+    w_bpm_compat: float | None = Query(default=None, description="BPM compatibility weight override"),
+    w_genre_coherence: float | None = Query(default=None, description="Genre coherence weight override"),
+    w_track_quality: float | None = Query(default=None, description="Track quality weight override"),
     db: Session = Depends(get_db),
 ):
     """Suggest best next tracks based on transition scoring."""
-    from kiku.config import SCORING_WEIGHTS
+    from kiku.config import SCORING_WEIGHTS, validate_scoring_weights
+    from kiku.db.models import SetTrack
     from kiku.setbuilder.camelot import harmonic_score
     from kiku.setbuilder.scoring import (
         bpm_compatibility,
@@ -117,10 +126,34 @@ def suggest_next(
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
 
-    genres = [g.strip() for g in genre_filter.split(",")] if genre_filter else None
-    scored = score_transitions(db, track, n=n, genre_filter=genres)
+    # Collect track IDs to exclude (tracks already in the set)
+    exclude_ids: list[int] | None = None
+    if set_id is not None:
+        exclude_ids = [
+            row.track_id
+            for row in db.query(SetTrack.track_id).filter(SetTrack.set_id == set_id).all()
+        ]
 
-    w = SCORING_WEIGHTS
+    # Build per-request weights if any overrides provided
+    weight_overrides = {
+        "harmonic": w_harmonic,
+        "energy_fit": w_energy_fit,
+        "bpm_compat": w_bpm_compat,
+        "genre_coherence": w_genre_coherence,
+        "track_quality": w_track_quality,
+    }
+    weights_dict = None
+    if any(v is not None for v in weight_overrides.values()):
+        weights_dict = {k: (v if v is not None else SCORING_WEIGHTS[k]) for k, v in weight_overrides.items()}
+        try:
+            validate_scoring_weights(weights_dict)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
+    genres = [g.strip() for g in genre_filter.split(",")] if genre_filter else None
+    scored = score_transitions(db, track, n=n, genre_filter=genres, weights=weights_dict, exclude_ids=exclude_ids)
+
+    w = weights_dict if weights_dict else SCORING_WEIGHTS
     suggestions = []
     for cand, total_score in scored:
         h = harmonic_score(track.key, cand.key)

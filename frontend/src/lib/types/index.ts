@@ -247,6 +247,16 @@ export interface EnhancedStatsResponse {
 	coverage: CoverageStats;
 }
 
+// ── Scoring weights ──
+
+export interface ScoringWeights {
+	harmonic: number;
+	energy_fit: number;
+	bpm_compat: number;
+	genre_coherence: number;
+	track_quality: number;
+}
+
 // ── Set mutation types ──
 
 export interface SetBuildParams {
@@ -259,6 +269,7 @@ export interface SetBuildParams {
 	seed_track_id?: number | null;
 	beam_width?: number;
 	playlist_preference?: string[] | null;
+	weights?: ScoringWeights;
 }
 
 export interface SetBuildComplete {
@@ -398,4 +409,43 @@ export interface HuntListResponse {
 	total: number;
 	offset: number;
 	limit: number;
+}
+
+// ── Replace Track types ──
+
+export interface ReplacementBreakdown {
+	harmonic: number;
+	energy_fit: number;
+	bpm_compat: number;
+	genre_coherence: number;
+	track_quality: number;
+	total: number;
+}
+
+export interface ReplacementCandidate {
+	track: Track;
+	combined_score: number;
+	incoming_breakdown: ReplacementBreakdown | null;
+	outgoing_breakdown: ReplacementBreakdown | null;
+}
+
+export interface TrackSummary {
+	track_id: number;
+	title: string | null;
+	artist: string | null;
+	bpm: number | null;
+	key: string | null;
+	genre: string | null;
+}
+
+export interface ReplacementContext {
+	prev_track: TrackSummary | null;
+	next_track: TrackSummary | null;
+	energy_target: number;
+	position: number;
+}
+
+export interface ReplacementSuggestionsResponse {
+	context: ReplacementContext;
+	candidates: ReplacementCandidate[];
 }

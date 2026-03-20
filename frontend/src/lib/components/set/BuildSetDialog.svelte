@@ -1,8 +1,9 @@
 <script lang="ts">
-	import type { SetBuildParams } from '$lib/types';
+	import type { SetBuildParams, ScoringWeights } from '$lib/types';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { fetchJson } from '$lib/api/client';
 	import EnergyPresetPicker from './EnergyPresetPicker.svelte';
+	import ScoringWeightsSliders from './ScoringWeights.svelte';
 
 	interface GenreFamily {
 		family_name: string;
@@ -34,6 +35,15 @@
 		}
 	}
 
+	// ── Default scoring weights ──
+	const DEFAULT_WEIGHTS: ScoringWeights = {
+		harmonic: 25,
+		energy_fit: 20,
+		bpm_compat: 20,
+		genre_coherence: 15,
+		track_quality: 20,
+	};
+
 	// ── Form state ──
 	let name = $state('');
 	let durationMin = $state(60);
@@ -43,6 +53,7 @@
 	let bpmMax = $state<number | null>(null);
 	let useSeedTrack = $state(true);
 	let beamWidth = $state(5);
+	let scoringWeights = $state<ScoringWeights>({ ...DEFAULT_WEIGHTS });
 
 	// ── Dialog element ref ──
 	let dialogEl = $state<HTMLDialogElement | null>(null);
@@ -102,6 +113,7 @@
 		bpmMax = null;
 		useSeedTrack = true;
 		beamWidth = 5;
+		scoringWeights = { ...DEFAULT_WEIGHTS };
 	}
 
 	function handleSubmit() {
@@ -123,6 +135,13 @@
 			duration_min: durationMin,
 			energy_preset: energyPreset,
 			beam_width: beamWidth,
+			weights: {
+				harmonic: scoringWeights.harmonic / 100,
+				energy_fit: scoringWeights.energy_fit / 100,
+				bpm_compat: scoringWeights.bpm_compat / 100,
+				genre_coherence: scoringWeights.genre_coherence / 100,
+				track_quality: scoringWeights.track_quality / 100,
+			},
 		};
 
 		// Genre filter from selected chips
@@ -322,6 +341,9 @@
 					<span class="field-error">Min BPM must be less than max</span>
 				{/if}
 			</div>
+
+			<!-- Scoring Weights -->
+			<ScoringWeightsSliders bind:weights={scoringWeights} />
 
 			<!-- Seed Track -->
 			<div class="field">

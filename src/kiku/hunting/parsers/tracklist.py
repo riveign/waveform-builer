@@ -205,6 +205,37 @@ def parse_comments(comments: list[dict] | None) -> list[ParsedTrack]:
     return tracks
 
 
+def parse_music_credits(credits: list[dict] | None) -> list[ParsedTrack]:
+    """Parse YouTube Content ID music credits into tracks.
+
+    Each credit is a dict with {title, artist, album} from YouTube's
+    auto-detected "Music in this video" section.
+    """
+    if not credits:
+        return []
+
+    tracks: list[ParsedTrack] = []
+    for i, credit in enumerate(credits, 1):
+        title_raw = credit.get("title", "").strip()
+        artist = credit.get("artist", "").strip()
+        if not title_raw or not artist:
+            continue
+
+        title, remix = parse_remix(title_raw)
+        tracks.append(ParsedTrack(
+            position=i,
+            artist=artist,
+            title=title,
+            remix_info=remix,
+            original_title=title if remix else None,
+            raw_text=f"{artist} - {title_raw}",
+            source="content_id",
+            confidence=0.95,
+        ))
+
+    return tracks
+
+
 def merge_tracklists(*tracklists: list[ParsedTrack]) -> list[ParsedTrack]:
     """Merge multiple tracklists, deduplicating by artist+title.
 
@@ -257,10 +288,14 @@ def _looks_like_tracklist_line(line: str) -> bool:
     # Must contain " - " separator
     if " - " not in line and " – " not in line and " — " not in line:
         return False
-    # Not too long (URLs, paragraphs)
-    if len(line) > 200:
+    # Not too long (URLs, paragraphs, prose sentences)
+    if len(line) > 120:
         return False
     # Not a URL
     if line.startswith("http"):
+        return False
+    # Reject lines with too many words (prose, not track names)
+    word_count = len(line.split())
+    if word_count > 15:
         return False
     return True

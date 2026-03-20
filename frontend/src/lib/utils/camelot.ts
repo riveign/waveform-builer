@@ -1,7 +1,7 @@
 /**
  * Camelot wheel color mapping for key display.
  */
-const CAMELOT_COLORS: Record<string, string> = {
+export const CAMELOT_COLORS: Record<string, string> = {
 	'1A': '#f44336', '1B': '#ff7043',
 	'2A': '#ff5722', '2B': '#ff9800',
 	'3A': '#ff9800', '3B': '#ffc107',

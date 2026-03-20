@@ -80,6 +80,7 @@ def start_hunt(body: HuntRequest, db: Session = Depends(get_db)):
         parse_chapters,
         parse_comments,
         parse_description,
+        parse_music_credits,
     )
     from kiku.hunting.sources import generate_purchase_links
 
@@ -110,8 +111,9 @@ def start_hunt(body: HuntRequest, db: Session = Depends(get_db)):
     desc_tracks = parse_description(metadata.description)
     chapter_tracks = parse_chapters(metadata.chapters)
     comment_tracks = parse_comments(metadata.comments)
+    credit_tracks = parse_music_credits(metadata.music_credits)
 
-    merged = merge_tracklists(chapter_tracks, desc_tracks, comment_tracks)
+    merged = merge_tracklists(credit_tracks, chapter_tracks, desc_tracks, comment_tracks)
 
     if not merged:
         hunt.status = "complete"

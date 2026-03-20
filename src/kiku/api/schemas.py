@@ -224,6 +224,7 @@ class SetBuildRequest(BaseModel):
     seed_track_id: int | None = None
     beam_width: int = 5
     playlist_preference: list[str] | None = None
+    weights: ScoringWeightsRequest | None = None
 
 
 class SetCreateRequest(BaseModel):
@@ -326,6 +327,22 @@ class TinderRetrainResponse(BaseModel):
 # ── Config endpoint response models ──
 
 
+class ScoringWeightsResponse(BaseModel):
+    harmonic: float
+    energy_fit: float
+    bpm_compat: float
+    genre_coherence: float
+    track_quality: float
+
+
+class ScoringWeightsRequest(BaseModel):
+    harmonic: float
+    energy_fit: float
+    bpm_compat: float
+    genre_coherence: float
+    track_quality: float
+
+
 class EnergySegmentResponse(BaseModel):
     name: str
     target_energy: float
@@ -409,3 +426,47 @@ class HuntListResponse(BaseModel):
 
 class HuntTrackUpdateRequest(BaseModel):
     acquisition_status: str  # "wanted", "owned", "unowned"
+
+
+# ── Replace Track models ──
+
+
+class ReplacementBreakdown(BaseModel):
+    harmonic: float
+    energy_fit: float
+    bpm_compat: float
+    genre_coherence: float
+    track_quality: float
+    total: float
+
+
+class ReplacementCandidate(BaseModel):
+    track: TrackResponse
+    combined_score: float
+    incoming_breakdown: ReplacementBreakdown | None = None
+    outgoing_breakdown: ReplacementBreakdown | None = None
+
+
+class TrackSummary(BaseModel):
+    track_id: int
+    title: str | None = None
+    artist: str | None = None
+    bpm: float | None = None
+    key: str | None = None
+    genre: str | None = None
+
+
+class ReplacementContext(BaseModel):
+    prev_track: TrackSummary | None = None
+    next_track: TrackSummary | None = None
+    energy_target: float
+    position: int
+
+
+class ReplacementSuggestionsResponse(BaseModel):
+    context: ReplacementContext
+    candidates: list[ReplacementCandidate]
+
+
+class ReplaceTrackRequest(BaseModel):
+    new_track_id: int

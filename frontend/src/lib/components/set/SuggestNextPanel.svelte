@@ -23,7 +23,7 @@
 		loading = true;
 		error = null;
 		try {
-			const res = await suggestNext(trackId, 10);
+			const res = await suggestNext(trackId, 10, undefined, undefined, setId);
 			suggestions = res.suggestions;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Could not load suggestions';

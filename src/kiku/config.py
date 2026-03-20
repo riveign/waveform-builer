@@ -83,6 +83,45 @@ def _resolve_scoring_weights() -> dict[str, float]:
 
 SCORING_WEIGHTS = _resolve_scoring_weights()
 
+SCORING_WEIGHT_KEYS = ("harmonic", "energy_fit", "bpm_compat", "genre_coherence", "track_quality")
+
+
+def reload_scoring_weights() -> dict[str, float]:
+    """Re-read scoring weights from TOML and update the module-level dict."""
+    global SCORING_WEIGHTS
+    SCORING_WEIGHTS = _resolve_scoring_weights()
+    return SCORING_WEIGHTS
+
+
+def validate_scoring_weights(weights: dict[str, float]) -> None:
+    """Validate that scoring weights have correct keys and sum to ~1.0."""
+    missing = set(SCORING_WEIGHT_KEYS) - set(weights.keys())
+    if missing:
+        raise ValueError(f"Missing weight keys: {', '.join(sorted(missing))}")
+    extra = set(weights.keys()) - set(SCORING_WEIGHT_KEYS)
+    if extra:
+        raise ValueError(f"Unknown weight keys: {', '.join(sorted(extra))}")
+    for k, v in weights.items():
+        if v < 0:
+            raise ValueError(f"Weight '{k}' must be non-negative, got {v}")
+    total = sum(weights.values())
+    if abs(total - 1.0) > 0.01:
+        raise ValueError(f"Weights must sum to ~1.0 (within 0.01), got {total}")
+
+
+def save_scoring_weights(weights: dict[str, float]) -> dict[str, float]:
+    """Validate, persist to TOML, and reload scoring weights."""
+    validate_scoring_weights(weights)
+    import tomli_w
+
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    config = _load_toml()
+    config["scoring"] = {k: weights[k] for k in SCORING_WEIGHT_KEYS}
+    with open(CONFIG_FILE, "wb") as f:
+        tomli_w.dump(config, f)
+    return reload_scoring_weights()
+
+
 # ── Search defaults ────────────────────────────────────────────────────
 
 BPM_TOLERANCE = _get("search", "bpm_tolerance", 0.06)

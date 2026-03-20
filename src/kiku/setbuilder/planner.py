@@ -84,6 +84,7 @@ def build_set(
     beam_width: int = DEFAULT_BEAM_WIDTH,
     set_name: str | None = None,
     prefer_playlists: list[str] | None = None,
+    weights: dict[str, float] | None = None,
 ) -> Set | None:
     """Generate a DJ set using beam search.
 
@@ -156,7 +157,7 @@ def build_set(
                         if not (0.47 < ratio < 0.53 or 1.88 < ratio < 2.12):
                             continue
 
-                score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists)
+                score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists, weights=weights)
 
                 # BPM progression bonus: reward tracks closer to target BPM at this point
                 if target_bpm and cand.bpm:
@@ -218,7 +219,7 @@ def build_set(
 
     prev_track = None
     for i, track in enumerate(best_seq):
-        t_score = transition_score(prev_track, track, prefer_playlists=prefer_playlists) if prev_track else None
+        t_score = transition_score(prev_track, track, prefer_playlists=prefer_playlists, weights=weights) if prev_track else None
         st = SetTrack(
             set_id=set_.id,
             position=i + 1,

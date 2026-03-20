@@ -1,13 +1,15 @@
-"""Configuration endpoints — energy presets and genre families."""
+"""Configuration endpoints — energy presets, genre families, and scoring weights."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from kiku.api.schemas import (
     EnergyPresetResponse,
     EnergySegmentResponse,
     GenreFamilyResponse,
+    ScoringWeightsRequest,
+    ScoringWeightsResponse,
 )
 from kiku.setbuilder.constraints import get_energy_presets, parse_energy_string
 from kiku.setbuilder.scoring import COMPATIBLE_FAMILIES, GENRE_FAMILIES
@@ -69,3 +71,24 @@ def list_genre_families():
         ))
 
     return result
+
+
+@router.get("/scoring-weights", response_model=ScoringWeightsResponse)
+def get_scoring_weights():
+    """Return current scoring weights — the balance behind every transition score."""
+    from kiku.config import SCORING_WEIGHTS
+
+    return ScoringWeightsResponse(**SCORING_WEIGHTS)
+
+
+@router.put("/scoring-weights", response_model=ScoringWeightsResponse)
+def update_scoring_weights(body: ScoringWeightsRequest):
+    """Update global scoring weights. Weights must sum to ~1.0 (within 0.01)."""
+    from kiku.config import save_scoring_weights
+
+    weights = body.model_dump()
+    try:
+        updated = save_scoring_weights(weights)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return ScoringWeightsResponse(**updated)

@@ -15,6 +15,11 @@ from kiku.api.deps import get_db
 from kiku.api.schemas import (
     CueCreateRequest,
     CueResponse,
+    ReplaceTrackRequest,
+    ReplacementCandidate,
+    ReplacementBreakdown,
+    ReplacementContext,
+    ReplacementSuggestionsResponse,
     SetAddTrackRequest,
     SetBuildRequest,
     SetCreateRequest,
@@ -24,6 +29,7 @@ from kiku.api.schemas import (
     SetTrackResponse,
     SetUpdateRequest,
     SetWaveformTrackResponse,
+    TrackSummary,
     TransitionResponse,
     TransitionScoreBreakdown,
 )
@@ -34,6 +40,7 @@ from kiku.db.store import (
     get_cues_for_set_track,
     reorder_set_tracks,
     remove_track_from_set,
+    replace_track_in_set,
     save_cue,
 )
 
@@ -98,6 +105,12 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                     return
                 seed_title = track.title
 
+            # Convert per-request weight overrides if provided
+            weights_dict = body.weights.model_dump() if body.weights else None
+            if weights_dict:
+                from kiku.config import validate_scoring_weights
+                validate_scoring_weights(weights_dict)
+
             result = build_set(
                 session=db,
                 duration_min=body.duration_min,
@@ -108,6 +121,7 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                 beam_width=body.beam_width,
                 set_name=body.name,
                 prefer_playlists=body.playlist_preference,
+                weights=weights_dict,
             )
 
             if result is None:
@@ -348,8 +362,7 @@ def set_transition(set_id: int, index: int, db: Session = Depends(get_db)):
     g = genre_coherence(t_a.dir_genre or t_a.rb_genre, t_b.dir_genre or t_b.rb_genre)
     q = track_quality(t_b)
 
-    from kiku.config import SCORING_WEIGHTS
-    w = SCORING_WEIGHTS
+    from kiku.config import SCORING_WEIGHTS as w
     total = w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b + w["genre_coherence"] * g + w["track_quality"] * q
 
     af_a = t_a.audio_features
@@ -447,3 +460,163 @@ def remove_cue(cue_id: int, db: Session = Depends(get_db)):
     if not delete_cue(db, cue_id):
         raise HTTPException(status_code=404, detail="Cue not found")
     return {"ok": True}
+
+
+# ── Replace Track endpoints ──
+
+
+def _track_summary(t: Track) -> TrackSummary:
+    return TrackSummary(
+        track_id=t.id,
+        title=t.title,
+        artist=t.artist,
+        bpm=t.bpm,
+        key=t.key,
+        genre=t.dir_genre or t.rb_genre,
+    )
+
+
+def _track_response(t: Track):
+    """Build a TrackResponse from a Track model."""
+    from kiku.api.schemas import EnergyConflictResponse, TrackResponse
+
+    af = t.audio_features
+    resolved_zone, source, confidence = t.resolved_energy_zone
+    conflict = t.energy_conflict
+    conflict_resp = None
+    if conflict:
+        conflict_resp = EnergyConflictResponse(**conflict)
+    return TrackResponse(
+        id=t.id,
+        title=t.title,
+        artist=t.artist,
+        album=t.album,
+        bpm=t.bpm,
+        key=t.key,
+        rating=t.rating,
+        genre=t.dir_genre or t.rb_genre,
+        energy=t.dir_energy or t.energy_predicted,
+        duration_sec=t.duration_sec,
+        play_count=t.play_count,
+        has_waveform=af is not None and af.waveform_overview is not None,
+        has_features=af is not None,
+        resolved_energy=resolved_zone,
+        energy_source=source,
+        energy_confidence=confidence,
+        energy_conflict=conflict_resp,
+    )
+
+
+@router.get("/{set_id}/tracks/{position}/replacements", response_model=ReplacementSuggestionsResponse)
+def get_replacements(
+    set_id: int,
+    position: int,
+    n: int = 10,
+    genre_filter: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Find replacement candidates for the track at a given position.
+
+    Scores candidates against both neighbors (prev and next track).
+    """
+    from sqlalchemy import or_
+
+    from kiku.config import BPM_TOLERANCE
+    from kiku.setbuilder.scoring import score_replacement
+
+    s = db.get(Set, set_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    ordered = sorted(s.tracks, key=lambda st: st.position)
+    if position < 0 or position >= len(ordered):
+        raise HTTPException(status_code=404, detail="Invalid position")
+
+    current_st = ordered[position]
+    current_track = current_st.track
+    prev_track = ordered[position - 1].track if position > 0 else None
+    next_track = ordered[position + 1].track if position < len(ordered) - 1 else None
+
+    # Compute energy target at this position from set's energy_profile
+    energy_target = 0.5
+    if s.energy_profile:
+        try:
+            from kiku.setbuilder.constraints import parse_energy_json, parse_energy_string
+            try:
+                profile = parse_energy_json(s.energy_profile)
+            except (json.JSONDecodeError, KeyError):
+                profile = parse_energy_string(s.energy_profile)
+            # Estimate elapsed time based on position
+            total_tracks = len(ordered)
+            total_dur = s.duration_min or 120
+            elapsed = (position / max(total_tracks - 1, 1)) * total_dur
+            energy_target = profile.target_energy_at(elapsed)
+        except Exception:
+            pass
+
+    # Collect existing track IDs to exclude
+    set_track_ids = {st.track_id for st in ordered}
+
+    # BPM pre-filter: use the average BPM of neighbors for filtering
+    ref_bpms = [t.bpm for t in [prev_track, next_track] if t and t.bpm and t.bpm > 0]
+    ref_bpm = sum(ref_bpms) / len(ref_bpms) if ref_bpms else (current_track.bpm or 0)
+
+    q = db.query(Track).filter(Track.id.notin_(set_track_ids))
+    if ref_bpm and ref_bpm > 0:
+        bpm_lo = ref_bpm * (1 - BPM_TOLERANCE * 2)
+        bpm_hi = ref_bpm * (1 + BPM_TOLERANCE * 2)
+        q = q.filter(Track.bpm.between(bpm_lo, bpm_hi))
+
+    if genre_filter:
+        genres = [g.strip() for g in genre_filter.split(",")]
+        genre_conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genres]
+        q = q.filter(or_(*genre_conditions))
+
+    candidates = q.all()
+
+    # Score each candidate
+    scored = []
+    for cand in candidates:
+        combined, incoming, outgoing = score_replacement(
+            cand, prev_track, next_track, target_energy=energy_target,
+        )
+        scored.append((cand, combined, incoming, outgoing))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+    top = scored[:n]
+
+    # Build response
+    result_candidates = []
+    for cand, combined, incoming, outgoing in top:
+        result_candidates.append(ReplacementCandidate(
+            track=_track_response(cand),
+            combined_score=combined,
+            incoming_breakdown=ReplacementBreakdown(**incoming) if incoming else None,
+            outgoing_breakdown=ReplacementBreakdown(**outgoing) if outgoing else None,
+        ))
+
+    context = ReplacementContext(
+        prev_track=_track_summary(prev_track) if prev_track else None,
+        next_track=_track_summary(next_track) if next_track else None,
+        energy_target=round(energy_target, 3),
+        position=position,
+    )
+
+    return ReplacementSuggestionsResponse(context=context, candidates=result_candidates)
+
+
+@router.post("/{set_id}/tracks/{position}/replace", response_model=list[SetTrackResponse])
+def replace_track(
+    set_id: int,
+    position: int,
+    body: ReplaceTrackRequest,
+    db: Session = Depends(get_db),
+):
+    """Replace the track at a given position with a new track."""
+    try:
+        tracks = replace_track_in_set(db, set_id, position, body.new_track_id)
+    except ValueError as exc:
+        detail = str(exc)
+        code = 404 if "not found" in detail.lower() else 400
+        raise HTTPException(status_code=code, detail=detail)
+    return [_set_track_response(st) for st in tracks]

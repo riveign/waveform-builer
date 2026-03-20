@@ -9,12 +9,14 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+import click
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from sqlalchemy.orm import Session
 
 from kiku.config import MUSIC_ROOTS
 from kiku.db.models import Track, get_session
+from kiku.db.paths import normalize_path
 from kiku.parsing.directory import parse_track_path
 
 console = Console()
@@ -157,44 +159,34 @@ def discover_audio_files(roots: list[Path]) -> list[Path]:
     return files
 
 
-def scan_filesystem(
-    roots: list[Path] | None = None,
-    dry_run: bool = False,
-    force: bool = False,
-) -> dict:
-    """Scan filesystem for audio files and import into the database.
+def _build_path_index(session: Session) -> dict[str, Track]:
+    """Build a normalized-path -> Track lookup for existing tracks.
 
-    Args:
-        roots: Directories to scan. Defaults to MUSIC_ROOTS from config.
-        dry_run: If True, show what would be imported without writing to DB.
-        force: If True, re-import tracks that already exist (update metadata).
-
-    Returns:
-        Dict with scan stats: total, added, updated, skipped, errors.
+    This allows scan to match files against tracks that were imported via
+    Rekordbox sync (which stores macOS /Volumes/... paths) even when scanning
+    on Linux (which sees /run/media/mantis/... paths).
     """
-    if roots is None:
-        roots = MUSIC_ROOTS
+    index: dict[str, Track] = {}
+    for track in session.query(Track).all():
+        if track.file_path:
+            norm = normalize_path(track.file_path)
+            index[norm] = track
+    return index
 
-    console.print(f"[bold]Scanning {len(roots)} root(s) for audio files...[/]")
-    for root in roots:
-        console.print(f"  [dim]{root}[/]")
 
-    # Discover files
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        transient=True,
-    ) as progress:
-        progress.add_task("[cyan]Discovering audio files...", total=None)
-        audio_files = discover_audio_files(roots)
+def _process_files(
+    audio_files: list[Path],
+    session: Session,
+    path_index: dict[str, Track],
+    force: bool = False,
+    dry_run: bool = False,
+) -> dict:
+    """Core scan loop -- reads files, matches to existing tracks, imports new ones.
 
-    console.print(f"[bold]Found {len(audio_files)} audio files[/]\n")
+    When *dry_run* is True the session is rolled back and no writes happen.
 
-    if not audio_files:
-        return {"total": 0, "added": 0, "updated": 0, "skipped": 0, "errors": 0}
-
-    session = get_session()
-
+    Returns dict with scan stats.
+    """
     added = 0
     updated = 0
     skipped = 0
@@ -208,23 +200,19 @@ def scan_filesystem(
         TaskProgressColumn(),
         console=console,
     ) as progress:
-        task = progress.add_task(
-            "[cyan]Scanning tracks..." if not dry_run else "[cyan]Dry run — scanning tracks...",
-            total=total,
-        )
+        label = "[cyan]Reading tracks..." if dry_run else "[cyan]Scanning tracks..."
+        task = progress.add_task(label, total=total)
 
         for file_path in audio_files:
             progress.advance(task)
 
             try:
                 file_path_str = str(file_path)
+                norm_path = normalize_path(file_path_str)
 
-                # Check for existing track by file_path
-                existing = (
-                    session.query(Track)
-                    .filter_by(file_path=file_path_str)
-                    .first()
-                )
+                # Check for existing track by normalized path
+                existing = path_index.get(norm_path)
+
                 if existing and not force:
                     skipped += 1
                     continue
@@ -273,27 +261,27 @@ def scan_filesystem(
                     last_synced=now,
                 )
 
-                if dry_run:
-                    # In dry run, just count
-                    added += 1
-                elif existing:
-                    for k, v in track_data.items():
-                        setattr(existing, k, v)
+                if existing:
+                    if not dry_run:
+                        for k, v in track_data.items():
+                            setattr(existing, k, v)
                     updated += 1
                 else:
-                    track = Track(**track_data)
-                    session.add(track)
+                    if not dry_run:
+                        track = Track(**track_data)
+                        session.add(track)
                     added += 1
 
             except Exception as e:
                 errors += 1
                 console.print(f"[red]Error processing {file_path.name}: {e}[/]")
 
-    if not dry_run:
+    if dry_run:
+        session.rollback()
+    else:
         session.commit()
 
-    # Summary
-    stats = {
+    return {
         "total": total,
         "added": added,
         "updated": updated,
@@ -301,14 +289,91 @@ def scan_filesystem(
         "errors": errors,
     }
 
+
+def _print_preview(stats: dict) -> None:
+    """Display a human-friendly scan preview."""
     console.print()
-    if dry_run:
-        console.print("[bold yellow]Dry run complete[/] — no changes written to database")
-        console.print(f"  Would add: {added} tracks")
-        console.print(f"  Already in library: {skipped}")
-        console.print(f"  Errors: {errors}")
-    else:
-        console.print(f"[bold green]Scan complete![/] {total} files processed")
-        console.print(f"  Added: {added}, Updated: {updated}, Skipped: {skipped}, Errors: {errors}")
+    console.print("[bold]Scan preview:[/]")
+    console.print(f"  New tracks:   {stats['added']:>6,}")
+    console.print(f"  Updated:      {stats['updated']:>6,}")
+    console.print(f"  Already here: {stats['skipped']:>6,}")
+    if stats["errors"]:
+        console.print(f"  Errors:       {stats['errors']:>6,}")
+    console.print()
+
+
+def scan_filesystem(
+    roots: list[Path] | None = None,
+    dry_run: bool = False,
+    force: bool = False,
+    yes: bool = False,
+) -> dict:
+    """Scan filesystem for audio files and import into the database.
+
+    When *dry_run* is True, shows what would change without writing.
+    When *yes* is False (default), a preview is shown and the DJ must
+    confirm before any writes happen.
+
+    Args:
+        roots: Directories to scan. Defaults to MUSIC_ROOTS from config.
+        dry_run: If True, show what would be imported without writing to DB.
+        force: If True, re-import tracks that already exist (update metadata).
+        yes: If True, skip confirmation prompt.
+
+    Returns:
+        Dict with scan stats: total, added, updated, skipped, errors.
+    """
+    if roots is None:
+        roots = MUSIC_ROOTS
+
+    console.print(f"[bold]Exploring your music folders...[/]")
+    for root in roots:
+        console.print(f"  [dim]{root}[/]")
+
+    # Discover files
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        transient=True,
+    ) as progress:
+        progress.add_task("[cyan]Discovering audio files...", total=None)
+        audio_files = discover_audio_files(roots)
+
+    console.print(f"[bold]Found {len(audio_files)} audio files[/]\n")
+
+    if not audio_files:
+        return {"total": 0, "added": 0, "updated": 0, "skipped": 0, "errors": 0}
+
+    session = get_session()
+
+    # Build normalized path index for cross-platform matching
+    path_index = _build_path_index(session)
+
+    # --- Preview pass (unless --yes) ---
+    if not yes:
+        stats = _process_files(
+            audio_files, session, path_index, force=force, dry_run=True,
+        )
+        _print_preview(stats)
+
+        if dry_run:
+            console.print("[dim]Dry run — nothing was written.[/]")
+            return stats
+
+        if not click.confirm("Ready to scan?", default=False):
+            console.print("[dim]Scan cancelled — your library is untouched.[/]")
+            return {**stats, "cancelled": True}
+
+    # --- Write pass ---
+    stats = _process_files(
+        audio_files, session, path_index, force=force, dry_run=False,
+    )
+
+    console.print()
+    console.print(f"[bold green]Scan complete![/] {stats['total']:,} files processed")
+    console.print(
+        f"  Added: {stats['added']:,}, Updated: {stats['updated']:,}, "
+        f"Skipped: {stats['skipped']:,}, Errors: {stats['errors']}"
+    )
 
     return stats

@@ -14,29 +14,10 @@ from rich.progress import Progress
 from sqlalchemy.orm import Session
 
 from kiku.db.models import Track, get_session
+from kiku.db.paths import normalize_path as _normalize_path
 from kiku.parsing.directory import parse_track_path
 
 console = Console()
-
-# Known mount-point mappings between macOS and Linux.
-# Rekordbox stores macOS paths; on Linux the same drive mounts differently.
-_PATH_ALIASES: list[tuple[str, str]] = [
-    ("/Volumes/", "/run/media/mantis/"),
-]
-
-
-def _normalize_path(path: str) -> str:
-    """Return a canonical form of *path* for cross-platform matching.
-
-    Replaces known macOS mount prefixes with their Linux equivalents so that
-    a track stored under ``/Volumes/SSD/…`` matches ``/run/media/mantis/SSD/…``.
-    """
-    for mac_prefix, linux_prefix in _PATH_ALIASES:
-        if path.startswith(mac_prefix):
-            return linux_prefix + path[len(mac_prefix):]
-        if path.startswith(linux_prefix):
-            return linux_prefix + path[len(linux_prefix):]
-    return path
 
 
 def _file_hash(path: str, chunk_size: int = 1024 * 1024) -> str | None:

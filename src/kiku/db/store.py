@@ -32,6 +32,7 @@ def search_tracks(
     energy_zone: str | None = None,
     key: str | list[str] | None = None,
     rating_min: int | None = None,
+    sort: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Track], int]:
@@ -39,6 +40,7 @@ def search_tracks(
 
     Returns (tracks, total_count) to support pagination.
     genre/key accept a single string or list of strings (OR-matched).
+    sort: "recent" orders by date_added DESC (newest first).
     """
     q = session.query(Track)
     if title:
@@ -72,6 +74,8 @@ def search_tracks(
         q = q.filter(or_(*key_conditions))
     if rating_min is not None:
         q = q.filter(Track.rating >= rating_min)
+    if sort == "recent":
+        q = q.filter(Track.date_added.isnot(None)).order_by(Track.date_added.desc())
     total = q.count()
     tracks = q.offset(offset).limit(limit).all()
     return tracks, total
@@ -342,6 +346,41 @@ def reorder_set_tracks(
         )
         session.add(new_st)
 
+    session.commit()
+    session.refresh(set_)
+
+    return sorted(set_.tracks, key=lambda st: st.position)
+
+
+def replace_track_in_set(
+    session: Session, set_id: int, position: int, new_track_id: int
+) -> list:
+    """Replace the track at a given position with a new track.
+
+    Returns the updated list of SetTrack objects sorted by position.
+    Raises ValueError if set, position, or track not found.
+    """
+    from kiku.db.models import Set, SetTrack
+
+    set_ = session.get(Set, set_id)
+    if not set_:
+        raise ValueError("Set not found")
+
+    track = session.get(Track, new_track_id)
+    if not track:
+        raise ValueError("Track not found")
+
+    target = None
+    for st in set_.tracks:
+        if st.position == position:
+            target = st
+            break
+
+    if target is None:
+        raise ValueError(f"No track at position {position}")
+
+    target.track_id = new_track_id
+    target.transition_score = None  # will be recomputed by frontend/caller
     session.commit()
     session.refresh(set_)
 
