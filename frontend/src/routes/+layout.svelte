@@ -1,7 +1,29 @@
-<script>
+<script lang="ts">
 	import '../app.css';
+	import NowPlayingBar from '$lib/components/player/NowPlayingBar.svelte';
+	import { getPlayerStore } from '$lib/stores/player.svelte';
+
 	let { children } = $props();
+
+	const player = getPlayerStore();
 </script>
+
+<svelte:window onkeydown={(e) => {
+	// Skip if user is typing in an input/textarea/select
+	const tag = (e.target as HTMLElement)?.tagName;
+	if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+	if (e.key === ' ' && player.hasTrack) {
+		e.preventDefault();
+		player.togglePlay();
+	} else if (e.key === 'ArrowLeft' && player.hasTrack) {
+		e.preventDefault();
+		player.seek(Math.max(0, player.currentTime - 5));
+	} else if (e.key === 'ArrowRight' && player.hasTrack) {
+		e.preventDefault();
+		player.seek(Math.min(player.duration, player.currentTime + 5));
+	}
+}} />
 
 <div class="app-shell">
 	<header class="app-header">
@@ -10,10 +32,12 @@
 			<h1 class="app-title">Kiku</h1>
 		</div>
 	</header>
-	<div class="app-body">
+	<div class="app-body" class:has-player={player.hasTrack}>
 		{@render children()}
 	</div>
 </div>
+
+<NowPlayingBar />
 
 <style>
 	.app-shell {
@@ -57,5 +81,9 @@
 	.app-body {
 		flex: 1;
 		overflow: hidden;
+	}
+
+	.app-body.has-player {
+		padding-bottom: 72px;
 	}
 </style>

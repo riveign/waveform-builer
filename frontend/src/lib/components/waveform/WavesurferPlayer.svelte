@@ -23,6 +23,10 @@
 		progressColor = '#00A8AB',
 		spectral = true,
 		autoplay = false,
+		/** When true, render waveform without loading audio — visual display only. */
+		visualOnly = false,
+		/** External playback progress (0-1) to sync cursor position when visualOnly is true. */
+		externalProgress = 0,
 		onfinish,
 		onready,
 	}: {
@@ -36,6 +40,10 @@
 		/** When true, fetch band data and render spectral (multi-color) waveform if available. */
 		spectral?: boolean;
 		autoplay?: boolean;
+		/** When true, render waveform without loading audio — visual display only. */
+		visualOnly?: boolean;
+		/** External playback progress (0-1) to sync cursor position when visualOnly is true. */
+		externalProgress?: number;
 		onfinish?: () => void;
 		onready?: (ws: WaveSurfer) => void;
 	} = $props();
@@ -161,21 +169,24 @@
 				backend: 'MediaElement',
 				peaks: wsPeaks,
 				duration,
-				url: `${API_BASE}/api/audio/${trackId}`,
+				// In visualOnly mode, skip loading audio — waveform is purely visual
+				...(visualOnly ? {} : { url: `${API_BASE}/api/audio/${trackId}` }),
 				...(renderFunction ? { renderFunction } : {}),
 			});
 
-			ws.on('timeupdate', (time) => {
-				currentTime = time;
-			});
+			if (!visualOnly) {
+				ws.on('timeupdate', (time) => {
+					currentTime = time;
+				});
 
-			ws.on('play', () => { isPlaying = true; });
-			ws.on('pause', () => { isPlaying = false; });
-			ws.on('finish', () => { onfinish?.(); });
+				ws.on('play', () => { isPlaying = true; });
+				ws.on('pause', () => { isPlaying = false; });
+				ws.on('finish', () => { onfinish?.(); });
+			}
 
 			onready?.(ws);
 
-			if (autoplay) {
+			if (autoplay && !visualOnly) {
 				ws.once('ready', () => { ws?.play(); });
 			}
 		}
@@ -185,6 +196,14 @@
 		return () => {
 			ws?.destroy();
 		};
+	});
+
+	// Sync cursor position from external progress when in visual-only mode
+	$effect(() => {
+		if (visualOnly && ws && externalProgress >= 0) {
+			ws.seekTo(Math.max(0, Math.min(1, externalProgress)));
+			currentTime = externalProgress * duration;
+		}
 	});
 
 	function togglePlay() {
@@ -224,29 +243,35 @@
 			backend: 'MediaElement',
 			peaks: wsPeaks,
 			duration,
-			url: `${API_BASE}/api/audio/${trackId}`,
+			...(visualOnly ? {} : { url: `${API_BASE}/api/audio/${trackId}` }),
 			...(renderFunction ? { renderFunction } : {}),
 		});
 
-		ws.on('timeupdate', (t) => { currentTime = t; });
-		ws.on('play', () => { isPlaying = true; });
-		ws.on('pause', () => { isPlaying = false; });
-		ws.on('finish', () => { onfinish?.(); });
+		if (!visualOnly) {
+			ws.on('timeupdate', (t) => { currentTime = t; });
+			ws.on('play', () => { isPlaying = true; });
+			ws.on('pause', () => { isPlaying = false; });
+			ws.on('finish', () => { onfinish?.(); });
+		}
 
 		onready?.(ws);
 
-		ws.once('ready', () => {
-			ws?.seekTo(duration > 0 ? time / duration : 0);
-			if (wasPlaying) ws?.play();
-		});
+		if (!visualOnly) {
+			ws.once('ready', () => {
+				ws?.seekTo(duration > 0 ? time / duration : 0);
+				if (wasPlaying) ws?.play();
+			});
+		}
 	}
 </script>
 
 <div class="wavesurfer-player">
 	<div class="controls">
-		<button class="play-btn" onclick={togglePlay}>
-			{isPlaying ? '⏸' : '▶'}
-		</button>
+		{#if !visualOnly}
+			<button class="play-btn" onclick={togglePlay}>
+				{isPlaying ? '⏸' : '▶'}
+			</button>
+		{/if}
 		<span class="time">{formatTime(currentTime)} / {formatTime(duration)}</span>
 		{#if spectral && bandArrays}
 			<button

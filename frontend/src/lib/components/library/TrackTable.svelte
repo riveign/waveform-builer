@@ -2,6 +2,16 @@
 	import type { Track } from '$lib/types';
 	import { getCamelotColor } from '$lib/utils/camelot';
 	import { formatTime } from '$lib/utils/waveform';
+	import { getPlayerStore } from '$lib/stores/player.svelte';
+	import { preloadOnHover } from '$lib/utils/audio-preload';
+	import { prefetchPeaks } from '$lib/api/waveforms';
+
+	const player = getPlayerStore();
+
+	function handleHover(track: Track) {
+		preloadOnHover(track.id);
+		prefetchPeaks(track.id);
+	}
 
 	let {
 		tracks,
@@ -12,12 +22,22 @@
 		selectedId?: number | null;
 		onselect: (track: Track) => void;
 	} = $props();
+
+	function handlePlay(e: MouseEvent, track: Track) {
+		e.stopPropagation();
+		if (player.isPlaying && player.currentTrack?.id === track.id) {
+			player.pause();
+		} else {
+			player.play(track);
+		}
+	}
 </script>
 
 <div class="track-table-wrapper">
 	<table class="track-table">
 		<thead>
 			<tr>
+				<th class="col-play"></th>
 				<th class="col-title">Title</th>
 				<th class="col-artist">Artist</th>
 				<th class="col-key">Key</th>
@@ -28,17 +48,35 @@
 		</thead>
 		<tbody>
 			{#each tracks as track (track.id)}
+				{@const isCurrentTrack = player.currentTrack?.id === track.id}
 				<tr
 					class="track-row"
 					class:selected={track.id === selectedId}
 					class:has-waveform={track.has_waveform}
+					class:now-playing={isCurrentTrack && player.isPlaying}
 					onclick={() => onselect(track)}
+					ondblclick={(e) => { e.preventDefault(); player.play(track); }}
+					onmouseenter={() => handleHover(track)}
 					draggable="true"
 					ondragstart={(e) => {
 						e.dataTransfer?.setData('application/x-kiku-track', JSON.stringify({ id: track.id, title: track.title }));
 						if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy';
 					}}
 				>
+					<td class="col-play">
+						<button
+							class="play-btn"
+							class:playing={isCurrentTrack && player.isPlaying}
+							onclick={(e) => handlePlay(e, track)}
+							title={isCurrentTrack && player.isPlaying ? 'Pause' : 'Play'}
+						>
+							{#if isCurrentTrack && player.isPlaying}
+								&#x23F8;
+							{:else}
+								&#x25B6;
+							{/if}
+						</button>
+					</td>
 					<td class="col-title" title={track.title ?? ''}>
 						{track.title ?? '?'}
 					</td>
@@ -60,7 +98,7 @@
 						{#if track.rating}
 							{'★'.repeat(track.rating)}
 						{:else}
-							<span class="dim">—</span>
+							<span class="dim">--</span>
 						{/if}
 					</td>
 				</tr>
@@ -125,16 +163,51 @@
 		border-left: 2px solid var(--accent);
 	}
 
+	.track-row.now-playing {
+		background: rgba(0, 206, 209, 0.08);
+	}
+
 	.track-row.has-waveform .col-title {
 		color: var(--accent);
 	}
 
+	.col-play { width: 28px; text-align: center; padding: 0 2px; }
 	.col-title { max-width: 140px; }
 	.col-artist { max-width: 100px; color: var(--text-secondary); }
 	.col-key { width: 40px; text-align: center; }
 	.col-bpm { width: 40px; text-align: right; }
 	.col-energy { width: 60px; }
 	.col-rating { width: 50px; color: #ffc107; font-size: 11px; }
+
+	.play-btn {
+		width: 22px;
+		height: 22px;
+		border-radius: 50%;
+		background: transparent;
+		color: var(--text-dim);
+		font-size: 9px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.15s;
+		border: none;
+		cursor: pointer;
+		opacity: 0;
+	}
+
+	.track-row:hover .play-btn,
+	.play-btn.playing {
+		opacity: 1;
+	}
+
+	.play-btn.playing {
+		color: var(--accent);
+	}
+
+	.play-btn:hover {
+		background: var(--bg-tertiary);
+		color: var(--accent);
+	}
 
 	.key-badge {
 		font-weight: 600;

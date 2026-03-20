@@ -204,10 +204,19 @@ class HuntTrack(Base):
     matched_track = relationship("Track")
 
 
+def _set_wal_mode(dbapi_conn, connection_record):
+    """Enable WAL journal mode for concurrent read/write access."""
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.close()
+
+
 def get_engine():
     global _engine
     if _engine is None:
+        from sqlalchemy import event
         _engine = create_engine(get_db_url(), poolclass=NullPool)
+        event.listen(_engine, "connect", _set_wal_mode)
     return _engine
 
 

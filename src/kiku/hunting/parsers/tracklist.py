@@ -236,31 +236,60 @@ def parse_music_credits(credits: list[dict] | None) -> list[ParsedTrack]:
     return tracks
 
 
+def _track_signature(track: ParsedTrack) -> str:
+    """Full artist+title string for fuzzy comparison."""
+    return f"{track.artist} {track.title}".lower().strip()
+
+
 def merge_tracklists(*tracklists: list[ParsedTrack]) -> list[ParsedTrack]:
     """Merge multiple tracklists, deduplicating by artist+title.
 
+    Uses fuzzy matching (>=85% similarity) to catch variants like
+    "Matrixxman - Hong Kong (Night)" vs "Matrixxman Hong Kong - Night".
     Higher confidence sources take priority. Position is renumbered.
     """
-    seen: dict[tuple[str, str], ParsedTrack] = {}
+    from thefuzz import fuzz
+
+    FUZZY_THRESHOLD = 85
+
+    merged_tracks: list[ParsedTrack] = []
+    signatures: list[str] = []
 
     for tracks in tracklists:
         for track in tracks:
-            key = (track.artist.lower().strip(), track.title.lower().strip())
-            existing = seen.get(key)
-            if existing is None or track.confidence > existing.confidence:
-                seen[key] = track
+            sig = _track_signature(track)
+
+            # Check for fuzzy match against existing entries
+            matched_idx = None
+            for i, existing_sig in enumerate(signatures):
+                if fuzz.ratio(sig, existing_sig) >= FUZZY_THRESHOLD:
+                    matched_idx = i
+                    break
+
+            if matched_idx is not None:
+                existing = merged_tracks[matched_idx]
+                # Replace if higher confidence, but preserve timestamp from either source
+                if track.confidence > existing.confidence:
+                    if track.timestamp_sec is None and existing.timestamp_sec is not None:
+                        track.timestamp_sec = existing.timestamp_sec
+                    merged_tracks[matched_idx] = track
+                    signatures[matched_idx] = sig
+                elif existing.timestamp_sec is None and track.timestamp_sec is not None:
+                    existing.timestamp_sec = track.timestamp_sec
+            else:
+                merged_tracks.append(track)
+                signatures.append(sig)
 
     # Sort by timestamp if available, otherwise by original position
-    merged = sorted(
-        seen.values(),
+    merged_tracks.sort(
         key=lambda t: (t.timestamp_sec if t.timestamp_sec is not None else float("inf"), t.position),
     )
 
     # Renumber
-    for i, track in enumerate(merged, 1):
+    for i, track in enumerate(merged_tracks, 1):
         track.position = i
 
-    return merged
+    return merged_tracks
 
 
 def _parse_track_text(text: str) -> tuple[str, str, str | None] | None:

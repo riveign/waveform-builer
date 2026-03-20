@@ -15,7 +15,7 @@ from kiku.api.schemas import (
     TransitionScoreBreakdown,
 )
 from kiku.db.models import Track
-from kiku.db.store import search_tracks
+from kiku.db.store import autocomplete_artists, autocomplete_labels, search_tracks
 
 router = APIRouter(prefix="/api/tracks", tags=["tracks"])
 
@@ -52,10 +52,12 @@ def _track_to_response(t: Track) -> TrackResponse:
 
 @router.get("/search", response_model=PaginatedTracksResponse)
 def track_search(
+    search: str | None = None,
     title: str | None = None,
-    artist: str | None = None,
+    artist: list[str] | None = Query(None),
     genre: list[str] | None = Query(None),
     key: list[str] | None = Query(None),
+    label: list[str] | None = Query(None),
     bpm_min: float | None = None,
     bpm_max: float | None = None,
     energy: str | None = None,
@@ -68,6 +70,7 @@ def track_search(
 ):
     tracks, total = search_tracks(
         db,
+        search=search,
         title=title,
         artist=artist,
         genre=genre,
@@ -76,6 +79,7 @@ def track_search(
         energy=energy,
         energy_zone=energy_zone,
         key=key,
+        label=label,
         rating_min=rating_min,
         sort=sort,
         limit=limit,
@@ -87,6 +91,24 @@ def track_search(
         offset=offset,
         limit=limit,
     )
+
+
+@router.get("/autocomplete/artists", response_model=list[str])
+def artists_autocomplete(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    return autocomplete_artists(db, q, limit=limit)
+
+
+@router.get("/autocomplete/labels", response_model=list[str])
+def labels_autocomplete(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
+    return autocomplete_labels(db, q, limit=limit)
 
 
 @router.get("/{track_id}", response_model=TrackResponse)

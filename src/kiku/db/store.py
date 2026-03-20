@@ -20,10 +20,36 @@ def get_track_by_title(session: Session, title: str) -> Optional[Track]:
     )
 
 
+def autocomplete_artists(session: Session, q: str, limit: int = 20) -> list[str]:
+    """Return distinct artist names matching a prefix/substring."""
+    rows = (
+        session.query(Track.artist)
+        .filter(Track.artist.isnot(None), Track.artist.ilike(f"%{q}%"))
+        .distinct()
+        .order_by(Track.artist)
+        .limit(limit)
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+def autocomplete_labels(session: Session, q: str, limit: int = 20) -> list[str]:
+    """Return distinct label names matching a prefix/substring."""
+    rows = (
+        session.query(Track.label)
+        .filter(Track.label.isnot(None), Track.label != "", Track.label.ilike(f"%{q}%"))
+        .distinct()
+        .order_by(Track.label)
+        .limit(limit)
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
 def search_tracks(
     session: Session,
     title: str | None = None,
-    artist: str | None = None,
+    artist: str | list[str] | None = None,
     genre: str | list[str] | None = None,
     bpm_min: float | None = None,
     bpm_max: float | None = None,
@@ -31,22 +57,38 @@ def search_tracks(
     *,
     energy_zone: str | None = None,
     key: str | list[str] | None = None,
+    label: str | list[str] | None = None,
     rating_min: int | None = None,
     sort: str | None = None,
+    search: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Track], int]:
     """Search tracks with multiple filters.
 
     Returns (tracks, total_count) to support pagination.
-    genre/key accept a single string or list of strings (OR-matched).
+    genre/key/artist/label accept a single string or list of strings (OR-matched).
     sort: "recent" orders by date_added DESC (newest first).
+    search: free-text OR-match across title, artist, and label.
     """
     q = session.query(Track)
+    if search:
+        pattern = f"%{search}%"
+        q = q.filter(or_(
+            Track.title.ilike(pattern),
+            Track.artist.ilike(pattern),
+            Track.label.ilike(pattern),
+        ))
     if title:
         q = q.filter(Track.title.ilike(f"%{title}%"))
     if artist:
-        q = q.filter(Track.artist.ilike(f"%{artist}%"))
+        artists = [artist] if isinstance(artist, str) else artist
+        artist_conditions = [Track.artist.ilike(f"%{a}%") for a in artists]
+        q = q.filter(or_(*artist_conditions))
+    if label:
+        labels = [label] if isinstance(label, str) else label
+        label_conditions = [Track.label.ilike(f"%{lb}%") for lb in labels]
+        q = q.filter(or_(*label_conditions))
     if genre:
         genres = [genre] if isinstance(genre, str) else genre
         genre_conditions = []
@@ -75,7 +117,7 @@ def search_tracks(
     if rating_min is not None:
         q = q.filter(Track.rating >= rating_min)
     if sort == "recent":
-        q = q.filter(Track.date_added.isnot(None)).order_by(Track.date_added.desc())
+        q = q.order_by(func.coalesce(Track.date_added, Track.last_synced).desc())
     total = q.count()
     tracks = q.offset(offset).limit(limit).all()
     return tracks, total

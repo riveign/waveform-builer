@@ -2,10 +2,12 @@ import type { Track, TrackFeatures, PaginatedTracks, SuggestNextResponse, Scorin
 import { fetchJson } from './client';
 
 export interface SearchParams {
+	search?: string;
 	title?: string;
-	artist?: string;
+	artist?: string[];
 	genre?: string[];
 	key?: string[];
+	label?: string[];
 	bpm_min?: number;
 	bpm_max?: number;
 	energy?: string;
@@ -29,6 +31,16 @@ export async function searchTracks(params: SearchParams): Promise<PaginatedTrack
 		}
 	}
 	return fetchJson<PaginatedTracks>(`/api/tracks/search?${qs}`);
+}
+
+export async function autocompleteArtists(q: string, limit = 20): Promise<string[]> {
+	const qs = new URLSearchParams({ q, limit: String(limit) });
+	return fetchJson<string[]>(`/api/tracks/autocomplete/artists?${qs}`);
+}
+
+export async function autocompleteLabels(q: string, limit = 20): Promise<string[]> {
+	const qs = new URLSearchParams({ q, limit: String(limit) });
+	return fetchJson<string[]>(`/api/tracks/autocomplete/labels?${qs}`);
 }
 
 export async function getTrack(id: number): Promise<Track> {

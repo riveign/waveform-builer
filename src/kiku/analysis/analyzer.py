@@ -12,9 +12,15 @@ from rich.console import Console
 from rich.progress import Progress
 
 from kiku.db.models import AudioFeatures, Track, get_session
+from kiku.db.paths import normalize_path
 from kiku.db.store import get_track_by_title, get_unanalyzed_tracks, get_partially_analyzed_tracks
 
 console = Console()
+
+
+def _resolve_path(file_path: str) -> str:
+    """Normalize macOS /Volumes/ paths to Linux mount points."""
+    return normalize_path(file_path)
 
 
 def _analyze_energy_mood(file_path: str) -> dict | None:
@@ -171,13 +177,14 @@ def run_analysis(
             console.print(f"[yellow]Track '{single_track}' not found.[/]")
             return
 
-        if not track.file_path or not Path(track.file_path).exists():
+        resolved = _resolve_path(track.file_path) if track.file_path else None
+        if not resolved or not Path(resolved).exists():
             console.print(f"[red]File not found: {track.file_path}[/]")
             return
 
         console.print(f"Analyzing: [cyan]{track.title}[/] — {track.artist}")
         results = _analyze_single(
-            track.file_path, waveform_only=waveform_only, bands_only=bands_only,
+            resolved, waveform_only=waveform_only, bands_only=bands_only,
         )
         if results:
             _save_features(session, track, results)
@@ -199,7 +206,8 @@ def run_analysis(
             .join(AudioFeatures)
             .all()
         )
-        available = [t for t in tracks if t.file_path and Path(t.file_path).exists()]
+        available = [(t, _resolve_path(t.file_path)) for t in tracks if t.file_path]
+        available = [(t, p) for t, p in available if Path(p).exists()]
         if not available:
             console.print("[yellow]No tracks to recompute.[/]")
             return
@@ -213,8 +221,8 @@ def run_analysis(
         if workers <= 1:
             with Progress() as progress:
                 task = progress.add_task(label, total=len(available))
-                for track in available:
-                    results = _analyze_energy_mood(track.file_path)
+                for track, resolved in available:
+                    results = _analyze_energy_mood(resolved)
                     if results:
                         _save_features(session, track, results)
                     progress.advance(task)
@@ -224,8 +232,8 @@ def run_analysis(
                 mp_ctx = multiprocessing.get_context("spawn")
                 with ProcessPoolExecutor(max_workers=workers, mp_context=mp_ctx) as executor:
                     futures = {
-                        executor.submit(_analyze_energy_mood, t.file_path): t
-                        for t in available
+                        executor.submit(_analyze_energy_mood, p): t
+                        for t, p in available
                     }
                     for future in as_completed(futures):
                         track = futures[future]
@@ -280,12 +288,14 @@ def run_analysis(
     if workers <= 0:
         workers = max(1, multiprocessing.cpu_count() // 2)
 
-    # Filter to tracks with accessible files
-    available = [t for t in tracks if t.file_path and Path(t.file_path).exists()]
+    # Filter to tracks with accessible files (normalize macOS → Linux paths)
+    available = [(t, _resolve_path(t.file_path)) for t in tracks if t.file_path]
+    available = [(t, p) for t, p in available if Path(p).exists()]
 
     if not available:
         console.print("[yellow]No tracks to analyze (files may not be mounted).[/]")
-        total_missing = len([t for t in tracks if t.file_path and not Path(t.file_path).exists()])
+        all_with_path = [t for t in tracks if t.file_path]
+        total_missing = len(all_with_path) - len(available)
         if total_missing:
             console.print(f"[dim]{total_missing} tracks have inaccessible files. Mount external drives?[/]")
         return
@@ -303,9 +313,9 @@ def run_analysis(
         # Sequential
         with Progress() as progress:
             task = progress.add_task(label, total=len(available))
-            for track in available:
+            for track, resolved in available:
                 results = _analyze_single(
-                    track.file_path, waveform_only=waveform_only, bands_only=bands_only,
+                    resolved, waveform_only=waveform_only, bands_only=bands_only,
                 )
                 if results:
                     _save_features(session, track, results)
@@ -317,8 +327,8 @@ def run_analysis(
             mp_ctx = multiprocessing.get_context("spawn")
             with ProcessPoolExecutor(max_workers=workers, mp_context=mp_ctx) as executor:
                 futures = {
-                    executor.submit(_analyze_single, t.file_path, waveform_only, bands_only): t
-                    for t in available
+                    executor.submit(_analyze_single, p, waveform_only, bands_only): t
+                    for t, p in available
                 }
                 for future in as_completed(futures):
                     track = futures[future]
@@ -330,5 +340,5 @@ def run_analysis(
                         console.print(f"[red]Error analyzing {track.title}: {e}[/]")
                     progress.advance(task)
 
-    analyzed_count = len([t for t in available if t.audio_features])
+    analyzed_count = len([t for t, _ in available if t.audio_features])
     console.print(f"[green]Analysis complete! {analyzed_count} tracks analyzed.[/]")

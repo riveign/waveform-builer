@@ -10,6 +10,16 @@
 
 	const owned = $derived(hunt.tracks.filter((t) => t.acquisition_status === 'owned').length);
 	const total = $derived(hunt.tracks.length);
+
+	function formatTime(sec: number | null): string {
+		if (sec == null) return '';
+		const h = Math.floor(sec / 3600);
+		const m = Math.floor((sec % 3600) / 60);
+		const s = Math.floor(sec % 60);
+		const mm = String(m).padStart(2, '0');
+		const ss = String(s).padStart(2, '0');
+		return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+	}
 </script>
 
 <div class="hunt-results">
@@ -33,6 +43,7 @@
 		<thead>
 			<tr>
 				<th class="col-pos">#</th>
+				<th class="col-time">Time</th>
 				<th class="col-artist">Artist</th>
 				<th class="col-title">Title</th>
 				<th class="col-source">Source</th>
@@ -44,6 +55,7 @@
 			{#each hunt.tracks as track}
 				<tr class:owned={track.acquisition_status === 'owned'}>
 					<td class="col-pos">{track.position}</td>
+					<td class="col-time">{formatTime(track.timestamp_sec)}</td>
 					<td class="col-artist">{track.artist ?? '?'}</td>
 					<td class="col-title">
 						{track.title ?? '?'}
@@ -141,6 +153,7 @@
 	}
 
 	.col-pos { width: 30px; text-align: right; color: var(--text-dim); }
+	.col-time { width: 55px; color: var(--text-dim); font-size: 12px; font-variant-numeric: tabular-nums; }
 	.col-source { color: var(--text-dim); font-size: 11px; }
 
 	.remix {

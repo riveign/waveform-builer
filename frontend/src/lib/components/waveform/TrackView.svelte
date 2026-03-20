@@ -5,8 +5,34 @@
 	import { getCamelotColor } from '$lib/utils/camelot';
 	import { formatTime } from '$lib/utils/waveform';
 	import WavesurferPlayer from './WavesurferPlayer.svelte';
+	import { getPlayerStore } from '$lib/stores/player.svelte';
 
 	let { track }: { track: Track } = $props();
+
+	const player = getPlayerStore();
+
+	/** Whether the global player is currently playing this track */
+	let isThisTrackPlaying = $derived(
+		player.currentTrack?.id === track.id && player.isPlaying
+	);
+
+	/** Whether the global player has this track loaded (playing or paused) */
+	let isThisTrackActive = $derived(
+		player.currentTrack?.id === track.id && player.status !== 'idle'
+	);
+
+	/** Progress ratio (0-1) from global player when this track is active */
+	let globalProgress = $derived(
+		isThisTrackActive ? player.progress : 0
+	);
+
+	function handlePlay() {
+		if (isThisTrackActive) {
+			player.togglePlay();
+		} else {
+			player.play(track);
+		}
+	}
 
 	let waveformData = $state<WaveformDetailData | null>(null);
 	let features = $state<TrackFeatures | null>(null);
@@ -52,8 +78,13 @@
 <div class="track-view">
 	<div class="track-header">
 		<div class="track-info">
-			<h2 class="track-title">{track.title ?? 'Unknown'}</h2>
-			<span class="track-artist">{track.artist ?? 'Unknown'}</span>
+			<button class="play-btn" onclick={handlePlay} title={isThisTrackPlaying ? 'Pause' : 'Play'}>
+				{isThisTrackPlaying ? '⏸' : '▶'}
+			</button>
+			<div>
+				<h2 class="track-title">{track.title ?? 'Unknown'}</h2>
+				<span class="track-artist">{track.artist ?? 'Unknown'}</span>
+			</div>
 		</div>
 		<div class="track-meta">
 			<span class="meta-badge" style="color: {getCamelotColor(track.key)}">
@@ -79,6 +110,8 @@
 			peaks={waveformData.envelope}
 			duration={waveformData.duration_sec}
 			beats={waveformData.beats}
+			visualOnly={true}
+			externalProgress={globalProgress}
 		/>
 	{:else if !track.has_waveform}
 		<div class="no-data">
@@ -143,6 +176,31 @@
 		justify-content: space-between;
 		align-items: flex-start;
 		gap: 12px;
+	}
+
+	.track-info {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.play-btn {
+		width: 36px;
+		height: 36px;
+		border-radius: 50%;
+		background: var(--accent);
+		color: #000;
+		font-size: 15px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		cursor: pointer;
+		border: none;
+	}
+
+	.play-btn:hover {
+		background: var(--accent-dim);
 	}
 
 	.track-title {

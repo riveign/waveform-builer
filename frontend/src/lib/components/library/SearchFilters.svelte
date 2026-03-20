@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { SearchParams } from '$lib/api/tracks';
+	import { autocompleteArtists, autocompleteLabels } from '$lib/api/tracks';
 	import { fetchJson } from '$lib/api/client';
 	import { CAMELOT_COLORS } from '$lib/utils/camelot';
+	import Typeahead from './Typeahead.svelte';
 
 	interface GenreFamily {
 		family_name: string;
@@ -13,6 +15,8 @@
 
 	// ── Filter state ──
 	let searchText = $state('');
+	let selectedArtists = $state<string[]>([]);
+	let selectedLabels = $state<string[]>([]);
 	let selectedGenres = $state<Set<string>>(new Set());
 	let selectedKeys = $state<Set<string>>(new Set());
 	let bpmMin = $state<number | null>(null);
@@ -47,9 +51,10 @@
 	function buildParams(): SearchParams {
 		const params: SearchParams = {};
 		if (searchText.trim()) {
-			params.title = searchText.trim();
-			params.artist = searchText.trim();
+			params.search = searchText.trim();
 		}
+		if (selectedArtists.length > 0) params.artist = selectedArtists;
+		if (selectedLabels.length > 0) params.label = selectedLabels;
 		if (selectedGenres.size > 0) params.genre = [...selectedGenres];
 		if (selectedKeys.size > 0) params.key = [...selectedKeys];
 		if (bpmMin !== null) params.bpm_min = bpmMin;
@@ -116,6 +121,8 @@
 
 	// ── Active filter helpers ──
 	let hasActiveFilters = $derived(
+		selectedArtists.length > 0 ||
+		selectedLabels.length > 0 ||
 		selectedGenres.size > 0 ||
 		selectedKeys.size > 0 ||
 		(bpmMin !== null || bpmMax !== null) ||
@@ -147,6 +154,8 @@
 
 	function clearAllFilters() {
 		searchText = '';
+		selectedArtists = [];
+		selectedLabels = [];
 		selectedGenres = new Set();
 		selectedKeys = new Set();
 		bpmMin = null;
@@ -168,6 +177,22 @@
 		showAdvanced = !showAdvanced;
 		if (showAdvanced) loadGenreFamilies();
 	}
+
+	// ── Watch artist/label changes (bound from Typeahead) ──
+	let prevArtistKey = $derived(JSON.stringify(selectedArtists));
+	let prevLabelKey = $derived(JSON.stringify(selectedLabels));
+	let lastArtistKey = '';
+	let lastLabelKey = '';
+	$effect(() => {
+		const aKey = prevArtistKey;
+		const lKey = prevLabelKey;
+		if (aKey !== lastArtistKey || lKey !== lastLabelKey) {
+			const isInit = lastArtistKey === '' && lastLabelKey === '';
+			lastArtistKey = aKey;
+			lastLabelKey = lKey;
+			if (!isInit) searchNow();
+		}
+	});
 
 	// ── Select change handlers ──
 	function onEnergyChange() { searchNow(); }
@@ -233,6 +258,16 @@
 	<!-- Active filter chips -->
 	{#if hasActiveFilters}
 		<div class="active-chips">
+			{#each selectedArtists as a}
+				<button class="chip chip-artist" type="button" onclick={() => { selectedArtists = selectedArtists.filter(x => x !== a); }}>
+					{a} <span class="chip-x">&times;</span>
+				</button>
+			{/each}
+			{#each selectedLabels as lb}
+				<button class="chip chip-label" type="button" onclick={() => { selectedLabels = selectedLabels.filter(x => x !== lb); }}>
+					{lb} <span class="chip-x">&times;</span>
+				</button>
+			{/each}
 			{#each [...selectedGenres] as g}
 				<button class="chip chip-genre" type="button" onclick={() => removeGenre(g)}>
 					{g} <span class="chip-x">&times;</span>
@@ -275,6 +310,26 @@
 	<!-- Advanced panel -->
 	{#if showAdvanced}
 		<div class="advanced">
+			<!-- Artist + Label typeaheads -->
+			<div class="section typeahead-row">
+				<div class="field-group typeahead-field">
+					<span class="section-label">Artist</span>
+					<Typeahead
+						placeholder="Type to find..."
+						bind:selected={selectedArtists}
+						fetchSuggestions={autocompleteArtists}
+					/>
+				</div>
+				<div class="field-group typeahead-field">
+					<span class="section-label">Label</span>
+					<Typeahead
+						placeholder="Type to find..."
+						bind:selected={selectedLabels}
+						fetchSuggestions={autocompleteLabels}
+					/>
+				</div>
+			</div>
+
 			<!-- Genre chips -->
 			<div class="section">
 				<div class="section-header">
@@ -583,6 +638,16 @@
 		color: var(--accent);
 	}
 
+	.chip-artist {
+		border-color: var(--accent-blue, #42a5f5);
+		color: var(--accent-blue, #42a5f5);
+	}
+
+	.chip-label {
+		border-color: var(--accent-coral, #ff6b6b);
+		color: var(--accent-coral, #ff6b6b);
+	}
+
 	.chip-x {
 		font-size: 12px;
 		line-height: 1;
@@ -606,6 +671,16 @@
 		flex-direction: column;
 		gap: 10px;
 		padding: 0 10px 10px;
+	}
+
+	.typeahead-row {
+		flex-direction: row;
+		gap: 10px;
+	}
+
+	.typeahead-field {
+		flex: 1;
+		min-width: 0;
 	}
 
 	.section {
