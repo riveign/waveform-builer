@@ -25,12 +25,117 @@ GENRE_FAMILIES: dict[str, list[str]] = {
     "other": ["dub", "new wave", "post punk", "nacional"],
 }
 
+# ── Rekordbox Genre → Kiku Family ─────────────────────────────────────
+# Maps Rekordbox genre strings (lowercased) to one of the 7 Kiku families.
+# Covers all 89 distinct rb_genre values found in the library.
+# Ambiguous mappings are annotated with comments.
+RB_GENRE_TO_FAMILY: dict[str, str] = {
+    # ── Techno ──
+    "techno": "techno",
+    "techno (raw / deep / hypnotic)": "techno",
+    "techno (raw  deep  hypnotic)": "techno",          # encoding variant
+    "techno (peak time / driving)": "techno",
+    "techno (peak time  driving)": "techno",            # encoding variant
+    "techno (peak time / driving / hard)": "techno",
+    "hard techno": "techno",
+    "minimal": "techno",
+    "minimal / deep tech": "techno",
+    "minimal  deep tech": "techno",                     # encoding variant
+    "deep tech": "techno",
+    "peak time": "techno",
+    "melodic house & techno": "techno",                 # Beatport category, techno-leaning
+    "hypno": "techno",
+    # ── House ──
+    "house": "house",
+    "deep house": "house",
+    "tech house": "house",
+    "afro house": "house",
+    "afro / latin / brazilian": "house",                # Afro house adjacent
+    "bass house": "house",
+    "electro house": "house",
+    "electro house/electroclash": "house",
+    "funky house": "house",
+    "funky / groove / jackin' house": "house",
+    "jackin house": "house",
+    "latin house": "house",
+    "organic house": "house",
+    "organic house / downtempo": "house",               # organic house primary
+    "progressive house": "house",
+    "soulful house": "house",
+    "mainstage": "house",                               # big-room house
+    # ── Groove ──
+    "disco": "groove",
+    "disco / nu-disco": "groove",
+    "nu disco": "groove",
+    "nu disco / disco": "groove",
+    "nu disco / indie dance": "groove",                 # nu disco primary
+    "funk/rare groove": "groove",
+    "soul / funk / disco": "groove",
+    "indie dance": "groove",                            # groove-adjacent
+    # ── Trance ──
+    "trance": "trance",
+    "trance (main floor)": "trance",
+    "trance (raw / deep / hypnotic)": "trance",
+    "trance (raw  deep  hypnotic)": "trance",           # encoding variant
+    "deep trance": "trance",
+    "psy-trance": "trance",
+    "uplifting trance/progressive trance": "trance",
+    "hard dance / hardcore": "trance",                  # hard dance closer to trance family
+    # ── Breaks ──
+    "breaks": "breaks",
+    "breaks / breakbeat / uk bass": "breaks",
+    "breaks  breakbeat  uk bass": "breaks",             # encoding variant
+    "drum & bass": "breaks",
+    "garage": "breaks",
+    "uk garage / bassline": "breaks",
+    "uk garage  bassline": "breaks",                    # encoding variant
+    "dubstep": "breaks",                                # bass music → breaks family
+    "bass / club": "breaks",
+    "bass  club": "breaks",                             # encoding variant
+    "bounce": "breaks",                                 # bass-heavy → breaks
+    # ── Electronic ──
+    "electro": "electronic",
+    "electro (classic / detroit / modern)": "electronic",
+    "electronic": "electronic",
+    "electronica": "electronic",
+    "electronica / downtempo": "electronic",
+    "electrónica": "electronic",                        # Spanish variant
+    "experimental/electronic": "electronic",
+    "ambient / experimental": "electronic",
+    "ambient  experimental": "electronic",              # encoding variant
+    "balearic/downtempo": "electronic",
+    "dub": "electronic",                                # electronic production style
+    "dance / electro pop": "electronic",
+    "dance/electro pop": "electronic",
+    "dance / pop": "electronic",
+    "dance  pop": "electronic",                         # encoding variant
+    "dance": "electronic",
+    "europop": "electronic",
+    "loop samples": "electronic",                       # DJ tools
+    "dj tools": "electronic",
+    # ── Other ──
+    "pop": "other",
+    "pop/rock": "other",
+    "rock": "other",
+    "blues": "other",
+    "hip-hop/rap": "other",
+    "alternativa & indie": "other",
+    "indie/alternative": "other",
+    "américa latina": "other",
+    "latin music": "other",
+    "bandas sonoras de cine": "other",                  # film soundtracks
+    "world music": "other",
+    "underreview": "other",                             # uncategorized
+}
+
 # Reverse lookup: genre name → family name
 _GENRE_TO_FAMILY: dict[str, str] = {
     genre: family
     for family, members in GENRE_FAMILIES.items()
     for genre in members
 }
+# Merge Rekordbox mappings (RB map takes priority for shared keys)
+_GENRE_TO_FAMILY.update(RB_GENRE_TO_FAMILY)
 
 COMPATIBLE_FAMILIES: set[frozenset[str]] = {
     frozenset({"techno", "groove"}),

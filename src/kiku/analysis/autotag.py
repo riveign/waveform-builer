@@ -33,9 +33,13 @@ BASE_FEATURES = [
     "energy", "loudness_lufs", "spectral_centroid", "spectral_complexity",
     "danceability", "energy_intro", "energy_body", "energy_outro",
 ]
-MOOD_FEATURES = ["mood_happy", "mood_sad", "mood_aggressive", "mood_relaxed"]
+# Mood features are dead weight — Essentia mood classifiers were never run,
+# so these columns are always null/0.0 across the entire library.
+# Kept as constants for reference but excluded from training since Tier 1
+# improvements (2026-03-20).
+_DEAD_MOOD_FEATURES = ["mood_happy", "mood_sad", "mood_aggressive", "mood_relaxed"]
+_DEAD_MOOD_DERIVED = ["aggression_ratio"]
 DERIVED_FEATURES = ["build_shape", "drop_shape", "intro_body_ratio", "outro_body_ratio"]
-MOOD_DERIVED = ["aggression_ratio"]
 
 DEFAULT_MODEL_DIR = Path("data")
 MODEL_FILENAME = "energy_model.pkl"
@@ -114,25 +118,16 @@ def extract_features(af: AudioFeatures) -> np.ndarray | None:
     else:
         base.extend([0.0, 0.0, 0.0, 0.0])
 
-    # Mood features (optional — use if available, fill 0 if not)
-    for feat in MOOD_FEATURES:
-        val = getattr(af, feat, None)
-        base.append(float(val) if val is not None else 0.0)
-
-    # Mood derived
-    aggressive = getattr(af, "mood_aggressive", None)
-    relaxed = getattr(af, "mood_relaxed", None)
-    if aggressive is not None and relaxed is not None:
-        base.append(aggressive / (relaxed + 0.01))
-    else:
-        base.append(0.0)
+    # Dead mood features removed in Tier 1 (2026-03-20).
+    # Essentia mood classifiers were never run — all values are null/0.0.
+    # Keeping them added noise to the model with zero signal.
 
     return np.array(base, dtype=np.float32)
 
 
 def feature_names() -> list[str]:
     """Return ordered feature names matching extract_features output."""
-    return BASE_FEATURES + DERIVED_FEATURES + MOOD_FEATURES + MOOD_DERIVED
+    return BASE_FEATURES + DERIVED_FEATURES
 
 
 def _load_training_data(
@@ -219,7 +214,9 @@ def train_energy_model(session: Session, include_approved: bool = True) -> dict:
         X_bal = np.vstack(X_bal)
         y_bal = np.concatenate(y_bal)
 
-        fold_clf = RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1)
+        fold_clf = RandomForestClassifier(
+            n_estimators=200, class_weight="balanced", random_state=42, n_jobs=-1,
+        )
         fold_clf.fit(X_bal, y_bal)
         all_true.extend(y_test)
         all_pred.extend(fold_clf.predict(X_test))
@@ -243,7 +240,9 @@ def train_energy_model(session: Session, include_approved: bool = True) -> dict:
     X_final = np.vstack(X_final)
     y_final = np.concatenate(y_final)
 
-    model = RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1)
+    model = RandomForestClassifier(
+        n_estimators=200, class_weight="balanced", random_state=42, n_jobs=-1,
+    )
     model.fit(X_final, y_final)
 
     # Feature importance
@@ -320,6 +319,17 @@ def save_model(result: dict, model_dir: Path = DEFAULT_MODEL_DIR) -> Path:
 
     joblib.dump(result["model"], model_path)
 
+    # Decision log: record training configuration for audit trail
+    decision_log = {
+        "features_used": feature_names(),
+        "features_removed": _DEAD_MOOD_FEATURES + _DEAD_MOOD_DERIVED,
+        "removal_reason": "Essentia mood classifiers never run — all values null/0.0",
+        "class_weight": "balanced",
+        "n_estimators": 200,
+        "oversampling": True,
+        "n_features": len(feature_names()),
+    }
+
     meta = {
         "trained_at": datetime.now().isoformat(),
         "training_samples": result["training_samples"],
@@ -332,6 +342,7 @@ def save_model(result: dict, model_dir: Path = DEFAULT_MODEL_DIR) -> Path:
         },
         "feature_importance": result["feature_importance"],
         "warnings": result["warnings"],
+        "decision_log": decision_log,
     }
     meta_path.write_text(json.dumps(meta, indent=2, default=str))
 

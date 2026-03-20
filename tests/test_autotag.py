@@ -8,6 +8,8 @@ import pytest
 
 from kiku.analysis.autotag import (
     ZONE_MAP,
+    _DEAD_MOOD_FEATURES,
+    _DEAD_MOOD_DERIVED,
     extract_features,
     feature_names,
 )
@@ -41,21 +43,19 @@ class TestFeatureExtraction:
         af = _make_af(energy=None)
         assert extract_features(af) is None
 
-    def test_mood_features_filled_zero_when_missing(self):
+    def test_dead_mood_features_excluded(self):
+        """Mood features were removed in Tier 1 — they are never populated."""
+        names = feature_names()
+        for dead in _DEAD_MOOD_FEATURES + _DEAD_MOOD_DERIVED:
+            assert dead not in names, f"{dead} should be excluded from feature set"
+
+    def test_feature_count_without_mood(self):
+        """Feature vector should be 12 features: 8 base + 4 derived."""
         af = _make_af()
         features = extract_features(af)
-        # Mood features are at indices 12-15, should be 0
-        mood_start = len(feature_names()) - 5  # 4 mood + 1 derived
-        assert all(features[mood_start:] == 0.0)
-
-    def test_mood_features_used_when_present(self):
-        af = _make_af(mood_happy=0.7, mood_sad=0.2, mood_aggressive=0.8, mood_relaxed=0.3)
-        features = extract_features(af)
-        names = feature_names()
-        idx = names.index("mood_happy")
-        assert features[idx] == pytest.approx(0.7)
-        idx_agg = names.index("aggression_ratio")
-        assert features[idx_agg] == pytest.approx(0.8 / (0.3 + 0.01), rel=1e-2)
+        assert features is not None
+        assert len(features) == 12
+        assert len(feature_names()) == 12
 
     def test_derived_features_computed(self):
         af = _make_af(energy_intro=0.5, energy_body=0.9, energy_outro=0.7)
@@ -80,7 +80,7 @@ class TestModelPersistence:
 
         # Create a minimal mock model
         from sklearn.ensemble import RandomForestClassifier
-        X = np.random.rand(30, 17)
+        X = np.random.rand(30, 12)
         y = np.array(["warmup"] * 10 + ["build"] * 10 + ["peak"] * 10)
         model = RandomForestClassifier(n_estimators=10, random_state=42)
         model.fit(X, y)
