@@ -9,6 +9,8 @@ export type DeckId = 'A' | 'B';
 const EXPRESS_SNIPPET_SEC = 45;
 /** Crossfade duration in seconds */
 const CROSSFADE_SEC = 2;
+/** Max pitch adjustment — beyond ±8% sounds unnatural */
+const MAX_RATE_DELTA = 0.08;
 
 let mode = $state<PlaybackMode | null>(null);
 let status = $state<PlaybackStatus>('idle');
@@ -21,6 +23,36 @@ let wsB = $state<WaveSurfer | null>(null);
 let volume = $state(0.8);
 let confirmed = $state<Set<number>>(new Set());
 let currentTime = $state(0);
+let bpmMatch = $state(true);
+
+/** Persist confirmed track IDs to localStorage keyed by set ID */
+function saveConfirmed(sid: number, ids: Set<number>) {
+	try {
+		localStorage.setItem(`kiku:confirmed:${sid}`, JSON.stringify([...ids]));
+	} catch { /* quota exceeded — ignore */ }
+}
+
+/** Load confirmed track IDs from localStorage for a given set */
+function loadConfirmed(sid: number): Set<number> {
+	try {
+		const raw = localStorage.getItem(`kiku:confirmed:${sid}`);
+		if (raw) return new Set(JSON.parse(raw) as number[]);
+	} catch { /* corrupted — ignore */ }
+	return new Set();
+}
+
+/**
+ * Calculate playback rate to pitch-match track B to track A's BPM.
+ * Returns 1.0 if matching is disabled, either BPM is missing, or the
+ * ratio exceeds the safe ±8% range.
+ */
+function calcRate(fromBpm: number | null, toBpm: number | null): number {
+	if (!bpmMatch || !fromBpm || !toBpm || toBpm === 0) return 1;
+	const ratio = fromBpm / toBpm;
+	// Clamp: if beyond ±8%, don't force it — sounds wrong
+	if (ratio < 1 - MAX_RATE_DELTA || ratio > 1 + MAX_RATE_DELTA) return 1;
+	return ratio;
+}
 
 /** Audio routing for crossfade */
 let audioCtx: AudioContext | null = null;
@@ -125,6 +157,13 @@ function doCrossfade(onComplete: () => void) {
 		return;
 	}
 
+	// Pitch-match: incoming track matches outgoing track's tempo
+	const currentTrackBpm = tracks[currentIndex]?.bpm ?? null;
+	const nextIdx = currentIndex + 1;
+	const nextTrackBpm = nextIdx < tracks.length ? (tracks[nextIdx]?.bpm ?? null) : null;
+	const incomingRate = calcRate(currentTrackBpm, nextTrackBpm);
+	inactiveWs.setPlaybackRate(incomingRate);
+
 	// Start inactive deck
 	inactiveGain.gain.value = 0;
 	inactiveWs.play();
@@ -216,6 +255,11 @@ function stopPlayback() {
 	if (gainNodeA) gainNodeA.gain.value = 1;
 	if (gainNodeB) gainNodeB.gain.value = 1;
 
+	// Persist confirmed tracks before clearing
+	if (setId !== null && confirmed.size > 0) {
+		saveConfirmed(setId, confirmed);
+	}
+
 	status = 'idle';
 	mode = null;
 	setId = null;
@@ -234,7 +278,7 @@ function startPlayback(playMode: PlaybackMode, newSetId: number, newTracks: SetW
 	currentIndex = 0;
 	activeDeck = 'A';
 	status = 'loading';
-	confirmed = new Set();
+	confirmed = loadConfirmed(newSetId);
 }
 
 /** Called by PlaybackDeck when wavesurfer is ready */
@@ -310,6 +354,8 @@ export function getPlaybackStore() {
 		get confirmed() { return confirmed; },
 		get isActive() { return status !== 'idle'; },
 		get currentTime() { return currentTime; },
+		get bpmMatch() { return bpmMatch; },
+		set bpmMatch(v: boolean) { bpmMatch = v; },
 
 		/** Current track being played */
 		get currentTrack(): SetWaveformTrack | null {
@@ -376,6 +422,7 @@ export function getPlaybackStore() {
 			const track = tracks[currentIndex];
 			if (track) {
 				confirmed = new Set([...confirmed, track.track_id]);
+				if (setId !== null) saveConfirmed(setId, confirmed);
 			}
 			advanceToNext();
 		},

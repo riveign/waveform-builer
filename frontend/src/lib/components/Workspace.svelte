@@ -3,6 +3,7 @@
 	import SetView from './set/SetView.svelte';
 	import DnaView from './dna/DnaView.svelte';
 	import EnergyTinder from './tinder/EnergyTinder.svelte';
+	import HuntView from './hunt/HuntView.svelte';
 	import SetPlaybackBar from './set/SetPlaybackBar.svelte';
 	import PlaybackDeck from './set/PlaybackDeck.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
@@ -30,6 +31,7 @@
 		else if (e.key === '2') { ui.activeTab = 'set'; e.preventDefault(); }
 		else if (e.key === '3') { ui.activeTab = 'dna'; e.preventDefault(); }
 		else if (e.key === '4') { ui.activeTab = 'tinder'; e.preventDefault(); }
+		else if (e.key === '5') { ui.activeTab = 'hunt'; e.preventDefault(); }
 	}
 </script>
 
@@ -49,6 +51,9 @@
 		<button class="tab" class:active={ui.activeTab === 'tinder'} onclick={() => ui.activeTab = 'tinder'}>
 			Energy Tinder <span class="shortcut">4</span>
 		</button>
+		<button class="tab" class:active={ui.activeTab === 'hunt'} onclick={() => ui.activeTab = 'hunt'}>
+			Track Hunter <span class="shortcut">5</span>
+		</button>
 	</div>
 	<div class="tab-content">
 		{#if ui.activeTab === 'track'}
@@ -65,6 +70,8 @@
 			<DnaView />
 		{:else if ui.activeTab === 'tinder'}
 			<EnergyTinder />
+		{:else if ui.activeTab === 'hunt'}
+			<HuntView />
 		{/if}
 	</div>
 

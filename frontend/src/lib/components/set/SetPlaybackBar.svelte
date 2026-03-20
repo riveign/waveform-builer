@@ -76,6 +76,15 @@
 				</button>
 			{/if}
 
+			<label class="bpm-match-toggle" title="Pitch-match BPMs during transitions">
+				<input
+					type="checkbox"
+					checked={pb.bpmMatch}
+					onchange={(e) => { pb.bpmMatch = (e.target as HTMLInputElement).checked; }}
+				/>
+				<span>BPM Match</span>
+			</label>
+
 			<div class="set-progress">
 				{#each pb.tracks as track, i}
 					<div
@@ -276,6 +285,20 @@
 
 	.builder-btn.skip:hover {
 		background: var(--bg-hover);
+	}
+
+	.bpm-match-toggle {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 11px;
+		color: var(--text-secondary);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+
+	.bpm-match-toggle input[type="checkbox"] {
+		accent-color: var(--accent);
 	}
 
 	.set-progress {
