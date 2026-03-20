@@ -193,8 +193,7 @@ def scan_filesystem(
     if not audio_files:
         return {"total": 0, "added": 0, "updated": 0, "skipped": 0, "errors": 0}
 
-    if not dry_run:
-        session = get_session()
+    session = get_session()
 
     added = 0
     updated = 0
@@ -221,17 +220,14 @@ def scan_filesystem(
                 file_path_str = str(file_path)
 
                 # Check for existing track by file_path
-                if not dry_run:
-                    existing = (
-                        session.query(Track)
-                        .filter_by(file_path=file_path_str)
-                        .first()
-                    )
-                    if existing and not force:
-                        skipped += 1
-                        continue
-                else:
-                    existing = None
+                existing = (
+                    session.query(Track)
+                    .filter_by(file_path=file_path_str)
+                    .first()
+                )
+                if existing and not force:
+                    skipped += 1
+                    continue
 
                 # Read audio tags
                 tags = _read_tags(file_path)
@@ -309,6 +305,7 @@ def scan_filesystem(
     if dry_run:
         console.print("[bold yellow]Dry run complete[/] — no changes written to database")
         console.print(f"  Would add: {added} tracks")
+        console.print(f"  Already in library: {skipped}")
         console.print(f"  Errors: {errors}")
     else:
         console.print(f"[bold green]Scan complete![/] {total} files processed")
