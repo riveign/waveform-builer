@@ -37,6 +37,7 @@ class Track(Base):
     title = Column(String)
     artist = Column(String)
     album = Column(String)
+    label = Column(String)
     rb_genre = Column(String)
     dir_genre = Column(String)
     dir_energy = Column(String)

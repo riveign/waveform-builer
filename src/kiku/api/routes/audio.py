@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from kiku.api.deps import get_db
 from kiku.db.models import Track
+from kiku.db.sync import _normalize_path
 
 router = APIRouter(prefix="/api/audio", tags=["audio"])
 
@@ -34,7 +35,7 @@ def stream_audio(track_id: int, request: Request, db: Session = Depends(get_db))
     if not track or not track.file_path:
         raise HTTPException(status_code=404, detail="Track not found")
 
-    path = Path(track.file_path)
+    path = Path(_normalize_path(track.file_path))
     if not path.exists():
         raise HTTPException(status_code=404, detail="Audio file not found on disk")
 

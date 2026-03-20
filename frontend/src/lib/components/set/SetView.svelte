@@ -9,8 +9,10 @@
 	import SuggestNextPanel from './SuggestNextPanel.svelte';
 	import SetEnergyReview from './SetEnergyReview.svelte';
 	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
+	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 
 	const ui = getUiStore();
+	const pb = getPlaybackStore();
 
 	/** The track currently loaded in the player (derived from playingTrackId) */
 	let playerTrack = $derived.by(() => {
@@ -167,6 +169,22 @@
 			{#if tracksNeedingReview.length > 0}
 				<button class="review-energy-btn" onclick={() => { showEnergyReview = true; }}>
 					Review energy ({tracksNeedingReview.length})
+				</button>
+			{/if}
+			{#if waveformTracks.length >= 2}
+				<button
+					class="play-set-btn"
+					onclick={() => pb.startExpress(selectedSet!.id, waveformTracks)}
+					disabled={pb.isActive}
+				>
+					Express
+				</button>
+				<button
+					class="play-set-btn builder"
+					onclick={() => pb.startBuilder(selectedSet!.id, waveformTracks)}
+					disabled={pb.isActive}
+				>
+					Live Builder
 				</button>
 			{/if}
 			<button class="export-btn" onclick={handleExport} disabled={exporting}>
@@ -332,6 +350,38 @@
 
 	.review-energy-btn:hover {
 		opacity: 0.85;
+	}
+
+	.play-set-btn {
+		padding: 4px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		color: #000;
+		background: var(--accent);
+		border: 1px solid var(--accent);
+		border-radius: 4px;
+		transition: all 0.15s;
+	}
+
+	.play-set-btn:hover:not(:disabled) {
+		opacity: 0.85;
+	}
+
+	.play-set-btn:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+
+	.play-set-btn.builder {
+		background: var(--bg-tertiary);
+		color: var(--text-primary);
+		border-color: var(--border);
+	}
+
+	.play-set-btn.builder:hover:not(:disabled) {
+		background: var(--accent);
+		color: #000;
+		border-color: var(--accent);
 	}
 
 	.export-btn {

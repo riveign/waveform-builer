@@ -16,6 +16,7 @@ class TrackResponse(BaseModel):
     title: str | None = None
     artist: str | None = None
     album: str | None = None
+    label: str | None = None
     bpm: float | None = None
     key: str | None = None
     rating: int | None = None

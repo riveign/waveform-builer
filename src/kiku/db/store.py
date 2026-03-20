@@ -241,12 +241,13 @@ def add_track_to_set(
     # Clamp position to valid range
     position = max(0, min(position, len(existing)))
 
-    # Shift positions of tracks at or after the insertion point
-    for st in existing:
+    # Shift positions of tracks at or after the insertion point.
+    # Iterate in reverse order (highest position first) to avoid
+    # hitting the UNIQUE constraint on (set_id, position).
+    for st in reversed(existing):
         if st.position >= position:
             st.position = st.position + 1
-
-    session.flush()
+            session.flush()
 
     new_st = SetTrack(set_id=set_id, position=position, track_id=track_id)
     session.add(new_st)

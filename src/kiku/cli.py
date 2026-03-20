@@ -138,11 +138,13 @@ def search(title: str | None, artist: str | None, genre: str | None,
 @click.option("--hashes", is_flag=True, help="Compute file hashes for change detection (slower)")
 @click.option("--db-path", default=None, type=click.Path(exists=True),
               help="Path to Rekordbox master.db (required on Linux)")
-def sync(hashes: bool, db_path: str | None):
+@click.option("--dry-run", is_flag=True, help="Show what would change without writing anything")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation and sync immediately")
+def sync(hashes: bool, db_path: str | None, dry_run: bool, yes: bool):
     """Import Rekordbox library and parse directory metadata."""
     from kiku.db.sync import sync_rekordbox
 
-    sync_rekordbox(compute_hashes=hashes, db_path=db_path)
+    sync_rekordbox(compute_hashes=hashes, db_path=db_path, dry_run=dry_run, yes=yes)
 
 
 @cli.command()

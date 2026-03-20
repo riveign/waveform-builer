@@ -33,6 +33,7 @@ def _track_to_response(t: Track) -> TrackResponse:
         title=t.title,
         artist=t.artist,
         album=t.album,
+        label=t.label,
         bpm=t.bpm,
         key=t.key,
         rating=t.rating,

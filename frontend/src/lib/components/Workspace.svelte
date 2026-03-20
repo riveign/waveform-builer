@@ -3,13 +3,29 @@
 	import SetView from './set/SetView.svelte';
 	import DnaView from './dna/DnaView.svelte';
 	import EnergyTinder from './tinder/EnergyTinder.svelte';
+	import SetPlaybackBar from './set/SetPlaybackBar.svelte';
+	import PlaybackDeck from './set/PlaybackDeck.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
+	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 
 	const ui = getUiStore();
+	const pb = getPlaybackStore();
 
 	function handleKeydown(e: KeyboardEvent) {
 		const target = e.target as HTMLElement;
 		if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
+
+		// Playback shortcuts (active when playback is running)
+		if (pb.isActive) {
+			if (e.key === ' ') { pb.togglePlayPause(); e.preventDefault(); return; }
+			if (e.key === 'ArrowRight') { pb.next(); e.preventDefault(); return; }
+			if (e.key === 'ArrowLeft') { pb.previous(); e.preventDefault(); return; }
+			if (e.key === 'Escape') { pb.stop(); e.preventDefault(); return; }
+			if (pb.mode === 'builder') {
+				if (e.key === 'k' || e.key === 'K') { pb.keep(); e.preventDefault(); return; }
+			}
+		}
+
 		if (e.key === '1') { ui.activeTab = 'track'; e.preventDefault(); }
 		else if (e.key === '2') { ui.activeTab = 'set'; e.preventDefault(); }
 		else if (e.key === '3') { ui.activeTab = 'dna'; e.preventDefault(); }
@@ -51,6 +67,26 @@
 			<EnergyTinder />
 		{/if}
 	</div>
+
+	{#if pb.isActive}
+		<SetPlaybackBar />
+		<PlaybackDeck
+			deck="A"
+			track={pb.deckATrack}
+			onready={pb.onDeckReady}
+			onfinish={pb.onDeckFinish}
+			ontimeupdate={pb.onDeckTimeUpdate}
+			onerror={pb.onDeckError}
+		/>
+		<PlaybackDeck
+			deck="B"
+			track={pb.deckBTrack}
+			onready={pb.onDeckReady}
+			onfinish={pb.onDeckFinish}
+			ontimeupdate={pb.onDeckTimeUpdate}
+			onerror={pb.onDeckError}
+		/>
+	{/if}
 </div>
 
 <style>
