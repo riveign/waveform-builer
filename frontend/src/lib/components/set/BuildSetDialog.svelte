@@ -1,7 +1,14 @@
 <script lang="ts">
 	import type { SetBuildParams } from '$lib/types';
 	import { getUiStore } from '$lib/stores/ui.svelte';
+	import { fetchJson } from '$lib/api/client';
 	import EnergyPresetPicker from './EnergyPresetPicker.svelte';
+
+	interface GenreFamily {
+		family_name: string;
+		genres: string[];
+		compatible_with: string[];
+	}
 
 	let {
 		open = $bindable(false),
@@ -13,11 +20,25 @@
 
 	const ui = getUiStore();
 
+	// ── Genre families from API ──
+	let genreFamilies = $state<GenreFamily[]>([]);
+	let genreFamiliesLoaded = $state(false);
+
+	async function loadGenreFamilies() {
+		if (genreFamiliesLoaded) return;
+		try {
+			genreFamilies = await fetchJson<GenreFamily[]>('/api/config/genre-families');
+			genreFamiliesLoaded = true;
+		} catch {
+			// Fall back to empty — text input still works
+		}
+	}
+
 	// ── Form state ──
 	let name = $state('');
 	let durationMin = $state(60);
 	let energyPreset = $state('journey');
-	let genreFilterText = $state('');
+	let selectedGenres = $state<Set<string>>(new Set());
 	let bpmMin = $state<number | null>(null);
 	let bpmMax = $state<number | null>(null);
 	let useSeedTrack = $state(true);
@@ -31,6 +52,7 @@
 		if (!dialogEl) return;
 		if (open && !dialogEl.open) {
 			resetForm();
+			loadGenreFamilies();
 			dialogEl.showModal();
 		} else if (!open && dialogEl.open) {
 			dialogEl.close();
@@ -50,11 +72,32 @@
 	);
 	let canSubmit = $derived(bpmValid);
 
+	function toggleGenre(genre: string) {
+		const next = new Set(selectedGenres);
+		if (next.has(genre)) {
+			next.delete(genre);
+		} else {
+			next.add(genre);
+		}
+		selectedGenres = next;
+	}
+
+	function toggleFamily(family: GenreFamily) {
+		const allSelected = family.genres.every((g) => selectedGenres.has(g));
+		const next = new Set(selectedGenres);
+		if (allSelected) {
+			family.genres.forEach((g) => next.delete(g));
+		} else {
+			family.genres.forEach((g) => next.add(g));
+		}
+		selectedGenres = next;
+	}
+
 	function resetForm() {
 		name = '';
 		durationMin = 60;
 		energyPreset = 'journey';
-		genreFilterText = '';
+		selectedGenres = new Set();
 		bpmMin = null;
 		bpmMax = null;
 		useSeedTrack = true;
@@ -82,13 +125,9 @@
 			beam_width: beamWidth,
 		};
 
-		// Parse genre filter
-		const genres = genreFilterText
-			.split(',')
-			.map((g) => g.trim())
-			.filter((g) => g.length > 0);
-		if (genres.length > 0) {
-			params.genre_filter = genres;
+		// Genre filter from selected chips
+		if (selectedGenres.size > 0) {
+			params.genre_filter = [...selectedGenres];
 		}
 
 		// BPM range
@@ -204,15 +243,53 @@
 
 			<!-- Genre Filter -->
 			<div class="field">
-				<label class="field-label" for="genre-filter">Genre filter</label>
-				<input
-					id="genre-filter"
-					type="text"
-					class="field-input"
-					placeholder="All genres"
-					bind:value={genreFilterText}
-				/>
-				<span class="field-subtext">Comma-separated, e.g. techno, house, breaks</span>
+				<div class="genre-header">
+					<span class="field-label">Genre filter</span>
+					{#if selectedGenres.size > 0}
+						<button
+							class="genre-clear-btn"
+							type="button"
+							onclick={() => { selectedGenres = new Set(); }}
+						>
+							Clear
+						</button>
+					{/if}
+				</div>
+				{#if genreFamilies.length > 0}
+					<div class="genre-families">
+						{#each genreFamilies as family}
+							<div class="genre-family">
+								<button
+									class="genre-family-label"
+									class:genre-family-active={family.genres.some((g) => selectedGenres.has(g))}
+									type="button"
+									onclick={() => toggleFamily(family)}
+								>
+									{family.family_name}
+								</button>
+								<div class="genre-chips">
+									{#each family.genres as genre}
+										<button
+											class="genre-chip"
+											class:genre-chip-active={selectedGenres.has(genre)}
+											type="button"
+											onclick={() => toggleGenre(genre)}
+										>
+											{genre}
+										</button>
+									{/each}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<span class="field-subtext">Loading genres...</span>
+				{/if}
+				{#if selectedGenres.size > 0}
+					<span class="field-subtext">{selectedGenres.size} genre{selectedGenres.size > 1 ? 's' : ''} selected</span>
+				{:else}
+					<span class="field-subtext">No filter — all genres included</span>
+				{/if}
 			</div>
 
 			<!-- BPM Range -->
@@ -460,6 +537,102 @@
 		font-size: 9px;
 		color: var(--text-dim);
 		margin-top: -2px;
+	}
+
+	/* ── Genre selector ── */
+	.genre-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.genre-clear-btn {
+		font-size: 10px;
+		color: var(--text-dim);
+		padding: 1px 6px;
+		border-radius: 3px;
+		transition: color 0.1s;
+	}
+
+	.genre-clear-btn:hover {
+		color: var(--accent-coral);
+	}
+
+	.genre-families {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		max-height: 180px;
+		overflow-y: auto;
+		padding: 8px;
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+	}
+
+	.genre-family {
+		display: flex;
+		align-items: flex-start;
+		gap: 6px;
+	}
+
+	.genre-family-label {
+		font-size: 10px;
+		font-weight: 600;
+		color: var(--text-dim);
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+		padding: 3px 6px;
+		border-radius: 3px;
+		white-space: nowrap;
+		flex-shrink: 0;
+		min-width: 64px;
+		text-align: left;
+		transition: all 0.1s;
+	}
+
+	.genre-family-label:hover {
+		color: var(--text-secondary);
+		background: var(--bg-hover);
+	}
+
+	.genre-family-active {
+		color: var(--accent);
+	}
+
+	.genre-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 3px;
+	}
+
+	.genre-chip {
+		font-size: 11px;
+		padding: 2px 8px;
+		border-radius: 10px;
+		color: var(--text-secondary);
+		background: var(--bg-secondary);
+		border: 1px solid var(--border);
+		transition: all 0.1s;
+		cursor: pointer;
+	}
+
+	.genre-chip:hover {
+		border-color: var(--accent);
+		color: var(--text-primary);
+	}
+
+	.genre-chip-active {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: #000;
+		font-weight: 500;
+	}
+
+	.genre-chip-active:hover {
+		background: var(--accent-dim);
+		border-color: var(--accent-dim);
+		color: #000;
 	}
 
 	/* ── BPM inputs ── */
