@@ -200,3 +200,12 @@ export async function exportRekordbox(setId: number): Promise<Blob> {
 	}
 	return res.blob();
 }
+
+export async function exportM3U8(setId: number): Promise<Blob> {
+	const res = await fetch(`${API_BASE}/api/sets/${setId}/export/m3u8`, { method: 'POST' });
+	if (!res.ok) {
+		const text = await res.text().catch(() => 'Export failed');
+		throw new Error(text);
+	}
+	return res.blob();
+}

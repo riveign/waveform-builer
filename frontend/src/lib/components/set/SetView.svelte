@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData } from '$lib/types';
-	import { getSet, getSetWaveforms, getTransition, exportRekordbox } from '$lib/api/sets';
+	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8 } from '$lib/api/sets';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import SetPicker from './SetPicker.svelte';
 	import SetTimeline from './SetTimeline.svelte';
@@ -59,6 +59,7 @@
 	let loadingTransition = $state(false);
 	let exporting = $state(false);
 	let exportMsg = $state<string | null>(null);
+	let exportFormat = $state<'m3u8' | 'rekordbox'>('m3u8');
 	let showEnergyReview = $state(false);
 	let error = $state<string | null>(null);
 	let timelineContainerEl = $state<HTMLDivElement>(null!);
@@ -100,11 +101,14 @@
 		exporting = true;
 		exportMsg = null;
 		try {
-			const blob = await exportRekordbox(setId);
+			const ext = exportFormat === 'm3u8' ? '.m3u8' : '.xml';
+			const blob = exportFormat === 'm3u8'
+				? await exportM3U8(setId)
+				: await exportRekordbox(setId);
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = `${setName.replace(/[^a-zA-Z0-9_-]/g, '_')}.xml`;
+			a.download = `${setName.replace(/[^a-zA-Z0-9_-]/g, '_')}${ext}`;
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
@@ -199,8 +203,12 @@
 					Live Builder
 				</button>
 			{/if}
+			<select bind:value={exportFormat} class="export-select">
+				<option value="m3u8">M3U8</option>
+				<option value="rekordbox">XML</option>
+			</select>
 			<button class="export-btn" onclick={handleExport} disabled={exporting}>
-				{exporting ? 'Exporting...' : 'Export XML'}
+				{exporting ? 'Exporting...' : 'Export'}
 			</button>
 			{#if exportMsg}
 				<span class="export-msg">{exportMsg}</span>
@@ -343,13 +351,24 @@
 		border-color: var(--accent);
 	}
 
+	.export-select {
+		padding: 4px 8px;
+		font-size: 12px;
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 4px 0 0 4px;
+		border-right: none;
+		cursor: pointer;
+	}
+
 	.export-btn {
 		padding: 4px 12px;
 		font-size: 12px;
 		color: var(--text-primary);
 		background: var(--bg-tertiary);
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: 0 4px 4px 0;
 		transition: all 0.15s;
 	}
 

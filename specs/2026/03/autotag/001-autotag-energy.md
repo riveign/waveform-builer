@@ -915,10 +915,38 @@ EOF
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+Implementation was completed incrementally across several commits, evolving beyond the original plan:
+
+- [x] Task 1 — models.py: Add `energy_predicted`, `energy_confidence`, `energy_source` columns + migration — Status: Done
+- [x] Task 2 — autotag.py: Classifier module (feature extraction, RF training, prediction, persistence) — Status: Done
+- [x] Task 3 — cli.py: `kiku autotag energy` command with `--dry-run`, `--approve`, `--auto`, `--retrain`, `--threshold`, `--force` — Status: Done
+- [x] Task 4 — test_autotag.py: Unit tests (8 tests) — Status: Done
+- [x] Task 5 — Lint all modified files — Status: Done
+- [x] Task 6 — E2E verification — Status: Done
+- [x] Task 7 — Commit — Status: Done
+
+### Implementation Commits
+- **3b2ac1b**: Package rename `djsetbuilder` → `kiku` (initial module move)
+- **598e1f7**: Expanded energy zones from 3 to 5 (warmup/build/drive/peak/close)
+- **2ba8a2e**: Include all 5 energy zones in tinder override validation
+- **d2e371c**: Added `resolve_energy()` and `detect_energy_conflict()` (inline set energy review)
+- **4239032**: Energy Model Tier 1 — `class_weight='balanced'`, removed 5 dead mood features (17→12), decision log table
+
+### Post-Plan Evolution
+The implementation diverged from the original plan in several ways:
+- **5 zones instead of 3**: `ZONE_MAP` expanded from warmup/build/peak to warmup/build/drive/peak/close
+- **Dead mood features removed**: Essentia mood classifiers were never run, so `mood_happy`, `mood_sad`, `mood_aggressive`, `mood_relaxed`, and `aggression_ratio` were dropped (12 features instead of 17)
+- **`class_weight='balanced'`** added to RandomForestClassifier (not in original plan)
+- **`resolve_energy()` and `detect_energy_conflict()`** added — cascading trust hierarchy (approved > dir_energy > predicted) and conflict detection for teaching moments
+- **Decision log** in model metadata for audit trail
 
 ## Test Evidence & Outputs
-<!-- Filled by explicit testing after /spec IMPLEMENT -->
+
+- 8/8 autotag unit tests passing (pytest)
+- Test coverage: feature extraction (with/without mood), zone mapping, model save/load roundtrip
+- 1,970 tracks have ML predictions (`energy_source="auto"`)
+- 975 tracks have manual `dir_energy` tags as ground truth
 
 ## Updated Doc
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->

@@ -12,12 +12,7 @@ from pyrekordbox.rbxml import RekordboxXml
 
 from kiku.config import DATA_DIR
 from kiku.db.models import Set
-
-# Path aliases: (macOS prefix, Linux prefix).
-# Reverse of sync.py's _PATH_ALIASES — export converts Linux back to macOS.
-_PATH_ALIASES: list[tuple[str, str]] = [
-    ("/Volumes/", "/run/media/mantis/"),
-]
+from kiku.export.utils import export_path
 
 # File extension -> Rekordbox Kind string
 _KIND_MAP: dict[str, str] = {
@@ -32,19 +27,6 @@ _KIND_MAP: dict[str, str] = {
     ".alac": "ALAC File",
 }
 
-
-def _export_path(file_path: str, target_platform: str = "macos") -> str:
-    """Convert Kiku's stored path to the target platform format.
-
-    The database stores Linux-normalised paths (``/run/media/mantis/…``).
-    For Rekordbox on macOS these must be reversed to ``/Volumes/…``.
-    """
-    if target_platform == "macos":
-        for mac_prefix, linux_prefix in _PATH_ALIASES:
-            if file_path.startswith(linux_prefix):
-                return mac_prefix + file_path[len(linux_prefix):]
-    # Linux or unknown: keep as-is
-    return file_path
 
 
 def _detect_kind(file_path: str) -> str:
@@ -84,7 +66,7 @@ def export_set_to_xml(
         track = st.track
 
         # --- Gap 2: reverse path alias for macOS ---
-        location = _export_path(track.file_path, "macos") if track.file_path else ""
+        location = export_path(track.file_path, "macos") if track.file_path else ""
 
         # --- Gap 1: use rb_id when available ---
         track_id = int(track.rb_id) if track.rb_id else track.id

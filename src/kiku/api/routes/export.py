@@ -13,6 +13,29 @@ from kiku.export.rekordbox_xml import export_set_to_xml
 router = APIRouter(prefix="/api/sets", tags=["export"])
 
 
+@router.post("/{set_id}/export/m3u8")
+def export_m3u8(
+    set_id: int,
+    platform: str = "macos",
+    with_metadata: bool = False,
+    db: Session = Depends(get_db),
+):
+    s = db.get(Set, set_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    from kiku.export.m3u8 import export_set_to_m3u8
+
+    output_path = export_set_to_m3u8(
+        s, target_platform=platform, with_metadata=with_metadata,
+    )
+    return FileResponse(
+        path=output_path,
+        media_type="audio/x-mpegurl",
+        filename=f"{s.name or 'set'}.m3u8",
+    )
+
+
 @router.post("/{set_id}/export/rekordbox")
 def export_rekordbox(set_id: int, db: Session = Depends(get_db)):
     s = db.get(Set, set_id)

@@ -494,42 +494,56 @@ def build(duration: int, energy: str, genres: str | None, bpm_min: float | None,
 
 @cli.command()
 @click.argument("set_name")
-@click.option("--format", "fmt", default="rekordbox", help="Export format")
+@click.option("--format", "fmt", default="m3u8", type=click.Choice(["m3u8", "rekordbox"]), help="Export format (default: m3u8)")
 @click.option("--output", "-o", default=None, help="Output file path")
-@click.option("--with-cues", is_flag=True, help="Include transition cue points in export")
-def export(set_name: str, fmt: str, output: str | None, with_cues: bool):
-    """Export a generated set as Rekordbox XML playlist."""
+@click.option("--with-cues", is_flag=True, help="Include transition cue points (rekordbox format only)")
+@click.option("--with-metadata", is_flag=True, help="Include Kiku metadata as comments (m3u8 only)")
+@click.option("--platform", default="macos", type=click.Choice(["macos", "linux"]), help="Target platform for path aliasing")
+def export(set_name: str, fmt: str, output: str | None, with_cues: bool, with_metadata: bool, platform: str):
+    """Export a set for import into Rekordbox or other DJ software."""
     from kiku.db.models import Set, TransitionCue, get_session
-    from kiku.export.rekordbox_xml import export_set_to_xml
 
     session = get_session()
     set_ = session.query(Set).filter(Set.name.ilike(f"%{set_name}%")).first()
 
     if not set_:
-        console.print(f"[yellow]Set '{set_name}' not found.[/]")
+        console.print(f"[yellow]Couldn't find a set matching '{set_name}' -- check the name and try again.[/]")
         return
 
-    transition_cues = None
-    if with_cues:
-        cues = (
-            session.query(TransitionCue)
-            .filter(TransitionCue.set_id == set_.id)
-            .order_by(TransitionCue.track_id, TransitionCue.start_sec)
-            .all()
-        )
-        if cues:
-            transition_cues: dict[int, list[dict]] = {}
-            for c in cues:
-                transition_cues.setdefault(c.track_id, []).append({
-                    "name": c.name, "type": c.cue_type,
-                    "start": c.start_sec, "end": c.end_sec, "num": c.hot_cue_num,
-                })
-            console.print(f"[cyan]Including {len(cues)} cue points from {len(transition_cues)} tracks[/]")
-        else:
-            console.print("[dim]No cue points found for this set.[/]")
+    if fmt == "m3u8":
+        from kiku.export.m3u8 import export_set_to_m3u8
 
-    output_path = export_set_to_xml(set_, output, transition_cues=transition_cues)
-    console.print(f"[green]Exported to {output_path}[/]")
+        output_path = export_set_to_m3u8(
+            set_, output, target_platform=platform, with_metadata=with_metadata,
+        )
+        track_count = len(set_.tracks)
+        console.print(f"[green]Exported {track_count} tracks to {output_path}[/]")
+        console.print("[dim]Import into Rekordbox: File > Import > Import Playlist[/]")
+
+    elif fmt == "rekordbox":
+        from kiku.export.rekordbox_xml import export_set_to_xml
+
+        transition_cues = None
+        if with_cues:
+            cues = (
+                session.query(TransitionCue)
+                .filter(TransitionCue.set_id == set_.id)
+                .order_by(TransitionCue.track_id, TransitionCue.start_sec)
+                .all()
+            )
+            if cues:
+                transition_cues: dict[int, list[dict]] = {}
+                for c in cues:
+                    transition_cues.setdefault(c.track_id, []).append({
+                        "name": c.name, "type": c.cue_type,
+                        "start": c.start_sec, "end": c.end_sec, "num": c.hot_cue_num,
+                    })
+                console.print(f"[cyan]Including {len(cues)} cue points from {len(transition_cues)} tracks[/]")
+            else:
+                console.print("[dim]No cue points found for this set.[/]")
+
+        output_path = export_set_to_xml(set_, output, transition_cues=transition_cues)
+        console.print(f"[green]Exported to {output_path}[/]")
 
 
 @cli.command()
