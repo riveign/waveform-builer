@@ -683,7 +683,7 @@ class TestExportSetToM3U8:
 
 ### Open Questions
 
-1. **Default format**: Should `m3u8` be the default for `--format`, or should it remain `rekordbox` until DJs have tested the M3U8 workflow? (Spec recommends: default to M3U8.)
+1. ~~**Default format**: Should `m3u8` be the default for `--format`, or should it remain `rekordbox` until DJs have tested the M3U8 workflow?~~ **RESOLVED**: M3U8 is the default.
 
 2. **Platform detection**: Should Kiku auto-detect the target platform instead of requiring `--platform macos`? The export runs on Linux but targets macOS -- auto-detection would not help here. The `macos` default seems correct since that is where Rekordbox runs.
 
@@ -691,4 +691,18 @@ class TestExportSetToM3U8:
 
 4. **Traktor `.m3u` option**: Should Kiku offer `--format m3u` (identical content, `.m3u` extension) for Traktor users? Trivial to implement but adds surface area.
 
-5. **`with_metadata` default**: Should metadata comments be included by default, or opt-in? (Spec recommends: opt-in via `--with-metadata` to keep the default output clean and maximally compatible.)
+5. ~~**`with_metadata` default**: Should metadata comments be included by default, or opt-in?~~ **RESOLVED**: Opt-in via `--with-metadata`.
+
+---
+
+### Implementation Status
+
+**IMPLEMENTED** — 2026-03-25, branch `m3u8-export`
+
+All 4 phases completed:
+- Phase 1: `src/kiku/export/m3u8.py` + `src/kiku/export/utils.py`
+- Phase 2: CLI `--format m3u8` (default), `--with-metadata`, `--platform`
+- Phase 3: API `POST /api/sets/{id}/export/m3u8`, frontend format selector dropdown
+- Phase 4: `rekordbox_xml.py` refactored to use shared `export_path()` from utils
+
+Verified: exported M3U8 file downloaded successfully from UI with correct format, paths, and UTF-8 encoding.
