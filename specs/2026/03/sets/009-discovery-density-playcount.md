@@ -1704,12 +1704,26 @@ Status: Done — 107 passed
 Status: Done
 
 Implementation commit: 72373f789a08a46125951cdabc7f5456aece357e
+Follow-up commit: 47fb906 (play count column, sort, filter in library browser)
 
 ## Test Evidence & Outputs
-<!-- Filled by explicit testing after /spec IMPLEMENT -->
+
+- Backend: 107 tests pass (29 new scoring + API tests)
+- Frontend: svelte-check 0 errors, 1 pre-existing a11y warning
+- Manual: Discovery/Density slider works in BuildSetDialog, play count recording fires at 60s, library sort/filter by plays functional
 
 ## Updated Doc
-<!-- Filled by explicit documentation updates after /spec IMPLEMENT -->
+
+- MEMORY.md updated with spec 009 completion, test count (107), key files
 
 ## Post-Implement Review
-<!-- Filled by /spec REVIEW -->
+
+**Status: COMPLETE**
+
+All objectives delivered:
+1. Discovery/Density slider in BuildSetDialog with 5 context-sensitive labels
+2. Scoring reshapes track_quality via alpha-blending (play_familiarity 20% + set_density 10%)
+3. Play count sync from Rekordbox — already working (607 tracks)
+4. In-app play recording at >60s threshold, both player stores instrumented
+5. Discovery labels in score breakdown ("fresh pick", "battle-tested", etc.)
+6. Library browser: Plays column, sort by plays, Unplayed/Played quick filters
