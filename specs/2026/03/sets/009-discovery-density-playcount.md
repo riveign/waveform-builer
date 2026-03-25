@@ -1651,7 +1651,59 @@ cd /home/mantis/Development/mantis-dev/waveform-builer && git add -A && git comm
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+### Task 1 — Alembic migration
+Status: Done
+
+### Task 2 — Track model
+Status: Done
+
+### Task 3 — Scoring changes
+Status: Done
+
+### Task 4 — API schemas
+Status: Done
+
+### Task 5 — POST /played endpoint
+Status: Done
+
+### Task 6 — Suggest-next threading
+Status: Done
+
+### Task 7 — Planner + sets routes threading
+Status: Done
+
+### Task 8 — Frontend types
+Status: Done
+
+### Task 9 — Global player store accumulator
+Status: Done
+
+### Task 10 — Set playback store accumulator
+Status: Done
+
+### Task 11 — DiscoveryDensitySlider component
+Status: Done
+
+### Task 12 — BuildSetDialog integration
+Status: Done
+
+### Task 13 — ScoreBreakdown display
+Status: Done
+
+### Task 14 — Backend unit tests
+Status: Done — 107 tests pass (29 new)
+
+### Task 15 — Frontend type-check
+Status: Done — 0 errors, 1 pre-existing warning
+
+### Task 16 — Backend tests
+Status: Done — 107 passed
+
+### Task 17 — Commit
+Status: Done
+
+Implementation commit: 72373f789a08a46125951cdabc7f5456aece357e
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
