@@ -1,0 +1,12 @@
+{
+  "version": "0.2.2",
+  "installed_at": "2026-03-14T11:40:00Z",
+  "project_type": "generic",
+  "install_mode": "symlink",
+  "agentic_global_path": "/home/mantis/.agents/agentic-config",
+  "auto_check": true,
+  "symlinks": [],
+  "copied": [
+    "AGENTS.md"
+  ]
+}
