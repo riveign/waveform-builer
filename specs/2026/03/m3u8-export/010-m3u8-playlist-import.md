@@ -2124,7 +2124,21 @@ COMPLETED 289 FILES 0 ERRORS 1 WARNINGS
 - Delete button tested: confirmed two-click flow, set removed, picker refreshed
 
 ## Updated Doc
-<!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
+
+Memory updated with TOP PRIORITY section for the 3-phase feature (Import → Analyze → Build).
+
+## Next Steps
+
+Phase 1 (this spec) is fully implemented. Remaining spec stages (REVIEW, TEST, DOCUMENT) are optional.
+
+**Priority: proceed to Phase 2 (Set Analysis)** — create a new spec for:
+- Transition scoring on imported sets
+- Arc analysis (energy flow, key progression, BPM drift)
+- Teaching moments ("this transition works because...")
+- Energy inference from position in set (using `inferred_energy` / `inference_source` columns)
+- Learning from DJ freestyle sessions
+
+Then **Phase 3 (Build from Import)** — cherry-pick + fill gaps + apply preferences.
 
 ## Post-Implement Review
 <!-- Filled by /spec REVIEW -->
