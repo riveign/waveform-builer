@@ -2079,10 +2079,34 @@ Commit message: `feat: M3U8 playlist import — parser, batch matching, API, CLI
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+- Task 1 — models.py: add import columns — Status: Done
+- Task 2 — Alembic migration — Status: Done
+- Task 3 — M3U8 parser module — Status: Done
+- Task 4 — Import service with batch matching — Status: Done
+- Task 5 — Pydantic schemas — Status: Done
+- Task 6 — API endpoint POST /import/m3u8 — Status: Done
+- Task 7 — CLI command import-playlist — Status: Done
+- Task 8 — Frontend TypeScript types — Status: Done
+- Task 9 — Frontend API client importPlaylist() — Status: Done
+- Task 10 — Frontend ImportPlaylistDialog.svelte — Status: Done
+- Task 11 — SetPicker.svelte import button — Status: Done
+- Task 12 — Unit tests: M3U8 parser (8 tests) — Status: Done
+- Task 13 — Integration tests: API import (8 tests) — Status: Done
+- Task 14 — Lint — Status: Done (0 errors, 1 pre-existing warning)
+- Task 15 — Run all tests — Status: Done (123 passed)
 
 ## Test Evidence & Outputs
-<!-- Filled by explicit testing after /spec IMPLEMENT -->
+
+```
+$ python -m pytest tests/ -x -q
+........................................................................ [ 58%]
+...................................................                      [100%]
+123 passed in 4.06s
+
+$ npx svelte-check --tsconfig ./tsconfig.json
+COMPLETED 289 FILES 0 ERRORS 1 WARNINGS
+```
 
 ## Updated Doc
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->

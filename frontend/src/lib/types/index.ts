@@ -72,6 +72,7 @@ export interface DJSet {
 	created_at: string | null;
 	duration_min: number | null;
 	track_count: number;
+	source: string | null;
 }
 
 export interface SetDetail {
@@ -454,4 +455,25 @@ export interface ReplacementContext {
 export interface ReplacementSuggestionsResponse {
 	context: ReplacementContext;
 	candidates: ReplacementCandidate[];
+}
+
+// ── Import Playlist types ──
+
+export interface UnmatchedTrack {
+	path: string;
+	title: string | null;
+	line: number;
+}
+
+export interface ImportResult {
+	set_id: number;
+	name: string;
+	source: string;
+	total_tracks: number;
+	matched_count: number;
+	unmatched_count: number;
+	unmatched_paths: UnmatchedTrack[];
+	match_methods: Record<string, number>;
+	warnings: string[];
+	duplicate_set_id: number | null;
 }

@@ -1,6 +1,7 @@
 import type {
 	Cue,
 	DJSet,
+	ImportResult,
 	ReplacementSuggestionsResponse,
 	SetBuildComplete,
 	SetBuildParams,
@@ -208,4 +209,24 @@ export async function exportM3U8(setId: number): Promise<Blob> {
 		throw new Error(text);
 	}
 	return res.blob();
+}
+
+export async function importPlaylist(
+	file: File,
+	name?: string,
+	force = false
+): Promise<ImportResult> {
+	const form = new FormData();
+	form.append('file', file);
+	if (name) form.append('name', name);
+	if (force) form.append('force', 'true');
+	const res = await fetch(`${API_BASE}/api/sets/import/m3u8`, {
+		method: 'POST',
+		body: form,
+	});
+	if (!res.ok) {
+		const err = await res.json().catch(() => ({ detail: 'Import failed' }));
+		throw new Error(err.detail || 'Import failed');
+	}
+	return res.json();
 }

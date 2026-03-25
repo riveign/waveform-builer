@@ -546,6 +546,72 @@ def export(set_name: str, fmt: str, output: str | None, with_cues: bool, with_me
         console.print(f"[green]Exported to {output_path}[/]")
 
 
+@cli.command("import-playlist")
+@click.argument("file_path", type=click.Path(exists=True))
+@click.option("--name", "-n", default=None, help="Set name override (defaults to playlist filename)")
+@click.option("--force", is_flag=True, help="Re-import even if source already exists")
+def import_playlist(file_path: str, name: str | None, force: bool):
+    """Import a Rekordbox M3U8 playlist as a new set.
+
+    Matches tracks to your library by file path — never creates new tracks.
+    """
+    from kiku.db.models import get_session
+    from kiku.import_playlist.m3u8 import parse_m3u8_file
+    from kiku.import_playlist.service import import_playlist as do_import
+
+    console.print(f"[cyan]Reading playlist...[/]")
+    parse_result = parse_m3u8_file(file_path)
+
+    if not parse_result.tracks:
+        console.print("[yellow]No tracks found in the playlist file.[/]")
+        return
+
+    console.print(f"Found [bold]{len(parse_result.tracks)}[/] tracks in playlist")
+    if parse_result.warnings:
+        for w in parse_result.warnings:
+            console.print(f"  [yellow]{w}[/]")
+
+    session = get_session()
+    result = do_import(session, parse_result, name=name, force=force)
+
+    if result.duplicate_set_id is not None:
+        console.print(
+            f"[yellow]Already imported as set {result.duplicate_set_id}.[/] "
+            "Use --force to re-import."
+        )
+        return
+
+    if result.matched_count == 0:
+        console.print(
+            "[red]None of the tracks matched your library.[/] "
+            "Check path aliases or sync from Rekordbox first."
+        )
+        return
+
+    console.print(f"\n[bold green]Imported set: {result.name}[/] (id={result.set_id})")
+    console.print(f"  Matched: {result.matched_count}/{result.total_tracks}")
+    if result.unmatched_count > 0:
+        console.print(f"  [yellow]Unmatched: {result.unmatched_count}[/]")
+
+    # Show match methods
+    if result.match_methods:
+        methods = ", ".join(f"{k}: {v}" for k, v in result.match_methods.items())
+        console.print(f"  Methods: {methods}")
+
+    # Show unmatched tracks
+    if result.unmatched:
+        console.print(f"\n[bold]Unmatched tracks:[/]")
+        table = Table()
+        table.add_column("#", justify="right", style="dim")
+        table.add_column("Path")
+        table.add_column("Title", style="dim")
+        for i, u in enumerate(result.unmatched[:20], 1):
+            table.add_row(str(i), u["path"], u.get("title") or "")
+        console.print(table)
+        if len(result.unmatched) > 20:
+            console.print(f"  [dim]... and {len(result.unmatched) - 20} more[/]")
+
+
 @cli.command()
 @click.option("--port", default=8000, help="HTTP port for the API server")
 @click.option("--host", default="0.0.0.0", help="Host to bind to")

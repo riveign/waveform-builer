@@ -84,6 +84,7 @@ class SetResponse(BaseModel):
     created_at: str | None = None
     duration_min: int | None = None
     track_count: int = 0
+    source: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -476,3 +477,25 @@ class ReplacementSuggestionsResponse(BaseModel):
 
 class ReplaceTrackRequest(BaseModel):
     new_track_id: int
+
+
+# ── Import playlist models ──
+
+
+class UnmatchedTrack(BaseModel):
+    path: str
+    title: str | None = None
+    line: int
+
+
+class ImportResultResponse(BaseModel):
+    set_id: int
+    name: str
+    source: str
+    total_tracks: int
+    matched_count: int
+    unmatched_count: int
+    unmatched_paths: list[UnmatchedTrack] = []
+    match_methods: dict[str, int] = {}
+    warnings: list[str] = []
+    duplicate_set_id: int | None = None

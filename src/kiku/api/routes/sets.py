@@ -7,7 +7,7 @@ import json
 import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from kiku.api.deps import get_db
 from kiku.api.schemas import (
     CueCreateRequest,
     CueResponse,
+    ImportResultResponse,
     ReplaceTrackRequest,
     ReplacementCandidate,
     ReplacementBreakdown,
@@ -32,6 +33,7 @@ from kiku.api.schemas import (
     TrackSummary,
     TransitionResponse,
     TransitionScoreBreakdown,
+    UnmatchedTrack,
 )
 from kiku.db.models import Set, Track, TransitionCue
 from kiku.db.store import (
@@ -76,6 +78,88 @@ def _set_track_response(st) -> SetTrackResponse:
 
 def _sse_event(event: str, data: str) -> str:
     return f"event: {event}\ndata: {data}\n\n"
+
+
+@router.post("/import/m3u8", response_model=ImportResultResponse)
+async def import_m3u8_playlist(
+    file: UploadFile | None = File(None),
+    file_path: str | None = Form(None),
+    name: str | None = Form(None),
+    force: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    """Import a Rekordbox M3U8 playlist as a new set.
+
+    Accepts either a file upload (multipart) or a file_path (form field).
+    Matches tracks to the library — never creates new track rows.
+    """
+    from kiku.import_playlist.m3u8 import parse_m3u8
+    from kiku.import_playlist.service import import_playlist
+
+    # Get content from upload or file path
+    if file is not None:
+        raw = await file.read()
+        content = raw.decode("utf-8-sig")
+        source_path = file.filename or "upload.m3u8"
+    elif file_path:
+        from pathlib import Path
+        p = Path(file_path)
+        if not p.exists():
+            raise HTTPException(status_code=400, detail=f"File not found: {file_path}")
+        content = p.read_text(encoding="utf-8-sig")
+        source_path = file_path
+    else:
+        raise HTTPException(status_code=400, detail="Provide a file upload or file_path")
+
+    # Validate it looks like M3U8
+    if not content.strip().startswith("#EXTM3U") and not any(
+        line.strip().startswith("#EXTINF:") for line in content.splitlines()[:20]
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="This doesn't look like an M3U8 file — check the file format",
+        )
+
+    parse_result = parse_m3u8(content, source_path=source_path)
+
+    if not parse_result.tracks:
+        raise HTTPException(status_code=400, detail="No tracks found in the playlist file")
+
+    result = import_playlist(db, parse_result, name=name, force=force)
+
+    # Duplicate set detected (not forced)
+    if result.duplicate_set_id is not None:
+        return ImportResultResponse(
+            set_id=result.duplicate_set_id,
+            name=result.name,
+            source=result.source,
+            total_tracks=result.total_tracks,
+            matched_count=0,
+            unmatched_count=0,
+            unmatched_paths=[],
+            match_methods={},
+            warnings=[f"Already imported as set {result.duplicate_set_id}. Use force=true to re-import."],
+            duplicate_set_id=result.duplicate_set_id,
+        )
+
+    # Zero matches
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="None of the tracks matched your library. Check path aliases or sync from Rekordbox first.",
+        )
+
+    return ImportResultResponse(
+        set_id=result.set_id,
+        name=result.name,
+        source=result.source,
+        total_tracks=result.total_tracks,
+        matched_count=result.matched_count,
+        unmatched_count=result.unmatched_count,
+        unmatched_paths=[UnmatchedTrack(**u) for u in result.unmatched],
+        match_methods=result.match_methods,
+        warnings=result.warnings,
+    )
 
 
 @router.post("/build")
@@ -180,6 +264,7 @@ def create_set(body: SetCreateRequest, db: Session = Depends(get_db)):
         created_at=set_.created_at,
         duration_min=set_.duration_min,
         track_count=0,
+        source=set_.source,
     )
 
 
@@ -203,6 +288,7 @@ def update_set(set_id: int, body: SetUpdateRequest, db: Session = Depends(get_db
         created_at=set_.created_at,
         duration_min=set_.duration_min,
         track_count=len(set_.tracks),
+        source=set_.source,
     )
 
 
@@ -273,6 +359,7 @@ def list_sets(
             created_at=s.created_at,
             duration_min=s.duration_min,
             track_count=len(s.tracks),
+            source=s.source,
         )
         for s in sets
     ]
