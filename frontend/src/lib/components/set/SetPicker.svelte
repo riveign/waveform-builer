@@ -4,13 +4,13 @@
 	import { onMount } from 'svelte';
 	import ImportPlaylistDialog from './ImportPlaylistDialog.svelte';
 
-	let { onselect }: { onselect: (set: DJSet) => void } = $props();
+	let { onselect, refreshSignal = 0 }: { onselect: (set: DJSet) => void; refreshSignal?: number } = $props();
 
 	let sets = $state<DJSet[]>([]);
 	let loading = $state(true);
 	let importOpen = $state(false);
 
-	onMount(async () => {
+	async function refresh() {
 		try {
 			sets = await listSets();
 		} catch {
@@ -18,6 +18,12 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	onMount(refresh);
+
+	$effect(() => {
+		if (refreshSignal > 0) refresh();
 	});
 
 	async function handleImport(result: ImportResult) {

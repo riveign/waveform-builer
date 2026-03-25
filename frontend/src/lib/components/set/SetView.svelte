@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData } from '$lib/types';
-	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8 } from '$lib/api/sets';
+	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8, deleteSet } from '$lib/api/sets';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import SetPicker from './SetPicker.svelte';
 	import SetTimeline from './SetTimeline.svelte';
@@ -62,6 +62,9 @@
 	let exportMsg = $state<string | null>(null);
 	let exportFormat = $state<'m3u8' | 'rekordbox'>('m3u8');
 	let showEnergyReview = $state(false);
+	let confirmDelete = $state(false);
+	let deleting = $state(false);
+	let pickerRefresh = $state(0);
 	let error = $state<string | null>(null);
 	let timelineContainerEl = $state<HTMLDivElement>(null!);
 
@@ -124,6 +127,29 @@
 		}
 	}
 
+	async function handleDelete() {
+		if (!selectedSet) return;
+		if (!confirmDelete) {
+			confirmDelete = true;
+			setTimeout(() => { confirmDelete = false; }, 3000);
+			return;
+		}
+		deleting = true;
+		try {
+			await deleteSet(selectedSet.id);
+			selectedSet = null;
+			setDetail = null;
+			waveformTracks = [];
+			transition = null;
+			confirmDelete = false;
+			pickerRefresh++;
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Delete failed';
+		} finally {
+			deleting = false;
+		}
+	}
+
 	async function loadSetData(setId: number) {
 		loading = true;
 		error = null;
@@ -177,7 +203,7 @@
 </script>
 
 <div class="set-view">
-	<SetPicker onselect={handleSetSelect} />
+	<SetPicker onselect={handleSetSelect} refreshSignal={pickerRefresh} />
 
 	{#if selectedSet}
 		<div class="timeline-controls">
@@ -214,6 +240,14 @@
 			{#if exportMsg}
 				<span class="export-msg">{exportMsg}</span>
 			{/if}
+			<button
+				class="delete-btn"
+				class:confirm={confirmDelete}
+				onclick={handleDelete}
+				disabled={deleting}
+			>
+				{deleting ? 'Deleting...' : confirmDelete ? 'Confirm delete?' : 'Delete'}
+			</button>
 		</div>
 
 		{#if loading}
@@ -387,6 +421,33 @@
 	.export-msg {
 		font-size: 11px;
 		color: var(--accent);
+	}
+
+	.delete-btn {
+		padding: 4px 12px;
+		font-size: 12px;
+		color: var(--text-dim);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		transition: all 0.15s;
+		margin-left: 4px;
+	}
+
+	.delete-btn:hover:not(:disabled) {
+		color: #e74c3c;
+		border-color: #e74c3c;
+	}
+
+	.delete-btn.confirm {
+		color: #fff;
+		background: #e74c3c;
+		border-color: #e74c3c;
+	}
+
+	.delete-btn:disabled {
+		opacity: 0.5;
+		cursor: default;
 	}
 
 	.timeline-container {

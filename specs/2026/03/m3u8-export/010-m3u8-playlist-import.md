@@ -2095,6 +2095,16 @@ Commit message: `feat: M3U8 playlist import — parser, batch matching, API, CLI
 - Task 13 — Integration tests: API import (8 tests) — Status: Done
 - Task 14 — Lint — Status: Done (0 errors, 1 pre-existing warning)
 - Task 15 — Run all tests — Status: Done (123 passed)
+- Task 16 — Delete set UI button — Status: Done (bonus, user-requested)
+
+### Post-plan additions
+
+**Delete Set UI** (user-requested during testing):
+- Added `Delete` button to `SetView.svelte` timeline controls bar
+- Two-click confirmation: first click shows "Confirm delete?" (red, 3s auto-reset), second click deletes
+- Calls existing `DELETE /api/sets/{id}` endpoint
+- Refreshes SetPicker dropdown via `refreshSignal` prop after deletion
+- Files modified: `SetView.svelte`, `SetPicker.svelte` (added `refreshSignal` prop + `refresh()` function)
 
 ## Test Evidence & Outputs
 
@@ -2107,6 +2117,11 @@ $ python -m pytest tests/ -x -q
 $ npx svelte-check --tsconfig ./tsconfig.json
 COMPLETED 289 FILES 0 ERRORS 1 WARNINGS
 ```
+
+### Manual testing
+- Imported `TEst.m3u8` (11 tracks from Rekordbox export) — 11/11 matched via exact path
+- Set created as "sss" with correct track order, 62min duration, source=m3u8
+- Delete button tested: confirmed two-click flow, set removed, picker refreshed
 
 ## Updated Doc
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
