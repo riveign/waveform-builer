@@ -15,6 +15,10 @@ Import Rekordbox M3U8 playlist exports into Kiku as "imported sets" — parsing 
 - CREATE frontend `ImportPlaylistDialog.svelte` — file drop zone, name field, analyze toggle, result display with matched/unmatched breakdown
 - ADD API client function `importPlaylist()` in `frontend/src/lib/api/sets.ts`
 - ENSURE 0-based position indexing (matching `add_track_to_set` in `store.py`)
+- ADD index on `tracks.file_path` in the migration for fast path lookups
+- IMPLEMENT batch matching: load all tracks into memory dict once, match in O(1) per track — no N+1 queries
+- ENSURE no new Track rows are created during import — match only, report unmatched
+- ADD duplicate set detection: warn if `source_ref` already exists, require `--force` / `force: true` to re-import
 - ADD 14 tests covering parser unit tests and import integration tests
 
 ## Details (DT)
@@ -59,6 +63,30 @@ class TrackMatchResult:
 ```
 
 Cascade: `normalize_path(m3u8_path)` → exact match on `tracks.file_path` → COLLATE NOCASE match → filename stem + duration ±10s fallback.
+
+### Performance: Batch Matching (No N+1 Queries)
+The importer MUST NOT issue one query per track. Instead:
+1. **Load a path index once**: `SELECT id, file_path, title, artist, duration_sec FROM tracks` → build a `dict[str, Track]` keyed by normalized `file_path` (+ a lowercase variant for nocase fallback)
+2. **Match in memory**: For each M3U8 track, look up the dict (O(1) per track)
+3. **Fuzzy fallback**: Only for unmatched tracks after dict lookup — build a secondary `dict[str, list[Track]]` keyed by filename stem for fuzzy matching with ±10s duration check
+4. **Result**: ~4,122 tracks loaded once, all matching is in-memory. Zero per-track DB queries.
+
+### No Track Creation
+The importer NEVER creates new Track rows. It only matches M3U8 entries to existing library tracks. Unmatched tracks are reported in the response — the DJ resolves them by syncing from Rekordbox or configuring path aliases.
+
+### Duplicate Set Prevention
+Before creating a new set, check if a set with the same `source_ref` (M3U8 filename) already exists:
+- If found: return a warning with the existing set ID and ask the DJ to confirm re-import
+- API adds `force: bool = False` parameter — if `true`, creates the set regardless
+- CLI adds `--force` flag
+- Frontend shows confirmation dialog: "You already imported 'Friday Night Set' on March 20. Import again?"
+
+### Database Index on file_path
+The migration MUST add an index on `tracks.file_path` for fast lookups:
+```python
+op.create_index('ix_tracks_file_path', 'tracks', ['file_path'])
+```
+This benefits both the import batch load and any future path-based queries.
 
 ### Schema Changes (sets table)
 | Column | Type | Default | Purpose |
