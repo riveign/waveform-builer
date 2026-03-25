@@ -24,7 +24,9 @@
 	let energy = $state('');
 	let energyZone = $state('');
 	let ratingMin = $state('');
+	let playsFilter = $state('');
 	let sortRecent = $state(false);
+	let sortPlays = $state<'' | 'plays' | 'plays_asc'>('');
 
 	// ── UI state ──
 	let showAdvanced = $state(false);
@@ -62,7 +64,10 @@
 		if (energy) params.energy = energy;
 		if (energyZone) params.energy_zone = energyZone;
 		if (ratingMin) params.rating_min = Number(ratingMin);
+		if (playsFilter === 'unplayed') params.plays_max = 0;
+		else if (playsFilter === 'played') params.plays_min = 1;
 		if (sortRecent) params.sort = 'recent';
+		else if (sortPlays) params.sort = sortPlays;
 		return params;
 	}
 
@@ -129,7 +134,9 @@
 		energy !== '' ||
 		energyZone !== '' ||
 		ratingMin !== '' ||
-		sortRecent
+		playsFilter !== '' ||
+		sortRecent ||
+		sortPlays !== ''
 	);
 
 	function removeGenre(g: string) {
@@ -163,12 +170,27 @@
 		energy = '';
 		energyZone = '';
 		ratingMin = '';
+		playsFilter = '';
 		sortRecent = false;
+		sortPlays = '';
 		onsearch({});
 	}
 
 	function toggleRecent() {
 		sortRecent = !sortRecent;
+		if (sortRecent) sortPlays = '';
+		searchNow();
+	}
+
+	function togglePlaysSort() {
+		if (sortPlays === '') { sortPlays = 'plays'; sortRecent = false; }
+		else if (sortPlays === 'plays') { sortPlays = 'plays_asc'; }
+		else { sortPlays = ''; }
+		searchNow();
+	}
+
+	function togglePlaysFilter(mode: '' | 'unplayed' | 'played') {
+		playsFilter = playsFilter === mode ? '' : mode;
 		searchNow();
 	}
 
@@ -253,6 +275,32 @@
 			</svg>
 			Recent
 		</button>
+		<button
+			class="quick-btn"
+			class:quick-btn-active={sortPlays !== ''}
+			type="button"
+			onclick={togglePlaysSort}
+			title="Click to cycle: Most played → Least played → Off"
+		>
+			{#if sortPlays === 'plays'}&#x25BC;{:else if sortPlays === 'plays_asc'}&#x25B2;{:else}&#x266B;{/if}
+			Plays
+		</button>
+		<button
+			class="quick-btn"
+			class:quick-btn-active={playsFilter === 'unplayed'}
+			type="button"
+			onclick={() => togglePlaysFilter('unplayed')}
+		>
+			Unplayed
+		</button>
+		<button
+			class="quick-btn"
+			class:quick-btn-active={playsFilter === 'played'}
+			type="button"
+			onclick={() => togglePlaysFilter('played')}
+		>
+			Played
+		</button>
 	</div>
 
 	<!-- Active filter chips -->
@@ -298,9 +346,19 @@
 					{ratingMin}+ stars <span class="chip-x">&times;</span>
 				</button>
 			{/if}
+			{#if playsFilter}
+				<button class="chip" type="button" onclick={() => { playsFilter = ''; searchNow(); }}>
+					{playsFilter === 'unplayed' ? 'Unplayed' : 'Played'} <span class="chip-x">&times;</span>
+				</button>
+			{/if}
 			{#if sortRecent}
 				<button class="chip" type="button" onclick={() => { sortRecent = false; searchNow(); }}>
 					Recent <span class="chip-x">&times;</span>
+				</button>
+			{/if}
+			{#if sortPlays}
+				<button class="chip" type="button" onclick={() => { sortPlays = ''; searchNow(); }}>
+					{sortPlays === 'plays' ? 'Most played' : 'Least played'} <span class="chip-x">&times;</span>
 				</button>
 			{/if}
 			<button class="clear-all" type="button" onclick={clearAllFilters}>Clear all</button>

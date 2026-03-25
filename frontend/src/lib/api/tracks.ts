@@ -13,6 +13,8 @@ export interface SearchParams {
 	energy?: string;
 	energy_zone?: string;
 	rating_min?: number;
+	plays_min?: number;
+	plays_max?: number;
 	sort?: string;
 	limit?: number;
 	offset?: number;

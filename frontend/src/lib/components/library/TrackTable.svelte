@@ -43,6 +43,7 @@
 				<th class="col-key">Key</th>
 				<th class="col-bpm">BPM</th>
 				<th class="col-energy">Energy</th>
+				<th class="col-plays">Plays</th>
 				<th class="col-rating">Rating</th>
 			</tr>
 		</thead>
@@ -93,6 +94,13 @@
 					</td>
 					<td class="col-energy">
 						<span class="energy-tag">{track.energy ?? '?'}</span>
+					</td>
+					<td class="col-plays">
+						{#if (track.play_count ?? 0) + (track.kiku_play_count ?? 0) > 0}
+							<span class="plays-count" title="Rekordbox: {track.play_count ?? 0} · Kiku: {track.kiku_play_count ?? 0}">{(track.play_count ?? 0) + (track.kiku_play_count ?? 0)}</span>
+						{:else}
+							<span class="dim">--</span>
+						{/if}
 					</td>
 					<td class="col-rating">
 						{#if track.rating}
@@ -177,6 +185,7 @@
 	.col-key { width: 40px; text-align: center; }
 	.col-bpm { width: 40px; text-align: right; }
 	.col-energy { width: 60px; }
+	.col-plays { width: 36px; text-align: right; }
 	.col-rating { width: 50px; color: #ffc107; font-size: 11px; }
 
 	.play-btn {
@@ -217,6 +226,11 @@
 	.energy-tag {
 		font-size: 11px;
 		color: var(--text-secondary);
+	}
+
+	.plays-count {
+		color: var(--text-secondary);
+		font-size: 11px;
 	}
 
 	.dim {

@@ -59,6 +59,8 @@ def search_tracks(
     key: str | list[str] | None = None,
     label: str | list[str] | None = None,
     rating_min: int | None = None,
+    plays_min: int | None = None,
+    plays_max: int | None = None,
     sort: str | None = None,
     search: str | None = None,
     limit: int = 50,
@@ -68,8 +70,9 @@ def search_tracks(
 
     Returns (tracks, total_count) to support pagination.
     genre/key/artist/label accept a single string or list of strings (OR-matched).
-    sort: "recent" orders by date_added DESC (newest first).
+    sort: "recent" | "plays" (desc) | "plays_asc" (asc).
     search: free-text OR-match across title, artist, and label.
+    plays_min/plays_max: filter by combined play count (Rekordbox + Kiku).
     """
     q = session.query(Track)
     if search:
@@ -116,8 +119,20 @@ def search_tracks(
         q = q.filter(or_(*key_conditions))
     if rating_min is not None:
         q = q.filter(Track.rating >= rating_min)
+    if plays_min is not None:
+        combined = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
+        q = q.filter(combined >= plays_min)
+    if plays_max is not None:
+        combined = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
+        q = q.filter(combined <= plays_max)
     if sort == "recent":
         q = q.order_by(func.coalesce(Track.date_added, Track.last_synced).desc())
+    elif sort == "plays":
+        combined = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
+        q = q.order_by(combined.desc())
+    elif sort == "plays_asc":
+        combined = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
+        q = q.order_by(combined.asc())
     total = q.count()
     tracks = q.offset(offset).limit(limit).all()
     return tracks, total
