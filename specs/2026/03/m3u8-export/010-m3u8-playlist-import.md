@@ -195,7 +195,106 @@ You are a senior engineer implementing Phase 1 of the Rekordbox Import feature f
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+### Codebase Findings
+
+**Database models** (`src/kiku/db/models.py`):
+- `Track`: `file_path` column has NO index, NO UNIQUE constraint. `rb_id` has UNIQUE.
+- `Set`: id, name, created_at, duration_min, energy_profile, genre_filter. No source/provenance columns yet.
+- `SetTrack`: composite PK (set_id, position). Has `transition_score` column.
+- `add_track_to_set()` in `store.py:270` uses **0-based** positions (appends at `len(existing)`, clamps `max(0, ...)`).
+- Test fixtures in `conftest.py` seed SetTrack with **1-based** positions (pos 1-5). Inconsistency confirmed.
+
+**Path normalization** (`src/kiku/db/paths.py`):
+- `normalize_path()`: simple prefix replacement `/Volumes/` → `/run/media/mantis/`. No NFC/NFD handling. No backslash conversion.
+- M3U8 import needs to add NFC normalization + backslash→forwardslash BEFORE calling normalize_path().
+
+**Sync pattern** (`src/kiku/db/sync.py`):
+- Match cascade: `rb_id` first → `normalize_path(file_path)` exact → raw file_path exact. Two separate queries per track.
+- Sync creates/updates Track rows. Import must NOT create — only match.
+- `_parse_artist_from_title()` splits "Artist - Title" — useful for parsing EXTINF display titles if needed.
+
+**Export M3U8** (`src/kiku/export/m3u8.py`):
+- Writes `#EXTM3U` + `#EXTINF:<duration>,<Artist - Title>` + file_path. Uses `export_path()` for platform aliasing.
+- `export_path()` reverses `normalize_path()` (Linux → macOS). Import needs the opposite direction.
+- The export already outputs `# kiku:` metadata comments when `with_metadata=True`.
+
+**API router** (`src/kiku/api/routes/sets.py`):
+- Router: `APIRouter(prefix="/api/sets")`. Routes include `POST ""`, `POST /build`, `GET /{set_id}`, etc.
+- `POST /api/sets/import/m3u8` must be registered BEFORE `/{set_id}` to avoid FastAPI matching "import" as a set_id.
+- Pattern: all endpoints use `Depends(get_db)` for session injection.
+- SSE pattern exists in `build_set_sse()` — useful reference for Phase 3 but not needed for Phase 1.
+
+**Schemas** (`src/kiku/api/schemas.py`):
+- Pydantic models: `SetResponse` (id, name, created_at, duration_min, track_count), `SetCreateRequest`, etc.
+- New schemas needed: `ImportPlaylistRequest`, `ImportResultResponse`, `UnmatchedTrack`.
+- `SetResponse` needs `source` field added.
+
+**CLI** (`src/kiku/cli.py`):
+- Click group at top-level `cli()`. Commands: sync, scan, search, build, export, serve, etc.
+- `kiku import` will be a new `@cli.command()`. Pattern: click options → rich console output → session logic.
+- `sync` has `--dry-run` and `--yes` pattern — reuse for import's `--dry-run` and `--force`.
+
+**Frontend** (`frontend/src/lib/`):
+- `api/sets.ts`: fetchJson wrapper, typed API functions. Add `importPlaylist()` here.
+- `api/client.ts`: `fetchJson<T>(url, init)` + `API_BASE` constant.
+- `components/set/SetView.svelte`: Main set view with SetPicker, SetTimeline, TransitionDetail, EnergyFlowChart.
+- `components/set/BuildSetDialog.svelte`: Dialog pattern with overlay — reuse structure for ImportPlaylistDialog.
+- `types/index.ts`: TypeScript interfaces for all API types.
+- Svelte 5 runes: `$state`, `$derived`, `$effect` throughout.
+
+**Tests** (`tests/`):
+- `tests/api/conftest.py`: in-memory SQLite, seed 20 tracks + 1 set + tinder + hunt data. FastAPI TestClient with DI override.
+- `tests/api/test_sets_api.py`: 11 tests for set CRUD, build SSE, track mutations. Pattern: `client.get/post/put/delete` + assert status + assert JSON.
+- No existing M3U8/import tests. New test file: `tests/test_m3u8_parser.py` (unit) + `tests/api/test_import_api.py` (integration).
+
+**Alembic** (`alembic/versions/`):
+- 2 migrations: `455598dafd10` (initial) → `16f80a5c17e9` (add label). Pattern: `op.add_column`, `op.drop_column`.
+- New migration chains from `16f80a5c17e9`.
+
+### Key Decisions
+
+1. **Position indexing**: Use 0-based (matching `add_track_to_set`). The conftest seeds 1-based but that's test data only — the actual code uses 0-based.
+2. **Batch matching**: Load all tracks once as `{normalized_path: Track}` dict. No per-track DB queries.
+3. **NFC normalization**: Apply `unicodedata.normalize('NFC', path)` in import parser before normalize_path(). Don't modify normalize_path() itself.
+4. **Route registration**: Register `POST /api/sets/import/m3u8` BEFORE `/{set_id}` routes in sets.py router.
+5. **File upload**: Use FastAPI `UploadFile` for multipart. Also accept JSON `file_path` for CLI backend calls.
+6. **No track creation**: Import only matches. Unmatched tracks reported, never inserted.
+7. **Duplicate set detection**: Query `Set.source_ref == filename` before creating. Return 409 if exists without `force=True`.
+
+### Strategy
+
+**Implementation order:**
+1. Alembic migration (adds columns to sets + set_tracks + index on tracks.file_path)
+2. M3U8 parser module (`src/kiku/import_playlist/m3u8.py`)
+3. Track matching logic (in import module, batch approach)
+4. Import API endpoint (in sets.py router)
+5. Pydantic schemas (in schemas.py)
+6. CLI command (in cli.py)
+7. Frontend ImportPlaylistDialog + API client
+8. Tests (parser unit + API integration)
+
+**Testing strategy:**
+- `tests/test_m3u8_parser.py`: 6 parser unit tests (BOM, backslash, NFC, empty lines, malformed EXTINF, #PLAYLIST tag)
+- `tests/api/test_import_api.py`: 8 integration tests (full match, partial match, zero match, duplicate set, force re-import, dry-run via CLI, position ordering, source/source_ref validation)
+- Reuse `conftest.py` fixture pattern: in-memory SQLite + TestClient. Seed tracks with known file_path values. Create fixture M3U8 content as strings (no file I/O needed — use UploadFile mock).
+
+**Files to create:**
+- `alembic/versions/xxx_add_import_columns.py`
+- `src/kiku/import_playlist/__init__.py`
+- `src/kiku/import_playlist/m3u8.py`
+- `frontend/src/lib/components/set/ImportPlaylistDialog.svelte`
+- `tests/test_m3u8_parser.py`
+- `tests/api/test_import_api.py`
+
+**Files to modify:**
+- `src/kiku/db/models.py` (Set + SetTrack columns)
+- `src/kiku/api/schemas.py` (new schemas + SetResponse.source)
+- `src/kiku/api/routes/sets.py` (import endpoint, route ordering)
+- `src/kiku/cli.py` (import command)
+- `frontend/src/lib/api/sets.ts` (importPlaylist function)
+- `frontend/src/lib/types/index.ts` (ImportResult type)
+- `frontend/src/lib/components/set/SetView.svelte` (import button)
 
 ## Plan
 <!-- Filled by /spec PLAN -->
