@@ -37,6 +37,7 @@ def db_session(tmp_path):
             duration_sec=300.0 + i * 10,
             rating=3,
             play_count=i,
+            kiku_play_count=i % 3,
         ))
 
     # Seed a set with tracks

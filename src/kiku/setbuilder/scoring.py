@@ -224,8 +224,16 @@ def energy_fit(track: Track, target_energy: float) -> float:
     return max(0.0, 1.0 - diff * 2.0)
 
 
-def track_quality(track: Track, prefer_playlists: list[str] | None = None) -> float:
-    """Score track quality based on rating, play count, and playlist membership (0-1)."""
+def track_quality(
+    track: Track,
+    prefer_playlists: list[str] | None = None,
+    discovery_density: float = 0.0,
+    set_appearance_count: int = 0,
+) -> tuple[float, str | None]:
+    """Score track quality based on rating, play count, playlist membership, and discovery/density bias (0-1).
+
+    Returns (score, discovery_label). discovery_label is None when no label applies.
+    """
     score = 0.0
 
     # Rating: 0-5 stars, normalize to 0-1 (unrated gets 0.3)
@@ -234,9 +242,31 @@ def track_quality(track: Track, prefer_playlists: list[str] | None = None) -> fl
     else:
         score += 0.4 * 0.3
 
-    # Play count: more plays = more proven, cap at 10
-    plays = min(track.play_count or 0, 10)
-    score += 0.3 * (plays / 10.0)
+    # Play familiarity (20% of track_quality)
+    combined_plays = min((track.play_count or 0) + (track.kiku_play_count or 0), 10)
+    ratio = combined_plays / 10.0
+    dd = discovery_density
+    if dd < 0:
+        alpha = abs(dd)
+        play_signal = (1 - alpha) * ratio + alpha * (1 - ratio)
+    elif dd > 0:
+        alpha = dd
+        play_signal = (1 - alpha) * ratio + alpha * (ratio ** 0.5)
+    else:
+        play_signal = ratio
+    score += 0.2 * play_signal
+
+    # Set density (10% of track_quality)
+    density = min(set_appearance_count, 6) / 6.0
+    if dd < 0:
+        alpha = abs(dd)
+        density_signal = (1 - alpha) * density + alpha * (1 - density)
+    elif dd > 0:
+        alpha = dd
+        density_signal = (1 - alpha) * density + alpha * (density ** 0.5)
+    else:
+        density_signal = density
+    score += 0.1 * density_signal
 
     # Playlist membership boost
     if prefer_playlists and track.playlist_tags:
@@ -247,7 +277,18 @@ def track_quality(track: Track, prefer_playlists: list[str] | None = None) -> fl
         except (json.JSONDecodeError, TypeError):
             pass
 
-    return score
+    # Compute discovery label
+    discovery_label: str | None = None
+    if dd < -0.3 and combined_plays <= 1:
+        discovery_label = "fresh pick"
+    elif dd < -0.3 and combined_plays <= 4:
+        discovery_label = "rarely played"
+    elif dd > 0.3 and set_appearance_count >= 2:
+        discovery_label = "battle-tested"
+    elif dd > 0.3 and combined_plays >= 7:
+        discovery_label = "crowd favorite"
+
+    return score, discovery_label
 
 
 def transition_score(
@@ -256,6 +297,8 @@ def transition_score(
     target_energy: float = 0.5,
     prefer_playlists: list[str] | None = None,
     weights: dict[str, float] | None = None,
+    discovery_density: float = 0.0,
+    set_appearance_counts: dict[int, int] | None = None,
 ) -> float:
     """Compute overall transition score between two tracks.
 
@@ -271,7 +314,8 @@ def transition_score(
         from_track.dir_genre or from_track.rb_genre,
         to_track.dir_genre or to_track.rb_genre,
     )
-    q = track_quality(to_track, prefer_playlists)
+    sac = (set_appearance_counts or {}).get(to_track.id, 0)
+    q, _ = track_quality(to_track, prefer_playlists, discovery_density, sac)
 
     return (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
             + w["genre_coherence"] * g + w["track_quality"] * q)
@@ -283,6 +327,8 @@ def score_replacement(
     next_track: Track | None,
     target_energy: float = 0.5,
     weights: dict[str, float] | None = None,
+    discovery_density: float = 0.0,
+    set_appearance_counts: dict[int, int] | None = None,
 ) -> tuple[float, dict | None, dict | None]:
     """Score a candidate as a replacement considering both neighbors.
 
@@ -299,7 +345,8 @@ def score_replacement(
             from_t.dir_genre or from_t.rb_genre,
             to_t.dir_genre or to_t.rb_genre,
         )
-        q = track_quality(to_t)
+        sac = (set_appearance_counts or {}).get(to_t.id, 0)
+        q, label = track_quality(to_t, discovery_density=discovery_density, set_appearance_count=sac)
         total = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
                  + w["genre_coherence"] * g + w["track_quality"] * q)
         return {
@@ -309,6 +356,8 @@ def score_replacement(
             "genre_coherence": round(g, 3),
             "track_quality": round(q, 3),
             "total": round(total, 3),
+            "discovery_label": label,
+            "set_appearances": sac,
         }
 
     incoming = _breakdown(prev_track, candidate) if prev_track else None
@@ -321,7 +370,7 @@ def score_replacement(
     elif outgoing:
         combined = outgoing["total"]
     else:
-        combined = track_quality(candidate)
+        combined, _ = track_quality(candidate, discovery_density=discovery_density)
 
     return round(combined, 3), incoming, outgoing
 
@@ -333,6 +382,8 @@ def score_transitions(
     genre_filter: list[str] | None = None,
     weights: dict[str, float] | None = None,
     exclude_ids: list[int] | None = None,
+    discovery_density: float = 0.0,
+    set_appearance_counts: dict[int, int] | None = None,
 ) -> list[tuple[Track, float]]:
     """Find and score best transitions from a given track."""
     q = session.query(Track).filter(Track.id != from_track.id)
@@ -359,7 +410,7 @@ def score_transitions(
 
     scored = []
     for track in candidates:
-        score = transition_score(from_track, track, weights=weights)
+        score = transition_score(from_track, track, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts)
         scored.append((track, score))
 
     scored.sort(key=lambda x: x[1], reverse=True)

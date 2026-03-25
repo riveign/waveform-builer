@@ -42,6 +42,12 @@ let setId = $state<number | null>(null);
 /** The registered WaveSurfer instance — set by the persistent audio component */
 let ws = $state<WaveSurfer | null>(null);
 
+/** Listen-time tracking for play count recording */
+let listenedSeconds = $state(0);
+let lastTimeUpdate = $state(0);
+/** Session-scoped dedup: one increment per track per page load */
+const playedTrackIds = new Set<number>();
+
 /** Volume before mute, for unmute restore */
 let preMuteVolume = 0.8;
 
@@ -60,6 +66,8 @@ function loadAndPlay(track: Track) {
 	currentTrack = track;
 	duration = track.duration_sec ?? 0;
 	currentTime = 0;
+	listenedSeconds = 0;
+	lastTimeUpdate = 0;
 	status = 'loading';
 
 	if (!ws) {
@@ -81,6 +89,19 @@ function registerPlayer(instance: WaveSurfer): () => void {
 
 	const onTimeUpdate = (time: number) => {
 		currentTime = time;
+
+		// Delta guard: only accumulate if time advanced by < 2s (not a seek)
+		const delta = time - lastTimeUpdate;
+		lastTimeUpdate = time;
+		if (delta > 0 && delta < 2) {
+			listenedSeconds += delta;
+		}
+
+		// Fire POST when threshold crossed (once per track per session)
+		if (currentTrack && listenedSeconds >= 60 && !playedTrackIds.has(currentTrack.id)) {
+			playedTrackIds.add(currentTrack.id);
+			fetch(`${API_BASE}/api/tracks/${currentTrack.id}/played`, { method: 'POST' }).catch(() => {});
+		}
 	};
 
 	const onPlay = () => {

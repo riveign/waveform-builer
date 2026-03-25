@@ -51,6 +51,7 @@ class Track(Base):
     file_hash = Column(String)
     date_added = Column(String)
     play_count = Column(Integer, default=0)
+    kiku_play_count = Column(Integer, default=0)
     release_year = Column(Integer)
     acquired_month = Column(String)
     playlist_tags = Column(Text)  # JSON list of playlist names this track belongs to
@@ -127,6 +128,10 @@ class Set(Base):
     duration_min = Column(Integer)
     energy_profile = Column(Text)  # JSON
     genre_filter = Column(Text)  # JSON
+    source = Column(String)  # "kiku", "manual", "m3u8", "rb_playlist"
+    source_ref = Column(Text)  # Original filename or playlist name
+    is_analyzed = Column(Integer, default=0)  # Whether analysis has been run
+    analysis_cache = Column(Text)  # JSON blob for cached analysis (Phase 2)
 
     tracks = relationship("SetTrack", back_populates="set_", cascade="all, delete-orphan")
 
@@ -138,6 +143,8 @@ class SetTrack(Base):
     position = Column(Integer, primary_key=True)
     track_id = Column(Integer, ForeignKey("tracks.id"))
     transition_score = Column(Float)
+    inferred_energy = Column(Float)  # Position-inferred energy (Phase 2)
+    inference_source = Column(String)  # How energy was inferred (Phase 2)
 
     set_ = relationship("Set", back_populates="tracks")
     track = relationship("Track")

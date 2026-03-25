@@ -16,6 +16,7 @@ export interface Track {
 	energy: string | null;
 	duration_sec: number | null;
 	play_count: number | null;
+	kiku_play_count: number | null;
 	has_waveform: boolean;
 	has_features: boolean;
 	resolved_energy: string | null;
@@ -122,6 +123,8 @@ export interface TransitionScoreBreakdown {
 	genre_coherence: number;
 	track_quality: number;
 	total: number;
+	discovery_label?: string | null;
+	set_appearances?: number | null;
 }
 
 export interface TransitionDetail {
@@ -270,6 +273,7 @@ export interface SetBuildParams {
 	beam_width?: number;
 	playlist_preference?: string[] | null;
 	weights?: ScoringWeights;
+	discovery_density?: number;
 }
 
 export interface SetBuildComplete {
@@ -420,6 +424,8 @@ export interface ReplacementBreakdown {
 	genre_coherence: number;
 	track_quality: number;
 	total: number;
+	discovery_label?: string | null;
+	set_appearances?: number | null;
 }
 
 export interface ReplacementCandidate {

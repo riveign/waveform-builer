@@ -64,6 +64,15 @@
 			</div>
 		{/each}
 	</div>
+	{#if breakdown.discovery_label}
+		<div class="discovery-badge">
+			<span class="discovery-icon">&#9679;</span>
+			<span class="discovery-text">{breakdown.discovery_label}</span>
+			{#if breakdown.set_appearances != null && breakdown.set_appearances > 0}
+				<span class="discovery-detail">&middot; in {breakdown.set_appearances} set{breakdown.set_appearances > 1 ? 's' : ''}</span>
+			{/if}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -154,6 +163,32 @@
 		width: 28px;
 		text-align: right;
 		font-size: 10px;
+		color: var(--text-dim);
+	}
+
+	.discovery-badge {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		margin-top: 8px;
+		padding: 6px 10px;
+		background: var(--bg-tertiary);
+		border-radius: 4px;
+		font-size: 11px;
+	}
+
+	.discovery-icon {
+		color: var(--accent);
+		font-size: 8px;
+	}
+
+	.discovery-text {
+		color: var(--accent);
+		font-weight: 500;
+		text-transform: capitalize;
+	}
+
+	.discovery-detail {
 		color: var(--text-dim);
 	}
 </style>

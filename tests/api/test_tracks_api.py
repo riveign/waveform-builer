@@ -94,3 +94,37 @@ def test_suggest_next_genre_filter(client):
     # All suggestions should be house genre
     for s in data["suggestions"]:
         assert s["track"]["genre"] == "house"
+
+
+def test_record_played(client):
+    """POST /api/tracks/{id}/played should return 204 and increment kiku_play_count."""
+    resp = client.post("/api/tracks/1/played")
+    assert resp.status_code == 204
+
+    # Verify the count incremented
+    detail = client.get("/api/tracks/1").json()
+    assert detail["kiku_play_count"] >= 1
+
+
+def test_record_played_not_found(client):
+    resp = client.post("/api/tracks/999/played")
+    assert resp.status_code == 404
+
+
+def test_suggest_next_with_discovery_density(client):
+    """discovery_density param should be accepted and affect results."""
+    resp_neutral = client.get("/api/tracks/1/suggest-next?n=5&discovery_density=0.0")
+    assert resp_neutral.status_code == 200
+
+    resp_discovery = client.get("/api/tracks/1/suggest-next?n=5&discovery_density=-1.0")
+    assert resp_discovery.status_code == 200
+
+    resp_density = client.get("/api/tracks/1/suggest-next?n=5&discovery_density=1.0")
+    assert resp_density.status_code == 200
+
+    # All should return valid structure
+    for resp in [resp_neutral, resp_discovery, resp_density]:
+        data = resp.json()
+        for s in data["suggestions"]:
+            assert "breakdown" in s
+            assert "discovery_label" in s["breakdown"]

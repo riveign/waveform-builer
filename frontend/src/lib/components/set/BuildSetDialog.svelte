@@ -4,6 +4,7 @@
 	import { fetchJson } from '$lib/api/client';
 	import EnergyPresetPicker from './EnergyPresetPicker.svelte';
 	import ScoringWeightsSliders from './ScoringWeights.svelte';
+	import DiscoveryDensitySlider from './DiscoveryDensitySlider.svelte';
 
 	interface GenreFamily {
 		family_name: string;
@@ -54,6 +55,7 @@
 	let useSeedTrack = $state(true);
 	let beamWidth = $state(5);
 	let scoringWeights = $state<ScoringWeights>({ ...DEFAULT_WEIGHTS });
+	let discoveryDensity = $state(0);
 
 	// ── Dialog element ref ──
 	let dialogEl = $state<HTMLDialogElement | null>(null);
@@ -114,6 +116,7 @@
 		useSeedTrack = true;
 		beamWidth = 5;
 		scoringWeights = { ...DEFAULT_WEIGHTS };
+		discoveryDensity = 0;
 	}
 
 	function handleSubmit() {
@@ -143,6 +146,7 @@
 				track_quality: scoringWeights.track_quality / 100,
 			},
 		};
+		params.discovery_density = discoveryDensity / 100;
 
 		// Genre filter from selected chips
 		if (selectedGenres.size > 0) {
@@ -258,6 +262,11 @@
 			<div class="field">
 				<span class="field-label">Energy arc</span>
 				<EnergyPresetPicker bind:value={energyPreset} />
+			</div>
+
+			<!-- Discovery / Density -->
+			<div class="field">
+				<DiscoveryDensitySlider bind:value={discoveryDensity} />
 			</div>
 
 			<!-- Genre Filter -->

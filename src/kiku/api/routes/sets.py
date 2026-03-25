@@ -122,6 +122,7 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                 set_name=body.name,
                 prefer_playlists=body.playlist_preference,
                 weights=weights_dict,
+                discovery_density=body.discovery_density,
             )
 
             if result is None:
@@ -332,7 +333,12 @@ def set_waveforms(set_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{set_id}/transition/{index}", response_model=TransitionResponse)
-def set_transition(set_id: int, index: int, db: Session = Depends(get_db)):
+def set_transition(
+    set_id: int,
+    index: int,
+    discovery_density: float = 0.0,
+    db: Session = Depends(get_db),
+):
     """Get transition detail between track at `index` and `index+1`."""
     s = db.get(Set, set_id)
     if not s:
@@ -360,7 +366,7 @@ def set_transition(set_id: int, index: int, db: Session = Depends(get_db)):
     e = energy_fit(t_b, 0.5)  # neutral target for display
     b = bpm_compatibility(t_a.bpm, t_b.bpm)
     g = genre_coherence(t_a.dir_genre or t_a.rb_genre, t_b.dir_genre or t_b.rb_genre)
-    q = track_quality(t_b)
+    q, label = track_quality(t_b, discovery_density=discovery_density)
 
     from kiku.config import SCORING_WEIGHTS as w
     total = w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b + w["genre_coherence"] * g + w["track_quality"] * q
@@ -384,6 +390,8 @@ def set_transition(set_id: int, index: int, db: Session = Depends(get_db)):
             genre_coherence=round(g, 3),
             track_quality=round(q, 3),
             total=round(total, 3),
+            discovery_label=label,
+            set_appearances=None,
         ),
         bpm_a=t_a.bpm,
         bpm_b=t_b.bpm,
@@ -498,6 +506,7 @@ def _track_response(t: Track):
         energy=t.dir_energy or t.energy_predicted,
         duration_sec=t.duration_sec,
         play_count=t.play_count,
+        kiku_play_count=t.kiku_play_count,
         has_waveform=af is not None and af.waveform_overview is not None,
         has_features=af is not None,
         resolved_energy=resolved_zone,
@@ -513,6 +522,7 @@ def get_replacements(
     position: int,
     n: int = 10,
     genre_filter: str | None = None,
+    discovery_density: float = 0.0,
     db: Session = Depends(get_db),
 ):
     """Find replacement candidates for the track at a given position.
@@ -579,6 +589,7 @@ def get_replacements(
     for cand in candidates:
         combined, incoming, outgoing = score_replacement(
             cand, prev_track, next_track, target_energy=energy_target,
+            discovery_density=discovery_density,
         )
         scored.append((cand, combined, incoming, outgoing))
 

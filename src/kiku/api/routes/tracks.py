@@ -41,6 +41,7 @@ def _track_to_response(t: Track) -> TrackResponse:
         energy=t.dir_energy,
         duration_sec=t.duration_sec,
         play_count=t.play_count,
+        kiku_play_count=t.kiku_play_count,
         has_waveform=af is not None and af.waveform_detail is not None,
         has_features=af is not None and af.energy is not None,
         resolved_energy=resolved_zone,
@@ -119,6 +120,17 @@ def track_detail(track_id: int, db: Session = Depends(get_db)):
     return _track_to_response(track)
 
 
+@router.post("/{track_id}/played", status_code=204)
+def record_played(track_id: int, db: Session = Depends(get_db)):
+    """Increment kiku_play_count when a track has been listened to for >60s in the player."""
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    track.kiku_play_count = (track.kiku_play_count or 0) + 1
+    db.commit()
+    return
+
+
 @router.get("/{track_id}/suggest-next", response_model=SuggestNextResponse)
 def suggest_next(
     track_id: int,
@@ -130,6 +142,7 @@ def suggest_next(
     w_bpm_compat: float | None = Query(default=None, description="BPM compatibility weight override"),
     w_genre_coherence: float | None = Query(default=None, description="Genre coherence weight override"),
     w_track_quality: float | None = Query(default=None, description="Track quality weight override"),
+    discovery_density: float = Query(default=0.0, ge=-1.0, le=1.0, description="Discovery/density bias (-1=fresh, +1=proven)"),
     db: Session = Depends(get_db),
 ):
     """Suggest best next tracks based on transition scoring."""
@@ -173,7 +186,7 @@ def suggest_next(
             raise HTTPException(status_code=422, detail=str(exc))
 
     genres = [g.strip() for g in genre_filter.split(",")] if genre_filter else None
-    scored = score_transitions(db, track, n=n, genre_filter=genres, weights=weights_dict, exclude_ids=exclude_ids)
+    scored = score_transitions(db, track, n=n, genre_filter=genres, weights=weights_dict, exclude_ids=exclude_ids, discovery_density=discovery_density)
 
     w = weights_dict if weights_dict else SCORING_WEIGHTS
     suggestions = []
@@ -185,7 +198,7 @@ def suggest_next(
             track.dir_genre or track.rb_genre,
             cand.dir_genre or cand.rb_genre,
         )
-        q = track_quality(cand)
+        q, label = track_quality(cand, discovery_density=discovery_density)
 
         suggestions.append(SuggestNextItem(
             track=_track_to_response(cand),
@@ -197,6 +210,8 @@ def suggest_next(
                 genre_coherence=round(g, 3),
                 track_quality=round(q, 3),
                 total=round(total_score, 3),
+                discovery_label=label,
+                set_appearances=None,
             ),
         ))
 

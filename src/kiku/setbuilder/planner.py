@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 
 from rich.console import Console
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from kiku.config import ARTIST_COOLDOWN, DEFAULT_BEAM_WIDTH
@@ -85,6 +85,7 @@ def build_set(
     set_name: str | None = None,
     prefer_playlists: list[str] | None = None,
     weights: dict[str, float] | None = None,
+    discovery_density: float = 0.0,
 ) -> Set | None:
     """Generate a DJ set using beam search.
 
@@ -97,6 +98,13 @@ def build_set(
         )
 
     candidates = _get_candidate_pool(session, genres=genres, bpm_range=bpm_range)
+
+    # Batch query: how many sets each track appears in (for density signal)
+    set_appearance_counts: dict[int, int] = {}
+    if discovery_density != 0.0:
+        rows = session.query(SetTrack.track_id, func.count(SetTrack.set_id.distinct())).group_by(SetTrack.track_id).all()
+        set_appearance_counts = {track_id: cnt for track_id, cnt in rows}
+
     if not candidates:
         console.print("[yellow]No tracks match the genre filter.[/]")
         return None
@@ -157,7 +165,7 @@ def build_set(
                         if not (0.47 < ratio < 0.53 or 1.88 < ratio < 2.12):
                             continue
 
-                score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists, weights=weights)
+                score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts)
 
                 # BPM progression bonus: reward tracks closer to target BPM at this point
                 if target_bpm and cand.bpm:
@@ -219,7 +227,7 @@ def build_set(
 
     prev_track = None
     for i, track in enumerate(best_seq):
-        t_score = transition_score(prev_track, track, prefer_playlists=prefer_playlists, weights=weights) if prev_track else None
+        t_score = transition_score(prev_track, track, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts) if prev_track else None
         st = SetTrack(
             set_id=set_.id,
             position=i + 1,

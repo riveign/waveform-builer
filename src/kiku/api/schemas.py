@@ -24,6 +24,7 @@ class TrackResponse(BaseModel):
     energy: str | None = None
     duration_sec: float | None = None
     play_count: int | None = None
+    kiku_play_count: int | None = None
     has_waveform: bool = False
     has_features: bool = False
     resolved_energy: str | None = None
@@ -164,6 +165,8 @@ class TransitionScoreBreakdown(BaseModel):
     genre_coherence: float
     track_quality: float
     total: float
+    discovery_label: str | None = None
+    set_appearances: int | None = None
 
 
 class TransitionResponse(BaseModel):
@@ -225,6 +228,7 @@ class SetBuildRequest(BaseModel):
     beam_width: int = 5
     playlist_preference: list[str] | None = None
     weights: ScoringWeightsRequest | None = None
+    discovery_density: float = 0.0
 
 
 class SetCreateRequest(BaseModel):
@@ -438,6 +442,8 @@ class ReplacementBreakdown(BaseModel):
     genre_coherence: float
     track_quality: float
     total: float
+    discovery_label: str | None = None
+    set_appearances: int | None = None
 
 
 class ReplacementCandidate(BaseModel):

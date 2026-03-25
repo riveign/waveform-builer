@@ -1,5 +1,6 @@
 import type { SetWaveformTrack } from '$lib/types';
 import type WaveSurfer from 'wavesurfer.js';
+import { API_BASE } from '$lib/api/client';
 
 export type PlaybackMode = 'express' | 'builder';
 export type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'transitioning';
@@ -24,6 +25,12 @@ let volume = $state(0.8);
 let confirmed = $state<Set<number>>(new Set());
 let currentTime = $state(0);
 let bpmMatch = $state(true);
+
+/** Per-deck listen tracking */
+let deckListenedSeconds = $state(0);
+let deckLastTimeUpdate = $state(0);
+/** Session-scoped dedup for set playback */
+const deckPlayedTrackIds = new Set<number>();
 
 /** Persist confirmed track IDs to localStorage keyed by set ID */
 function saveConfirmed(sid: number, ids: Set<number>) {
@@ -219,6 +226,8 @@ function advanceToNext() {
 		// Swap active deck
 		activeDeck = activeDeck === 'A' ? 'B' : 'A';
 		currentIndex = nextIndex;
+		deckListenedSeconds = 0;
+		deckLastTimeUpdate = 0;
 		status = 'playing';
 		preloadNextTrack();
 	});
@@ -243,6 +252,8 @@ function advanceToPrev() {
 	doCrossfade(() => {
 		activeDeck = activeDeck === 'A' ? 'B' : 'A';
 		currentIndex = prevIndex;
+		deckListenedSeconds = 0;
+		deckLastTimeUpdate = 0;
 		status = 'playing';
 	});
 }
@@ -323,6 +334,20 @@ function onDeckError(deck: DeckId, trackId: number) {
 function onDeckTimeUpdate(deck: DeckId, time: number) {
 	if (deck !== activeDeck) return;
 	currentTime = time;
+
+	// Listen-time accumulation (builder mode only — express is 45s, below 60s threshold)
+	if (mode === 'builder' && status === 'playing') {
+		const delta = time - deckLastTimeUpdate;
+		if (delta > 0 && delta < 2) {
+			deckListenedSeconds += delta;
+		}
+		const track = tracks[currentIndex];
+		if (track && deckListenedSeconds >= 60 && !deckPlayedTrackIds.has(track.track_id)) {
+			deckPlayedTrackIds.add(track.track_id);
+			fetch(`${API_BASE}/api/tracks/${track.track_id}/played`, { method: 'POST' }).catch(() => {});
+		}
+	}
+	deckLastTimeUpdate = time;
 
 	if (mode !== 'express') return;
 	if (status !== 'playing') return;

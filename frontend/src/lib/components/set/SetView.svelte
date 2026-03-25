@@ -29,6 +29,7 @@
 			energy: swt.energy,
 			duration_sec: swt.duration_sec,
 			play_count: null,
+			kiku_play_count: null,
 			has_waveform: swt.waveform_overview !== null,
 			has_features: false,
 			resolved_energy: swt.energy,
