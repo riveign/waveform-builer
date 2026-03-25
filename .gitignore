@@ -24,6 +24,7 @@ Thumbs.db
 
 # Data (user-specific, contains local DB and exports)
 data/
+*.db
 
 # ML models (downloaded, not tracked)
 models/
