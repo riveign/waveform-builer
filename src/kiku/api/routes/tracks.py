@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from kiku.api.deps import get_db
@@ -11,7 +12,9 @@ from kiku.api.schemas import (
     SuggestNextItem,
     SuggestNextResponse,
     TrackFeaturesResponse,
+    TrackRatingRequest,
     TrackResponse,
+    TrackSetAppearance,
     TransitionScoreBreakdown,
 )
 from kiku.db.models import Track
@@ -21,7 +24,10 @@ router = APIRouter(prefix="/api/tracks", tags=["tracks"])
 
 
 def _track_to_response(t: Track) -> TrackResponse:
+    import json as _json
+
     from kiku.energy import get_track_energy
+    from kiku.setbuilder.scoring import genre_to_family
 
     af = t.audio_features
     te = get_track_energy(t)
@@ -30,6 +36,18 @@ def _track_to_response(t: Track) -> TrackResponse:
     if conflict:
         from kiku.api.schemas import EnergyConflictResponse
         conflict_resp = EnergyConflictResponse(**conflict)
+
+    # Parse playlist_tags JSON
+    tags: list[str] = []
+    if t.playlist_tags:
+        try:
+            tags = _json.loads(t.playlist_tags)
+        except (ValueError, TypeError):
+            pass
+
+    genre = t.dir_genre or t.rb_genre
+    family = genre_to_family(genre).capitalize() if genre else None
+
     return TrackResponse(
         id=t.id,
         title=t.title,
@@ -39,7 +57,7 @@ def _track_to_response(t: Track) -> TrackResponse:
         bpm=t.bpm,
         key=t.key,
         rating=t.rating,
-        genre=t.dir_genre or t.rb_genre,
+        genre=genre,
         energy=t.dir_energy,
         duration_sec=t.duration_sec,
         play_count=t.play_count,
@@ -52,6 +70,11 @@ def _track_to_response(t: Track) -> TrackResponse:
         energy_value=te.numeric,
         energy_label=te.label,
         energy_conflict=conflict_resp,
+        date_added=t.date_added,
+        release_year=t.release_year,
+        comment=t.comment,
+        playlist_tags=tags,
+        genre_family=family,
     )
 
 
@@ -128,6 +151,23 @@ def track_detail(track_id: int, db: Session = Depends(get_db)):
     return _track_to_response(track)
 
 
+@router.patch("/{track_id}/rating", response_model=TrackResponse)
+def update_track_rating(
+    track_id: int,
+    body: TrackRatingRequest,
+    db: Session = Depends(get_db),
+) -> TrackResponse:
+    """Update a track's star rating (0 clears, 1-5 sets)."""
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    track.rating = body.rating if body.rating > 0 else None
+    track.rating_source = "kiku"
+    db.commit()
+    db.refresh(track)
+    return _track_to_response(track)
+
+
 @router.post("/{track_id}/played", status_code=204)
 def record_played(track_id: int, db: Session = Depends(get_db)):
     """Increment kiku_play_count when a track has been listened to for >60s in the player."""
@@ -137,6 +177,99 @@ def record_played(track_id: int, db: Session = Depends(get_db)):
     track.kiku_play_count = (track.kiku_play_count or 0) + 1
     db.commit()
     return
+
+
+@router.get("/{track_id}/artwork")
+def track_artwork(track_id: int, db: Session = Depends(get_db)):
+    """Extract embedded artwork from a track's audio file."""
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    if not track.file_path:
+        raise HTTPException(status_code=404, detail="No file path for this track")
+
+    from kiku.db.paths import normalize_path
+
+    file_path = normalize_path(track.file_path)
+
+    import os
+
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Audio file not found")
+
+    try:
+        import mutagen
+
+        audio = mutagen.File(file_path)
+        if audio is None:
+            raise HTTPException(status_code=404, detail="Could not read audio file")
+
+        image_data: bytes | None = None
+        mime_type = "image/jpeg"
+
+        # ID3 (MP3, AIFF)
+        if hasattr(audio, "tags") and audio.tags:
+            for key in audio.tags:
+                if key.startswith("APIC"):
+                    apic = audio.tags[key]
+                    image_data = apic.data
+                    mime_type = apic.mime or "image/jpeg"
+                    break
+
+        # MP4/M4A
+        if image_data is None and hasattr(audio, "tags") and audio.tags and "covr" in audio.tags:
+            covers = audio.tags["covr"]
+            if covers:
+                image_data = bytes(covers[0])
+                mime_type = "image/jpeg"
+
+        # FLAC
+        if image_data is None and hasattr(audio, "pictures"):
+            pics = audio.pictures
+            if pics:
+                image_data = pics[0].data
+                mime_type = pics[0].mime or "image/jpeg"
+
+        if not image_data:
+            raise HTTPException(status_code=404, detail="No embedded artwork")
+
+        return Response(
+            content=image_data,
+            media_type=mime_type,
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to extract artwork")
+
+
+@router.get("/{track_id}/sets", response_model=list[TrackSetAppearance])
+def track_sets(track_id: int, db: Session = Depends(get_db)):
+    """Return all sets that contain this track."""
+    from kiku.db.models import Set, SetTrack as SetTrackModel
+
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    rows = (
+        db.query(SetTrackModel, Set)
+        .join(Set, SetTrackModel.set_id == Set.id)
+        .filter(SetTrackModel.track_id == track_id)
+        .order_by(Set.created_at.desc())
+        .all()
+    )
+
+    return [
+        TrackSetAppearance(
+            set_id=s.id,
+            set_name=s.name,
+            position=st.position,
+            created_at=s.created_at,
+        )
+        for st, s in rows
+    ]
 
 
 @router.get("/{track_id}/suggest-next", response_model=SuggestNextResponse)

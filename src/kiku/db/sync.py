@@ -205,6 +205,9 @@ def _process_tracks(
                 # Always set rb_id (may be missing on tracks matched by path)
                 existing.rb_id = rb_id
                 for k, v in track_data.items():
+                    # Skip overwriting rating if the DJ set it in Kiku
+                    if k == "rating" and existing.rating_source == "kiku":
+                        continue
                     setattr(existing, k, v)
                 updated += 1
             else:

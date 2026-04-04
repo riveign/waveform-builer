@@ -44,6 +44,7 @@ class Track(Base):
     bpm = Column(Float)
     key = Column(String)
     rating = Column(Integer)
+    rating_source = Column(String)  # NULL = from rekordbox, "kiku" = set by user in Kiku
     color = Column(String)
     comment = Column(Text)
     duration_sec = Column(Float)
