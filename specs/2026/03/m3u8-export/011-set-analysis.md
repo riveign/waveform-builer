@@ -116,7 +116,107 @@ You are a senior AI engineer building a teaching tool for DJs. Every piece of an
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+### Existing Scoring Infrastructure
+
+All 5 scoring dimensions live in `src/kiku/setbuilder/scoring.py`:
+- `harmonic_score(key_a, key_b)` → 1.0 (same), 0.85 (adjacent), 0.8 (mode switch), 0.5 (+/-2), 0.2 (clash) — in `camelot.py:68`
+- `bpm_compatibility(bpm_a, bpm_b)` → 1.0–0.7 (±6%), 0.6 (double/half), 0.3 (±12%), 0.1 (beyond) — `scoring.py:155`
+- `genre_coherence(genre_a, genre_b)` → 1.0/0.8/0.5/0.2 via `GENRE_FAMILIES` + `COMPATIBLE_FAMILIES` — `scoring.py:183`
+- `energy_fit(track, target_energy)` → `max(0, 1 - diff*2)` — `scoring.py:207`
+- `track_quality(track, ...)` → rating(40%) + play_familiarity(20%) + set_density(10%) + playlist(30%) — `scoring.py:227`
+- `transition_score()` combines all 5 with configurable weights (default: harmonic 25%, energy 20%, BPM 20%, genre 15%, quality 20%) — `scoring.py:294`
+- `score_replacement()` scores against both neighbors (incoming + outgoing) — `scoring.py:324`
+
+Key insight: `transition_score()` takes a `target_energy` parameter (default 0.5) — for set analysis, we should compute target energy *from the set's actual energy curve* rather than using a neutral value. This makes energy_fit contextual to the set's narrative.
+
+### Per-Transition API Already Exists
+
+`GET /api/sets/{set_id}/transition/{index}` at `src/kiku/api/routes/sets.py:422` already computes score breakdown for a single transition. However:
+- It uses a neutral `target_energy=0.5` hardcoded for display
+- It requires individual calls per transition (N-1 calls for N tracks)
+- No teaching moments or arc analysis
+
+The set analysis endpoint should batch all transitions in one call and use position-aware target energy.
+
+### Energy Resolution Chain
+
+`Track.resolved_energy_zone` property (`models.py:68`) delegates to `analysis/autotag.py:resolve_energy()`:
+- Priority: approved > dir_energy > predicted > None
+- Returns `(zone, source, confidence)` tuple
+- Zone names: warmup, build, drive, peak, close
+- Numeric mapping in `constraints.py:84`: warmup=0.25, build=0.55, drive=0.72, peak=0.9, close=0.35
+
+For set analysis energy inference: tracks *without* any energy source get values from set position + neighbor interpolation, written to `set_tracks.inferred_energy` / `inference_source`.
+
+### DB Schema (Already Migrated)
+
+`Set` model (`models.py:122`):
+- `analysis_cache = Column(Text)` — JSON blob, ready for use
+- `is_analyzed = Column(Integer, default=0)` — flag
+
+`SetTrack` model (`models.py:139`):
+- `inferred_energy = Column(Float)` — 0.0–1.0
+- `inference_source = Column(String)` — "position", "interpolation"
+- `transition_score = Column(Float)` — already exists (from build)
+
+No migration needed. All columns exist from spec 010.
+
+### Frontend Components (Reuse Opportunities)
+
+- `EnergyFlowChart.svelte` — Chart.js line chart showing energy per track position. Already maps zone labels to numeric values. Can be extended to show analysis overlay (target curve vs. actual)
+- `ScoreBreakdown.svelte` — Per-dimension bar chart with teaching notes. Already has a `TEACHING` map with 3-tier messages (high/mid/low). The set analysis teaching moments should follow this pattern but be more contextual.
+- `TransitionDetail.svelte` — Shows waveforms + score breakdown for a transition pair
+- `SetView.svelte` — Main set view with timeline, could host an "Analysis" tab/section
+- `TransitionIndicator.svelte` — Color-coded transition quality between tracks in timeline
+
+### Existing Analysis Module
+
+`src/kiku/analysis/` contains:
+- `autotag.py` — Energy zone resolver, ML classifier, tinder approval
+- `analyzer.py` — Audio analysis pipeline (Essentia/Librosa features)
+- `insights.py` — Existing but unexplored (potential home for teaching logic?)
+
+The new `set_analyzer.py` fits naturally in this module. Teaching moments could go in a separate `teaching.py` for clarity.
+
+### Test Patterns
+
+- Unit tests use `MagicMock` for Track objects (`test_scoring.py:55`)
+- API tests use `conftest.py` fixtures with in-memory SQLite, seeded tracks/sets (`tests/api/conftest.py`)
+- Existing seed data: 20 tracks, 1 set with 5 tracks (positions 1-5), tracks have BPM/key/genre/energy
+- Test patterns: direct function calls for unit tests, `TestClient` for API integration
+
+The conftest already has a 5-track set — perfect for testing analysis. May need to add more varied tracks (different keys, genres, energies) for arc analysis tests.
+
+### Strategy
+
+**Module structure:**
+1. `src/kiku/analysis/set_analyzer.py` — main `analyze_set()` function, orchestrates scoring + arc + teaching
+2. `src/kiku/analysis/teaching.py` — teaching moment generator (per-transition + set-level patterns)
+3. API: `POST /api/sets/{set_id}/analyze` (trigger) + `GET /api/sets/{set_id}/analysis` (read cache)
+4. CLI: `kiku analyze <set>` — calls `analyze_set()`, prints summary
+5. Frontend: `SetAnalysisView.svelte` — tab/section in SetView, reuses EnergyFlowChart + ScoreBreakdown
+
+**Key design decisions:**
+- Use existing `transition_score()` with position-derived `target_energy` (not neutral 0.5)
+- Energy inference writes to `set_tracks` rows — persistent, re-computable
+- Analysis cache is full JSON blob in `sets.analysis_cache` — denormalized for fast reads
+- Teaching moments are generated from score breakdown + Camelot context, not stored separately
+- Arc classification uses simple heuristics (no ML needed — pattern matching on energy/key/BPM sequences)
+
+**Testing strategy:**
+- Unit tests (`tests/test_set_analysis.py`):
+  - Teaching moment generation: strong (≥0.8), good (0.6–0.8), weak (<0.6) transitions
+  - Energy inference: interpolation between neighbors, position-based fallback, edge cases (first/last track)
+  - Arc classification: energy shape detection, key style, BPM drift
+  - 8–10 test cases
+- API integration tests (`tests/api/test_analysis_api.py`):
+  - POST analyze → sets is_analyzed=1 and populates analysis_cache
+  - GET analysis returns valid response with transitions + arc + patterns
+  - GET analysis on non-analyzed set returns 404 or empty
+  - Re-analyze overwrites cache
+  - 4–5 test cases
+- Conftest updates: add tracks with varied keys/genres/energies for meaningful arc analysis
 
 ## Plan
 <!-- Filled by /spec PLAN -->
