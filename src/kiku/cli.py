@@ -987,8 +987,21 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
                 console.print(f"  {name:20s} {bar} {imp:.3f}")
 
             if retrain:
+                # Run calibration for composite energy boundaries
+                try:
+                    from kiku.analysis.autotag import calibrate_energy
+                    cal = calibrate_energy(session)
+                    result["calibration"] = cal
+                    console.print(f"[cyan]Calibrated energy boundaries from {cal['training_samples']} tagged tracks[/]")
+                except ValueError as cal_err:
+                    console.print(f"[yellow]Calibration skipped: {cal_err}[/]")
+
                 path = save_model(result)
                 console.print(f"\n[green]Model saved to {path}[/]")
+
+                # Reset calibration cache
+                from kiku.energy import reset_calibration_cache
+                reset_calibration_cache()
 
             model = result["model"]
 

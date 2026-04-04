@@ -1,4 +1,4 @@
-import type { TinderQueueResponse, TinderDecision, TinderDecideResult, TinderRetrainResult, TinderStats } from '$lib/types';
+import type { TinderQueueResponse, TinderDecision, TinderDecideResult, TinderRetrainResult, TinderStats, TinderBatchDecision, TinderBatchResult } from '$lib/types';
 import { fetchJson } from './client';
 
 export interface TinderQueueParams {
@@ -33,6 +33,16 @@ export async function submitDecision(
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ track_id: trackId, decision, override_zone: overrideZone }),
+	});
+}
+
+export async function submitBatchDecisions(
+	decisions: TinderBatchDecision[]
+): Promise<TinderBatchResult> {
+	return fetchJson<TinderBatchResult>('/api/tinder/decide/batch', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ decisions }),
 	});
 }
 

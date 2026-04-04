@@ -44,6 +44,7 @@ DERIVED_FEATURES = ["build_shape", "drop_shape", "intro_body_ratio", "outro_body
 DEFAULT_MODEL_DIR = Path("data")
 MODEL_FILENAME = "energy_model.pkl"
 META_FILENAME = "energy_model_meta.json"
+CALIBRATION_FILENAME = "energy_calibration.json"
 
 
 def resolve_energy(track: Track) -> tuple[str | None, str, float]:
@@ -128,6 +129,112 @@ def extract_features(af: AudioFeatures) -> np.ndarray | None:
 def feature_names() -> list[str]:
     """Return ordered feature names matching extract_features output."""
     return BASE_FEATURES + DERIVED_FEATURES
+
+
+def calibrate_energy(session: Session) -> dict:
+    """Calibrate composite energy boundaries from the DJ's own tags.
+
+    Queries all tracks with dir_energy + audio_features, computes per-feature
+    min/max for normalization, derives composite scores weighted by F-ratio,
+    and finds zone boundary midpoints between adjacent zone medians.
+
+    Returns calibration dict: {feature_ranges, zone_boundaries, composite_weights, calibrated_at}.
+    """
+    from scipy import stats as scipy_stats
+
+    # Energy zones in order (exclude 'close' — positional, not energy-derived)
+    ordered_zones = ["warmup", "build", "drive", "peak"]
+
+    # Gather tracks with known zones + audio features
+    query = (
+        session.query(Track, AudioFeatures)
+        .join(AudioFeatures)
+        .filter(AudioFeatures.energy.isnot(None))
+    )
+
+    rows: list[tuple[str, np.ndarray]] = []
+    for track, af in query.all():
+        tag = None
+        if track.dir_energy:
+            tag = track.dir_energy.lower()
+        elif track.energy_source == "approved" and track.energy_predicted:
+            tag = track.energy_predicted.lower()
+        if tag is None or tag not in ZONE_MAP:
+            continue
+        zone = ZONE_MAP[tag]
+        if zone == "close":
+            continue  # Can't calibrate close — it's positional
+        features = extract_features(af)
+        if features is None:
+            continue
+        rows.append((zone, features))
+
+    if len(rows) < 20:
+        raise ValueError(f"Need at least 20 tagged tracks for calibration, found {len(rows)}")
+
+    zones_arr = np.array([r[0] for r in rows])
+    X = np.array([r[1] for r in rows])
+    names = feature_names()
+
+    # Compute per-feature min/max for normalization
+    feature_ranges: dict[str, dict[str, float]] = {}
+    for i, name in enumerate(names):
+        col = X[:, i]
+        feature_ranges[name] = {"min": float(np.min(col)), "max": float(np.max(col))}
+
+    # Compute F-ratio per feature (ANOVA: how well does this feature discriminate zones?)
+    f_ratios: dict[str, float] = {}
+    for i, name in enumerate(names):
+        groups = [X[zones_arr == z, i] for z in ordered_zones if np.sum(zones_arr == z) > 0]
+        if len(groups) >= 2 and all(len(g) > 0 for g in groups):
+            f_stat, _ = scipy_stats.f_oneway(*groups)
+            f_ratios[name] = float(f_stat) if np.isfinite(f_stat) else 0.0
+        else:
+            f_ratios[name] = 0.0
+
+    # Normalize F-ratios into weights (sum to 1)
+    total_f = sum(f_ratios.values())
+    if total_f > 0:
+        composite_weights = {name: f / total_f for name, f in f_ratios.items()}
+    else:
+        # Fallback: equal weights
+        composite_weights = {name: 1.0 / len(names) for name in names}
+
+    # Compute composite score per track
+    composites_by_zone: dict[str, list[float]] = {z: [] for z in ordered_zones}
+    for zone, features in rows:
+        score = 0.0
+        for i, name in enumerate(names):
+            fr = feature_ranges[name]
+            rng = fr["max"] - fr["min"]
+            normalized = (features[i] - fr["min"]) / rng if rng > 0 else 0.5
+            score += composite_weights[name] * normalized
+        composites_by_zone[zone].append(score)
+
+    # Find zone medians, then midpoints between adjacent zones
+    zone_medians: dict[str, float] = {}
+    for z in ordered_zones:
+        if composites_by_zone[z]:
+            zone_medians[z] = float(np.median(composites_by_zone[z]))
+
+    # Derive boundaries as midpoints between adjacent zone medians
+    zone_boundaries: list[tuple[float, str]] = []
+    present_zones = [z for z in ordered_zones if z in zone_medians]
+    for i, zone in enumerate(present_zones):
+        if i < len(present_zones) - 1:
+            mid = (zone_medians[zone] + zone_medians[present_zones[i + 1]]) / 2
+            zone_boundaries.append((mid, zone))
+        else:
+            zone_boundaries.append((1.01, zone))  # Last zone captures everything above
+
+    return {
+        "feature_ranges": feature_ranges,
+        "zone_boundaries": [(float(b), z) for b, z in zone_boundaries],
+        "composite_weights": composite_weights,
+        "zone_medians": zone_medians,
+        "calibrated_at": datetime.now().isoformat(),
+        "training_samples": len(rows),
+    }
 
 
 def _load_training_data(
@@ -345,6 +452,11 @@ def save_model(result: dict, model_dir: Path = DEFAULT_MODEL_DIR) -> Path:
         "decision_log": decision_log,
     }
     meta_path.write_text(json.dumps(meta, indent=2, default=str))
+
+    # Write calibration sidecar if present
+    if "calibration" in result:
+        cal_path = model_dir / CALIBRATION_FILENAME
+        cal_path.write_text(json.dumps(result["calibration"], indent=2, default=str))
 
     return model_path
 

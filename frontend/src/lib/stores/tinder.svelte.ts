@@ -1,5 +1,5 @@
-import type { TinderQueueItem, TinderDecision, TinderRetrainResult } from '$lib/types';
-import { getTinderQueue, submitDecision, retrain, type TinderQueueParams } from '$lib/api/tinder';
+import type { TinderQueueItem, TinderDecision, TinderRetrainResult, TinderBatchDecision } from '$lib/types';
+import { getTinderQueue, submitDecision, submitBatchDecisions, retrain, type TinderQueueParams } from '$lib/api/tinder';
 
 let queue = $state<TinderQueueItem[]>([]);
 let queueTotal = $state(0);
@@ -54,6 +54,29 @@ async function decide(decision: TinderDecision, overrideZone?: string) {
 	}
 }
 
+async function decideBatch(decisions: TinderBatchDecision[]) {
+	const batchSize = decisions.length;
+	// Only send non-skip decisions to the API
+	const toSubmit = decisions.filter(d => d.decision !== 'skip');
+	const skipCount = batchSize - toSubmit.length;
+
+	try {
+		if (toSubmit.length > 0) {
+			const result = await submitBatchDecisions(toSubmit);
+			for (const r of result.results) {
+				if (r.decision === 'confirm') sessionConfirmed++;
+				else if (r.decision === 'override') sessionOverridden++;
+			}
+			lastTeachingMoment = result.results.find(r => r.teaching_moment)?.teaching_moment ?? null;
+		}
+		sessionSkipped += skipCount;
+		// Advance past the entire batch page
+		currentIndex += batchSize;
+	} catch (e) {
+		error = e instanceof Error ? e.message : String(e);
+	}
+}
+
 async function triggerRetrain() {
 	retraining = true;
 	error = null;
@@ -84,6 +107,7 @@ export function getTinderStore() {
 		get retraining() { return retraining; },
 		loadQueue,
 		decide,
+		decideBatch,
 		triggerRetrain,
 	};
 }

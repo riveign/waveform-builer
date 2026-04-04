@@ -2,7 +2,18 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+class TrackRatingRequest(BaseModel):
+    rating: int  # 0 = clear rating; 1–5 = star count
+
+    @field_validator('rating')
+    @classmethod
+    def validate_rating(cls, v: int) -> int:
+        if not 0 <= v <= 5:
+            raise ValueError('rating must be between 0 and 5')
+        return v
 
 
 class EnergyConflictResponse(BaseModel):
@@ -33,6 +44,11 @@ class TrackResponse(BaseModel):
     energy_value: float | None = None
     energy_label: str | None = None
     energy_conflict: EnergyConflictResponse | None = None
+    date_added: str | None = None
+    release_year: int | None = None
+    comment: str | None = None
+    playlist_tags: list[str] = []
+    genre_family: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -78,6 +94,13 @@ class WaveformBandsResponse(BaseModel):
     sr: int
     hop: int
     duration_sec: float
+
+
+class TrackSetAppearance(BaseModel):
+    set_id: int
+    set_name: str | None = None
+    position: int
+    created_at: str | None = None
 
 
 class SetResponse(BaseModel):
@@ -321,6 +344,14 @@ class TinderDecideResponse(BaseModel):
     teaching_moment: str | None = None  # one-sentence explanation on override
 
 
+class TinderBatchDecideRequest(BaseModel):
+    decisions: list[TinderDecideRequest]
+
+
+class TinderBatchDecideResponse(BaseModel):
+    results: list[TinderDecideResponse]
+
+
 class TinderStatsResponse(BaseModel):
     total_reviewed: int
     confirmed: int
@@ -330,6 +361,8 @@ class TinderStatsResponse(BaseModel):
     confirmed_pct: float
     overridden_pct: float
     skip_pct: float
+    retrain_suggested: bool = False
+    retrain_threshold: int = 50
 
 
 class TinderRetrainResponse(BaseModel):

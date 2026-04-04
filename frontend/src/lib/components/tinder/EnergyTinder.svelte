@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { TinderDecision } from '$lib/types';
+	import type { TinderDecision, TinderBatchDecision } from '$lib/types';
 	import { getTinderStore } from '$lib/stores/tinder.svelte';
 	import TinderCard from './TinderCard.svelte';
+	import TinderBatch from './TinderBatch.svelte';
 	import TinderSummary from './TinderSummary.svelte';
 
 	const store = getTinderStore();
@@ -10,6 +11,9 @@
 	let genreFamily = $state('');
 	let bpmMin = $state('');
 	let bpmMax = $state('');
+	let batchMode = $state(false);
+
+	const BATCH_SIZE = 5;
 
 	function loadWithFilters() {
 		store.loadQueue({
@@ -27,6 +31,14 @@
 	function handleDecide(decision: TinderDecision, overrideZone?: string) {
 		store.decide(decision, overrideZone);
 	}
+
+	function handleBatchSubmit(decisions: TinderBatchDecision[]) {
+		store.decideBatch(decisions);
+	}
+
+	let batchItems = $derived(
+		store.queue.slice(store.currentIndex, store.currentIndex + BATCH_SIZE)
+	);
 </script>
 
 <div class="energy-tinder">
@@ -42,10 +54,15 @@
 	{:else if store.isComplete}
 		<TinderSummary onrestart={loadWithFilters} />
 	{:else}
-		<!-- Queue progress -->
-		<div class="progress-bar">
-			<span>{store.currentIndex + 1} / {store.queue.length}</span>
-			<span class="queue-total">({store.queueTotal} total in queue)</span>
+		<!-- Queue progress + mode toggle -->
+		<div class="toolbar">
+			<div class="progress-bar">
+				<span>{store.currentIndex + 1} / {store.queue.length}</span>
+				<span class="queue-total">({store.queueTotal} total in queue)</span>
+			</div>
+			<button class="mode-toggle" onclick={() => batchMode = !batchMode}>
+				{batchMode ? 'Card mode' : 'Batch mode'}
+			</button>
 		</div>
 
 		<!-- Filters -->
@@ -63,15 +80,22 @@
 			<input type="number" placeholder="BPM max" bind:value={bpmMax} onchange={loadWithFilters} />
 		</div>
 
-		<!-- Current card -->
-		{#if store.currentItem}
-			{#key store.currentItem.track.id}
-				<TinderCard
-					item={store.currentItem}
-					ondecide={handleDecide}
-					teachingMoment={store.lastTeachingMoment}
-				/>
-			{/key}
+		{#if batchMode}
+			<!-- Batch mode: show multiple tracks at once -->
+			{#if batchItems.length > 0}
+				<TinderBatch items={batchItems} onsubmit={handleBatchSubmit} />
+			{/if}
+		{:else}
+			<!-- Card mode: one track at a time -->
+			{#if store.currentItem}
+				{#key store.currentItem.track.id}
+					<TinderCard
+						item={store.currentItem}
+						ondecide={handleDecide}
+						teachingMoment={store.lastTeachingMoment}
+					/>
+				{/key}
+			{/if}
 		{/if}
 	{/if}
 </div>
@@ -83,8 +107,11 @@
 	.empty { text-align: center; padding: 40px; color: var(--text-dim); }
 	.empty p { margin: 4px 0; }
 	.hint { font-size: 12px; }
-	.progress-bar { text-align: center; font-size: 13px; color: var(--text-secondary); padding: 4px 0; }
+	.toolbar { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+	.progress-bar { font-size: 13px; color: var(--text-secondary); }
 	.queue-total { font-size: 11px; color: var(--text-dim); margin-left: 4px; }
+	.mode-toggle { padding: 3px 10px; font-size: 11px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+	.mode-toggle:hover { background: var(--bg-hover); }
 	.filters { display: flex; gap: 8px; justify-content: center; padding: 8px 0; }
 	.filters select, .filters input { padding: 4px 8px; font-size: 12px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; }
 	.filters input { width: 80px; }

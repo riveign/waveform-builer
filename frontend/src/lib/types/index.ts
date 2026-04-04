@@ -9,6 +9,7 @@ export interface Track {
 	title: string | null;
 	artist: string | null;
 	album: string | null;
+	label: string | null;
 	bpm: number | null;
 	key: string | null;
 	rating: number | null;
@@ -25,6 +26,18 @@ export interface Track {
 	energy_value: number | null;
 	energy_label: string | null;
 	energy_conflict: EnergyConflict | null;
+	date_added: string | null;
+	release_year: number | null;
+	comment: string | null;
+	playlist_tags: string[];
+	genre_family: string | null;
+}
+
+export interface TrackSetAppearance {
+	set_id: number;
+	set_name: string | null;
+	position: number;
+	created_at: string | null;
 }
 
 export interface TrackFeatures {
@@ -388,6 +401,16 @@ export interface TinderDecideResult {
 	teaching_moment: string | null;
 }
 
+export interface TinderBatchDecision {
+	track_id: number;
+	decision: TinderDecision;
+	override_zone?: string;
+}
+
+export interface TinderBatchResult {
+	results: TinderDecideResult[];
+}
+
 export interface TinderStats {
 	total_reviewed: number;
 	confirmed: number;
@@ -397,6 +420,8 @@ export interface TinderStats {
 	confirmed_pct: number;
 	overridden_pct: number;
 	skip_pct: number;
+	retrain_suggested: boolean;
+	retrain_threshold: number;
 }
 
 export interface TinderRetrainResult {

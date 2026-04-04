@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from kiku.api.deps import get_db
 from kiku.api.schemas import (
+    TinderBatchDecideRequest,
+    TinderBatchDecideResponse,
     TinderDecideRequest,
     TinderDecideResponse,
     TinderQueueItem,
@@ -132,6 +134,38 @@ def tinder_decide(body: TinderDecideRequest, db: Session = Depends(get_db)):
     )
 
 
+@router.post("/decide/batch", response_model=TinderBatchDecideResponse)
+def tinder_decide_batch(body: TinderBatchDecideRequest, db: Session = Depends(get_db)):
+    """Submit multiple tinder decisions at once."""
+    from kiku.analysis.autotag import ENERGY_ZONES
+
+    results = []
+    for item in body.decisions:
+        if item.decision not in ("confirm", "override", "skip"):
+            raise HTTPException(status_code=400, detail=f"decision must be confirm, override, or skip (track {item.track_id})")
+        if item.decision == "override" and not item.override_zone:
+            raise HTTPException(status_code=400, detail=f"override_zone required for override (track {item.track_id})")
+        if item.override_zone and item.override_zone not in ENERGY_ZONES:
+            raise HTTPException(status_code=400, detail=f"override_zone must be one of: {ENERGY_ZONES}")
+
+        track = save_tinder_decision(db, item.track_id, item.decision, item.override_zone)
+        if not track:
+            raise HTTPException(status_code=404, detail=f"Track {item.track_id} not found")
+
+        teaching = None
+        if item.decision == "override":
+            teaching = _generate_teaching_moment(track, item.override_zone)
+
+        results.append(TinderDecideResponse(
+            track_id=item.track_id,
+            decision=item.decision,
+            applied_zone=item.override_zone if item.decision == "override" else track.energy_predicted,
+            teaching_moment=teaching,
+        ))
+
+    return TinderBatchDecideResponse(results=results)
+
+
 @router.get("/stats", response_model=TinderStatsResponse)
 def tinder_stats(db: Session = Depends(get_db)):
     """Get review session statistics."""
@@ -173,6 +207,10 @@ def tinder_stats(db: Session = Depends(get_db)):
     # Skip count is not tracked (skip = no-op), report 0
     skipped = 0
 
+    # Suggest retrain every 50 approvals since last model
+    retrain_threshold = 50
+    retrain_suggested = total_reviewed > 0 and total_reviewed % retrain_threshold < 10
+
     return TinderStatsResponse(
         total_reviewed=total_reviewed,
         confirmed=confirmed,
@@ -182,6 +220,8 @@ def tinder_stats(db: Session = Depends(get_db)):
         confirmed_pct=round(confirmed / total_reviewed * 100, 1) if total_reviewed else 0,
         overridden_pct=round(overridden / total_reviewed * 100, 1) if total_reviewed else 0,
         skip_pct=0,
+        retrain_suggested=retrain_suggested,
+        retrain_threshold=retrain_threshold,
     )
 
 
@@ -192,7 +232,20 @@ def tinder_retrain(db: Session = Depends(get_db)):
 
     try:
         result = train_energy_model(db, include_approved=True)
+
+        # Run calibration and include in result for save_model
+        try:
+            from kiku.analysis.autotag import calibrate_energy
+            result["calibration"] = calibrate_energy(db)
+        except (ValueError, Exception) as cal_err:
+            logger.warning("Calibration skipped: %s", cal_err)
+
         save_model(result)
+
+        # Reset calibration cache so new boundaries take effect
+        from kiku.energy import reset_calibration_cache
+        reset_calibration_cache()
+
         return TinderRetrainResponse(
             accuracy=result["metrics"].get("accuracy"),
             class_counts=result["class_counts"],
