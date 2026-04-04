@@ -1,5 +1,5 @@
-import type { Track, TrackFeatures, PaginatedTracks, SuggestNextResponse, ScoringWeights } from '$lib/types';
-import { fetchJson } from './client';
+import type { Track, TrackFeatures, TrackSetAppearance, PaginatedTracks, SuggestNextResponse, ScoringWeights } from '$lib/types';
+import { API_BASE, fetchJson } from './client';
 
 export interface SearchParams {
 	search?: string;
@@ -51,6 +51,22 @@ export async function getTrack(id: number): Promise<Track> {
 
 export async function getTrackFeatures(id: number): Promise<TrackFeatures> {
 	return fetchJson<TrackFeatures>(`/api/tracks/${id}/features`);
+}
+
+export async function updateTrackRating(trackId: number, rating: number): Promise<Track> {
+	return fetchJson<Track>(`/api/tracks/${trackId}/rating`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ rating }),
+	});
+}
+
+export function getTrackArtworkUrl(id: number): string {
+	return `${API_BASE}/api/tracks/${id}/artwork`;
+}
+
+export async function getTrackSets(id: number): Promise<TrackSetAppearance[]> {
+	return fetchJson<TrackSetAppearance[]>(`/api/tracks/${id}/sets`);
 }
 
 export async function suggestNext(

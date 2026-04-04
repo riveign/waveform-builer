@@ -38,6 +38,12 @@
 			energy_value: swt.energy_value,
 			energy_label: swt.energy_label,
 			energy_conflict: swt.energy_conflict,
+			label: null,
+			date_added: null,
+			release_year: null,
+			comment: null,
+			playlist_tags: [],
+			genre_family: null,
 		};
 	}
 
