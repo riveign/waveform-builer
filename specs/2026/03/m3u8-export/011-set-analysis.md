@@ -1825,10 +1825,29 @@ git commit -m "spec(011): IMPLEMENT - set-analysis"
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+### TODO
+
+- [x] Task 1 — teaching.py: Teaching moments engine — Status: Done
+- [x] Task 2 — set_analyzer.py: Core set analyzer — Status: Done
+- [x] Task 3 — schemas.py: SetAnalysis response models — Status: Done
+- [x] Task 4 — sets.py: Analyze + analysis endpoints — Status: Done
+- [x] Task 5 — cli.py: `kiku analyze-set` command — Status: Done (renamed to avoid conflict with existing `analyze` command)
+- [x] Task 6 — frontend types: SetAnalysis interfaces — Status: Done
+- [x] Task 7 — frontend API: analyzeSet + getSetAnalysis — Status: Done
+- [x] Task 8 — SetAnalysisView.svelte: Analysis display — Status: Done
+- [x] Task 9 — SetView.svelte: Integrate analysis — Status: Done
+- [x] Task 10 — Unit tests — Status: Done (24 unit tests)
+- [x] Task 11 — API integration tests — Status: Done (4 API tests)
+- [x] Task 12 — Lint — Status: Done (0 svelte-check errors, ruff not installed)
+- [x] Task 13 — Commit — Status: Done
 
 ## Test Evidence & Outputs
-<!-- Filled by explicit testing after /spec IMPLEMENT -->
+
+- **Unit tests**: `tests/test_set_analysis.py` — 24 tests covering teaching moments (strong/good/weak tiers, BPM/genre feedback), set patterns (building/steady energy, strongest dimension), arc classification (energy shape, key style, BPM style), genre segment detection
+- **API tests**: `tests/api/test_analysis_api.py` — 4 tests: analyze set, get cached analysis, 404 before analysis, 404 for nonexistent set
+- **Full suite**: 174 tests passing (was 123 before spec 010, +28 from this spec + others)
+- **Svelte check**: 0 errors, 1 pre-existing warning (a11y in ReplaceTrackModal)
 
 ## Updated Doc
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->

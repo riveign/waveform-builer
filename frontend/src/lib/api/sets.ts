@@ -3,6 +3,7 @@ import type {
 	DJSet,
 	ImportResult,
 	ReplacementSuggestionsResponse,
+	SetAnalysis,
 	SetBuildComplete,
 	SetBuildParams,
 	SetCreateParams,
@@ -227,6 +228,24 @@ export async function importPlaylist(
 	if (!res.ok) {
 		const err = await res.json().catch(() => ({ detail: 'Import failed' }));
 		throw new Error(err.detail || 'Import failed');
+	}
+	return res.json();
+}
+
+export async function analyzeSet(setId: number): Promise<SetAnalysis> {
+	const res = await fetch(`${API_BASE}/api/sets/${setId}/analyze`, { method: 'POST' });
+	if (!res.ok) {
+		const err = await res.json().catch(() => ({ detail: 'Analysis failed' }));
+		throw new Error(err.detail || 'Analysis failed');
+	}
+	return res.json();
+}
+
+export async function getSetAnalysis(setId: number): Promise<SetAnalysis> {
+	const res = await fetch(`${API_BASE}/api/sets/${setId}/analysis`);
+	if (!res.ok) {
+		const err = await res.json().catch(() => ({ detail: 'Not analyzed yet' }));
+		throw new Error(err.detail || 'Not analyzed yet');
 	}
 	return res.json();
 }
