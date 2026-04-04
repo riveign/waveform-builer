@@ -77,6 +77,7 @@ export async function deleteSet(id: number): Promise<void> {
 /**
  * Build a set via SSE. Calls onEvent for each SSE event.
  * Returns a promise that resolves with the completed set info, or rejects on error.
+ * The stream may include an 'analyzed' event after 'complete' with pre-computed analysis.
  */
 export function buildSet(
 	params: SetBuildParams,
@@ -98,6 +99,7 @@ export function buildSet(
 				const decoder = new TextDecoder();
 				let buffer = '';
 				let settled = false;
+				let completeData: SetBuildComplete | null = null;
 
 				function processChunk(chunk: string) {
 					buffer += chunk;
@@ -113,8 +115,9 @@ export function buildSet(
 							onEvent?.(currentEvent, data);
 
 							if (currentEvent === 'complete') {
-								settled = true;
-								resolve(data as SetBuildComplete);
+								completeData = data as SetBuildComplete;
+							} else if (currentEvent === 'analyzed') {
+								// Analysis arrived after complete — forward via callback
 							} else if (currentEvent === 'error') {
 								settled = true;
 								reject(new Error((data as { detail: string }).detail));
@@ -128,7 +131,10 @@ export function buildSet(
 						.read()
 						.then(({ done, value }) => {
 							if (done) {
-								if (!settled) {
+								if (!settled && completeData) {
+									settled = true;
+									resolve(completeData);
+								} else if (!settled) {
 									reject(new Error('SSE stream closed before build completed'));
 								}
 								return;

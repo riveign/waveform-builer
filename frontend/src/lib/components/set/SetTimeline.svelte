@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { dndzone } from 'svelte-dnd-action';
-	import type { SetTrack, SetWaveformTrack } from '$lib/types';
+	import type { SetTrack, SetWaveformTrack, SetAnalysis } from '$lib/types';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { reorderSetTracks, removeTrackFromSet, addTrackToSet } from '$lib/api/sets';
 	import SetTrackCard from './SetTrackCard.svelte';
@@ -12,6 +12,7 @@
 		setId,
 		energyProfile,
 		activeTransitionIndex = -1,
+		analysis = null,
 		onTransitionClick,
 		onTracksChanged,
 		onTrackPlay,
@@ -20,6 +21,7 @@
 		setId: number;
 		energyProfile?: string | null;
 		activeTransitionIndex?: number;
+		analysis?: SetAnalysis | null;
 		onTransitionClick?: (index: number) => void;
 		onTracksChanged?: () => void;
 		onTrackPlay?: (trackId: number) => void;
@@ -71,6 +73,16 @@
 	}
 
 	let energyTargets = $derived(computeEnergyTargets(energyProfile, items.length));
+
+	/** Map transition position → analysis data (from set analysis) */
+	let analysisMap = $derived.by(() => {
+		if (!analysis) return new Map<number, { score: number; teaching: string }>();
+		const map = new Map<number, { score: number; teaching: string }>();
+		for (const t of analysis.transitions) {
+			map.set(t.position, { score: t.scores.total, teaching: t.teaching_moment });
+		}
+		return map;
+	});
 
 	// DnD event handlers
 	function handleConsider(e: CustomEvent<{ items: (SetWaveformTrack & { id: number })[] }>) {
@@ -272,6 +284,8 @@
 									fromTrackId={item.track_id}
 									toTrackId={items[i + 1].track_id}
 									score={items[i + 1].transition_score ?? undefined}
+									analysisScore={analysisMap.get(i)?.score}
+									teachingMoment={analysisMap.get(i)?.teaching}
 									{setId}
 									transitionIndex={i}
 								active={activeTransitionIndex === i}

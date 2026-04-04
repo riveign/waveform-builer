@@ -1,6 +1,6 @@
 <script lang="ts">
 	type BuildEvent = {
-		type: 'started' | 'track_added' | 'complete' | 'error';
+		type: 'started' | 'track_added' | 'complete' | 'analyzed' | 'error';
 		data: any;
 	};
 

@@ -1,4 +1,4 @@
-import type { Track } from '$lib/types';
+import type { Track, SetAnalysis } from '$lib/types';
 
 export type Tab = 'track' | 'set' | 'dna' | 'tinder' | 'hunt';
 export type TimelineViewMode = 'linear' | 'staircase';
@@ -9,6 +9,7 @@ let selectedSetId = $state<number | null>(null);
 let selectedTrackInSet = $state<number | null>(null);
 let timelineViewMode = $state<TimelineViewMode>('linear');
 let playingTrackId = $state<number | null>(null);
+let pendingAnalysis = $state<SetAnalysis | null>(null);
 
 export function getUiStore() {
 	return {
@@ -24,5 +25,7 @@ export function getUiStore() {
 		set timelineViewMode(v: TimelineViewMode) { timelineViewMode = v; },
 		get playingTrackId() { return playingTrackId; },
 		set playingTrackId(v: number | null) { playingTrackId = v; },
+		get pendingAnalysis() { return pendingAnalysis; },
+		set pendingAnalysis(v: SetAnalysis | null) { pendingAnalysis = v; },
 	};
 }

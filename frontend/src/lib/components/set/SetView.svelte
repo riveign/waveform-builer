@@ -7,7 +7,6 @@
 	import TransitionDetail from './TransitionDetail.svelte';
 	import EnergyFlowChart from './EnergyFlowChart.svelte';
 	import SetEnergyReview from './SetEnergyReview.svelte';
-	import SetAnalysisView from './SetAnalysisView.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
@@ -180,11 +179,23 @@
 			]);
 			setDetail = detail;
 			waveformTracks = waveforms;
-			// Try loading cached analysis
-			try {
-				analysis = await getSetAnalysis(setId);
-			} catch {
-				analysis = null;
+
+			// Use pre-computed analysis from build if available
+			if (ui.pendingAnalysis && ui.pendingAnalysis.set_id === setId) {
+				analysis = ui.pendingAnalysis;
+				ui.pendingAnalysis = null;
+			} else {
+				// Try loading cached analysis
+				try {
+					analysis = await getSetAnalysis(setId);
+				} catch {
+					analysis = null;
+				}
+			}
+
+			// Auto-analyze if no analysis exists and set has enough tracks
+			if (!analysis && waveforms.length >= 2) {
+				handleAnalyze();
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -238,6 +249,17 @@
 					Review energy ({tracksNeedingReview.length})
 				</button>
 			{/if}
+			{#if waveformTracks.length >= 2 && analysis}
+				<button
+					class="analyze-btn"
+					onclick={handleAnalyze}
+					disabled={analyzingSet}
+				>
+					{analyzingSet ? 'Analyzing...' : 'Re-analyze'}
+				</button>
+			{:else if waveformTracks.length >= 2 && analyzingSet}
+				<span class="analyzing-status">Analyzing...</span>
+			{/if}
 			{#if waveformTracks.length >= 2}
 				<button
 					class="play-set-btn"
@@ -290,43 +312,57 @@
 						/>
 					</div>
 				</div>
-				<div class="timeline-scroll">
-					<SetTimeline
-						tracks={waveformTracks}
-						setId={selectedSet.id}
-						energyProfile={setDetail?.energy_profile}
-						{activeTransitionIndex}
-						onTransitionClick={handleTransitionClick}
-						onTracksChanged={handleTracksChanged}
-						onTrackPlay={handleTrackPlay}
-					/>
-				</div>
-			</div>
 
-			{#if loadingTransition}
-				<div class="status">Analyzing the transition...</div>
-			{:else if transition}
-				<TransitionDetail
-					{transition}
-					setId={selectedSet.id}
-					hasPrev={activeTransitionIndex > 0}
-					hasNext={activeTransitionIndex < waveformTracks.length - 2}
-					onPrev={() => handleTransitionClick(activeTransitionIndex - 1)}
-					onNext={() => handleTransitionClick(activeTransitionIndex + 1)}
-				/>
-			{/if}
-
-			<div class="analysis-section">
-				<button
-					class="analyze-btn"
-					onclick={handleAnalyze}
-					disabled={analyzingSet}
-				>
-					{analyzingSet ? 'Analyzing...' : analysis ? 'Re-analyze' : 'Analyze Set'}
-				</button>
 				{#if analysis}
-					<SetAnalysisView {analysis} />
+					<div class="analysis-bar">
+						<span class="analysis-score" style="color: {analysis.overall_score >= 0.7 ? 'var(--color-success, #66BB6A)' : analysis.overall_score >= 0.5 ? 'var(--color-warning, #FFA726)' : 'var(--color-error, #EF5350)'}">
+							{analysis.overall_score.toFixed(3)}
+						</span>
+						<span class="analysis-arc">
+							{analysis.arc.energy_shape}
+						</span>
+						<span class="analysis-arc">
+							{analysis.arc.key_style}
+						</span>
+						<span class="analysis-arc">
+							{analysis.arc.bpm_style}
+							{#if analysis.arc.bpm_range[0] > 0}
+								({analysis.arc.bpm_range[0].toFixed(0)}–{analysis.arc.bpm_range[1].toFixed(0)})
+							{/if}
+						</span>
+						{#each analysis.set_patterns as pattern}
+							<span class="analysis-pattern">{pattern}</span>
+						{/each}
+					</div>
 				{/if}
+
+				<div class="timeline-scroll">
+					{#if loadingTransition}
+						<div class="status">Analyzing the transition...</div>
+					{:else if transition}
+						<TransitionDetail
+							{transition}
+							setId={selectedSet.id}
+							analysisTransition={analysis?.transitions.find(t => t.position === activeTransitionIndex) ?? null}
+							hasPrev={activeTransitionIndex > 0}
+							hasNext={activeTransitionIndex < waveformTracks.length - 2}
+							onPrev={() => handleTransitionClick(activeTransitionIndex - 1)}
+							onNext={() => handleTransitionClick(activeTransitionIndex + 1)}
+							onBack={() => { activeTransitionIndex = -1; transition = null; }}
+						/>
+					{:else}
+						<SetTimeline
+							tracks={waveformTracks}
+							setId={selectedSet.id}
+							energyProfile={setDetail?.energy_profile}
+							{activeTransitionIndex}
+							{analysis}
+							onTransitionClick={handleTransitionClick}
+							onTracksChanged={handleTracksChanged}
+							onTrackPlay={handleTrackPlay}
+						/>
+					{/if}
+				</div>
 			</div>
 
 		{:else}
@@ -533,27 +569,61 @@
 		font-size: 14px;
 	}
 
-	.analysis-section {
-		margin-top: 16px;
+	.analyzing-status {
+		font-size: 12px;
+		color: var(--text-dim);
 	}
 
 	.analyze-btn {
-		padding: 8px 16px;
-		background: var(--accent);
-		color: var(--bg-primary);
-		border: none;
-		border-radius: 6px;
-		cursor: pointer;
-		font-size: 13px;
-		font-weight: 500;
+		padding: 4px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		transition: all 0.15s;
 	}
 
 	.analyze-btn:hover:not(:disabled) {
-		opacity: 0.9;
+		background: var(--accent);
+		color: #000;
+		border-color: var(--accent);
 	}
 
 	.analyze-btn:disabled {
 		opacity: 0.5;
-		cursor: not-allowed;
+		cursor: default;
+	}
+
+	.analysis-bar {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 6px 16px;
+		background: var(--bg-secondary);
+		border-bottom: 1px solid var(--border);
+		flex-shrink: 0;
+		flex-wrap: wrap;
+	}
+
+	.analysis-score {
+		font-size: 16px;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.analysis-arc {
+		font-size: 11px;
+		color: var(--text-secondary);
+		padding: 2px 8px;
+		background: var(--bg-tertiary);
+		border-radius: 10px;
+	}
+
+	.analysis-pattern {
+		font-size: 11px;
+		color: var(--text-dim);
+		font-style: italic;
 	}
 </style>

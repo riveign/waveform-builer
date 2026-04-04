@@ -6,18 +6,22 @@
 		fromTrackId: number;
 		toTrackId: number;
 		score?: number;
+		analysisScore?: number;
+		teachingMoment?: string;
 		setId: number;
 		transitionIndex: number;
 		active?: boolean;
 		onclick?: (index: number) => void;
 	}
 
-	let { fromTrackId, toTrackId, score, setId, transitionIndex, active = false, onclick }: Props = $props();
+	let { fromTrackId, toTrackId, score, analysisScore, teachingMoment, setId, transitionIndex, active = false, onclick }: Props = $props();
 
 	let loading = $state(false);
 	let breakdown = $state<TransitionScoreBreakdown | null>(null);
 	let error = $state<string | null>(null);
-	let displayScore = $derived(breakdown?.total ?? score ?? null);
+	let builderScore = $derived(breakdown?.total ?? score ?? null);
+	let displayScore = $derived(analysisScore ?? builderScore);
+	let hasDualScores = $derived(analysisScore != null && builderScore != null);
 
 	function scoreColor(s: number): string {
 		if (s >= 0.8) return '#66BB6A';
@@ -83,8 +87,21 @@
 			{#if loading && displayScore == null}
 				...
 			{:else if displayScore != null}
-				{displayScore.toFixed(2)}
+				{#if hasDualScores}
+					<span class="builder-score" style="color: {scoreColor(builderScore!)}">
+						<span class="score-label">build</span>{builderScore!.toFixed(2)}
+					</span>
+					<span class="score-separator">/</span>
+					<span class="analysis-score" style="color: {scoreColor(analysisScore!)}">
+						{analysisScore!.toFixed(2)}<span class="score-label">ctx</span>
+					</span>
+				{:else}
+					<span>{displayScore.toFixed(2)}</span>
+				{/if}
 				<span class="score-quality">{scoreLabel(displayScore)}</span>
+				{#if teachingMoment}
+					<span class="teaching-moment">{teachingMoment}</span>
+				{/if}
 			{:else if error}
 				--
 			{/if}
@@ -142,11 +159,47 @@
 		gap: 6px;
 	}
 
+	.builder-score,
+	.analysis-score {
+		display: flex;
+		align-items: center;
+		gap: 3px;
+		font-size: 11px;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.score-label {
+		font-size: 8px;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+		opacity: 0.6;
+	}
+
+	.score-separator {
+		font-size: 9px;
+		color: var(--text-dim);
+		opacity: 0.3;
+		margin: 0 1px;
+	}
+
 	.score-quality {
 		font-size: 10px;
 		font-weight: 400;
 		color: var(--text-secondary);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
+	}
+
+	.teaching-moment {
+		font-size: 10px;
+		font-weight: 400;
+		color: var(--text-dim);
+		margin-left: 4px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		max-width: 300px;
 	}
 </style>

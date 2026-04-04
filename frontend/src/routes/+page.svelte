@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Track, SetBuildParams, SetBuildComplete } from '$lib/types';
+	import type { Track, SetBuildParams, SetBuildComplete, SetAnalysis } from '$lib/types';
 	import LibraryBrowser from '$lib/components/library/LibraryBrowser.svelte';
 	import Workspace from '$lib/components/Workspace.svelte';
 	import BuildSetDialog from '$lib/components/set/BuildSetDialog.svelte';
@@ -10,7 +10,7 @@
 	const ui = getUiStore();
 
 	type BuildEvent = {
-		type: 'started' | 'track_added' | 'complete' | 'error';
+		type: 'started' | 'track_added' | 'complete' | 'analyzed' | 'error';
 		data: any;
 	};
 
@@ -22,6 +22,7 @@
 	let buildEvents = $state<BuildEvent[]>([]);
 	let buildError = $state('');
 	let lastBuildResult = $state<SetBuildComplete | null>(null);
+	let lastBuildAnalysis = $state<SetAnalysis | null>(null);
 
 	function handleTrackSelect(track: Track) {
 		ui.selectedTrack = track;
@@ -37,6 +38,7 @@
 		buildEvents = [];
 		buildError = '';
 		lastBuildResult = null;
+		lastBuildAnalysis = null;
 
 		let errorDuringStream = false;
 
@@ -53,6 +55,8 @@
 					buildEvents = [...buildEvents, event];
 				} else if (eventType === 'complete') {
 					buildEvents = [...buildEvents, event];
+				} else if (eventType === 'analyzed') {
+					lastBuildAnalysis = data as SetAnalysis;
 				} else if (eventType === 'error') {
 					errorDuringStream = true;
 					buildState = 'error';
@@ -87,6 +91,9 @@
 		lastBuildResult = null;
 
 		if (completedSetId !== null) {
+			// Pass pre-computed analysis to SetView via ui store
+			ui.pendingAnalysis = lastBuildAnalysis;
+			lastBuildAnalysis = null;
 			// Switch to set tab and select the newly built set
 			ui.selectedSetId = completedSetId;
 			ui.activeTab = 'set';

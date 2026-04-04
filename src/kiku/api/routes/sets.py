@@ -288,6 +288,19 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                 "duration_min": result.duration_min,
             }))
 
+            # Auto-analyze the freshly built set
+            try:
+                from dataclasses import asdict
+
+                from kiku.analysis.set_analyzer import analyze_set as _analyze_set
+
+                analysis_result = _analyze_set(db, result.id)
+                analysis_data = asdict(analysis_result)
+                analysis_data["arc"]["bpm_range"] = list(analysis_data["arc"]["bpm_range"])
+                yield _sse_event("analyzed", json.dumps(analysis_data))
+            except Exception as analyze_exc:
+                logger.warning("Auto-analysis after build failed: %s", analyze_exc)
+
         except Exception as exc:
             logger.exception("Set build failed")
             yield _sse_event("error", json.dumps({"detail": str(exc)}))
