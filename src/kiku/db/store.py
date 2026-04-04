@@ -651,3 +651,72 @@ def update_hunt_track_status(
         ht.acquisition_status = status
         session.flush()
     return ht
+
+
+# ── OAuth token CRUD ─────────────────────────────────────────────────
+
+
+def save_oauth_token(
+    session: Session, provider: str, access_token: str,
+    refresh_token: str | None = None, expires_at: str | None = None,
+    user_id: str | None = None, username: str | None = None,
+    avatar_url: str | None = None,
+) -> "OAuthToken":
+    """Create or update an OAuth token for a provider."""
+    from kiku.db.models import OAuthToken
+
+    token = session.query(OAuthToken).filter_by(provider=provider).first()
+    if token:
+        token.access_token = access_token
+        token.refresh_token = refresh_token
+        token.expires_at = expires_at
+        token.user_id = user_id
+        token.username = username
+        token.avatar_url = avatar_url
+    else:
+        token = OAuthToken(
+            provider=provider, access_token=access_token,
+            refresh_token=refresh_token, expires_at=expires_at,
+            user_id=user_id, username=username, avatar_url=avatar_url,
+        )
+        session.add(token)
+    session.flush()
+    return token
+
+
+def get_oauth_token(session: Session, provider: str) -> "OAuthToken | None":
+    """Get stored OAuth token for a provider."""
+    from kiku.db.models import OAuthToken
+
+    return session.query(OAuthToken).filter_by(provider=provider).first()
+
+
+def delete_oauth_token(session: Session, provider: str) -> bool:
+    """Remove stored OAuth token. Returns True if deleted."""
+    from kiku.db.models import OAuthToken
+
+    token = session.query(OAuthToken).filter_by(provider=provider).first()
+    if token:
+        session.delete(token)
+        session.flush()
+        return True
+    return False
+
+
+def update_oauth_token(
+    session: Session, provider: str,
+    access_token: str, refresh_token: str | None = None,
+    expires_at: str | None = None,
+) -> "OAuthToken | None":
+    """Update just the token fields (used after refresh)."""
+    from kiku.db.models import OAuthToken
+
+    token = session.query(OAuthToken).filter_by(provider=provider).first()
+    if token:
+        token.access_token = access_token
+        if refresh_token:
+            token.refresh_token = refresh_token
+        if expires_at:
+            token.expires_at = expires_at
+        session.flush()
+    return token

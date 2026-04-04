@@ -46,6 +46,7 @@ def _hunt_track_to_response(ht) -> HuntTrackResponse:
         acquisition_status=ht.acquisition_status or "unowned",
         purchase_links=links,
         raw_text=ht.raw_text,
+        external_url=ht.external_url,
     )
 
 

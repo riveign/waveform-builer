@@ -448,6 +448,7 @@ export interface HuntTrack {
 	acquisition_status: string;
 	purchase_links: Record<string, string>;
 	raw_text: string | null;
+	external_url: string | null;
 }
 
 export interface HuntSession {
@@ -542,4 +543,38 @@ export interface ImportResult {
 	match_methods: Record<string, number>;
 	warnings: string[];
 	duplicate_set_id: number | null;
+}
+
+// ── SoundCloud types ──
+
+export interface SCStatus {
+	connected: boolean;
+	username: string | null;
+	avatar_url: string | null;
+	user_id: string | null;
+}
+
+export interface SCPlaylist {
+	id: number;
+	title: string;
+	track_count: number;
+	permalink_url: string;
+	artwork_url: string | null;
+	duration_ms: number;
+}
+
+export interface SCTrack {
+	id: number;
+	title: string;
+	artist: string | null;
+	permalink_url: string;
+	artwork_url: string | null;
+	duration_ms: number;
+	genre: string | null;
+	bpm: number | null;
+}
+
+export interface SCLikesResponse {
+	tracks: SCTrack[];
+	next_cursor: string | null;
 }

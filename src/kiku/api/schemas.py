@@ -432,6 +432,7 @@ class HuntTrackResponse(BaseModel):
     acquisition_status: str = "unowned"
     purchase_links: dict[str, str] = {}
     raw_text: str | None = None
+    external_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -576,3 +577,48 @@ class SetAnalysisResponse(BaseModel):
     overall_score: float
     set_patterns: list[str]
     analyzed_at: str
+
+
+# ── SoundCloud models ──
+
+
+class SCStatusResponse(BaseModel):
+    connected: bool
+    username: str | None = None
+    avatar_url: str | None = None
+    user_id: str | None = None
+
+
+class SCConnectResponse(BaseModel):
+    auth_url: str
+
+
+class SCPlaylistResponse(BaseModel):
+    id: int
+    title: str
+    track_count: int
+    permalink_url: str
+    artwork_url: str | None = None
+    duration_ms: int = 0
+
+
+class SCTrackResponse(BaseModel):
+    id: int
+    title: str
+    artist: str | None = None
+    permalink_url: str
+    artwork_url: str | None = None
+    duration_ms: int = 0
+    genre: str | None = None
+    bpm: float | None = None
+
+
+class SCLikesResponse(BaseModel):
+    tracks: list[SCTrackResponse]
+    next_cursor: str | None = None
+
+
+class SCChaseRequest(BaseModel):
+    playlist_id: int | None = None
+    track_ids: list[int] | None = None
+    source: str = "soundcloud_playlist"  # or "soundcloud_likes"

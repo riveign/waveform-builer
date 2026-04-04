@@ -77,6 +77,11 @@
 					</td>
 					<td class="col-links">
 						{#if track.acquisition_status !== 'owned'}
+							{#if track.external_url}
+								<a href={track.external_url} target="_blank" rel="noopener" class="store-link sc-link">
+									SC
+								</a>
+							{/if}
 							{#each Object.entries(track.purchase_links) as [store, url]}
 								<a href={url} target="_blank" rel="noopener" class="store-link">
 									{store}
@@ -199,5 +204,10 @@
 
 	.store-link:hover {
 		background: var(--bg-hover);
+	}
+
+	.sc-link {
+		color: #ff5500;
+		border-color: rgba(255, 85, 0, 0.3);
 	}
 </style>

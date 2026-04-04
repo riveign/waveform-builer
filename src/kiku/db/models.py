@@ -201,15 +201,29 @@ class HuntTrack(Base):
     original_artist = Column(String)  # Original artist if this is a remix
     original_title = Column(String)  # Original title if this is a remix
     confidence = Column(Float, default=0.0)  # 0-1 extraction confidence
-    source = Column(String)  # "description", "comment", "chapter", "1001tracklists", "copyright"
+    source = Column(String)  # "description", "comment", "chapter", "1001tracklists", "copyright", "soundcloud_playlist", "soundcloud_likes"
     timestamp_sec = Column(Float)  # Position in the mix where this track appears
     matched_track_id = Column(Integer, ForeignKey("tracks.id"))  # Link to owned track
     match_score = Column(Float)  # Fuzzy match score 0-1
     acquisition_status = Column(String, default="unowned")  # "owned", "unowned", "wanted"
     purchase_links = Column(Text)  # JSON dict of {store: url}
+    external_url = Column(String)  # Permalink to track on external platform (e.g. SoundCloud)
+    external_id = Column(String)  # External platform track ID for dedup
 
     session = relationship("HuntSession", back_populates="tracks")
     matched_track = relationship("Track")
+
+
+class OAuthToken(Base):
+    __tablename__ = "oauth_tokens"
+
+    provider = Column(String, primary_key=True)  # e.g. "soundcloud"
+    access_token = Column(String, nullable=False)
+    refresh_token = Column(String)
+    expires_at = Column(String)  # ISO datetime
+    user_id = Column(String)  # Provider user ID
+    username = Column(String)
+    avatar_url = Column(String)
 
 
 def _set_wal_mode(dbapi_conn, connection_record):
