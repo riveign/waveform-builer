@@ -30,6 +30,8 @@ class TrackResponse(BaseModel):
     resolved_energy: str | None = None
     energy_source: str | None = None
     energy_confidence: float | None = None
+    energy_value: float | None = None
+    energy_label: str | None = None
     energy_conflict: EnergyConflictResponse | None = None
 
     model_config = {"from_attributes": True}
@@ -101,7 +103,11 @@ class SetTrackResponse(BaseModel):
     duration_sec: float | None = None
     transition_score: float | None = None
     has_waveform: bool = False
+    resolved_energy: str | None = None
     energy_source: str | None = None
+    energy_confidence: float | None = None
+    energy_value: float | None = None
+    energy_label: str | None = None
     energy_conflict: EnergyConflictResponse | None = None
 
 
@@ -155,7 +161,11 @@ class SetWaveformTrackResponse(BaseModel):
     duration_sec: float | None = None
     transition_score: float | None = None
     waveform_overview: str | None = None  # base64 float32
+    resolved_energy: str | None = None
     energy_source: str | None = None
+    energy_confidence: float | None = None
+    energy_value: float | None = None
+    energy_label: str | None = None
     energy_conflict: EnergyConflictResponse | None = None
 
 
@@ -499,3 +509,37 @@ class ImportResultResponse(BaseModel):
     match_methods: dict[str, int] = {}
     warnings: list[str] = []
     duplicate_set_id: int | None = None
+
+
+# ── Set Analysis models ──
+
+
+class TransitionAnalysisResponse(BaseModel):
+    position: int
+    track_a_id: int
+    track_b_id: int
+    scores: dict
+    teaching_moment: str
+    suggestion: str | None = None
+
+
+class ArcAnalysisResponse(BaseModel):
+    energy_curve: list[float]
+    energy_shape: str
+    key_journey: list[str | None]
+    key_style: str
+    bpm_range: list[float]  # JSON-friendly (not tuple)
+    bpm_drift: float
+    bpm_style: str
+    genre_segments: list[dict]
+
+
+class SetAnalysisResponse(BaseModel):
+    set_id: int
+    track_count: int
+    transition_count: int
+    transitions: list[TransitionAnalysisResponse]
+    arc: ArcAnalysisResponse
+    overall_score: float
+    set_patterns: list[str]
+    analyzed_at: str

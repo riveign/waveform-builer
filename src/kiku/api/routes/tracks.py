@@ -21,8 +21,10 @@ router = APIRouter(prefix="/api/tracks", tags=["tracks"])
 
 
 def _track_to_response(t: Track) -> TrackResponse:
+    from kiku.energy import get_track_energy
+
     af = t.audio_features
-    resolved_zone, source, confidence = t.resolved_energy_zone
+    te = get_track_energy(t)
     conflict = t.energy_conflict
     conflict_resp = None
     if conflict:
@@ -44,9 +46,11 @@ def _track_to_response(t: Track) -> TrackResponse:
         kiku_play_count=t.kiku_play_count,
         has_waveform=af is not None and af.waveform_detail is not None,
         has_features=af is not None and af.energy is not None,
-        resolved_energy=resolved_zone,
-        energy_source=source,
-        energy_confidence=confidence,
+        resolved_energy=te.zone,
+        energy_source=te.source,
+        energy_confidence=te.confidence,
+        energy_value=te.numeric,
+        energy_label=te.label,
         energy_conflict=conflict_resp,
     )
 

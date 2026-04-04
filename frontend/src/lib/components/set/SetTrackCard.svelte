@@ -2,6 +2,7 @@
 	import type { SetTrack, EnergyConflict } from '$lib/types';
 	import { getCamelotColor } from '$lib/utils/camelot';
 	import { getUiStore } from '$lib/stores/ui.svelte';
+	import { getTrackEnergyNumeric, energyColor as getEnergyColor } from '$lib/utils/energy';
 	import EnergyConflictBadge from './EnergyConflictBadge.svelte';
 
 	let {
@@ -24,50 +25,19 @@
 
 	const ui = getUiStore();
 
-	/** Parse energy string to numeric 1-9 scale, or null if unknown */
-	function parseEnergy(energy: string | null): number | null {
-		if (!energy) return null;
-		const n = parseInt(energy, 10);
-		return isNaN(n) ? null : n;
-	}
-
-	/** Normalized energy on 0-1 scale (assumes 1-9 input range) */
-	function normalizedEnergy(energy: string | null): number | null {
-		const n = parseEnergy(energy);
-		if (n === null) return null;
-		return (n - 1) / 8;
-	}
-
-	/** Energy deviation from target: positive = above, negative = below, null = unknown */
-	function energyDeviation(energy: string | null, target: number | undefined): number | null {
-		if (target === undefined) return null;
-		const norm = normalizedEnergy(energy);
-		if (norm === null) return null;
-		return norm - target;
-	}
-
-	/** Color for the energy bar fill based on normalized energy */
-	function energyBarColor(energy: string | null): string {
-		const norm = normalizedEnergy(energy);
-		if (norm === null) return 'var(--text-dim)';
-		if (norm < 0.35) return 'var(--energy-low)';
-		if (norm < 0.7) return 'var(--energy-mid)';
-		return 'var(--energy-high)';
-	}
-
 	/** Indicator for energy vs target: match, above, below, or none */
-	function energyFitIndicator(energy: string | null, target: number | undefined): { label: string; color: string } | null {
-		const dev = energyDeviation(energy, target);
-		if (dev === null) return null;
+	function energyFitIndicator(norm: number | null, target: number | undefined): { label: string; color: string } | null {
+		if (norm === null || target === undefined) return null;
+		const dev = norm - target;
 		const absDev = Math.abs(dev);
 		if (absDev <= 0.12) return { label: '', color: 'var(--energy-low)' };
 		if (dev > 0) return { label: '', color: 'var(--energy-high)' };
 		return { label: '', color: 'var(--accent)' };
 	}
 
-	let energyNorm = $derived(normalizedEnergy(track.energy));
-	let energyFit = $derived(energyFitIndicator(track.energy, energyTarget));
-	let energyColor = $derived(energyBarColor(track.energy));
+	let energyNorm = $derived(getTrackEnergyNumeric(track.energy_value, track.energy));
+	let energyFit = $derived(energyFitIndicator(energyNorm, energyTarget));
+	let energyColorVal = $derived(getEnergyColor(energyNorm));
 
 	function handleClick() {
 		ui.selectedTrackInSet = track.track_id;
@@ -133,7 +103,7 @@
 		<div class="energy-bar-bg">
 			<div
 				class="energy-bar-fill"
-				style="width: {energyNorm !== null ? energyNorm * 100 : 0}%; background: {energyColor}"
+				style="width: {energyNorm !== null ? energyNorm * 100 : 0}%; background: {energyColorVal}"
 			></div>
 			{#if energyTarget !== undefined}
 				<div

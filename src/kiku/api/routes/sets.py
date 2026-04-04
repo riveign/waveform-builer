@@ -16,6 +16,7 @@ from kiku.api.schemas import (
     CueCreateRequest,
     CueResponse,
     ImportResultResponse,
+    SetAnalysisResponse,
     ReplaceTrackRequest,
     ReplacementCandidate,
     ReplacementBreakdown,
@@ -52,6 +53,8 @@ router = APIRouter(prefix="/api/sets", tags=["sets"])
 
 
 def _set_track_response(st) -> SetTrackResponse:
+    from kiku.energy import get_track_energy
+
     t = st.track
     af = t.audio_features if t else None
     conflict = t.energy_conflict if t else None
@@ -59,6 +62,8 @@ def _set_track_response(st) -> SetTrackResponse:
     if conflict:
         from kiku.api.schemas import EnergyConflictResponse
         conflict_resp = EnergyConflictResponse(**conflict)
+
+    te = get_track_energy(t) if t else None
     return SetTrackResponse(
         position=st.position,
         track_id=st.track_id,
@@ -71,7 +76,11 @@ def _set_track_response(st) -> SetTrackResponse:
         duration_sec=t.duration_sec if t else None,
         transition_score=st.transition_score,
         has_waveform=af is not None and af.waveform_detail is not None,
-        energy_source=t.energy_source if t else None,
+        resolved_energy=te.zone if te else None,
+        energy_source=te.source if te else None,
+        energy_confidence=te.confidence if te else None,
+        energy_value=te.numeric if te else None,
+        energy_label=te.label if te else None,
         energy_conflict=conflict_resp,
     )
 
@@ -162,6 +171,39 @@ async def import_m3u8_playlist(
     )
 
 
+@router.post("/{set_id}/analyze", response_model=SetAnalysisResponse)
+def analyze_set_endpoint(set_id: int, db: Session = Depends(get_db)):
+    """Trigger full analysis on a set: score transitions, compute arc, generate teaching moments."""
+    from dataclasses import asdict
+
+    from kiku.analysis.set_analyzer import analyze_set
+
+    try:
+        result = analyze_set(db, set_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    data = asdict(result)
+    # Convert tuple to list for JSON
+    data["arc"]["bpm_range"] = list(data["arc"]["bpm_range"])
+    return data
+
+
+@router.get("/{set_id}/analysis", response_model=SetAnalysisResponse)
+def get_set_analysis(set_id: int, db: Session = Depends(get_db)):
+    """Get cached analysis for a set. Returns 404 if not yet analyzed."""
+    s = db.get(Set, set_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+    if not s.is_analyzed or not s.analysis_cache:
+        raise HTTPException(
+            status_code=404,
+            detail="Set has not been analyzed yet. Use POST /analyze first.",
+        )
+
+    return json.loads(s.analysis_cache)
+
+
 @router.post("/build")
 def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
     """Build a DJ set using beam search. Returns SSE stream with progress and result."""
@@ -215,10 +257,13 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
 
             # Emit per-track progress events so the frontend can
             # render tracks incrementally as they "appear".
+            from kiku.energy import get_track_energy
+
             ordered_tracks = sorted(result.tracks, key=lambda st: st.position)
             total_tracks = len(ordered_tracks)
             for st in ordered_tracks:
                 t = st.track
+                te = get_track_energy(t) if t else None
                 yield _sse_event("track_added", json.dumps({
                     "track_id": st.track_id,
                     "title": t.title if t else None,
@@ -227,6 +272,9 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                     "bpm": t.bpm if t else None,
                     "key": t.key if t else None,
                     "energy": t.dir_energy if t else None,
+                    "resolved_energy": te.zone if te else None,
+                    "energy_value": te.numeric if te else None,
+                    "energy_source": te.source if te else None,
                     "score": round(st.transition_score, 3) if st.transition_score else None,
                     "total_tracks_so_far": st.position,
                     "total_tracks": total_tracks,
@@ -389,6 +437,8 @@ def set_waveforms(set_id: int, db: Session = Depends(get_db)):
     if not s:
         raise HTTPException(status_code=404, detail="Set not found")
 
+    from kiku.energy import get_track_energy
+
     result = []
     for st in sorted(s.tracks, key=lambda st: st.position):
         t = st.track
@@ -401,6 +451,7 @@ def set_waveforms(set_id: int, db: Session = Depends(get_db)):
         if conflict:
             from kiku.api.schemas import EnergyConflictResponse
             conflict_resp = EnergyConflictResponse(**conflict)
+        te = get_track_energy(t) if t else None
         result.append(SetWaveformTrackResponse(
             position=st.position,
             track_id=st.track_id,
@@ -413,7 +464,11 @@ def set_waveforms(set_id: int, db: Session = Depends(get_db)):
             duration_sec=t.duration_sec if t else None,
             transition_score=st.transition_score,
             waveform_overview=wf_b64,
-            energy_source=t.energy_source if t else None,
+            resolved_energy=te.zone if te else None,
+            energy_source=te.source if te else None,
+            energy_confidence=te.confidence if te else None,
+            energy_value=te.numeric if te else None,
+            energy_label=te.label if te else None,
             energy_conflict=conflict_resp,
         ))
     return result
@@ -574,9 +629,10 @@ def _track_summary(t: Track) -> TrackSummary:
 def _track_response(t: Track):
     """Build a TrackResponse from a Track model."""
     from kiku.api.schemas import EnergyConflictResponse, TrackResponse
+    from kiku.energy import get_track_energy
 
     af = t.audio_features
-    resolved_zone, source, confidence = t.resolved_energy_zone
+    te = get_track_energy(t)
     conflict = t.energy_conflict
     conflict_resp = None
     if conflict:
@@ -596,9 +652,11 @@ def _track_response(t: Track):
         kiku_play_count=t.kiku_play_count,
         has_waveform=af is not None and af.waveform_overview is not None,
         has_features=af is not None,
-        resolved_energy=resolved_zone,
-        energy_source=source,
-        energy_confidence=confidence,
+        resolved_energy=te.zone,
+        energy_source=te.source,
+        energy_confidence=te.confidence,
+        energy_value=te.numeric,
+        energy_label=te.label,
         energy_conflict=conflict_resp,
     )
 

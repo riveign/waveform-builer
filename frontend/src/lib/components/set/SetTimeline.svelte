@@ -115,18 +115,7 @@
 		onTransitionClick?.(index);
 	}
 
-	// Energy bar sidebar data: normalized energy for each track (0-1)
-	const ENERGY_LABEL_MAP: Record<string, number> = {
-		low: 0.15, warmup: 0.3, close: 0.35, closing: 0.35, mid: 0.5,
-		build: 0.55, dance: 0.6, up: 0.7, drive: 0.75, high: 0.8, fast: 0.85, peak: 0.95,
-	};
-
-	function parseTrackEnergy(energy: string | null): number | null {
-		if (!energy) return null;
-		const n = parseInt(energy, 10);
-		if (!isNaN(n)) return (n - 1) / 8;
-		return ENERGY_LABEL_MAP[energy.toLowerCase()] ?? null;
-	}
+	import { getTrackEnergyNumeric } from '$lib/utils/energy';
 
 	function handleDragOver(e: DragEvent) {
 		if (!e.dataTransfer?.types.includes('application/x-kiku-track')) return;
@@ -180,7 +169,7 @@
 			<!-- Energy sidebar -->
 			<div class="energy-sidebar" aria-label="Energy profile">
 				{#each items as item, i (item.id)}
-					{@const norm = parseTrackEnergy(item.energy)}
+					{@const norm = getTrackEnergyNumeric(item.energy_value, item.energy)}
 					{@const target = energyTargets[i]}
 					<div class="energy-row">
 						<div class="energy-bar-track">
@@ -235,7 +224,11 @@
 										duration_sec: item.duration_sec,
 										transition_score: item.transition_score,
 										has_waveform: item.waveform_overview != null,
+										resolved_energy: item.resolved_energy,
 										energy_source: item.energy_source,
+										energy_confidence: item.energy_confidence,
+										energy_value: item.energy_value,
+										energy_label: item.energy_label,
 										energy_conflict: item.energy_conflict,
 									}}
 									position={i + 1}
@@ -320,7 +313,11 @@
 			duration_sec: rItem.duration_sec,
 			transition_score: rItem.transition_score,
 			has_waveform: rItem.waveform_overview != null,
+			resolved_energy: rItem.resolved_energy,
 			energy_source: rItem.energy_source,
+			energy_confidence: rItem.energy_confidence,
+			energy_value: rItem.energy_value,
+			energy_label: rItem.energy_label,
 			energy_conflict: rItem.energy_conflict,
 		}}
 		onclose={() => { replacePosition = null; }}

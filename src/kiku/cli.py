@@ -118,15 +118,18 @@ def search(title: str | None, artist: str | None, genre: str | None,
     table.add_column("Genre")
     table.add_column("★", justify="right", style="yellow")
 
+    from kiku.energy import get_track_energy
+
     for i, t in enumerate(results, 1):
         stars = "★" * t.rating if t.rating else "—"
+        te = get_track_energy(t)
         table.add_row(
             str(i),
             t.title or "?",
             t.artist or "?",
             t.key or "?",
             f"{t.bpm:.0f}" if t.bpm else "?",
-            t.dir_energy or "?",
+            te.label,
             t.dir_genre or t.rb_genre or "?",
             stars,
         )
@@ -473,16 +476,19 @@ def build(duration: int, energy: str, genres: str | None, bpm_min: float | None,
     table.add_column("▶", justify="right")
     table.add_column("Trans.", justify="right", style="green")
 
+    from kiku.energy import get_track_energy
+
     for st in result.tracks:
         t = st.track
         rating_str = "★" * t.rating if t.rating else "—"
+        te = get_track_energy(t)
         table.add_row(
             str(st.position),
             t.title or "?",
             t.artist or "?",
             t.key or "?",
             f"{t.bpm:.0f}" if t.bpm else "?",
-            t.dir_energy or "?",
+            te.label,
             t.dir_genre or t.rb_genre or "?",
             rating_str,
             str(t.play_count or 0),
@@ -612,6 +618,72 @@ def import_playlist(file_path: str, name: str | None, force: bool):
             console.print(f"  [dim]... and {len(result.unmatched) - 20} more[/]")
 
 
+@cli.command("analyze-set")
+@click.argument("set_name_or_id")
+def analyze_set_cmd(set_name_or_id: str):
+    """Analyze a set — score transitions, compute arc, generate teaching moments.
+
+    Shows why your transitions work and where to grow.
+    """
+    from kiku.analysis.set_analyzer import analyze_set
+    from kiku.db.models import Set, get_session
+
+    session = get_session()
+
+    # Resolve set by ID or name
+    try:
+        set_id = int(set_name_or_id)
+        s = session.get(Set, set_id)
+    except ValueError:
+        s = session.query(Set).filter(Set.name.ilike(f"%{set_name_or_id}%")).first()
+
+    if not s:
+        console.print(f"[red]Couldn't find set '{set_name_or_id}'.[/]")
+        return
+
+    console.print(f"[cyan]Analyzing set: {s.name}...[/]")
+    try:
+        result = analyze_set(session, s.id)
+    except ValueError as e:
+        console.print(f"[red]{e}[/]")
+        return
+
+    # Print summary
+    score_color = "green" if result.overall_score >= 0.7 else "yellow" if result.overall_score >= 0.5 else "red"
+    console.print(f"\n[bold]{s.name}[/] — {result.track_count} tracks, {result.transition_count} transitions")
+    console.print(f"Overall score: [bold {score_color}]{result.overall_score:.3f}[/]")
+    console.print(
+        f"Energy shape: [cyan]{result.arc.energy_shape}[/] | "
+        f"Key style: [cyan]{result.arc.key_style}[/] | "
+        f"BPM: [cyan]{result.arc.bpm_style}[/]"
+    )
+
+    # Transitions
+    console.print("\n[bold]Transitions:[/]")
+    table = Table()
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Score")
+    table.add_column("Teaching Moment")
+    table.add_column("Suggestion", style="dim")
+    for t in result.transitions:
+        t_color = "green" if t.scores["total"] >= 0.7 else "yellow" if t.scores["total"] >= 0.5 else "red"
+        table.add_row(
+            str(t.position + 1),
+            f"[{t_color}]{t.scores['total']:.3f}[/]",
+            t.teaching_moment,
+            t.suggestion or "",
+        )
+    console.print(table)
+
+    # Set patterns
+    if result.set_patterns:
+        console.print("\n[bold]What your ear tells us:[/]")
+        for p in result.set_patterns:
+            console.print(f"  {p}")
+
+    console.print("\n[dim]Analysis cached. View in the app or re-run to update.[/]")
+
+
 @cli.command()
 @click.option("--port", default=8000, help="HTTP port for the API server")
 @click.option("--host", default="0.0.0.0", help="Host to bind to")
@@ -670,7 +742,9 @@ def classify(query: str):
     console.print(f"\n[bold]{track.title}[/] — {track.artist}")
     console.print(f"  BPM: {track.bpm or '?'} | Key: {track.key or '?'} | Rating: {track.rating or '?'}")
     console.print(f"  Rekordbox genre: {track.rb_genre or '?'}")
-    console.print(f"  Directory genre: {track.dir_genre or '?'} | Energy: {track.dir_energy or '?'}")
+    from kiku.energy import get_track_energy
+    te = get_track_energy(track)
+    console.print(f"  Directory genre: {track.dir_genre or '?'} | Energy: {te.label}")
     console.print(f"  Duration: {track.duration_sec:.0f}s" if track.duration_sec else "")
     console.print(f"  Play count: {track.play_count or 0}")
     console.print(f"  File: {track.file_path or '?'}")

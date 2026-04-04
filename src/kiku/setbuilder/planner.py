@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from kiku.config import ARTIST_COOLDOWN, DEFAULT_BEAM_WIDTH
 from kiku.db.models import Set, SetTrack, Track
 from kiku.db.store import get_track_by_title
-from kiku.setbuilder.constraints import EnergyProfile, dir_energy_to_numeric
+from kiku.energy import get_track_energy
+from kiku.setbuilder.constraints import EnergyProfile
 from kiku.setbuilder.scoring import transition_score
 
 console = Console()
@@ -55,12 +56,8 @@ def _pick_seed(
     target = energy_profile.segments[0].target_energy if energy_profile.segments else 0.3
 
     def energy_diff(t: Track) -> float:
-        if t.audio_features and t.audio_features.energy is not None:
-            return abs(t.audio_features.energy - target)
-        e = dir_energy_to_numeric(t.dir_energy)
-        if e is not None:
-            return abs(e - target)
-        return 1.0  # Unknown — low priority
+        te = get_track_energy(t)
+        return abs(te.numeric - target)
 
     candidates_sorted = sorted(candidates, key=energy_diff)
     return candidates_sorted[0]

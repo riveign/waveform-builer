@@ -60,21 +60,22 @@ def bpm_histogram(
 
 
 def energy_genre_heatmap(session: Session) -> dict[str, dict[str, int]]:
-    """Energy level x genre family matrix.
+    """Energy zone x genre family matrix (uses resolved energy from all sources).
 
-    Returns: {"Techno": {"low": 5, "warmup": 12, ...}, ...}
+    Returns: {"Techno": {"warmup": 12, "build": 30, ...}, ...}
     """
-    tracks = (
-        session.query(Track.dir_genre, Track.rb_genre, Track.dir_energy)
-        .filter(Track.dir_energy.isnot(None))
-        .all()
-    )
+    from kiku.energy import get_track_energy
+
+    tracks = session.query(Track).all()
 
     matrix: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-    for dir_genre, rb_genre, energy in tracks:
-        genre = dir_genre or rb_genre
+    for t in tracks:
+        te = get_track_energy(t)
+        if te.zone is None:
+            continue
+        genre = t.dir_genre or t.rb_genre
         family = genre_to_family(genre).capitalize()
-        matrix[family][energy.lower()] += 1
+        matrix[family][te.zone] += 1
 
     return {k: dict(v) for k, v in matrix.items()}
 
@@ -190,21 +191,21 @@ def library_gaps(session: Session) -> dict[str, list[dict]]:
                 })
     bpm_gaps.sort(key=lambda g: g["count"])
 
-    # ── Energy gaps ──
-    energy_counts: dict[str, int] = defaultdict(int)
-    energy_rows = (
-        session.query(Track.dir_energy)
-        .filter(Track.dir_energy.isnot(None))
-        .all()
-    )
-    for (e,) in energy_rows:
-        energy_counts[e.lower()] += 1
+    # ── Energy gaps (resolved zones from all sources) ──
+    from kiku.analysis.autotag import ENERGY_ZONES
+    from kiku.energy import get_track_energy
+
+    zone_counts: dict[str, int] = defaultdict(int)
+    for t in session.query(Track).all():
+        te = get_track_energy(t)
+        if te.zone:
+            zone_counts[te.zone] += 1
 
     energy_gaps = []
-    for level in ENERGY_TAG_VALUES:
-        count = energy_counts.get(level, 0)
+    for zone in ENERGY_ZONES:
+        count = zone_counts.get(zone, 0)
         if count < 20:
-            energy_gaps.append({"level": level, "count": count})
+            energy_gaps.append({"level": zone, "count": count})
     energy_gaps.sort(key=lambda g: g["count"])
 
     return {
@@ -240,31 +241,25 @@ def enhanced_stats(session: Session) -> dict:
             "count": len(bpms_list),
         }
 
-    # ── Energy zones ──
-    energy_rows = (
-        session.query(Track.dir_energy, Track.dir_genre, Track.rb_genre)
-        .filter(Track.dir_energy.isnot(None))
-        .all()
-    )
+    # ── Energy zones (5 canonical zones from all resolved sources) ──
+    from kiku.analysis.autotag import ENERGY_ZONES
+    from kiku.energy import get_track_energy
 
-    zones: dict[str, dict] = {
-        "warmup": {"levels": {"low", "warmup", "closing"}, "tracks": [], "families": defaultdict(int)},
-        "build": {"levels": {"mid", "dance", "up"}, "tracks": [], "families": defaultdict(int)},
-        "peak": {"levels": {"high", "fast", "peak"}, "tracks": [], "families": defaultdict(int)},
+    zone_data: dict[str, dict] = {
+        z: {"count": 0, "families": defaultdict(int)} for z in ENERGY_ZONES
     }
-    for energy, dir_g, rb_g in energy_rows:
-        el = energy.lower()
-        family = genre_to_family(dir_g or rb_g).capitalize()
-        for zone_name, zone in zones.items():
-            if el in zone["levels"]:
-                zone["tracks"].append(el)
-                zone["families"][family] += 1
+    for t in session.query(Track).all():
+        te = get_track_energy(t)
+        if te.zone and te.zone in zone_data:
+            family = genre_to_family(t.dir_genre or t.rb_genre).capitalize()
+            zone_data[te.zone]["count"] += 1
+            zone_data[te.zone]["families"][family] += 1
 
     energy_zones = {}
-    for zone_name, zone in zones.items():
-        top_families = sorted(zone["families"].items(), key=lambda x: -x[1])[:3]
+    for zone_name, data in zone_data.items():
+        top_families = sorted(data["families"].items(), key=lambda x: -x[1])[:3]
         energy_zones[zone_name] = {
-            "count": len(zone["tracks"]),
+            "count": data["count"],
             "top_genres": [{"family": f, "count": c} for f, c in top_families],
         }
 

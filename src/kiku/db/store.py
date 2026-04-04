@@ -187,14 +187,16 @@ def library_stats(session: Session) -> dict:
         .all()
     )
 
-    # Energy distribution
-    energy_rows = (
-        session.query(Track.dir_energy, func.count(Track.id))
-        .filter(Track.dir_energy.isnot(None))
-        .group_by(Track.dir_energy)
-        .order_by(func.count(Track.id).desc())
-        .all()
-    )
+    # Energy distribution — uses resolved zones from all sources
+    from kiku.energy import get_track_energy
+    from collections import Counter
+    all_tracks = session.query(Track).all()
+    zone_counts: Counter[str] = Counter()
+    for t in all_tracks:
+        te = get_track_energy(t)
+        if te.zone:
+            zone_counts[te.zone] += 1
+    energy_rows = sorted(zone_counts.items(), key=lambda x: -x[1])
 
     # BPM range
     bpm_min = session.query(func.min(Track.bpm)).filter(Track.bpm > 0).scalar()

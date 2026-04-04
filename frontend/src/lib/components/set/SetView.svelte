@@ -1,12 +1,13 @@
 <script lang="ts">
-	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData } from '$lib/types';
-	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8, deleteSet } from '$lib/api/sets';
+	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData, SetAnalysis } from '$lib/types';
+	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8, deleteSet, analyzeSet, getSetAnalysis } from '$lib/api/sets';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import SetPicker from './SetPicker.svelte';
 	import SetTimeline from './SetTimeline.svelte';
 	import TransitionDetail from './TransitionDetail.svelte';
 	import EnergyFlowChart from './EnergyFlowChart.svelte';
 	import SetEnergyReview from './SetEnergyReview.svelte';
+	import SetAnalysisView from './SetAnalysisView.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
@@ -34,7 +35,9 @@
 			has_features: false,
 			resolved_energy: swt.energy,
 			energy_source: swt.energy_source,
-			energy_confidence: null,
+			energy_confidence: swt.energy_confidence,
+			energy_value: swt.energy_value,
+			energy_label: swt.energy_label,
 			energy_conflict: swt.energy_conflict,
 		};
 	}
@@ -67,6 +70,8 @@
 	let pickerRefresh = $state(0);
 	let error = $state<string | null>(null);
 	let timelineContainerEl = $state<HTMLDivElement>(null!);
+	let analysis = $state<SetAnalysis | null>(null);
+	let analyzingSet = $state(false);
 
 	/** Tracks that need energy review (not yet approved) */
 	let tracksNeedingReview = $derived(
@@ -150,11 +155,24 @@
 		}
 	}
 
+	async function handleAnalyze() {
+		if (!selectedSet) return;
+		analyzingSet = true;
+		try {
+			analysis = await analyzeSet(selectedSet.id);
+		} catch (e) {
+			console.error('Analysis failed:', e);
+		} finally {
+			analyzingSet = false;
+		}
+	}
+
 	async function loadSetData(setId: number) {
 		loading = true;
 		error = null;
 		transition = null;
 		activeTransitionIndex = -1;
+		analysis = null;
 		try {
 			const [detail, waveforms] = await Promise.all([
 				getSet(setId),
@@ -162,6 +180,12 @@
 			]);
 			setDetail = detail;
 			waveformTracks = waveforms;
+			// Try loading cached analysis
+			try {
+				analysis = await getSetAnalysis(setId);
+			} catch {
+				analysis = null;
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 			waveformTracks = [];
@@ -291,6 +315,19 @@
 					onNext={() => handleTransitionClick(activeTransitionIndex + 1)}
 				/>
 			{/if}
+
+			<div class="analysis-section">
+				<button
+					class="analyze-btn"
+					onclick={handleAnalyze}
+					disabled={analyzingSet}
+				>
+					{analyzingSet ? 'Analyzing...' : analysis ? 'Re-analyze' : 'Analyze Set'}
+				</button>
+				{#if analysis}
+					<SetAnalysisView {analysis} />
+				{/if}
+			</div>
 
 		{:else}
 			<div class="status">An empty set — your story starts here</div>
@@ -494,5 +531,29 @@
 		flex: 1;
 		color: var(--text-dim);
 		font-size: 14px;
+	}
+
+	.analysis-section {
+		margin-top: 16px;
+	}
+
+	.analyze-btn {
+		padding: 8px 16px;
+		background: var(--accent);
+		color: var(--bg-primary);
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
+		font-size: 13px;
+		font-weight: 500;
+	}
+
+	.analyze-btn:hover:not(:disabled) {
+		opacity: 0.9;
+	}
+
+	.analyze-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 </style>

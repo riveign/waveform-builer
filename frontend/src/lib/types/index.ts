@@ -22,6 +22,8 @@ export interface Track {
 	resolved_energy: string | null;
 	energy_source: string | null;
 	energy_confidence: number | null;
+	energy_value: number | null;
+	energy_label: string | null;
 	energy_conflict: EnergyConflict | null;
 }
 
@@ -97,7 +99,11 @@ export interface SetTrack {
 	duration_sec: number | null;
 	transition_score: number | null;
 	has_waveform: boolean;
+	resolved_energy: string | null;
 	energy_source: string | null;
+	energy_confidence: number | null;
+	energy_value: number | null;
+	energy_label: string | null;
 	energy_conflict: EnergyConflict | null;
 }
 
@@ -113,7 +119,11 @@ export interface SetWaveformTrack {
 	duration_sec: number | null;
 	transition_score: number | null;
 	waveform_overview: string | null;
+	resolved_energy: string | null;
 	energy_source: string | null;
+	energy_confidence: number | null;
+	energy_value: number | null;
+	energy_label: string | null;
 	energy_conflict: EnergyConflict | null;
 }
 
@@ -141,6 +151,37 @@ export interface TransitionDetail {
 	waveform_b_overview: string | null;
 	beats_a: string | null;
 	beats_b: string | null;
+}
+
+export interface TransitionAnalysis {
+	position: number;
+	track_a_id: number;
+	track_b_id: number;
+	scores: TransitionScoreBreakdown & { total: number };
+	teaching_moment: string;
+	suggestion: string | null;
+}
+
+export interface ArcAnalysis {
+	energy_curve: number[];
+	energy_shape: string;
+	key_journey: (string | null)[];
+	key_style: string;
+	bpm_range: [number, number];
+	bpm_drift: number;
+	bpm_style: string;
+	genre_segments: { genre_family: string; start_pos: number; end_pos: number }[];
+}
+
+export interface SetAnalysis {
+	set_id: number;
+	track_count: number;
+	transition_count: number;
+	transitions: TransitionAnalysis[];
+	arc: ArcAnalysis;
+	overall_score: number;
+	set_patterns: string[];
+	analyzed_at: string;
 }
 
 export interface Cue {

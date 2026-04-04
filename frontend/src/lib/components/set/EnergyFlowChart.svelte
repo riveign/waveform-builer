@@ -11,6 +11,7 @@
 		Filler,
 	} from 'chart.js';
 	import type { SetWaveformTrack } from '$lib/types';
+	import { getTrackEnergyNumeric } from '$lib/utils/energy';
 
 	Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
 
@@ -25,20 +26,6 @@
 
 	let canvas = $state<HTMLCanvasElement>(null!);
 	let chart: Chart | null = null;
-
-	/** Map energy label or numeric string to normalized 0-1. */
-	const ENERGY_LABEL_MAP: Record<string, number> = {
-		low: 0.15, warmup: 0.3, close: 0.35, closing: 0.35, mid: 0.5,
-		build: 0.55, dance: 0.6, up: 0.7, drive: 0.75, high: 0.8, fast: 0.85, peak: 0.95,
-	};
-
-	function normalizeEnergy(energy: string | null): number | null {
-		if (!energy) return null;
-		const n = parseInt(energy, 10);
-		if (!isNaN(n)) return n / 9.0;
-		const mapped = ENERGY_LABEL_MAP[energy.toLowerCase()];
-		return mapped ?? null;
-	}
 
 	/** Parse energy profile — supports both JSON array and string format.
 	 *  JSON: [{"name":"dark","target_energy":0.85,"duration_min":30}, ...]
@@ -93,7 +80,7 @@
 
 	function buildChartData() {
 		const labels = tracks.map((_, i) => String(i + 1));
-		const actualValues = tracks.map((t) => normalizeEnergy(t.energy));
+		const actualValues = tracks.map((t) => getTrackEnergyNumeric(t.energy_value, t.energy));
 		const targetValues = parseEnergyProfile(energyProfile, tracks.length);
 		const hasTarget = targetValues.some((v) => v !== null);
 
