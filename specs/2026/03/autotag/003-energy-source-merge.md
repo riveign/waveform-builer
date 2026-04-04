@@ -633,7 +633,12 @@ Every step is independently deployable and reversible. No database changes mean 
 - [x] **D3**: Type-check frontend — 0 errors, 1 pre-existing warning | Status: Done
 
 ## Test Evidence & Outputs
-<!-- Filled by explicit testing after /spec IMPLEMENT -->
+
+**Implementation commit**: `d8126bd`
+
+- Backend: 23 new energy unit tests, 144 total pass (1 pre-existing failure in test_set_analysis unrelated)
+- Frontend: 0 type errors (`svelte-check`), 1 pre-existing a11y warning
+- API: 54 existing tests pass, new `energy_value`/`energy_label` fields additive
 
 ## Updated Doc
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
