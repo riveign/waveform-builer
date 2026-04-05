@@ -1313,7 +1313,18 @@ Verification: `git log --oneline -1` shows the commit.
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+- [x] Task 1: Create PDB parser module (`src/kiku/import_playlist/pdb.py`) — Status: Done
+- [x] Task 2: Add `import_cdj_history()` to `service.py` — Status: Done
+- [x] Task 3: Add `import-history` CLI command — Status: Done
+- [x] Task 4: Add API endpoint for CDJ history import — Status: Done
+- [x] Task 5: PDB parser unit tests — Status: Done (12 tests pass)
+- [x] Task 6: CDJ history API integration tests — Status: Done (6 tests pass)
+- [x] Task 7: Lint all modified files — Status: Done (no ruff installed, py_compile OK)
+- [x] Task 8: Run full test suite — Status: Done (169 pass, 1 pre-existing failure in test_energy.py unrelated to this spec)
+- [x] Task 9: Commit — Status: Done (941317d)
+
+Implementation commit: 941317d
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
