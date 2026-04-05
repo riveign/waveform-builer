@@ -1,4 +1,4 @@
-"""Import M3U8 playlists into Kiku sets with batch track matching."""
+"""Import playlists into Kiku sets with batch track matching."""
 
 from __future__ import annotations
 
@@ -215,3 +215,151 @@ def import_playlist(
         match_methods=method_counts,
         warnings=parse_result.warnings,
     )
+
+
+def import_cdj_history(
+    session: Session,
+    pdb_result: "PDBParseResult",
+    *,
+    session_ids: list[int] | None = None,
+    force: bool = False,
+    name_override: str | None = None,
+) -> list[ImportResult]:
+    """Import CDJ history sessions as Kiku sets.
+
+    Parameters
+    ----------
+    session : Session
+        SQLAlchemy session.
+    pdb_result : PDBParseResult
+        Parsed PDB data with history sessions and track lookup.
+    session_ids : list[int], optional
+        Import only these session IDs. None = all sessions.
+    force : bool
+        Re-import even if source_ref already exists.
+    name_override : str, optional
+        Override set name (only meaningful for single session import).
+    """
+    from kiku.import_playlist.pdb import PDBParseResult  # noqa: F811
+
+    exact_idx, nocase_idx, stem_idx = _build_path_index(session)
+
+    targets = pdb_result.sessions
+    if session_ids is not None:
+        target_set = set(session_ids)
+        targets = [s for s in targets if s.id in target_set]
+
+    results: list[ImportResult] = []
+
+    for hist_session in targets:
+        if not hist_session.entries:
+            continue
+
+        set_name = name_override or hist_session.name or "CDJ History"
+        source_ref = f"{hist_session.name} @ cdj_history"
+
+        # Duplicate check
+        existing = session.query(Set).filter(Set.source_ref == source_ref).first()
+        if existing and not force:
+            results.append(ImportResult(
+                set_id=existing.id,
+                name=existing.name or "",
+                source="cdj_history",
+                total_tracks=len(hist_session.entries),
+                matched_count=0,
+                unmatched_count=0,
+                unmatched=[],
+                match_methods={},
+                warnings=[],
+                duplicate_set_id=existing.id,
+            ))
+            continue
+
+        # Match each history entry's track to the Kiku library
+        matched_tracks: list[tuple[int, Track, str]] = []  # (entry_index, track, method)
+        unmatched_list: list[dict] = []
+        method_counts: dict[str, int] = {}
+
+        for entry in hist_session.entries:
+            pdb_track = pdb_result.tracks.get(entry.track_id)
+            if not pdb_track or not pdb_track.file_path:
+                unmatched_list.append({
+                    "path": f"[track_id={entry.track_id}]",
+                    "title": pdb_track.title if pdb_track else None,
+                    "line": entry.entry_index,
+                })
+                continue
+
+            norm_path = unicodedata.normalize("NFC", normalize_path(pdb_track.file_path))
+
+            # Level 1: exact normalized path
+            track = exact_idx.get(norm_path)
+            method = "exact_path"
+
+            # Level 2: case-insensitive
+            if not track:
+                track = nocase_idx.get(norm_path.lower())
+                method = "nocase_path"
+
+            # Level 3: fuzzy filename stem
+            if not track:
+                stem = PurePosixPath(norm_path).stem.lower()
+                candidates = stem_idx.get(stem, [])
+                if candidates:
+                    track = candidates[0]
+                method = "fuzzy_filename"
+
+            if track:
+                matched_tracks.append((entry.entry_index, track, method))
+                method_counts[method] = method_counts.get(method, 0) + 1
+            else:
+                unmatched_list.append({
+                    "path": pdb_track.file_path,
+                    "title": pdb_track.title,
+                    "line": entry.entry_index,
+                })
+
+        if not matched_tracks:
+            results.append(ImportResult(
+                set_id=0,
+                name=set_name,
+                source="cdj_history",
+                total_tracks=len(hist_session.entries),
+                matched_count=0,
+                unmatched_count=len(unmatched_list),
+                unmatched=unmatched_list,
+                match_methods={},
+                warnings=[],
+            ))
+            continue
+
+        # Compute total duration from matched tracks
+        total_dur = sum(t.duration_sec for _, t, _ in matched_tracks if t.duration_sec)
+
+        new_set = Set(
+            name=set_name,
+            duration_min=int(total_dur / 60) if total_dur else None,
+            source="cdj_history",
+            source_ref=source_ref,
+        )
+        session.add(new_set)
+        session.flush()
+
+        for pos, (_, track, _) in enumerate(matched_tracks):
+            session.add(SetTrack(set_id=new_set.id, position=pos, track_id=track.id))
+
+        session.commit()
+
+        results.append(ImportResult(
+            set_id=new_set.id,
+            name=set_name,
+            source="cdj_history",
+            total_tracks=len(hist_session.entries),
+            matched_count=len(matched_tracks),
+            unmatched_count=len(unmatched_list),
+            unmatched=unmatched_list,
+            match_methods=method_counts,
+            warnings=[],
+        ))
+
+    return results
