@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
         allow_origins=["http://localhost:5173", "http://localhost:4173"],
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
     )
 
     app.include_router(tracks.router)

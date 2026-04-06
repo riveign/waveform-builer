@@ -87,14 +87,14 @@
 		if (ws) {
 			// Unregister old event listeners before loading new content
 			if (cleanup) { cleanup(); cleanup = null; }
-			// Load new audio + peaks into existing instance
+			// Re-register event listeners BEFORE load so onReady is never missed
+			cleanup = player.registerPlayer(ws);
+			// Load new audio + peaks into existing instance (single load path)
 			ws.load(
 				audioUrl,
 				peakData ? [peakData] : undefined,
 				trackDuration
 			);
-			// Re-register event listeners
-			cleanup = player.registerPlayer(ws);
 			return;
 		}
 
