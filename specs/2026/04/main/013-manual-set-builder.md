@@ -115,7 +115,183 @@ You are a senior fullstack engineer implementing a manual set builder for a DJ t
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+### Verified Line Numbers (corrected from audit reports)
+
+The MUX audit reports contain stale line references for route endpoints. Verified against live code:
+
+| Reference | Audit Says | Actual | File |
+|-----------|-----------|--------|------|
+| `create_set` endpoint | L311-329 | **L311-329** | `src/kiku/api/routes/sets.py` |
+| `add_track` endpoint | L367-376 | **L367-376** | `src/kiku/api/routes/sets.py` |
+| `remove_track` endpoint | L379-388 | **L379-388** | `src/kiku/api/routes/sets.py` |
+| `reorder_tracks` endpoint | L391-402 | **L391-402** | `src/kiku/api/routes/sets.py` |
+| `delete_set` endpoint | L356-364 | **L356-364** | `src/kiku/api/routes/sets.py` |
+| `list_sets` endpoint | L405-426 | **L405-426** | `src/kiku/api/routes/sets.py` |
+| `set_detail` endpoint | L429-443 | **L429-443** | `src/kiku/api/routes/sets.py` |
+| `suggest_next` endpoint | L279+ | **L279** | `src/kiku/api/routes/tracks.py` |
+| `build_set` 1-indexed position | L232 | **L230** (`position=i + 1`) | `src/kiku/setbuilder/planner.py` |
+| `SetCreateRequest` schema | L268-271 | **L268-271** | `src/kiku/api/schemas.py` |
+| `SetAddTrackRequest` schema | L280-282 | **L280-282** | `src/kiku/api/schemas.py` |
+| `add_track_to_set` DB fn | L287-325 | **L287-325** | `src/kiku/db/store.py` |
+| `reorder_set_tracks` DB fn | L363-411 | **L363-411** | `src/kiku/db/store.py` |
+| `transition_score` | L294 | **L294** | `src/kiku/setbuilder/scoring.py` |
+| `score_replacement` | L324 | **L324** | `src/kiku/setbuilder/scoring.py` |
+| `score_transitions` | L378+ | **L378** | `src/kiku/setbuilder/scoring.py` |
+| `replace_track` endpoint | L777-791 | **L777-791** | `src/kiku/api/routes/sets.py` |
+| `get_replacements` endpoint | L677-774 | **L677-774** | `src/kiku/api/routes/sets.py` |
+
+Note: The sentinel review claimed stale line numbers but the audit references are actually correct against current code. The sentinel's "actual" lines were wrong.
+
+### Backend Findings
+
+**1. Position Indexing Inconsistency (CONFIRMED)**
+
+`build_set()` at `planner.py:230` saves positions as `i + 1` (1-based). All other paths use 0-based:
+- `add_track_to_set()` (`store.py:307,310`) -- 0-based
+- `reorder_set_tracks()` (`store.py:399`) -- 0-based (enumerate)
+- `import_playlist()` (`service.py:190`) -- 0-based (enumerate)
+- `import_cdj_history()` (`service.py:349`) -- 0-based
+
+The test fixture at `tests/api/conftest.py:47` seeds positions 1-5 (1-based), matching the build path. This means existing built sets in the DB use 1-based positions. The fix should be in `planner.py` only (change to 0-based), but must account for existing data.
+
+**2. No transition_score on manual add (CONFIRMED)**
+
+`add_track_to_set()` (`store.py:320`) creates `SetTrack` without `transition_score`. The score is only computed during `build_set()` (planner.py:227) and is set to `None` during `replace_track_in_set()` (store.py:442). The spec's Phase 1 requirement to compute score on add is validated as a real gap.
+
+**3. No `source` field on create (CONFIRMED)**
+
+`create_set()` at `sets.py:314-318` creates a `Set` without setting `source`. The `Set` model has a `source` column (models.py) that supports "kiku", "manual", "m3u8", "rb_playlist", "cdj_history". Adding `source: str | None = None` to `SetCreateRequest` is straightforward.
+
+**4. No `duration_min` recomputation on add/remove (CONFIRMED)**
+
+Neither `add_track_to_set()` nor `remove_track_from_set()` update `Set.duration_min`. The field is only set during `build_set()` (planner.py:215) and `import_playlist()` (service.py:186).
+
+**5. Suggest-next uses neutral energy target (CONFIRMED)**
+
+`score_transitions()` at scoring.py:429 calls `transition_score()` without passing `target_energy`, defaulting to 0.5. The suggest-next endpoint at tracks.py:334 does the same. The spec's requirement to add `position_min` and `energy_profile` params is valid.
+
+**6. No analysis_cache invalidation on manual changes**
+
+The sentinel review (R8) correctly identified that `analysis_cache` and `is_analyzed` become stale after manual add/remove/reorder. No current code invalidates these on track mutations. This should be added.
+
+**7. Existing reusable primitives verified**
+
+| Primitive | File:Line | Reusable As-Is |
+|-----------|-----------|----------------|
+| `transition_score()` | `scoring.py:294` | Yes -- accepts target_energy, weights, discovery_density |
+| `score_replacement()` | `scoring.py:324` | Yes -- scores against both neighbors |
+| `energy_fit()` | `scoring.py:207` | Yes |
+| `EnergyProfile.target_energy_at()` | `constraints.py:28` | Yes |
+| `_violates_artist_cooldown()` | `planner.py:66` | Yes -- currently private but easily importable |
+| `_get_candidate_pool()` | `planner.py:22` | Yes -- genre/BPM filtered pool |
+| `parse_energy_json()` | `constraints.py:65` | Yes -- parses stored energy profiles |
+| `parse_energy_string()` | `constraints.py:49` | Yes -- parses preset strings |
+
+### Frontend Findings
+
+**1. Entry points for "Add to Set" (CONFIRMED -- 5 gaps)**
+
+- `TrackContextMenu.svelte` (L52-96): Has energy, rating, play -- no "Add to Set". This is the highest-leverage addition because it propagates to both TrackTable and SetTrackCard right-click.
+- `TrackView.svelte`: Has play, energy, rating, SetAppearances, SimilarTracks -- no "Add to Set" button.
+- `SimilarTracks.svelte`: Shows similar tracks but no add action.
+- `NowPlayingBar.svelte`: No add-to-set action.
+- `SetTimeline.svelte`: Drop zone exists (L132-159) but no inline "Add Track" button.
+
+**2. SetPicker has no "New Set" button (CONFIRMED)**
+
+`SetPicker.svelte` (L37-63): Only a `<select>` dropdown and "Import" button. The `createSet()` API function exists in `sets.ts:57-63` but is never called from any UI surface.
+
+**3. Frontend API client is complete (CONFIRMED)**
+
+`frontend/src/lib/api/sets.ts` already has all needed functions:
+- `createSet()` (L57-63)
+- `addTrackToSet()` (L154-164)
+- `removeTrackFromSet()` (L166-168)
+- `reorderSetTracks()` (L170-176)
+- `listSets()` (L18-23)
+- `getSet()` (L25-27)
+
+**4. Existing manual-add patterns**
+
+- Drag-and-drop: `TrackTable` -> `SetTimeline` via `application/x-kiku-track` (SetTimeline L132-159)
+- SuggestNextPanel "Add" button (SuggestNextPanel.svelte L35-46): Calls `addTrackToSet()` then removes from list and fires `onAdd` callback
+- Both use `addTrackToSet()` from `sets.ts` and refresh via callbacks
+
+**5. Store/reactivity pattern for cross-panel updates**
+
+SetTimeline receives `onTracksChanged` callback. SetView provides this to trigger re-fetch. When a track is added from outside (e.g., context menu), the set data needs refreshing. Current pattern: callbacks + explicit re-fetch via `getSet()`. No global store for set state -- all prop-drilled.
+
+### Test Infrastructure
+
+**Backend tests**: `tests/api/conftest.py` provides `db_session` (in-memory SQLite, 20 seed tracks, 1 seed set with 5 tracks at positions 1-5) and `client` (FastAPI TestClient with dependency override).
+
+Existing relevant tests in `tests/api/test_sets_api.py`:
+- `test_create_set` -- creates empty set, verifies track_count=0
+- `test_add_track_to_set` -- appends track 10, verifies 6 tracks
+- `test_remove_track_from_set` -- removes track 3, verifies 4 remain
+- `test_reorder_set_tracks` -- reverses order [5,4,3,2,1]
+- `test_build_set_sse` -- full SSE build flow
+
+Scoring tests in `tests/test_scoring.py` cover `transition_score`, `bpm_compatibility`, `genre_coherence`, `track_quality`.
+
+No frontend tests exist (no `*.test.ts`, `*.spec.ts`, or `__tests__/` directories found).
+
+### Strategy
+
+**Phase 1: Create and Add (foundation)**
+
+Backend changes:
+1. Add `source: str | None = None` to `SetCreateRequest` schema (schemas.py:268)
+2. Set `source` in `create_set()` endpoint (sets.py:314)
+3. Compute `transition_score` in `add_track_to_set()` or in the API endpoint handler -- prefer the endpoint handler since it has DB session access to load neighbor tracks and call `transition_score()`
+4. Recompute `duration_min` on add/remove in the API handlers
+5. Invalidate `is_analyzed`/`analysis_cache` on add/remove/reorder
+6. Fix planner.py:230 position indexing (change `i + 1` to `i`) -- but must update test fixture seed data to match
+
+Frontend changes:
+1. Create `AddToSetPicker.svelte` -- popover with set search, track count, "New Set" inline create, duplicate detection
+2. Add "+ New" button to `SetPicker.svelte` next to Import
+3. Add "Add to Set" submenu to `TrackContextMenu.svelte` using AddToSetPicker
+4. Add "Add to Set" button to `TrackView.svelte` header
+5. Add "+" icon to `SimilarTracks.svelte` rows
+6. Toast notifications on successful add
+
+**Phase 2: In-Set Search and Scoring**
+
+Backend changes:
+1. Add `position_min` and `energy_profile` optional params to suggest-next endpoint
+2. Derive `target_energy` from energy profile at given position
+3. Pass `target_energy` through `score_transitions()`
+
+Frontend changes:
+1. Create `InSetTrackSearch.svelte` -- inline panel in SetView with filters + scored results
+2. Insertion point selection in SetTimeline (click between tracks to target a gap)
+3. Score badges on search results
+
+**Phase 3: AI Fill and Reorder**
+
+Backend changes:
+1. Create `src/kiku/setbuilder/filler.py` -- gap identification, candidate scoring, SSE streaming
+2. Create `src/kiku/setbuilder/reorder.py` -- gentle (neighbor swaps) and full (simulated annealing) strategies
+3. Three new endpoints: `/fill` (SSE), `/optimize-order`, `/score-sequence`
+4. New schemas: `SetFillRequest`, `SetOptimizeOrderRequest`, etc.
+
+Frontend changes:
+1. Create `FillReorderDialog.svelte` -- two tabs (Fill Gaps + Reorder), energy curve viz, before/after comparison
+2. "Assist" button in SetView (visible when >= 3 tracks)
+
+**Testing strategy:**
+- Phase 1 unit tests: `test_create_set_with_source`, `test_add_track_computes_score`, `test_add_track_recomputes_duration`, `test_add_track_invalidates_analysis`, `test_position_indexing_consistency`
+- Phase 2 unit tests: `test_suggest_next_with_energy_profile`, `test_suggest_next_position_aware`
+- Phase 3 unit tests: `test_fill_identifies_weak_transitions`, `test_gentle_reorder_improves_score`, `test_full_reorder_converges`, `test_score_sequence_endpoint`
+- All tests follow existing patterns in `tests/api/conftest.py` and `tests/api/test_sets_api.py`
+- No frontend tests (project has none) -- manual verification per existing practice
+
+**Key risks:**
+- R1: Position indexing fix may break existing sets in the DB (mitigate: only fix going forward in planner.py, existing sets remain as-is since all read paths handle both)
+- R2: analysis_cache staleness (mitigate: invalidate on every mutation)
+- R3: Cross-panel reactivity when adding from context menu (mitigate: use callback chain or store subscription to trigger SetTimeline refresh)
 
 ## Plan
 <!-- Filled by /spec PLAN -->
