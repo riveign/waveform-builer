@@ -10,11 +10,13 @@
 	let {
 		item,
 		parentTrackId,
+		parentBpm = null,
 		affinity = null,
 		onaffinitychange,
 	}: {
 		item: SuggestNextItem;
 		parentTrackId: number;
+		parentBpm?: number | null;
 		affinity?: string | null;
 		onaffinitychange?: (trackId: number, newAffinity: string | null) => void;
 	} = $props();
@@ -37,6 +39,11 @@
 	const energyZone = $derived(track.resolved_energy ?? null);
 	const energyColor = $derived(energyZone ? (ZONE_COLORS[energyZone] ?? 'var(--text-dim)') : 'var(--text-dim)');
 	const genreLabel = $derived(track.genre_family ?? track.genre ?? null);
+	const bpmDelta = $derived.by(() => {
+		if (!track.bpm || !parentBpm) return null;
+		const diff = Math.round(track.bpm) - Math.round(parentBpm);
+		return diff;
+	});
 
 	function scoreColor(score: number): string {
 		if (score >= 0.75) return 'var(--accent)';
@@ -159,6 +166,14 @@
 
 	<!-- Chips row -->
 	<div class="chips-row">
+		{#if track.bpm}
+			<span class="chip chip-bpm">
+				{Math.round(track.bpm)}
+				{#if bpmDelta !== null && bpmDelta !== 0}
+					<span class="bpm-delta" class:bpm-up={bpmDelta > 0} class:bpm-down={bpmDelta < 0}>{bpmDelta > 0 ? '+' : ''}{bpmDelta}</span>
+				{/if}
+			</span>
+		{/if}
 		{#if genreLabel}
 			<span class="chip chip-genre">{genreLabel}</span>
 		{/if}
@@ -348,6 +363,24 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+	}
+
+	.chip-bpm {
+		font-variant-numeric: tabular-nums;
+	}
+
+	.bpm-delta {
+		font-size: 9px;
+		font-weight: 600;
+		margin-left: 1px;
+	}
+
+	.bpm-delta.bpm-up {
+		color: var(--energy-mid, #f39c12);
+	}
+
+	.bpm-delta.bpm-down {
+		color: var(--accent);
 	}
 
 	.chip-energy {

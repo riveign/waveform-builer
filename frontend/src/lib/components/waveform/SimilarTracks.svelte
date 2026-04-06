@@ -5,7 +5,7 @@
 	import Spinner from '../Spinner.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 
-	let { trackId, trackKey = null }: { trackId: number; trackKey?: string | null } = $props();
+	let { trackId, trackKey = null, parentBpm = null }: { trackId: number; trackKey?: string | null; parentBpm?: number | null } = $props();
 
 	let pool = $state<SuggestNextItem[]>([]);
 	let rejectedIds = $state<Set<number>>(new Set());
@@ -100,6 +100,7 @@
 					<SimilarTrackCard
 						{item}
 						parentTrackId={trackId}
+						{parentBpm}
 						affinity={affinityMap[item.track.id] ?? null}
 						onaffinitychange={handleAffinityChange}
 					/>

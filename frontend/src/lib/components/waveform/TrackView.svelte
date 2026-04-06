@@ -379,7 +379,7 @@
 	{/if}
 
 	<!-- ── Sounds Like (always visible, auto-loads) ── -->
-	<SimilarTracks trackId={track.id} trackKey={track.key} />
+	<SimilarTracks trackId={track.id} trackKey={track.key} parentBpm={track.bpm} />
 
 	<!-- ── Sets (at the bottom) ── -->
 	<SetAppearances trackId={track.id} />
