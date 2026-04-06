@@ -6,6 +6,7 @@
 	import SetTrackCard from './SetTrackCard.svelte';
 	import TransitionIndicator from './TransitionIndicator.svelte';
 	import ReplaceTrackModal from './ReplaceTrackModal.svelte';
+	import InSetTrackSearch from './InSetTrackSearch.svelte';
 
 	let {
 		tracks,
@@ -308,6 +309,15 @@
 			</div>
 		{/if}
 	{/if}
+
+	<InSetTrackSearch
+		{setId}
+		lastTrackId={items.length > 0 ? items[items.length - 1].track_id : null}
+		excludeTrackIds={items.map((i) => i.track_id)}
+		{energyProfile}
+		positionMin={items.length > 0 ? items.reduce((sum, i) => sum + (i.duration_sec ?? 0), 0) / 60 : null}
+		ontrackadded={onTracksChanged}
+	/>
 </div>
 
 {#if replacePosition !== null && items[replacePosition]}

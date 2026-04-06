@@ -269,6 +269,7 @@ class SetCreateRequest(BaseModel):
     name: str
     energy_profile: str | None = None
     genre_filter: list[str] | None = None
+    source: str | None = None  # "manual", "kiku", "m3u8", etc.
 
 
 class SetUpdateRequest(BaseModel):
@@ -656,3 +657,50 @@ class AffinityListItem(BaseModel):
 
 class TrackAffinitiesResponse(BaseModel):
     affinities: list[AffinityListItem]
+
+
+# ── Manual set builder: fill, reorder, score-sequence ──
+
+
+class SetFillRequest(BaseModel):
+    energy_profile: str | None = None
+    target_duration_min: int | None = None
+    genre_filter: list[str] | None = None
+    max_fill_tracks: int = 10
+    gap_threshold: float = 0.6
+    discovery_density: float = 0.0
+    weights: ScoringWeightsRequest | None = None
+
+
+class SetOptimizeOrderRequest(BaseModel):
+    strategy: str = "gentle"  # "gentle" | "full"
+    energy_profile: str | None = None
+    weights: ScoringWeightsRequest | None = None
+
+
+class OrderChangeResponse(BaseModel):
+    track_id: int
+    track_title: str | None
+    from_position: int
+    to_position: int
+    explanation: str
+
+
+class SetOptimizeOrderResponse(BaseModel):
+    current_score: float
+    proposed_score: float
+    proposed_order: list[int]
+    changes: list[OrderChangeResponse]
+    current_energy_curve: list[float]
+    proposed_energy_curve: list[float]
+
+
+class ScoreSequenceRequest(BaseModel):
+    track_ids: list[int]
+    energy_profile: str | None = None
+    weights: ScoringWeightsRequest | None = None
+
+
+class ScoreSequenceResponse(BaseModel):
+    total_score: float
+    energy_curve: list[float]

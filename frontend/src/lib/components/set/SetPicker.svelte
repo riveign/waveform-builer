@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { DJSet, ImportResult } from '$lib/types';
-	import { listSets } from '$lib/api/sets';
+	import { listSets, createSet } from '$lib/api/sets';
 	import { onMount } from 'svelte';
 	import ImportPlaylistDialog from './ImportPlaylistDialog.svelte';
 
@@ -9,6 +9,9 @@
 	let sets = $state<DJSet[]>([]);
 	let loading = $state(true);
 	let importOpen = $state(false);
+	let creatingNew = $state(false);
+	let newName = $state('');
+	let newInputEl = $state<HTMLInputElement | null>(null);
 
 	async function refresh() {
 		try {
@@ -32,6 +35,20 @@
 		const imported = sets.find(s => s.id === result.set_id);
 		if (imported) onselect(imported);
 	}
+
+	async function handleCreateNew() {
+		if (!newName.trim()) return;
+		try {
+			const newSet = await createSet({ name: newName.trim(), source: 'manual' });
+			sets = await listSets();
+			onselect(newSet);
+		} catch {
+			// Silently fail — the DJ can try again
+		} finally {
+			creatingNew = false;
+			newName = '';
+		}
+	}
 </script>
 
 <div class="set-picker">
@@ -54,6 +71,19 @@
 						</option>
 					{/each}
 				</select>
+			{/if}
+			{#if creatingNew}
+				<input
+					bind:this={newInputEl}
+					bind:value={newName}
+					placeholder="Set name..."
+					class="new-set-input"
+					onkeydown={(e) => { if (e.key === 'Enter') handleCreateNew(); if (e.key === 'Escape') { creatingNew = false; newName = ''; } }}
+				/>
+			{:else}
+				<button class="new-btn" onclick={() => { creatingNew = true; setTimeout(() => newInputEl?.focus(), 0); }} title="Create new set">
+					+ New
+				</button>
 			{/if}
 			<button class="import-btn" onclick={() => importOpen = true} title="Import playlist">
 				Import
@@ -95,6 +125,27 @@
 
 	.import-btn:hover {
 		background: var(--bg-tertiary);
+	}
+
+	.new-btn {
+		padding: 8px 12px;
+		font-size: 12px;
+		border: 1px solid var(--accent);
+		border-radius: 6px;
+		background: var(--accent);
+		color: #000;
+		cursor: pointer;
+		white-space: nowrap;
+		font-weight: 600;
+	}
+
+	.new-set-input {
+		padding: 8px 10px;
+		font-size: 13px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--bg-secondary);
+		color: var(--text-primary);
 	}
 
 	.dim {

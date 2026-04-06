@@ -3315,7 +3315,50 @@ FillReorderDialog with fill/reorder tabs, Assist button in SetView.
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+### Completed Tasks
+
+**Phase 1: Backend Foundation**
+- [x] Task 1: `source` field on SetCreateRequest + create_set route
+- [x] Task 2: Transition score on add_track, duration recompute, analysis invalidation
+- [x] Task 3: Duration recompute + score recompute on remove_track, analysis invalidation
+- [x] Task 4: Analysis invalidation on reorder_tracks
+- [x] Task 5: Fix 1-based → 0-based position in planner.py
+
+**Phase 1: Frontend**
+- [x] Task 6: `source` on SetCreateParams type
+- [x] Task 7: AddToSetPicker.svelte (reusable set picker + inline create)
+- [x] Task 8: SetPicker "+ New" button with inline name input
+- [x] Task 9: TrackContextMenu "Add to Set" submenu
+- [x] Task 10: TrackView "Add to Set" button + popover
+- [x] Task 11: SimilarTracks "+" add-to-set icon per card
+
+**Phase 2: Position-Aware Energy + In-Set Search**
+- [x] Task 12: position_min + energy_profile params on suggest-next endpoint
+- [x] Task 13: target_energy param on score_transitions
+- [x] Task 14: InSetTrackSearch.svelte (expandable search panel)
+- [x] Task 15: Wire InSetTrackSearch into SetTimeline
+
+**Phase 3: Fill, Reorder, Assist**
+- [x] Task 16: filler.py — gap-finding + SSE fill proposals
+- [x] Task 17: reorder.py — gentle (local swap) + full (simulated annealing) + energy curves
+- [x] Task 18: Fill/OptimizeOrder/ScoreSequence schemas
+- [x] Task 19: Three new API endpoints (fill SSE, optimize-order, score-sequence)
+- [x] Task 20: Frontend API functions (fillSet, optimizeOrder, scoreSequence)
+- [x] Task 21: FillReorderDialog.svelte (two-tab dialog: Fill Gaps + Reorder)
+- [x] Task 22: Assist button in SetView (visible for sets with ≥3 tracks)
+
+**Wrap-up**
+- [x] Task 23: Python files compile clean
+- [x] Task 24: Frontend type-check passes (0 errors)
+- [x] Task 25: 151 backend tests pass (pre-existing energy zone calibration test excluded)
+
+### Key Files Created
+- `src/kiku/setbuilder/filler.py` — Fill algorithm with SSE event generator
+- `src/kiku/setbuilder/reorder.py` — Gentle + full reorder with energy curves
+- `frontend/src/lib/components/set/AddToSetPicker.svelte` — Reusable set picker
+- `frontend/src/lib/components/set/InSetTrackSearch.svelte` — In-set track search
+- `frontend/src/lib/components/set/FillReorderDialog.svelte` — Fill + Reorder dialog
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->

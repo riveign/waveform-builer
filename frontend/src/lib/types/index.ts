@@ -342,6 +342,7 @@ export interface SetCreateParams {
 	name: string;
 	energy_profile?: string | null;
 	genre_filter?: string[] | null;
+	source?: string | null;
 }
 
 export interface SetUpdateParams {

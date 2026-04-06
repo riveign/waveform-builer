@@ -384,6 +384,7 @@ def score_transitions(
     exclude_ids: list[int] | None = None,
     discovery_density: float = 0.0,
     set_appearance_counts: dict[int, int] | None = None,
+    target_energy: float = 0.5,
 ) -> list[tuple[Track, float]]:
     """Find and score best transitions from a given track."""
     q = session.query(Track).filter(Track.id != from_track.id)
@@ -426,7 +427,7 @@ def score_transitions(
 
     scored = []
     for track in candidates:
-        score = transition_score(from_track, track, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts)
+        score = transition_score(from_track, track, target_energy=target_energy, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts)
         # Apply affinity modifier: "good" → +10%, "bad" → -20%
         aff = affinities.get(track.id)
         if aff == "good":

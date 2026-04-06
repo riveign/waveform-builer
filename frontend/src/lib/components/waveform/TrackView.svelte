@@ -15,6 +15,7 @@
 	import Spinner from '../Spinner.svelte';
 	import EnergyZonePicker from '../library/EnergyZonePicker.svelte';
 	import { ZONE_COLORS } from '../library/EnergyZonePicker.svelte';
+	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 
 	let { track }: { track: Track } = $props();
 
@@ -49,6 +50,7 @@
 	let localZone = $state<string | null>(null);
 	let showZonePicker = $state(false);
 	let teachingMoment = $state<string | null>(null);
+	let showAddToSet = $state(false);
 
 	$effect(() => {
 		localRating = track.rating ?? 0;
@@ -221,6 +223,11 @@
 				{#if track.duration_sec}
 					<span class="meta-badge dim">{formatTime(track.duration_sec)}</span>
 				{/if}
+				<button
+					class="meta-badge meta-badge-interactive add-to-set-btn"
+					onclick={() => showAddToSet = !showAddToSet}
+					title="Add to a set"
+				>+ Add to Set</button>
 			</div>
 			<!-- Rating inline with header -->
 			<div class="track-rating-row">
@@ -234,6 +241,16 @@
 			</div>
 		</div>
 	</div>
+
+	{#if showAddToSet}
+		<div class="add-to-set-popover">
+			<AddToSetPicker
+				trackId={track.id}
+				trackTitle={track.title ?? 'track'}
+				onclose={() => showAddToSet = false}
+			/>
+		</div>
+	{/if}
 
 	{#if teachingMoment}
 		<p class="teaching-moment" aria-live="polite">{teachingMoment}</p>
@@ -732,5 +749,28 @@
 		height: 6px;
 		border-radius: 50%;
 		flex-shrink: 0;
+	}
+
+	.add-to-set-btn {
+		border: 1px solid var(--accent);
+		color: var(--accent);
+		cursor: pointer;
+		background: transparent;
+		font-weight: 600;
+	}
+
+	.add-to-set-btn:hover {
+		background: var(--accent);
+		color: #000;
+	}
+
+	.add-to-set-popover {
+		position: relative;
+		background: var(--bg-primary);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+		z-index: 100;
+		max-width: 300px;
 	}
 </style>

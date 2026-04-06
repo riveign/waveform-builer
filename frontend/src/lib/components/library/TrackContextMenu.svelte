@@ -6,6 +6,7 @@
 	import EnergyZonePicker from './EnergyZonePicker.svelte';
 	import { ZONE_COLORS } from './EnergyZonePicker.svelte';
 	import StarRating from './StarRating.svelte';
+	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 
 	const player = getPlayerStore();
 
@@ -20,6 +21,7 @@
 	} = $props();
 
 	let showEnergySubmenu = $state(false);
+	let showAddToSet = $state(false);
 
 	async function handleZoneSelect(zone: string) {
 		const previousZone = track.resolved_energy;
@@ -83,6 +85,28 @@
 			showScore={false}
 		/>
 	</div>
+</div>
+
+<div class="menu-divider"></div>
+
+<div class="menu-section">
+	<button
+		class="menu-item has-submenu"
+		onclick={() => showAddToSet = !showAddToSet}
+		role="menuitem"
+		aria-haspopup="true"
+		aria-expanded={showAddToSet}
+	>
+		+ Add to Set
+		<span class="submenu-arrow">›</span>
+	</button>
+	{#if showAddToSet}
+		<AddToSetPicker
+			trackId={track.id}
+			trackTitle={track.title ?? 'track'}
+			onclose={onclose}
+		/>
+	{/if}
 </div>
 
 <div class="menu-divider"></div>

@@ -227,7 +227,7 @@ def build_set(
         t_score = transition_score(prev_track, track, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts) if prev_track else None
         st = SetTrack(
             set_id=set_.id,
-            position=i + 1,
+            position=i,
             track_id=track.id,
             transition_score=t_score,
         )

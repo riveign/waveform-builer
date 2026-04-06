@@ -288,6 +288,8 @@ def suggest_next(
     w_genre_coherence: float | None = Query(default=None, description="Genre coherence weight override"),
     w_track_quality: float | None = Query(default=None, description="Track quality weight override"),
     discovery_density: float = Query(default=0.0, ge=-1.0, le=1.0, description="Discovery/density bias (-1=fresh, +1=proven)"),
+    position_min: float | None = Query(default=None, description="Elapsed minutes at this position in the set"),
+    energy_profile: str | None = Query(default=None, description="Energy profile string for position-aware energy target"),
     db: Session = Depends(get_db),
 ):
     """Suggest best next tracks based on transition scoring."""
@@ -331,13 +333,25 @@ def suggest_next(
             raise HTTPException(status_code=422, detail=str(exc))
 
     genres = [g.strip() for g in genre_filter.split(",")] if genre_filter else None
-    scored = score_transitions(db, track, n=n, genre_filter=genres, weights=weights_dict, exclude_ids=exclude_ids, discovery_density=discovery_density)
+
+    # Compute position-aware energy target
+    target_energy = 0.5  # default neutral
+    if position_min is not None and energy_profile:
+        from kiku.setbuilder.constraints import parse_energy_string
+
+        try:
+            ep = parse_energy_string(energy_profile)
+            target_energy = ep.target_energy_at(position_min)
+        except Exception:
+            pass  # Fall back to neutral
+
+    scored = score_transitions(db, track, n=n, genre_filter=genres, weights=weights_dict, exclude_ids=exclude_ids, discovery_density=discovery_density, target_energy=target_energy)
 
     w = weights_dict if weights_dict else SCORING_WEIGHTS
     suggestions = []
     for cand, total_score in scored:
         h = harmonic_score(track.key, cand.key)
-        e = energy_fit(cand, 0.5)
+        e = energy_fit(cand, target_energy)
         b = bpm_compatibility(track.bpm, cand.bpm)
         g = genre_coherence(
             track.dir_genre or track.rb_genre,

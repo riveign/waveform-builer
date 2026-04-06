@@ -255,3 +255,98 @@ export async function getSetAnalysis(setId: number): Promise<SetAnalysis> {
 	}
 	return res.json();
 }
+
+
+// ── Manual set builder: fill, reorder, score-sequence ──
+
+export interface FillParams {
+	energy_profile?: string | null;
+	target_duration_min?: number | null;
+	genre_filter?: string[] | null;
+	max_fill_tracks?: number;
+	gap_threshold?: number;
+	discovery_density?: number;
+}
+
+export interface OptimizeOrderParams {
+	strategy?: 'gentle' | 'full';
+	energy_profile?: string | null;
+}
+
+export interface OptimizeOrderResponse {
+	current_score: number;
+	proposed_score: number;
+	proposed_order: number[];
+	changes: { track_id: number; track_title: string | null; from_position: number; to_position: number; explanation: string }[];
+	current_energy_curve: number[];
+	proposed_energy_curve: number[];
+}
+
+export interface ScoreSequenceResponse {
+	total_score: number;
+	energy_curve: number[];
+}
+
+export function fillSet(
+	setId: number,
+	params: FillParams,
+	onEvent?: (event: string, data: unknown) => void
+): Promise<void> {
+	return new Promise((resolve, reject) => {
+		fetch(`${API_BASE}/api/sets/${setId}/fill`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(params),
+		})
+			.then((res) => {
+				if (!res.ok || !res.body) {
+					reject(new Error(`Fill request failed: ${res.status}`));
+					return;
+				}
+				const reader = res.body.getReader();
+				const decoder = new TextDecoder();
+				let buffer = '';
+
+				function processChunk(chunk: string) {
+					buffer += chunk;
+					const lines = buffer.split('\n');
+					buffer = lines.pop() ?? '';
+					let currentEvent = '';
+					for (const line of lines) {
+						if (line.startsWith('event: ')) {
+							currentEvent = line.slice(7).trim();
+						} else if (line.startsWith('data: ')) {
+							const data = JSON.parse(line.slice(6));
+							onEvent?.(currentEvent, data);
+						}
+					}
+				}
+
+				function read(): void {
+					reader.read().then(({ done, value }) => {
+						if (done) { resolve(); return; }
+						processChunk(decoder.decode(value, { stream: true }));
+						read();
+					}).catch(reject);
+				}
+				read();
+			})
+			.catch(reject);
+	});
+}
+
+export async function optimizeOrder(setId: number, params: OptimizeOrderParams): Promise<OptimizeOrderResponse> {
+	return fetchJson<OptimizeOrderResponse>(`/api/sets/${setId}/optimize-order`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(params),
+	});
+}
+
+export async function scoreSequence(setId: number, trackIds: number[], energyProfile?: string): Promise<ScoreSequenceResponse> {
+	return fetchJson<ScoreSequenceResponse>(`/api/sets/${setId}/score-sequence`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ track_ids: trackIds, energy_profile: energyProfile }),
+	});
+}
