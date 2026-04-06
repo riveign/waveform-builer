@@ -88,3 +88,38 @@ export async function suggestNext(
 	}
 	return fetchJson<SuggestNextResponse>(`/api/tracks/${trackId}/suggest-next?${qs}`);
 }
+
+// ── Track Affinity API ──
+
+export interface TrackAffinity {
+	track_id: number;
+	affinity: string;
+}
+
+export async function setTrackAffinity(
+	trackId: number,
+	otherTrackId: number,
+	affinity: 'good' | 'bad'
+): Promise<void> {
+	await fetchJson<unknown>(`/api/tracks/${trackId}/affinity`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ other_track_id: otherTrackId, affinity }),
+	});
+}
+
+export async function removeTrackAffinity(
+	trackId: number,
+	otherTrackId: number
+): Promise<void> {
+	await fetchJson<unknown>(`/api/tracks/${trackId}/affinity/${otherTrackId}`, {
+		method: 'DELETE',
+	});
+}
+
+export async function getTrackAffinities(
+	trackId: number
+): Promise<TrackAffinity[]> {
+	const res = await fetchJson<{ affinities: TrackAffinity[] }>(`/api/tracks/${trackId}/affinities`);
+	return res.affinities ?? [];
+}

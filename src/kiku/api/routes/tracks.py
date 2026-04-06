@@ -8,9 +8,13 @@ from sqlalchemy.orm import Session
 
 from kiku.api.deps import get_db
 from kiku.api.schemas import (
+    AffinityListItem,
     PaginatedTracksResponse,
     SuggestNextItem,
     SuggestNextResponse,
+    TrackAffinitiesResponse,
+    TrackAffinityRequest,
+    TrackAffinityResponse,
     TrackFeaturesResponse,
     TrackRatingRequest,
     TrackResponse,
@@ -386,3 +390,127 @@ def track_features(track_id: int, db: Session = Depends(get_db)):
         verified_bpm=af.verified_bpm,
         verified_key=af.verified_key,
     )
+
+
+# ── Track Affinity endpoints ──────────────────────────────────────────
+
+
+def _canonical_pair(id_a: int, id_b: int) -> tuple[int, int]:
+    """Return (smaller, larger) for canonical storage ordering."""
+    return (min(id_a, id_b), max(id_a, id_b))
+
+
+@router.post("/{track_id}/affinity", response_model=TrackAffinityResponse)
+def set_affinity(
+    track_id: int,
+    body: TrackAffinityRequest,
+    db: Session = Depends(get_db),
+):
+    """Mark two tracks as 'good' or 'bad' together. Upserts if pair exists."""
+    from kiku.db.models import TrackAffinity
+
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    other = db.get(Track, body.other_track_id)
+    if not other:
+        raise HTTPException(status_code=404, detail="Other track not found")
+
+    if track_id == body.other_track_id:
+        raise HTTPException(status_code=422, detail="Cannot create affinity between a track and itself")
+
+    a_id, b_id = _canonical_pair(track_id, body.other_track_id)
+
+    existing = (
+        db.query(TrackAffinity)
+        .filter(TrackAffinity.track_a_id == a_id, TrackAffinity.track_b_id == b_id)
+        .first()
+    )
+
+    if existing:
+        existing.affinity = body.affinity
+        db.commit()
+        db.refresh(existing)
+        return TrackAffinityResponse(
+            id=existing.id,
+            track_a_id=existing.track_a_id,
+            track_b_id=existing.track_b_id,
+            affinity=existing.affinity,
+        )
+
+    new = TrackAffinity(track_a_id=a_id, track_b_id=b_id, affinity=body.affinity)
+    db.add(new)
+    db.commit()
+    db.refresh(new)
+    return TrackAffinityResponse(
+        id=new.id,
+        track_a_id=new.track_a_id,
+        track_b_id=new.track_b_id,
+        affinity=new.affinity,
+    )
+
+
+@router.delete("/{track_id}/affinity/{other_id}", status_code=204)
+def delete_affinity(
+    track_id: int,
+    other_id: int,
+    db: Session = Depends(get_db),
+):
+    """Remove affinity between two tracks."""
+    from kiku.db.models import TrackAffinity
+
+    a_id, b_id = _canonical_pair(track_id, other_id)
+
+    row = (
+        db.query(TrackAffinity)
+        .filter(TrackAffinity.track_a_id == a_id, TrackAffinity.track_b_id == b_id)
+        .first()
+    )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Affinity not found for this pair")
+
+    db.delete(row)
+    db.commit()
+
+
+@router.get("/{track_id}/affinities", response_model=TrackAffinitiesResponse)
+def list_affinities(
+    track_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return all affinities for a track, with full TrackResponse for each partner."""
+    from sqlalchemy import or_
+
+    from kiku.db.models import TrackAffinity
+
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    rows = (
+        db.query(TrackAffinity)
+        .filter(
+            or_(
+                TrackAffinity.track_a_id == track_id,
+                TrackAffinity.track_b_id == track_id,
+            )
+        )
+        .all()
+    )
+
+    items = []
+    for row in rows:
+        partner_id = row.track_b_id if row.track_a_id == track_id else row.track_a_id
+        partner = db.get(Track, partner_id)
+        if partner:
+            items.append(
+                AffinityListItem(
+                    track_id=partner_id,
+                    affinity=row.affinity,
+                    track=_track_to_response(partner),
+                )
+            )
+
+    return TrackAffinitiesResponse(affinities=items)

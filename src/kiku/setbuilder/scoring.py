@@ -391,27 +391,78 @@ def score_transitions(
     if exclude_ids:
         q = q.filter(Track.id.notin_(exclude_ids))
 
-    # BPM pre-filter
+    # BPM pre-filter — include direct range, double-time, and half-time
+    from sqlalchemy import or_ as sql_or
+
     if from_track.bpm and from_track.bpm > 0:
-        bpm_lo = from_track.bpm * (1 - BPM_TOLERANCE * 2)
-        bpm_hi = from_track.bpm * (1 + BPM_TOLERANCE * 2)
-        q = q.filter(Track.bpm.between(bpm_lo, bpm_hi))
+        tol = BPM_TOLERANCE * 2  # 12% window each side
+        bpm = from_track.bpm
+        bpm_lo = bpm * (1 - tol)
+        bpm_hi = bpm * (1 + tol)
+        # Double-time range (e.g. 70 BPM source → 126-154 BPM candidates)
+        dbl_lo = (bpm * 2) * (1 - tol)
+        dbl_hi = (bpm * 2) * (1 + tol)
+        # Half-time range (e.g. 140 BPM source → 61.6-78.4 BPM candidates)
+        half_lo = (bpm * 0.5) * (1 - tol)
+        half_hi = (bpm * 0.5) * (1 + tol)
+        q = q.filter(
+            sql_or(
+                Track.bpm.between(bpm_lo, bpm_hi),
+                Track.bpm.between(dbl_lo, dbl_hi),
+                Track.bpm.between(half_lo, half_hi),
+                Track.bpm.is_(None),  # don't exclude tracks missing BPM
+            )
+        )
 
     if genre_filter:
         genre_conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genre_filter]
-        q = q.filter(
-            Track.dir_genre.isnot(None),
-            *[],  # SQLAlchemy or_
-        )
-        from sqlalchemy import or_
-        q = q.filter(or_(*genre_conditions))
+        q = q.filter(Track.dir_genre.isnot(None))
+        q = q.filter(sql_or(*genre_conditions))
 
     candidates = q.all()
+
+    # Load affinities for the source track to boost/penalize suggestions
+    affinities = _load_affinities(session, from_track.id)
 
     scored = []
     for track in candidates:
         score = transition_score(from_track, track, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts)
+        # Apply affinity modifier: "good" → +10%, "bad" → -20%
+        aff = affinities.get(track.id)
+        if aff == "good":
+            score = min(score * 1.10, 1.0)
+        elif aff == "bad":
+            score = score * 0.80
         scored.append((track, score))
 
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:n]
+
+
+def _load_affinities(session: Session, track_id: int) -> dict[int, str]:
+    """Load all affinities for a track as {partner_id: 'good'|'bad'}.
+
+    Returns empty dict if the table doesn't exist yet (pre-migration).
+    """
+    try:
+        from kiku.db.models import TrackAffinity
+        from sqlalchemy import or_
+
+        rows = (
+            session.query(TrackAffinity)
+            .filter(
+                or_(
+                    TrackAffinity.track_a_id == track_id,
+                    TrackAffinity.track_b_id == track_id,
+                )
+            )
+            .all()
+        )
+        result = {}
+        for row in rows:
+            partner = row.track_b_id if row.track_a_id == track_id else row.track_a_id
+            result[partner] = row.affinity
+        return result
+    except Exception:
+        # Table may not exist yet if migration hasn't run
+        return {}

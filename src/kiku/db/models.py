@@ -6,13 +6,17 @@ from datetime import datetime
 
 from sqlalchemy import (
     Column,
+    DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
+    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 from sqlalchemy.pool import NullPool
@@ -212,6 +216,31 @@ class HuntTrack(Base):
 
     session = relationship("HuntSession", back_populates="tracks")
     matched_track = relationship("Track")
+
+
+class TrackAffinity(Base):
+    """DJ-defined pair affinity: two tracks are 'good' or 'bad' together.
+
+    Always stored with track_a_id < track_b_id (canonical ordering)
+    so (A,B) and (B,A) resolve to the same row.
+    """
+    __tablename__ = "track_affinities"
+
+    id = Column(Integer, primary_key=True)
+    track_a_id = Column(Integer, ForeignKey("tracks.id"), nullable=False)
+    track_b_id = Column(Integer, ForeignKey("tracks.id"), nullable=False)
+    affinity = Column(String, nullable=False)  # "good" or "bad"
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("track_a_id", "track_b_id", name="uq_track_affinity_pair"),
+        Index("ix_track_affinity_a", "track_a_id"),
+        Index("ix_track_affinity_b", "track_b_id"),
+    )
+
+    track_a = relationship("Track", foreign_keys=[track_a_id])
+    track_b = relationship("Track", foreign_keys=[track_b_id])
 
 
 class OAuthToken(Base):

@@ -2,6 +2,7 @@
 	import type { TrackSetAppearance } from '$lib/types';
 	import { getTrackSets } from '$lib/api/tracks';
 	import { getUiStore } from '$lib/stores/ui.svelte';
+	import Spinner from '../Spinner.svelte';
 
 	let { trackId }: { trackId: number } = $props();
 
@@ -61,7 +62,7 @@
 	{#if expanded}
 		<div class="card-body">
 			{#if loading}
-				<p class="muted">Checking your sets...</p>
+				<Spinner size={16} label="Checking your sets..." />
 			{:else if appearances.length === 0}
 				<p class="muted">Not in any sets yet</p>
 			{:else}

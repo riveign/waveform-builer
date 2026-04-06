@@ -622,3 +622,37 @@ class SCChaseRequest(BaseModel):
     playlist_id: int | None = None
     track_ids: list[int] | None = None
     source: str = "soundcloud_playlist"  # or "soundcloud_likes"
+
+
+# ── Track Affinity models ──
+
+
+class TrackAffinityRequest(BaseModel):
+    other_track_id: int
+    affinity: str  # "good" or "bad"
+
+    @field_validator('affinity')
+    @classmethod
+    def validate_affinity(cls, v: str) -> str:
+        if v not in ("good", "bad"):
+            raise ValueError('affinity must be "good" or "bad"')
+        return v
+
+
+class TrackAffinityResponse(BaseModel):
+    id: int
+    track_a_id: int
+    track_b_id: int
+    affinity: str
+
+    model_config = {"from_attributes": True}
+
+
+class AffinityListItem(BaseModel):
+    track_id: int
+    affinity: str
+    track: TrackResponse
+
+
+class TrackAffinitiesResponse(BaseModel):
+    affinities: list[AffinityListItem]
