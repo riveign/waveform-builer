@@ -6,32 +6,42 @@
 
 	let { trackId, trackKey = null }: { trackId: number; trackKey?: string | null } = $props();
 
-	let suggestions = $state<SuggestNextItem[]>([]);
+	let pool = $state<SuggestNextItem[]>([]);
+	let rejectedIds = $state<Set<number>>(new Set());
 	let loading = $state(false);
 	let showAll = $state(false);
 	let affinityMap = $state<Record<number, string>>({});
+	let dismissing = $state<Set<number>>(new Set());
 
-	const INITIAL_COUNT = 12;
+	const VISIBLE_COUNT = 12;
+	const FETCH_COUNT = 30;
+
+	// Filter out rejected tracks from the pool
+	let available = $derived(
+		pool.filter((item) => !rejectedIds.has(item.track.id))
+	);
 
 	let visibleSuggestions = $derived(
-		showAll ? suggestions : suggestions.slice(0, INITIAL_COUNT)
+		showAll ? available : available.slice(0, VISIBLE_COUNT)
 	);
-	let hasMore = $derived(suggestions.length > INITIAL_COUNT);
+	let hasMore = $derived(available.length > VISIBLE_COUNT);
 
 	// Auto-load when track changes
 	$effect(() => {
 		const id = trackId;
 		loading = true;
-		suggestions = [];
+		pool = [];
+		rejectedIds = new Set();
 		showAll = false;
 		affinityMap = {};
+		dismissing = new Set();
 
 		Promise.all([
-			suggestNext(id, 18),
+			suggestNext(id, FETCH_COUNT),
 			getTrackAffinities(id).catch(() => [] as TrackAffinity[]),
 		])
 			.then(([res, affinities]) => {
-				suggestions = res.suggestions;
+				pool = res.suggestions;
 				const map: Record<number, string> = {};
 				for (const a of affinities) {
 					map[a.track_id] = a.affinity;
@@ -39,7 +49,7 @@
 				affinityMap = map;
 			})
 			.catch(() => {
-				suggestions = [];
+				pool = [];
 			})
 			.finally(() => {
 				loading = false;
@@ -47,12 +57,26 @@
 	});
 
 	function handleAffinityChange(trackIdChanged: number, newAffinity: string | null) {
-		if (newAffinity) {
+		if (newAffinity === 'bad') {
+			// Animate out, then remove from visible pool
+			dismissing = new Set([...dismissing, trackIdChanged]);
+			setTimeout(() => {
+				rejectedIds = new Set([...rejectedIds, trackIdChanged]);
+				dismissing = new Set([...dismissing].filter((id) => id !== trackIdChanged));
+			}, 300);
+			affinityMap = { ...affinityMap, [trackIdChanged]: newAffinity };
+		} else if (newAffinity) {
 			affinityMap = { ...affinityMap, [trackIdChanged]: newAffinity };
 		} else {
+			// Remove opinion — if it was rejected, bring it back
 			const next = { ...affinityMap };
 			delete next[trackIdChanged];
 			affinityMap = next;
+			if (rejectedIds.has(trackIdChanged)) {
+				const updated = new Set(rejectedIds);
+				updated.delete(trackIdChanged);
+				rejectedIds = updated;
+			}
 		}
 	}
 </script>
@@ -62,22 +86,24 @@
 
 	{#if loading}
 		<Spinner label="Listening to your library..." />
-	{:else if suggestions.length === 0}
+	{:else if available.length === 0}
 		<p class="muted">No similar tracks found</p>
 	{:else}
 		<div class="cards-grid">
 			{#each visibleSuggestions as item (item.track.id)}
-				<SimilarTrackCard
-					{item}
-					parentTrackId={trackId}
-					affinity={affinityMap[item.track.id] ?? null}
-					onaffinitychange={handleAffinityChange}
-				/>
+				<div class="card-slot" class:dismissing={dismissing.has(item.track.id)}>
+					<SimilarTrackCard
+						{item}
+						parentTrackId={trackId}
+						affinity={affinityMap[item.track.id] ?? null}
+						onaffinitychange={handleAffinityChange}
+					/>
+				</div>
 			{/each}
 		</div>
 		{#if hasMore && !showAll}
 			<button class="show-more" onclick={() => { showAll = true; }}>
-				Show {suggestions.length - INITIAL_COUNT} more
+				Show {available.length - VISIBLE_COUNT} more
 			</button>
 		{/if}
 	{/if}
@@ -114,20 +140,30 @@
 
 	@media (max-width: 1200px) {
 		.cards-grid {
-			grid-template-columns: repeat(4, 1fr);
+			grid-template-columns: repeat(4, minmax(0, 1fr));
 		}
 	}
 
 	@media (max-width: 900px) {
 		.cards-grid {
-			grid-template-columns: repeat(3, 1fr);
+			grid-template-columns: repeat(3, minmax(0, 1fr));
 		}
 	}
 
 	@media (max-width: 600px) {
 		.cards-grid {
-			grid-template-columns: repeat(2, 1fr);
+			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
+	}
+
+	.card-slot {
+		transition: opacity 0.3s, transform 0.3s;
+	}
+
+	.card-slot.dismissing {
+		opacity: 0;
+		transform: scale(0.9);
+		pointer-events: none;
 	}
 
 	.show-more {
