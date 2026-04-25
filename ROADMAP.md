@@ -1,11 +1,70 @@
 # Kiku — Product Roadmap
 
-**Version:** 1.0
-**Date:** 2026-03-14
+**Version:** 2.0
+**Date:** 2026-04-04
 **Timeframe:** Q2 2026 (April - June)
 **Author:** Solo developer
 
 **Vision:** Build the first DJ set planning tool that teaches you WHY transitions work, not just which ones do — combining 5-dimension beam search optimization with energy flow mentorship in a web interface no competitor offers.
+
+---
+
+## Completed Since Roadmap v1.0 (2026-03-14 → 2026-04-04)
+
+### Month 1: Foundation — ALL COMPLETE
+- API foundation (set build SSE, suggest-next, CRUD, pagination)
+- Set timeline (HTML DOM + DnD via svelte-dnd-action)
+- Energy flow chart (Chart.js, actual vs target curve)
+- Build set dialog (energy presets, genre chips, BPM range, scoring weights, discovery/density slider)
+- Transition Inspector (dual waveform, 5-dim score breakdown, teaching tooltips)
+- Taste DNA dashboard (genre, BPM, key, energy distributions, mood radar)
+
+### Month 2: Intelligence — ALL COMPLETE
+- Energy Tinder (spec 002): swipe-based ML review, teaching moments, keyboard shortcuts, session stats
+- Energy Source Merge (spec 003): unified resolution with cascading trust (approved > dir_energy > predicted), conflict detection
+- Energy Model Tier 1: balanced RF, dead feature removal, decision log, genre normalization (89 RB → 7 families)
+- Cue points + library-to-set drag
+- Inline set energy review (set-scoped tinder queue)
+- Set playback (A/B deck, express/live mode, BPM pitch-matching, crossfade)
+- Track Hunter (spec 004): YouTube Content ID scraping, fuzzy dedup, purchase links
+- Replace Track in Set: scored replacement against both neighbors, modal UI
+
+### Month 3 (partial): Export, Config, Data Quality — MOSTLY COMPLETE
+- Rekordbox XML export refactor + M3U8 export (spec 008)
+- Scoring weights API + UI sliders
+- Discovery/Density mode (spec 009): play count recording, familiarity scoring
+- M3U8 playlist import (spec 010): Rekordbox M3U8 → match → create set
+- Set analysis (spec 011): auto-analyze after build, arc analysis, transition teaching
+- Global player (persistent NowPlayingBar, peaks cache, hover preload)
+- Data quality: artist parsing, label field, normalize_path, sync dry-run
+- Spectral waveforms (spec 007): 4-band rendering, classic/spectral toggle
+- Track detail enrichment: artwork, set appearances, similar tracks, feature cards
+- SoundCloud integration: OAuth + browse/chase (code complete, needs SC app registration)
+- Context menu + StarRating + EnergyZonePicker (built, partially wired)
+
+### Energy Zone Accuracy Improvements — COMPLETE (2026-04-04)
+- **Problem**: Essentia RMS energy skewed — 92% of audio-only tracks mapped to "peak"
+- **Composite scoring**: Multi-feature weighted composite (F-ratio from ANOVA), calibrated boundaries from DJ's tags
+- **Result**: 92% peak → 59% warmup / 28% peak / 10% build / 3% drive
+- **Tinder batch mode**: 5-track compact review list with play buttons, confirm-all, batch API
+- **Stats enhancement**: retrain_suggested flag every 50 approvals
+- **Calibration auto-runs** on every `--retrain`, saved as `data/energy_calibration.json`
+
+### Intro Energy Zone — COMPLETE (2026-04-06)
+- **New positional zone**: "intro" — DJ intent marker for tracks that open a set (like "close" but for the start)
+- **Not energy-derived**: Track keeps its actual energy value for scoring; "intro" is a placement hint only
+- **Backend**: Added to `ENERGY_ZONES`, `ZONE_MAP` (identity mapping), `ENERGY_TAG_VALUES` (0.1), excluded from calibration alongside "close"
+- **Frontend**: EnergyZonePicker, energy.ts, SearchFilters, EnergyConflictBadge — color `#6388b4` (slate-blue), auto-propagates to Tinder components
+- **6 zones total**: intro → warmup → build → drive → peak → close
+
+### Bug Fixes (2026-04-06)
+- **Audio playback double-load fix**: Eliminated race condition where `loadAndPlay()` and NowPlayingBar `$effect` both called `ws.load()`, causing audio to start then restart. Single load path via NowPlayingBar. Also added `Accept-Ranges: none` for transcoded streams and exposed CORS range headers.
+
+### Not Started / Deferred
+- Stem separation (Demucs) — deferred to v1.1
+- Custom energy preset editor — presets work, editor deferred
+- Responsive design — desktop-only for now
+- M3U8 Phase 3: Build from import (cherry-pick + fill gaps)
 
 ---
 
