@@ -3,7 +3,6 @@
 	import { suggestNext, getTrackAffinities, type TrackAffinity } from '$lib/api/tracks';
 	import SimilarTrackCard from '../library/SimilarTrackCard.svelte';
 	import Spinner from '../Spinner.svelte';
-	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 
 	let { trackId, trackKey = null, parentBpm = null }: { trackId: number; trackKey?: string | null; parentBpm?: number | null } = $props();
 
@@ -13,8 +12,6 @@
 	let showAll = $state(false);
 	let affinityMap = $state<Record<number, string>>({});
 	let dismissing = $state<Set<number>>(new Set());
-	let addToSetTrackId = $state<number | null>(null);
-
 	const VISIBLE_COUNT = 12;
 	const FETCH_COUNT = 30;
 
@@ -104,20 +101,6 @@
 						affinity={affinityMap[item.track.id] ?? null}
 						onaffinitychange={handleAffinityChange}
 					/>
-					<button
-						class="add-to-set-icon"
-						onclick={(e) => { e.stopPropagation(); addToSetTrackId = addToSetTrackId === item.track.id ? null : item.track.id; }}
-						title="Add to set"
-					>+</button>
-					{#if addToSetTrackId === item.track.id}
-						<div class="add-picker-popover">
-							<AddToSetPicker
-								trackId={item.track.id}
-								trackTitle={item.track.title ?? 'track'}
-								onclose={() => addToSetTrackId = null}
-							/>
-						</div>
-					{/if}
 				</div>
 			{/each}
 		</div>
@@ -205,40 +188,5 @@
 		color: var(--text-primary);
 	}
 
-	.add-to-set-icon {
-		position: absolute;
-		top: 4px;
-		right: 4px;
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		border: 1px solid var(--border);
-		background: var(--bg-primary);
-		color: var(--accent);
-		font-size: 14px;
-		font-weight: 700;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		opacity: 0;
-		transition: opacity 0.15s;
-		z-index: 2;
-	}
 
-	.card-slot:hover .add-to-set-icon {
-		opacity: 1;
-	}
-
-	.add-picker-popover {
-		position: absolute;
-		top: 28px;
-		right: 0;
-		background: var(--bg-primary);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-		z-index: 10;
-		min-width: 220px;
-	}
 </style>

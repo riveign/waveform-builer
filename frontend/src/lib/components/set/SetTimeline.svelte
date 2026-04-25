@@ -39,9 +39,10 @@
 	let replacePosition = $state<number | null>(null);
 
 	// Sync items when tracks prop changes (but not during drag)
+	// Use position (not track_id) as id — a track can appear multiple times in a set
 	$effect(() => {
 		if (!reordering) {
-			items = tracks.map((t) => ({ ...t, id: t.track_id }));
+			items = tracks.map((t, i) => ({ ...t, id: t.position ?? i }));
 		}
 	});
 
@@ -102,7 +103,7 @@
 			onTracksChanged?.();
 		} catch (err) {
 			// Revert on failure — re-sync from props
-			items = tracks.map((t) => ({ ...t, id: t.track_id }));
+			items = tracks.map((t, i) => ({ ...t, id: t.position ?? i }));
 			console.error('Failed to reorder tracks:', err);
 		}
 	}

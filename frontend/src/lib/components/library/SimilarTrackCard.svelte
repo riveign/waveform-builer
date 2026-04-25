@@ -4,6 +4,7 @@
 	import { ZONE_COLORS } from './EnergyZonePicker.svelte';
 	import StarRating from './StarRating.svelte';
 	import ContextMenu from '../ContextMenu.svelte';
+	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 
@@ -28,6 +29,8 @@
 	let menuOpen = $state(false);
 	let menuX = $state(0);
 	let menuY = $state(0);
+	let isSelected = $state(false);
+	let showAddPicker = $state(false);
 
 	// Reset artwork error when item changes
 	$effect(() => {
@@ -37,19 +40,24 @@
 
 	const track = $derived(item.track);
 	const energyZone = $derived(track.resolved_energy ?? null);
-	const energyColor = $derived(energyZone ? (ZONE_COLORS[energyZone] ?? 'var(--text-dim)') : 'var(--text-dim)');
 	const genreLabel = $derived(track.genre_family ?? track.genre ?? null);
+	const scoreDisplay = $derived(Math.round(item.score * 100));
 	const bpmDelta = $derived.by(() => {
 		if (!track.bpm || !parentBpm) return null;
 		const diff = Math.round(track.bpm) - Math.round(parentBpm);
 		return diff;
 	});
 
-	function scoreColor(score: number): string {
-		if (score >= 0.75) return 'var(--accent)';
-		if (score >= 0.5) return 'var(--energy-mid, #f39c12)';
-		return 'var(--energy-high, #e74c3c)';
-	}
+	// Phase pill colors: fill + text per zone
+	const PHASE_PILL_COLORS: Record<string, { bg: string; text: string }> = {
+		intro:   { bg: '#E6F1FB', text: '#185FA5' },
+		warmup:  { bg: '#E1F5EE', text: '#0F6E56' },
+		build:   { bg: '#FAEEDA', text: '#854F0B' },
+		drive:   { bg: '#FAEEDA', text: '#854F0B' },
+		peak:    { bg: '#FAECE7', text: '#993C1D' },
+		close:   { bg: '#E1F5EE', text: '#085041' },
+		cooldown:{ bg: '#E1F5EE', text: '#085041' },
+	};
 
 	function handleCardClick() {
 		ui.selectedTrack = track;
@@ -110,10 +118,16 @@
 		ui.selectedTrack = track;
 		ui.activeTab = 'track';
 	}
+
+	function handleAddToSet(e: MouseEvent) {
+		e.stopPropagation();
+		showAddPicker = !showAddPicker;
+	}
 </script>
 
 <div
 	class="similar-card"
+	class:selected={isSelected}
 	role="button"
 	tabindex="0"
 	draggable="true"
@@ -122,8 +136,8 @@
 	ondragstart={handleDragStart}
 	onkeydown={(e) => { if (e.key === 'Enter') handleCardClick(); }}
 >
-	<!-- Top row: artwork + title/artist + menu button -->
-	<div class="card-top">
+	<!-- Zone 1: Header Row — artwork + title/artist + menu -->
+	<div class="zone-header">
 		<div class="artwork-wrap">
 			{#if artworkFailed}
 				<div class="artwork-fallback">
@@ -158,44 +172,72 @@
 			{/if}
 			<button
 				class="menu-btn"
+				onclick={handleAddToSet}
+				aria-label="Add to set"
+				title="Add to set"
+			>+</button>
+			<button
+				class="menu-btn"
 				onclick={handleMenuClick}
 				aria-label="Track options"
 			>&#8942;</button>
+			{#if showAddPicker}
+				<div class="add-picker-popover">
+					<AddToSetPicker
+						trackId={track.id}
+						trackTitle={track.title ?? 'track'}
+						onclose={() => showAddPicker = false}
+					/>
+				</div>
+			{/if}
 		</div>
 	</div>
 
-	<!-- Chips row -->
-	<div class="chips-row">
-		{#if track.bpm}
-			<span class="chip chip-bpm">
-				{Math.round(track.bpm)}
+	<!-- Divider -->
+	<div class="zone-divider"></div>
+
+	<!-- Zone 2: Track Metadata Row — BPM + delta | genre + phase pills -->
+	<div class="zone-metadata">
+		<div class="meta-left">
+			{#if track.bpm}
+				<span class="bpm-value">{Math.round(track.bpm)}</span>
+				<span class="bpm-unit">BPM</span>
 				{#if bpmDelta !== null && bpmDelta !== 0}
-					<span class="bpm-delta" class:bpm-up={bpmDelta > 0} class:bpm-down={bpmDelta < 0}>{bpmDelta > 0 ? '+' : ''}{bpmDelta}</span>
+					<span
+						class="bpm-delta-badge"
+						class:delta-up={bpmDelta > 0}
+						class:delta-down={bpmDelta < 0}
+						title="{Math.abs(bpmDelta)} BPM {bpmDelta > 0 ? 'faster' : 'slower'} than current track"
+					>{bpmDelta > 0 ? '+' : '\u2212'}{Math.abs(bpmDelta)}</span>
 				{/if}
-			</span>
-		{/if}
-		{#if genreLabel}
-			<span class="chip chip-genre">{genreLabel}</span>
-		{/if}
-		{#if energyZone}
-			<span class="chip chip-energy" style="--zone-color: {energyColor}">
-				<span class="energy-dot"></span>
-				{energyZone}
-			</span>
-		{/if}
-		{#if track.rating && track.rating > 0}
-			<span class="chip chip-rating">
-				<StarRating rating={track.rating} readonly size="sm" />
-			</span>
-		{/if}
+			{/if}
+		</div>
+		<div class="meta-right">
+			{#if genreLabel}
+				<span class="pill pill-genre">{genreLabel}</span>
+			{/if}
+			{#if energyZone}
+				{@const colors = PHASE_PILL_COLORS[energyZone]}
+				<span
+					class="pill pill-phase"
+					style="background: {colors?.bg ?? 'var(--bg-tertiary)'}; color: {colors?.text ?? 'var(--text-secondary)'}"
+				>{energyZone}</span>
+			{/if}
+		</div>
 	</div>
 
-	<!-- Score -->
-	<div class="score-row">
-		<span class="score-label">Score</span>
-		<span class="score-value" style="color: {scoreColor(item.score)}">
-			{(item.score * 100).toFixed(0)}
-		</span>
+	<!-- Divider -->
+	<div class="zone-divider"></div>
+
+	<!-- Zone 3: Score + Actions Row -->
+	<div class="zone-score">
+		<div class="score-display">
+			<span class="score-number">{scoreDisplay}</span>
+			<span class="score-suffix">/ 100</span>
+		</div>
+		{#if track.rating && track.rating > 0}
+			<StarRating rating={track.rating} readonly size="sm" />
+		{/if}
 	</div>
 </div>
 
@@ -227,44 +269,49 @@
 </ContextMenu>
 
 <style>
+	/* ── Card Container ── */
 	.similar-card {
 		background: var(--bg-secondary);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 10px 12px;
+		border: 0.5px solid var(--border);
+		border-radius: 12px;
 		cursor: pointer;
-		transition: box-shadow 0.15s, border-color 0.15s;
+		transition: border-color 0.15s;
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
 		min-width: 0;
 		overflow: hidden;
 	}
 
 	.similar-card:hover {
-		border-color: var(--text-dim);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+		border-color: var(--border-focus);
 	}
 
-	.similar-card:active {
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	.similar-card.selected {
+		border: 2px solid var(--accent);
 	}
 
-	/* Top row */
-	.card-top {
+	/* ── Zone Divider ── */
+	.zone-divider {
+		height: 1px;
+		background: currentColor;
+		opacity: 0.08;
+	}
+
+	/* ── Zone 1: Header ── */
+	.zone-header {
 		display: flex;
-		align-items: flex-start;
 		gap: 10px;
-		min-width: 0;
+		align-items: flex-start;
+		padding: 14px 14px 10px;
 	}
 
 	.artwork-wrap {
-		width: 60px;
-		height: 60px;
+		width: 48px;
+		height: 48px;
 		flex-shrink: 0;
-		border-radius: 4px;
+		border-radius: 6px;
 		overflow: hidden;
-		background: var(--bg-tertiary);
+		background: #1a1a1a;
 	}
 
 	.artwork-img {
@@ -284,8 +331,8 @@
 	}
 
 	.artwork-fallback svg {
-		width: 28px;
-		height: 28px;
+		width: 24px;
+		height: 24px;
 	}
 
 	.text-col {
@@ -294,21 +341,23 @@
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
-		padding-top: 2px;
 	}
 
 	.track-title {
 		font-size: 13px;
-		font-weight: 600;
+		font-weight: 500;
+		line-height: 1.35;
 		color: var(--text-primary);
-		white-space: nowrap;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
 		overflow: hidden;
-		text-overflow: ellipsis;
 	}
 
 	.track-artist {
-		font-size: 11px;
+		font-size: 12px;
 		color: var(--text-secondary);
+		margin-top: 2px;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -319,6 +368,7 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
+		position: relative;
 	}
 
 	.affinity-dot {
@@ -345,81 +395,104 @@
 		color: var(--text-primary);
 	}
 
-	/* Chips */
-	.chips-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-		align-items: center;
-	}
-
-	.chip {
-		font-size: 10px;
-		padding: 2px 6px;
-		border-radius: 4px;
-		background: var(--bg-tertiary);
-		color: var(--text-secondary);
-		white-space: nowrap;
+	/* ── Zone 2: Metadata ── */
+	.zone-metadata {
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		justify-content: space-between;
+		padding: 8px 14px;
+		gap: 8px;
 	}
 
-	.chip-bpm {
-		font-variant-numeric: tabular-nums;
-	}
-
-	.bpm-delta {
-		font-size: 9px;
-		font-weight: 600;
-		margin-left: 1px;
-	}
-
-	.bpm-delta.bpm-up {
-		color: var(--energy-mid, #f39c12);
-	}
-
-	.bpm-delta.bpm-down {
-		color: var(--accent);
-	}
-
-	.chip-energy {
-		color: var(--zone-color);
-	}
-
-	.energy-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
-		background: var(--zone-color);
+	.meta-left {
+		display: flex;
+		align-items: baseline;
 		flex-shrink: 0;
 	}
 
-	.chip-rating {
-		padding: 1px 4px;
+	.bpm-value {
+		font-size: 13px;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		color: var(--text-primary);
 	}
 
-	/* Score */
-	.score-row {
-		display: flex;
-		align-items: center;
-		gap: 6px;
+	.bpm-unit {
+		font-size: 11px;
+		color: var(--text-tertiary);
+		margin-left: 3px;
 	}
 
-	.score-label {
-		font-size: 10px;
-		color: var(--text-dim);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.score-value {
-		font-size: 12px;
-		font-weight: 600;
+	.bpm-delta-badge {
+		font-size: 11px;
+		font-weight: 500;
+		padding: 1px 6px;
+		border-radius: 99px;
+		margin-left: 6px;
 		font-variant-numeric: tabular-nums;
 	}
 
-	/* Context menu items */
+	.bpm-delta-badge.delta-up {
+		background: #FAEEDA;
+		color: #854F0B;
+	}
+
+	.bpm-delta-badge.delta-down {
+		background: #E6F1FB;
+		color: #185FA5;
+	}
+
+	.meta-right {
+		display: flex;
+		gap: 5px;
+		min-width: 0;
+	}
+
+	.pill {
+		font-size: 11px;
+		font-weight: 500;
+		padding: 2px 8px;
+		border-radius: 99px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.pill-genre {
+		background: var(--bg-tertiary);
+		color: var(--text-secondary);
+	}
+
+	/* pill-phase colors set inline via style attribute */
+
+	/* ── Zone 3: Score + Stars ── */
+	.zone-score {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 8px 14px 14px;
+	}
+
+	.score-display {
+		display: flex;
+		align-items: baseline;
+	}
+
+	.score-number {
+		font-size: 22px;
+		font-weight: 500;
+		color: var(--text-primary);
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+	}
+
+	.score-suffix {
+		font-size: 11px;
+		color: var(--text-tertiary);
+		margin-left: 3px;
+	}
+
+	/* ── Context menu items ── */
 	.ctx-item {
 		display: flex;
 		align-items: center;
@@ -450,5 +523,19 @@
 		height: 1px;
 		background: var(--border);
 		margin: 2px 0;
+	}
+
+	/* ── Add to Set Popover ── */
+	.add-picker-popover {
+		position: absolute;
+		top: 100%;
+		right: 0;
+		margin-top: 4px;
+		background: var(--bg-primary);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+		z-index: 10;
+		min-width: 220px;
 	}
 </style>

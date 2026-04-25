@@ -48,16 +48,6 @@
 </script>
 
 <div class="analysis-view">
-	<!-- Overall Score -->
-	<div class="overall-section">
-		<div class="overall-score" style="color: {scoreColor(analysis.overall_score)}">
-			{analysis.overall_score.toFixed(3)}
-		</div>
-		<div class="overall-label">
-			{analysis.track_count} tracks &middot; {analysis.transition_count} transitions
-		</div>
-	</div>
-
 	<!-- Arc Summary -->
 	<div class="arc-section">
 		<h3>Set Arc</h3>
@@ -138,25 +128,6 @@
 		flex-direction: column;
 		gap: 20px;
 		padding: 16px;
-	}
-
-	.overall-section {
-		text-align: center;
-		padding: 16px;
-		background: var(--bg-secondary);
-		border-radius: 8px;
-	}
-
-	.overall-score {
-		font-size: 36px;
-		font-weight: 700;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.overall-label {
-		font-size: 13px;
-		color: var(--text-secondary);
-		margin-top: 4px;
 	}
 
 	h3 {

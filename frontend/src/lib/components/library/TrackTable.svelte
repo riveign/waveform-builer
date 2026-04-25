@@ -2,9 +2,14 @@
 	import type { Track } from '$lib/types';
 	import { getCamelotColor } from '$lib/utils/camelot';
 	import { formatTime } from '$lib/utils/waveform';
+	import { energyColor, normalizeEnergy } from '$lib/utils/energy';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { preloadOnHover } from '$lib/utils/audio-preload';
 	import { prefetchPeaks } from '$lib/api/waveforms';
+	import { updateTrackRating } from '$lib/api/tracks';
+	import ContextMenu from '../ContextMenu.svelte';
+	import TrackContextMenu from './TrackContextMenu.svelte';
+	import StarRating from './StarRating.svelte';
 
 	const player = getPlayerStore();
 
@@ -23,12 +28,27 @@
 		onselect: (track: Track) => void;
 	} = $props();
 
+	let contextMenuTrack = $state<Track | null>(null);
+	let contextMenuX = $state(0);
+	let contextMenuY = $state(0);
+	let contextMenuOpen = $state(false);
+
 	function handlePlay(e: MouseEvent, track: Track) {
 		e.stopPropagation();
 		if (player.isPlaying && player.currentTrack?.id === track.id) {
 			player.pause();
 		} else {
 			player.play(track);
+		}
+	}
+
+	async function handleRatingChange(track: Track, rating: number) {
+		const prev = track.rating;
+		track.rating = rating;
+		try {
+			await updateTrackRating(track.id, rating);
+		} catch {
+			track.rating = prev;
 		}
 	}
 </script>
@@ -58,6 +78,13 @@
 					onclick={() => onselect(track)}
 					ondblclick={(e) => { e.preventDefault(); player.play(track); }}
 					onmouseenter={() => handleHover(track)}
+					oncontextmenu={(e) => {
+						e.preventDefault();
+						contextMenuTrack = track;
+						contextMenuX = e.clientX;
+						contextMenuY = e.clientY;
+						contextMenuOpen = true;
+					}}
 					draggable="true"
 					ondragstart={(e) => {
 						e.dataTransfer?.setData('application/x-kiku-track', JSON.stringify({ id: track.id, title: track.title }));
@@ -93,7 +120,7 @@
 						{track.bpm ? Math.round(track.bpm) : '?'}
 					</td>
 					<td class="col-energy">
-						<span class="energy-tag">{track.energy ?? '?'}</span>
+						<span class="energy-tag" style="color: {energyColor(normalizeEnergy(track.resolved_energy))}">{track.resolved_energy ?? '?'}</span>
 					</td>
 					<td class="col-plays">
 						{#if (track.play_count ?? 0) + (track.kiku_play_count ?? 0) > 0}
@@ -102,18 +129,30 @@
 							<span class="dim">--</span>
 						{/if}
 					</td>
-					<td class="col-rating">
-						{#if track.rating}
-							{'★'.repeat(track.rating)}
-						{:else}
-							<span class="dim">--</span>
-						{/if}
+					<td class="col-rating" onclick={(e) => e.stopPropagation()}>
+						<StarRating
+							rating={track.rating ?? 0}
+							size="sm"
+							onchange={(r) => handleRatingChange(track, r)}
+						/>
 					</td>
 				</tr>
 			{/each}
 		</tbody>
 	</table>
 </div>
+
+{#if contextMenuTrack}
+	<ContextMenu bind:open={contextMenuOpen} x={contextMenuX} y={contextMenuY}>
+		<TrackContextMenu
+			track={contextMenuTrack}
+			onclose={() => contextMenuOpen = false}
+			ontrackupdated={(updates) => {
+				if (contextMenuTrack) Object.assign(contextMenuTrack, updates);
+			}}
+		/>
+	</ContextMenu>
+{/if}
 
 <style>
 	.track-table-wrapper {
@@ -186,7 +225,7 @@
 	.col-bpm { width: 40px; text-align: right; }
 	.col-energy { width: 60px; }
 	.col-plays { width: 36px; text-align: right; }
-	.col-rating { width: 50px; color: #ffc107; font-size: 11px; }
+	.col-rating { width: 60px; }
 
 	.play-btn {
 		width: 22px;
@@ -226,6 +265,7 @@
 	.energy-tag {
 		font-size: 11px;
 		color: var(--text-secondary);
+		text-transform: capitalize;
 	}
 
 	.plays-count {
