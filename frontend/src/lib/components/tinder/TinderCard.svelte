@@ -4,6 +4,7 @@
 	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
 	import MoodRadar from './MoodRadar.svelte';
 	import EnergyConflictBadge from '../set/EnergyConflictBadge.svelte';
+	import { ZONES, ZONE_COLORS as zoneColors } from '../library/EnergyZonePicker.svelte';
 
 	let {
 		item,
@@ -18,16 +19,6 @@
 	let waveformPeaks = $state<string | null>(null);
 	let waveformDuration = $state(0);
 	let showOverrideMenu = $state(false);
-
-	const ZONES = ['warmup', 'build', 'drive', 'peak', 'close'] as const;
-
-	const zoneColors: Record<string, string> = {
-		warmup: '#4ecdc4',
-		build: '#ffe66d',
-		drive: '#f39c12',
-		peak: '#ff6b6b',
-		close: '#9b59b6',
-	};
 
 	$effect(() => {
 		// Load waveform when item changes

@@ -965,7 +965,7 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
             table.add_column("F1", justify="right", style="green")
             table.add_column("Support", justify="right", style="dim")
 
-            for zone in ["warmup", "build", "drive", "peak", "close"]:
+            for zone in ["intro", "warmup", "build", "drive", "peak", "close"]:
                 if zone in metrics:
                     m = metrics[zone]
                     table.add_row(

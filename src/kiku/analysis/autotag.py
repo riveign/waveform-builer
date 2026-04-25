@@ -15,6 +15,7 @@ from kiku.db.models import AudioFeatures, Track
 
 # Zone mapping: granular tag → zone
 ZONE_MAP: dict[str, str] = {
+    "intro": "intro",
     "low": "warmup", "warmup": "warmup",
     "mid": "build", "dance": "build",
     "up": "drive", "high": "drive",
@@ -23,7 +24,7 @@ ZONE_MAP: dict[str, str] = {
 }
 
 # Canonical list of energy zones (order: low → high energy, then close)
-ENERGY_ZONES: list[str] = ["warmup", "build", "drive", "peak", "close"]
+ENERGY_ZONES: list[str] = ["intro", "warmup", "build", "drive", "peak", "close"]
 
 # All valid granular energy tags
 ENERGY_TAGS = list(ZONE_MAP.keys())
@@ -142,7 +143,7 @@ def calibrate_energy(session: Session) -> dict:
     """
     from scipy import stats as scipy_stats
 
-    # Energy zones in order (exclude 'close' — positional, not energy-derived)
+    # Energy zones in order (exclude 'intro' and 'close' — positional, not energy-derived)
     ordered_zones = ["warmup", "build", "drive", "peak"]
 
     # Gather tracks with known zones + audio features
@@ -162,8 +163,8 @@ def calibrate_energy(session: Session) -> dict:
         if tag is None or tag not in ZONE_MAP:
             continue
         zone = ZONE_MAP[tag]
-        if zone == "close":
-            continue  # Can't calibrate close — it's positional
+        if zone in ("intro", "close"):
+            continue  # Can't calibrate intro/close — they're positional
         features = extract_features(af)
         if features is None:
             continue

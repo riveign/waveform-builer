@@ -7,6 +7,7 @@
 
 /** Zone/tag to numeric energy value (0-1). Matches backend ENERGY_TAG_VALUES. */
 export const ENERGY_VALUES: Record<string, number> = {
+	intro: 0.1,
 	low: 0.2,
 	warmup: 0.25,
 	closing: 0.35,

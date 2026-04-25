@@ -4,6 +4,7 @@
 	let { conflict }: { conflict: EnergyConflict } = $props();
 
 	const zoneColors: Record<string, string> = {
+		intro: '#6388b4',
 		warmup: '#4ecdc4',
 		build: '#ffe66d',
 		drive: '#f39c12',

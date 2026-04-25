@@ -1,5 +1,6 @@
 <script lang="ts" module>
 	export const ZONE_COLORS: Record<string, string> = {
+		intro: '#6388b4',
 		warmup: '#4ecdc4',
 		build: '#ffe66d',
 		drive: '#f39c12',
@@ -7,10 +8,11 @@
 		close: '#9b59b6',
 	};
 
-	export const ZONES = ['warmup', 'build', 'drive', 'peak', 'close'] as const;
+	export const ZONES = ['intro', 'warmup', 'build', 'drive', 'peak', 'close'] as const;
 	export type EnergyZone = (typeof ZONES)[number];
 
 	export const ZONE_TIPS: Record<string, string> = {
+		intro: 'Set opener — the first track that sets the mood and invites people in',
 		warmup: 'Low energy — opening the night, easing in',
 		build: 'Rising energy — crowd warming up, building anticipation',
 		drive: 'Mid-high energy — locked in, dancing hard',

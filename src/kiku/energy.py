@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class TrackEnergy:
     """Resolved energy for a track."""
 
-    zone: str | None       # Canonical zone: warmup, build, drive, peak, close
+    zone: str | None       # Canonical zone: intro, warmup, build, drive, peak, close
     numeric: float         # 0-1 value, always available
     source: str            # Provenance: "approved", "dir_energy", "predicted", "audio", "none"
     confidence: float      # 0-1 trust level
@@ -116,7 +116,7 @@ def numeric_to_zone(energy: float) -> str:
     """Derive zone label from numeric energy value.
 
     Uses calibrated boundaries when available, fallback otherwise.
-    "close" is positional (end of set), not derivable from energy alone.
+    "intro" and "close" are positional (start/end of set), not derivable from energy alone.
     """
     for threshold, zone in _get_zone_boundaries():
         if energy < threshold:
