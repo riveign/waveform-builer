@@ -142,14 +142,63 @@ COMPATIBLE_FAMILIES: set[frozenset[str]] = {
     frozenset({"techno", "electronic"}),
     frozenset({"house", "groove"}),
     frozenset({"house", "electronic"}),
+    frozenset({"house", "trance"}),       # progressive house <-> trance
+    frozenset({"groove", "electronic"}),   # disco/funk <-> electronica
+    frozenset({"breaks", "electronic"}),   # breakbeat <-> electronic
+    frozenset({"techno", "trance"}),       # hard trance <-> techno overlap
 }
+
+# Keyword fallback for dir_genre values not in _GENRE_TO_FAMILY.
+# Order matters: more specific keywords first to avoid false positives.
+_KEYWORD_FALLBACKS: list[tuple[str, str]] = [
+    ("techno", "techno"),
+    ("house", "house"),
+    ("trance", "trance"),
+    ("breakbeat", "breaks"),
+    ("drum and bass", "breaks"),
+    ("dnb", "breaks"),
+    ("breaks", "breaks"),
+    ("groove", "groove"),
+    ("disco", "groove"),
+    ("funk", "groove"),
+    ("hypno", "techno"),
+]
 
 
 def genre_to_family(genre: str | None) -> str:
-    """Map a genre name to its family. Returns 'other' if unrecognized."""
+    """Map a genre name to its family. Returns 'other' if unrecognized.
+
+    Tries exact dict lookup first, then keyword-based fallback for
+    dir_genre values like "Hard Techno Dark", "Techno Acid", "House Deep".
+    """
     if not genre:
         return "other"
-    return _GENRE_TO_FAMILY.get(genre.lower().strip(), "other")
+    key = genre.lower().strip()
+    # Exact match (covers both GENRE_FAMILIES and RB_GENRE_TO_FAMILY)
+    family = _GENRE_TO_FAMILY.get(key)
+    if family:
+        return family
+    # Keyword fallback for custom dir_genre names
+    for keyword, fam in _KEYWORD_FALLBACKS:
+        if keyword in key:
+            return fam
+    return "other"
+
+
+def _resolve_genre_family(track: Track) -> str:
+    """Resolve the best genre family for a track.
+
+    Tries dir_genre first, then rb_genre.  Prefers whichever yields a
+    non-"other" family so that a rich rb_genre isn't shadowed by an
+    unmapped dir_genre folder name.
+    """
+    for genre_str in [track.dir_genre, track.rb_genre]:
+        if genre_str:
+            family = genre_to_family(genre_str)
+            if family != "other":
+                return family
+    # Both mapped to "other" or both None — return whatever we got
+    return genre_to_family(track.dir_genre or track.rb_genre)
 
 
 def bpm_compatibility(bpm_a: float | None, bpm_b: float | None) -> float:
@@ -181,7 +230,11 @@ def bpm_compatibility(bpm_a: float | None, bpm_b: float | None) -> float:
 
 
 def genre_coherence(genre_a: str | None, genre_b: str | None) -> float:
-    """Score genre compatibility between two tracks."""
+    """Score genre compatibility between two tracks.
+
+    Uses genre_to_family() which includes keyword fallback, so custom
+    dir_genre names like "Hard Techno Dark" resolve correctly.
+    """
     if not genre_a or not genre_b:
         return 0.5
 
@@ -191,17 +244,50 @@ def genre_coherence(genre_a: str | None, genre_b: str | None) -> float:
     if ga == gb:
         return 1.0
 
-    family_a = _GENRE_TO_FAMILY.get(ga)
-    family_b = _GENRE_TO_FAMILY.get(gb)
+    family_a = genre_to_family(genre_a)
+    family_b = genre_to_family(genre_b)
 
-    if family_a and family_b:
-        if family_a == family_b:
-            return 0.8
-        if frozenset({family_a, family_b}) in COMPATIBLE_FAMILIES:
-            return 0.5
-        return 0.2
+    if family_a == family_b:
+        return 0.8
+    if frozenset({family_a, family_b}) in COMPATIBLE_FAMILIES:
+        return 0.5
+    # Both are "other" — we can't tell, give neutral score
+    if family_a == "other" and family_b == "other":
+        return 0.4
+    return 0.2
 
-    return 0.3
+
+def genre_momentum_bonus(
+    preceding_tracks: list[Track],
+    candidate: Track,
+    window: int = 3,
+) -> float:
+    """Bonus/penalty for genre continuity with recent tracks.
+
+    Returns a value in [-0.1, +0.1] that should be added to the
+    transition score.  Rewards staying in-family, mildly rewards
+    compatible-family moves, penalizes random jumps.
+    """
+    if not preceding_tracks:
+        return 0.0
+    recent = preceding_tracks[-window:]
+    families = [_resolve_genre_family(t) for t in recent]
+    cand_family = _resolve_genre_family(candidate)
+
+    same_count = sum(1 for f in families if f == cand_family)
+    compat_count = sum(
+        1 for f in families
+        if f != cand_family
+        and (
+            frozenset({f, cand_family}) in COMPATIBLE_FAMILIES
+            or f == "other"
+            or cand_family == "other"
+        )
+    )
+
+    ratio = (same_count + 0.5 * compat_count) / len(families)
+    # Map ratio to bonus: 1.0 → +0.1, 0.5 → 0.0, 0.0 → -0.1
+    return (ratio - 0.5) * 0.2
 
 
 def energy_fit(track: Track, target_energy: float) -> float:
@@ -291,6 +377,18 @@ def track_quality(
     return score, discovery_label
 
 
+def _best_genre_str(track: Track) -> str | None:
+    """Return the genre string that maps to the best (non-'other') family.
+
+    Tries dir_genre first, falls back to rb_genre.  Returns whichever
+    maps to a real family, or whichever is available.
+    """
+    for g in [track.dir_genre, track.rb_genre]:
+        if g and genre_to_family(g) != "other":
+            return g
+    return track.dir_genre or track.rb_genre
+
+
 def transition_score(
     from_track: Track,
     to_track: Track,
@@ -310,10 +408,10 @@ def transition_score(
     h = harmonic_score(from_track.key, to_track.key)
     e = energy_fit(to_track, target_energy)
     b = bpm_compatibility(from_track.bpm, to_track.bpm)
-    g = genre_coherence(
-        from_track.dir_genre or from_track.rb_genre,
-        to_track.dir_genre or to_track.rb_genre,
-    )
+    # Use _resolve_genre_family to pick the best genre string per track
+    from_genre = _best_genre_str(from_track)
+    to_genre = _best_genre_str(to_track)
+    g = genre_coherence(from_genre, to_genre)
     sac = (set_appearance_counts or {}).get(to_track.id, 0)
     q, _ = track_quality(to_track, prefer_playlists, discovery_density, sac)
 
@@ -342,8 +440,8 @@ def score_replacement(
         e = energy_fit(to_t, target_energy)
         b = bpm_compatibility(from_t.bpm, to_t.bpm)
         g = genre_coherence(
-            from_t.dir_genre or from_t.rb_genre,
-            to_t.dir_genre or to_t.rb_genre,
+            _best_genre_str(from_t),
+            _best_genre_str(to_t),
         )
         sac = (set_appearance_counts or {}).get(to_t.id, 0)
         q, label = track_quality(to_t, discovery_density=discovery_density, set_appearance_count=sac)
@@ -417,7 +515,7 @@ def score_transitions(
 
     if genre_filter:
         genre_conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genre_filter]
-        q = q.filter(Track.dir_genre.isnot(None))
+        genre_conditions += [Track.rb_genre.ilike(f"%{g}%") for g in genre_filter]
         q = q.filter(sql_or(*genre_conditions))
 
     candidates = q.all()

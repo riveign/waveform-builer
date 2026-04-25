@@ -73,8 +73,8 @@ def _resolve_scoring_weights() -> dict[str, float]:
         "harmonic": 0.25,
         "energy_fit": 0.20,
         "bpm_compat": 0.20,
-        "genre_coherence": 0.15,
-        "track_quality": 0.20,
+        "genre_coherence": 0.20,
+        "track_quality": 0.15,
     }
     toml = _load_toml()
     overrides = toml.get("scoring", {})

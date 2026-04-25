@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from kiku.db.models import Set, Track
 from kiku.setbuilder.constraints import EnergyProfile, parse_energy_json, parse_energy_string
 from kiku.setbuilder.planner import _get_candidate_pool, _violates_artist_cooldown
-from kiku.setbuilder.scoring import score_replacement, transition_score
+from kiku.setbuilder.scoring import genre_momentum_bonus, score_replacement, transition_score
 
 
 DEFAULT_GAP_THRESHOLD = 0.6
@@ -132,6 +132,10 @@ def fill_set(
         next_track = gap["to_track"]
         target_e = gap["target_energy"]
 
+        # Gather preceding tracks for genre momentum context
+        pos = gap["position"]
+        preceding = tracks[:pos]  # tracks before the gap
+
         scored_candidates = []
         for cand in candidates:
             if cand.id in existing_ids:
@@ -142,6 +146,9 @@ def fill_set(
                 cand, prev_track, next_track, target_energy=target_e,
                 weights=weights, discovery_density=discovery_density,
             )
+            # Genre momentum: reward candidates continuing the genre arc
+            momentum = genre_momentum_bonus(preceding, cand, window=3)
+            combined = round(combined + momentum, 3)
             scored_candidates.append((cand, combined, incoming_bd, outgoing_bd))
 
         scored_candidates.sort(key=lambda x: x[1], reverse=True)

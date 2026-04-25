@@ -29,6 +29,7 @@ def _get_candidate_pool(
 
     if genres:
         conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genres]
+        conditions += [Track.rb_genre.ilike(f"%{g}%") for g in genres]
         q = q.filter(or_(*conditions))
 
     if bpm_range:

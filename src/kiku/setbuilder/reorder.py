@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from kiku.db.models import Track
 from kiku.setbuilder.constraints import EnergyProfile
-from kiku.setbuilder.scoring import transition_score
+from kiku.setbuilder.scoring import _resolve_genre_family, transition_score
 
 
 @dataclass
@@ -27,7 +27,11 @@ def score_full_sequence(
     energy_profile: EnergyProfile | None = None,
     weights: dict[str, float] | None = None,
 ) -> float:
-    """Score a full track sequence using position-aware energy targets."""
+    """Score a full track sequence using position-aware energy targets.
+
+    Includes a genre fragmentation penalty: sequences with many genre
+    family changes score lower than sequences with genre clustering.
+    """
     if len(tracks) < 2:
         return 1.0
     total = 0.0
@@ -36,7 +40,23 @@ def score_full_sequence(
         target_e = energy_profile.target_energy_at(elapsed) if energy_profile else 0.5
         total += transition_score(tracks[i - 1], tracks[i], target_energy=target_e, weights=weights)
         elapsed += (tracks[i - 1].duration_sec or 360) / 60
-    return total / (len(tracks) - 1)
+    pairwise_avg = total / (len(tracks) - 1)
+
+    # Genre fragmentation penalty — penalize sequences with excessive
+    # genre family changes (oscillation like house→techno→house→techno).
+    families = [_resolve_genre_family(t) for t in tracks]
+    changes = sum(
+        1 for i in range(1, len(families))
+        if families[i] != families[i - 1]
+        and families[i] != "other"
+        and families[i - 1] != "other"
+    )
+    max_changes = len(tracks) - 1
+    fragmentation = changes / max_changes if max_changes > 0 else 0
+    # Mild penalty: fragmentation of 0.5 costs 0.05
+    penalty = fragmentation * 0.1
+
+    return pairwise_avg - penalty
 
 
 def optimize_gentle(
