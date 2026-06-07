@@ -786,3 +786,66 @@ class MBApplyResponse(BaseModel):
     updated_count: int
     album_key: str
     mb_release_id: str
+
+
+# ── Multi-source metadata correction (spec 016) ──────────────────────────
+
+class SourceInfo(BaseModel):
+    name: str
+    lookup_mode: str  # "url" | "search" | "files"
+    available: bool
+
+
+class SourcesResponse(BaseModel):
+    sources: list[SourceInfo]
+
+
+class CorrectionFieldChange(BaseModel):
+    field: str
+    old: str | int | None = None
+    new: str | int | None = None
+    changed: bool
+
+
+class CorrectionTrackItem(BaseModel):
+    track_id: int
+    track_title: str | None = None
+    matched_title: str | None = None
+    confidence: float = 0.0
+    changes: list[CorrectionFieldChange] = []
+
+
+class CorrectionPreviewResponse(BaseModel):
+    source: str
+    source_ref: str | None = None
+    album: str | None = None
+    artist: str | None = None
+    label: str | None = None
+    year: int | None = None
+    track_count: int = 0
+    items: list[CorrectionTrackItem] = []
+
+
+class CorrectionMatchRequest(BaseModel):
+    url: str | None = None
+    query: str | None = None  # defaults to the album's name when omitted
+    artist: str | None = None
+    candidate_index: int = 0
+    fields: list[str] | None = None
+
+
+class ApplyCorrectionItem(BaseModel):
+    track_id: int
+    values: dict[str, str | int | None]
+
+
+class ApplyCorrectionRequest(BaseModel):
+    source: str
+    source_ref: str | None = None
+    fields: list[str]
+    items: list[ApplyCorrectionItem]
+
+
+class ApplyCorrectionResponse(BaseModel):
+    updated_count: int
+    album_key: str

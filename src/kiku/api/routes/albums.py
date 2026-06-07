@@ -15,6 +15,12 @@ from kiku.api.routes.tracks import _track_to_response
 from kiku.api.schemas import (
     AlbumResponse,
     AlbumTracksResponse,
+    ApplyCorrectionRequest,
+    ApplyCorrectionResponse,
+    CorrectionFieldChange,
+    CorrectionMatchRequest,
+    CorrectionPreviewResponse,
+    CorrectionTrackItem,
     MBApplyRequest,
     MBApplyResponse,
     MBCandidate,
@@ -22,6 +28,8 @@ from kiku.api.schemas import (
     MBMappingPreviewItem,
     MBMatchResponse,
     PaginatedAlbumsResponse,
+    SourceInfo,
+    SourcesResponse,
 )
 from kiku.db.models import AlbumMetadata, Track
 from kiku.metadata.album_key import (
@@ -452,3 +460,134 @@ def _year_from_date(date_str: str | None) -> int | None:
         return int(date_str[:4])
     except (ValueError, TypeError):
         return None
+
+
+# ── Multi-source metadata correction (spec 016) ──────────────────────────
+
+
+@router.get("/sources", response_model=SourcesResponse)
+def list_sources() -> SourcesResponse:
+    """List metadata sources and whether each is usable right now."""
+    from kiku.metadata.sources import available_sources
+
+    return SourcesResponse(sources=[SourceInfo(**s) for s in available_sources()])
+
+
+@router.post("/{album_key}/match-source", response_model=CorrectionPreviewResponse)
+def match_source(
+    album_key: str,
+    body: CorrectionMatchRequest,
+    source: str = Query(..., description="bandcamp | musicbrainz | discogs | tags"),
+    db: Session = Depends(get_db),
+) -> CorrectionPreviewResponse:
+    """Check an album against a source and return a before→after diff to confirm."""
+    from kiku.metadata.models import CORRECTABLE_FIELDS
+    from kiku.metadata.service import correct_from_source
+    from kiku.metadata.sources.base import LookupUnsupported, SourceUnavailable
+
+    resolved = _find_album_by_key(db, album_key)
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Album not found")
+    _, album_artist, _ = resolved
+
+    fields = tuple(body.fields) if body.fields else CORRECTABLE_FIELDS
+    query = body.query or (resolved[0][0] if resolved[0] else None)
+
+    try:
+        candidate, tracks, corrections = correct_from_source(
+            db, source,
+            album_key=album_key, url=body.url,
+            album=query, artist=body.artist or album_artist,
+            candidate_index=body.candidate_index, fields=fields,
+        )
+    except SourceUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except LookupUnsupported as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Source lookup failed")
+        raise HTTPException(status_code=502, detail=f"Source lookup failed: {e}") from e
+
+    if candidate is None:
+        return CorrectionPreviewResponse(source=source, track_count=0, items=[])
+
+    title_by_id = {t.id: t.title for t in tracks}
+    items = [
+        CorrectionTrackItem(
+            track_id=c.track_id,
+            track_title=title_by_id.get(c.track_id),
+            matched_title=c.matched_title,
+            confidence=c.confidence,
+            changes=[
+                CorrectionFieldChange(
+                    field=ch.field, old=ch.old, new=ch.new, changed=ch.changed,
+                )
+                for ch in c.changes
+            ],
+        )
+        for c in corrections
+    ]
+    return CorrectionPreviewResponse(
+        source=candidate.source,
+        source_ref=candidate.source_id,
+        album=candidate.album,
+        artist=candidate.artist,
+        label=candidate.label,
+        year=candidate.year,
+        track_count=candidate.track_count,
+        items=items,
+    )
+
+
+@router.post("/{album_key}/apply-correction", response_model=ApplyCorrectionResponse)
+def apply_correction_endpoint(
+    album_key: str,
+    body: ApplyCorrectionRequest,
+    db: Session = Depends(get_db),
+) -> ApplyCorrectionResponse:
+    """Write the confirmed per-track field values, scoped to this album's tracks."""
+    from kiku.metadata.models import CORRECTABLE_FIELDS, FieldChange
+    from kiku.metadata.correct import _TRACK_ATTR
+
+    resolved = _find_album_by_key(db, album_key)
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Album not found")
+    album_names, album_artist, _ = resolved
+
+    allowed = set(body.fields) & set(CORRECTABLE_FIELDS)
+    valid_ids = {
+        tid for (tid,) in db.query(Track.id).filter(Track.album.in_(album_names)).all()
+    }
+
+    updated = 0
+    for item in body.items:
+        if item.track_id not in valid_ids:
+            continue
+        track = db.get(Track, item.track_id)
+        if track is None:
+            continue
+        wrote = False
+        for field, new in item.values.items():
+            if field not in allowed:
+                continue
+            change = FieldChange(field=field, old=getattr(track, _TRACK_ATTR[field], None), new=new)
+            if not change.changed:
+                continue
+            setattr(track, _TRACK_ATTR[field], new)
+            wrote = True
+        if wrote:
+            updated += 1
+
+    md = db.get(AlbumMetadata, album_key)
+    if md is None:
+        md = AlbumMetadata(album_key=album_key, album=album_names[0], album_artist=album_artist)
+        db.add(md)
+    md.source = body.source
+    md.source_ref = body.source_ref
+    if body.source == "musicbrainz":
+        md.mb_release_id = body.source_ref
+    md.last_matched_at = datetime.utcnow()
+    md.match_status = "applied"
+    db.commit()
+
+    return ApplyCorrectionResponse(updated_count=updated, album_key=album_key)
