@@ -5,6 +5,7 @@
 	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
 	import CueOverlay from '../waveform/CueOverlay.svelte';
 	import ScoreBreakdown from './ScoreBreakdown.svelte';
+	import VibeArc from './VibeArc.svelte';
 	import HarmonicBadge from './HarmonicBadge.svelte';
 	import BpmBadge from './BpmBadge.svelte';
 	import CrossfadePreview from './CrossfadePreview.svelte';
@@ -119,6 +120,10 @@
 
 		<!-- Column 2: Score breakdowns side by side -->
 		<div class="scores-col">
+			<div class="score-panel">
+				<div class="score-panel-label">Vibe</div>
+				<VibeArc trackAId={a.track_id} trackBId={b.track_id} />
+			</div>
 			<div class="score-panel">
 				<div class="score-panel-label">Builder score</div>
 				<ScoreBreakdown breakdown={transition.score_breakdown} keyA={transition.key_a} keyB={transition.key_b} />
