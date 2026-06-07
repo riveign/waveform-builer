@@ -223,6 +223,77 @@ def test_apply_mb_mapping_ignores_unknown_track_ids(albums_client, albums_db) ->
     assert res.json()["updated_count"] == 1  # only track 1 was updated
 
 
+def test_album_cover_redirects_to_track_artwork_when_no_mb(albums_client) -> None:
+    """With no AlbumMetadata + no cached CAA cover, /cover should 302 to track artwork."""
+    res = albums_client.get("/api/albums", params={"search": "solar"})
+    key = res.json()["items"][0]["album_key"]
+
+    res = albums_client.get(f"/api/albums/{key}/cover", follow_redirects=False)
+    assert res.status_code == 302
+    # Track id 1 is the cover for Solar EP (lowest disc/track/file_path)
+    assert "/api/tracks/1/artwork" in res.headers["location"]
+
+
+def test_album_cover_serves_cached_file(
+    albums_client, albums_db, tmp_path, monkeypatch
+) -> None:
+    """A pre-existing cached file should be served directly without hitting CAA."""
+    monkeypatch.setenv("KIKU_DATA_DIR", str(tmp_path))
+
+    res = albums_client.get("/api/albums", params={"search": "solar"})
+    key = res.json()["items"][0]["album_key"]
+
+    cover_dir = tmp_path / "cover_art"
+    cover_dir.mkdir(parents=True)
+    fake = b"\xff\xd8\xff\xe0cached-jpeg-bytes"
+    (cover_dir / f"{key}.jpg").write_bytes(fake)
+
+    res = albums_client.get(f"/api/albums/{key}/cover")
+    assert res.status_code == 200
+    assert res.content == fake
+    assert res.headers["content-type"].startswith("image/jpeg")
+
+
+def test_album_cover_fetches_caa_when_mb_known(
+    albums_client, albums_db, tmp_path, monkeypatch
+) -> None:
+    """If AlbumMetadata has an mb_release_id and no cache yet, CAA is called."""
+    monkeypatch.setenv("KIKU_DATA_DIR", str(tmp_path))
+
+    res = albums_client.get("/api/albums", params={"search": "solar"})
+    key = res.json()["items"][0]["album_key"]
+
+    # Pretend the album was previously matched
+    from kiku.db.models import AlbumMetadata
+    md = AlbumMetadata(
+        album_key=key,
+        album="Solar EP",
+        album_artist="Astral",
+        mb_release_id="caa-rel-7",
+        match_status="applied",
+    )
+    albums_db.add(md)
+    albums_db.commit()
+
+    payload = b"\xff\xd8\xff\xe0caa-jpeg"
+
+    def fake_fetch(mb_release_id: str, album_key: str, *, transport=None):
+        from pathlib import Path
+        d = Path(tmp_path) / "cover_art"
+        d.mkdir(parents=True, exist_ok=True)
+        out = d / f"{album_key}.jpg"
+        out.write_bytes(payload)
+        return out
+
+    monkeypatch.setattr(
+        "kiku.musicbrainz.cover_art.fetch_front_cover", fake_fetch
+    )
+
+    res = albums_client.get(f"/api/albums/{key}/cover")
+    assert res.status_code == 200
+    assert res.content == payload
+
+
 def test_match_musicbrainz_returns_candidates(albums_client) -> None:
     """MB endpoint returns candidates with mapping preview using mocked client."""
     res = albums_client.get("/api/albums", params={"search": "solar"})

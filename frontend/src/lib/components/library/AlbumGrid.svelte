@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { listAlbums, type Album } from '$lib/api/albums';
-	import { getTrackArtworkUrl } from '$lib/api/tracks';
+	import { listAlbums, getAlbumCoverUrl, type Album } from '$lib/api/albums';
 
 	let { onselect }: { onselect: (album: Album) => void } = $props();
 
@@ -83,11 +82,12 @@
 			{#each albums as album (album.album_key)}
 				<button class="card" onclick={() => onselect(album)}>
 					<div class="cover">
-						{#if album.cover_track_id !== null}
-							<img src={getTrackArtworkUrl(album.cover_track_id)} alt="" loading="lazy" />
-						{:else}
-							<div class="cover-placeholder">♪</div>
-						{/if}
+						<img
+							src={getAlbumCoverUrl(album.album_key)}
+							alt=""
+							loading="lazy"
+							onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
+						/>
 					</div>
 					<div class="info">
 						<div class="title" title={album.album}>{album.album}</div>
@@ -191,6 +191,26 @@
 		border-radius: 6px;
 		overflow: hidden;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 48px;
+		color: var(--text-dim);
+		position: relative;
+	}
+	.cover::before {
+		content: '♪';
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 48px;
+		color: var(--text-dim);
+	}
+	.cover img {
+		position: relative;
+		z-index: 1;
 	}
 	.cover img {
 		width: 100%;
@@ -198,16 +218,6 @@
 		object-fit: cover;
 		display: block;
 	}
-	.cover-placeholder {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 100%;
-		height: 100%;
-		font-size: 48px;
-		color: var(--text-dim);
-	}
-
 	.info {
 		display: flex;
 		flex-direction: column;

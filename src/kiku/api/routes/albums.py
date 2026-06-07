@@ -8,6 +8,7 @@ import re
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -217,6 +218,73 @@ def album_tracks(album_key: str, db: Session = Depends(get_db)) -> AlbumTracksRe
         album=album,
         tracks=[_track_to_response(t) for t in tracks],
     )
+
+
+@router.get("/{album_key}/cover")
+def album_cover(album_key: str, db: Session = Depends(get_db)):
+    """Serve the album cover, fetching from Cover Art Archive on first hit.
+
+    Resolution order:
+        1. On-disk cache → serve file
+        2. AlbumMetadata.mb_release_id → fetch from CAA, cache, serve
+        3. Fallback to the embedded artwork of the album's cover track (302 redirect)
+        4. 404 if nothing is available
+    """
+    from kiku.musicbrainz.cover_art import (
+        cached_cover_path,
+        fetch_front_cover,
+        is_cover_known_missing,
+    )
+
+    # 1. Cache hit
+    cached = cached_cover_path(album_key)
+    if cached:
+        return FileResponse(
+            cached,
+            media_type=_image_media_type(cached.suffix),
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+
+    # 2. Try CAA if we have an MB release id and haven't already marked missing
+    md = db.get(AlbumMetadata, album_key)
+    if md and md.mb_release_id and not is_cover_known_missing(album_key):
+        path = fetch_front_cover(md.mb_release_id, album_key)
+        if path is not None:
+            return FileResponse(
+                path,
+                media_type=_image_media_type(path.suffix),
+                headers={"Cache-Control": "public, max-age=86400"},
+            )
+
+    # 3. Fallback: redirect to the embedded artwork of the album's cover track
+    resolved = _find_album_by_key(db, album_key)
+    if resolved:
+        album_name, _, _ = resolved
+        cover_row = (
+            db.query(Track.id)
+            .filter(Track.album == album_name)
+            .order_by(
+                Track.disc_number.is_(None),
+                Track.disc_number.asc(),
+                Track.track_number.is_(None),
+                Track.track_number.asc(),
+                Track.file_path.asc(),
+            )
+            .limit(1)
+            .first()
+        )
+        if cover_row:
+            return RedirectResponse(f"/api/tracks/{cover_row[0]}/artwork", status_code=302)
+
+    # 4. Nothing
+    raise HTTPException(status_code=404, detail="No cover available")
+
+
+def _image_media_type(suffix: str) -> str:
+    s = suffix.lower().lstrip(".")
+    if s == "png":
+        return "image/png"
+    return "image/jpeg"
 
 
 @router.post("/{album_key}/match-musicbrainz", response_model=MBMatchResponse)

@@ -4,6 +4,7 @@
 	import DnaView from './dna/DnaView.svelte';
 	import EnergyTinder from './tinder/EnergyTinder.svelte';
 	import HuntView from './hunt/HuntView.svelte';
+	import AlbumsView from './library/AlbumsView.svelte';
 	import SetPlaybackBar from './set/SetPlaybackBar.svelte';
 	import PlaybackDeck from './set/PlaybackDeck.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
@@ -32,6 +33,7 @@
 		else if (e.key === '3') { ui.activeTab = 'dna'; e.preventDefault(); }
 		else if (e.key === '4') { ui.activeTab = 'tinder'; e.preventDefault(); }
 		else if (e.key === '5') { ui.activeTab = 'hunt'; e.preventDefault(); }
+		else if (e.key === '6') { ui.activeTab = 'albums'; e.preventDefault(); }
 	}
 </script>
 
@@ -54,6 +56,9 @@
 		<button class="tab" class:active={ui.activeTab === 'hunt'} onclick={() => ui.activeTab = 'hunt'}>
 			Track Hunter <span class="shortcut">5</span>
 		</button>
+		<button class="tab" class:active={ui.activeTab === 'albums'} onclick={() => ui.activeTab = 'albums'}>
+			Albums <span class="shortcut">6</span>
+		</button>
 	</div>
 	<div class="tab-content">
 		{#if ui.activeTab === 'track'}
@@ -72,6 +77,8 @@
 			<EnergyTinder />
 		{:else if ui.activeTab === 'hunt'}
 			<HuntView />
+		{:else if ui.activeTab === 'albums'}
+			<AlbumsView />
 		{/if}
 	</div>
 

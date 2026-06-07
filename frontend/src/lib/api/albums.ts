@@ -89,6 +89,10 @@ export interface ListAlbumsParams {
 	offset?: number;
 }
 
+export function getAlbumCoverUrl(albumKey: string): string {
+	return `/api/albums/${albumKey}/cover`;
+}
+
 export async function listAlbums(params: ListAlbumsParams = {}): Promise<PaginatedAlbums> {
 	const qs = new URLSearchParams();
 	for (const [k, v] of Object.entries(params)) {

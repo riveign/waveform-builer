@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Track } from '$lib/types';
-	import { getAlbumTracks, type Album } from '$lib/api/albums';
-	import { getTrackArtworkUrl } from '$lib/api/tracks';
+	import { getAlbumTracks, getAlbumCoverUrl, type Album } from '$lib/api/albums';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import MusicBrainzMatchModal from './MusicBrainzMatchModal.svelte';
 
@@ -86,11 +85,11 @@
 	{:else if album}
 		<div class="album-header">
 			<div class="cover-large">
-				{#if album.cover_track_id !== null}
-					<img src={getTrackArtworkUrl(album.cover_track_id)} alt="" />
-				{:else}
-					<div class="cover-placeholder">♪</div>
-				{/if}
+				<img
+					src={getAlbumCoverUrl(album.album_key)}
+					alt=""
+					onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
+				/>
 			</div>
 			<div class="info">
 				<div class="album-title">{album.album}</div>
@@ -184,13 +183,22 @@
 		border-radius: 8px;
 		overflow: hidden;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+		position: relative;
+	}
+	.cover-large::before {
+		content: '♪';
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 64px;
+		color: var(--text-dim);
 	}
 	.cover-large img {
+		position: relative;
+		z-index: 1;
 		width: 100%; height: 100%; object-fit: cover; display: block;
-	}
-	.cover-placeholder {
-		display: flex; align-items: center; justify-content: center;
-		width: 100%; height: 100%; font-size: 64px; color: var(--text-dim);
 	}
 
 	.info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
