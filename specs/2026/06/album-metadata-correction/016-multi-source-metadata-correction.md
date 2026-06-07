@@ -80,3 +80,19 @@ The DJ should be able to point the tool at a release — by pasting a Bandcamp U
 
 ### Migration
 - Alembic: add `source`, `source_ref` to `album_metadata` (nullable; backfill `source='musicbrainz'` where `mb_release_id` set).
+
+## OUTCOME (implemented)
+
+Delivered all six phases; 36 tests pass (4 API + 19 engine/source unit + 13 existing album tests still green).
+
+- **Engine** `src/kiku/metadata/`: `ReleaseCandidate`/`RecordingCandidate`/`TrackCorrection` models; `sources/` with bandcamp (URL scrape of `data-tralbum`+`ld+json`), musicbrainz (wraps existing client), discogs (API + token), tags (mutagen); `correct.py` (`build_correction`, `discover_tracks_for_release`, `apply_correction`); `service.py` orchestration; `album_key.py` shared with the API route (de-duplicated).
+- **Discovery precision fix**: switched from `token_set_ratio` (rewards subset titles → "You" matched "Bite the Hand That Feeds You") to `token_sort_ratio` at a 0.85 threshold.
+- **CLI** `kiku fix-album`: `--url` / `--album-key` / query, source auto-inferred from URL, rich before→after diff, `--dry-run`/`--yes`. Validated live on the real Hadone Bandcamp release (discovered the 5 vinyl tracks, filled the `disc_number` the manual fix had missed).
+- **API**: `GET /api/albums/sources`, `POST /{album_key}/match-source`, `POST /{album_key}/apply-correction` (writes only confirmed, non-empty, changed fields scoped to the album; records provenance).
+- **UI**: `FixMetadataModal.svelte` (source picker → diff with per-field toggles → apply) wired into `AlbumDetail` next to the MusicBrainz button. `svelte-check`: 0 errors.
+- **Migration** `f6a7b8c9d0e1`: `source`+`source_ref` on `album_metadata`, applied.
+
+### Notes / follow-ups
+- Spec **number collision**: another concurrent branch (`vibe-aware-sets`) used `016` for "album-artwork-enrichment" and `017` for vibe work; this spec is also numbered 016. Orchestrator should renumber on merge to keep history clean.
+- Discogs source is code-complete but inert until a token is set: `kiku config set discogs.token <TOKEN>`.
+- `tags` source depends on the files being reachable at their stored `file_path` (external drive mounted).
