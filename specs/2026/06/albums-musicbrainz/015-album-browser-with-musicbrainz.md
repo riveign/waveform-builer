@@ -796,7 +796,39 @@ git commit -m "spec(015): IMPLEMENT - album-browser-with-musicbrainz"
 - Production DB (1,703 albums) — `GET /api/albums?limit=3` returns correctly-grouped releases; `GET /api/albums/{key}/tracks` returns ordered tracks (NULL track_numbers correctly fall through to file_path sort, ready for MusicBrainz enrichment).
 
 ## Updated Doc
-<!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
+
+### Surfaces touched
+- **Library workspace** gains an Albums view: `LibraryBrowser.svelte` view-mode toggle (Tracks ⇄ Albums), persisted to `localStorage` (`kiku:libraryViewMode`). Albums was later promoted to its own workspace tab (commit `dc0d693`).
+- **New endpoints** under `/api/albums`:
+  - `GET /api/albums` — paginated, grouped releases (`search`, `sort=artist|year|recent`, `limit`, `offset`).
+  - `GET /api/albums/{album_key}/tracks` — release tracklist, ordered `disc → track → file_path`.
+  - `GET /api/albums/{album_key}/cover` — cover image (cache → CAA → embedded fallback).
+  - `POST /api/albums/{album_key}/match-musicbrainz` — candidate releases + mapping preview.
+  - `POST /api/albums/{album_key}/apply-mb-mapping` — user-confirmed write of disc/track numbers + cached `mb_release_id`.
+- **CLI / sync**: `kiku sync` now captures Rekordbox `TrackNo`/`DiscNo`; a NULL-only filename-prefix backfill runs post-sync (`src/kiku/db/filename_track_numbers.py`).
+- **DB**: migration `e5f6a7b8c9d0` adds `tracks.track_number`, `tracks.disc_number`, `ix_tracks_album`, and the `album_metadata` table.
+
+### Follow-up docs / memory
+- MEMORY index should gain an "Album Browser (spec 015)" entry pointing at `src/kiku/api/routes/albums.py`, `src/kiku/musicbrainz/`, and `frontend/.../library/Album*.svelte`.
+- No user-facing README/CHANGELOG entry is written until this merges to `origin/main` (per CHANGELOG guidelines — unreleased work is one logical unit).
 
 ## Post-Implement Review
-<!-- Filled by /spec REVIEW -->
+
+### Outcome
+All three phases shipped and are green. Album/MusicBrainz tests: **42/42 pass**. Full suite: **224 passed**; the only failures are 5 `test_energy.py::TestNumericToZone` / `TestGetTrackEnergy` cases that **pre-exist on a clean tree** (verified via `git stash`) and are calibration-data dependent — unrelated to this spec.
+
+### Post-IMPLEMENT fixes (commits after `56800e9`)
+1. **`dc0d693`** — Albums promoted to a top-level workspace tab; Cover Art Archive integration (`src/kiku/musicbrainz/cover_art.py`) with on-disk cache + `.missing` sentinels.
+2. **`52dd236`** — Sticky A–Z section headers + jump rail.
+3. **`201ccb4`** (this review pass) — three real defects found and fixed in the jump rail / albums route:
+   - **Sticky-header jump bug**: section headers were flat siblings of the scroll container, so all of them shared `.scroll` as their containing block and stacked at `top:0` instead of un-sticking. Jumping *up* read `delta ≈ 0` and did nothing; the fix wraps each header+grid in `<section class="album-section">` and measures the non-sticky wrapper (a stuck header reports the *bottom* of its section → overshoot).
+   - **Duplicate `#` section**: non-ASCII artists (e.g. `ÅMRTÜM`) sort after `Z`, creating a second `#` run that broke the keyed `{#each}`. Fixed by bucketing sections through a `Map`.
+   - **Album-key collisions + N+1**: raw album rows that normalize to the same key (casing/whitespace variants) were treated as distinct; per-album cover/artist lookups were N+1. Fixed by merging variant rows (`Track.album.in_(names)`) and replacing per-row queries with one aggregation + batched cover/metadata fetches.
+
+### Branding alignment (verified)
+CTA reads "Match on MusicBrainz" (not "Auto-fill"); confidence buckets are surfaced per-row with color (*Opinions You Can See Through*); MB writes are user-confirmed only, never silent (*Grow the Ear*). Albums view serves *Your Library Is the Lesson* — rediscovering owned releases in the artist's intended order.
+
+### Known limitations → follow-up scope
+- **Artwork coverage is sparse.** The only *automatic* cover source is embedded tags; CAA is gated behind a manual per-album MusicBrainz match, so it rarely fires. `GET /api/tracks/{id}/artwork` also returns `500` (bare `except Exception`) on unreadable/odd files. → addressed by the artwork-enrichment spec (next).
+- `albums.py:494` uses deprecated `datetime.utcnow()` — low-priority cleanup (swap to `datetime.now(UTC)`).
+- `match_status` is written (`'applied'`) but not yet surfaced in the grid as a "matched" badge.
