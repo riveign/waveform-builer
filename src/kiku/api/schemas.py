@@ -66,6 +66,8 @@ class TrackFeaturesResponse(BaseModel):
     mood_sad: float | None = None
     mood_aggressive: float | None = None
     mood_relaxed: float | None = None
+    vibe_brightness: float | None = None
+    vibe_density: float | None = None
     ml_genre: str | None = None
     ml_genre_confidence: float | None = None
     energy_intro: float | None = None
@@ -261,10 +263,13 @@ class SetBuildRequest(BaseModel):
     bpm_min: float | None = None
     bpm_max: float | None = None
     seed_track_id: int | None = None
+    end_track_id: int | None = None       # Soft ending anchor — pulls the tail toward it
     beam_width: int = 5
     playlist_preference: list[str] | None = None
     weights: ScoringWeightsRequest | None = None
     discovery_density: float = 0.0
+    vibe_preset: str | None = None        # e.g. "dark & deep", "euphoric" — see VIBE_PRESETS
+    vibe_intensity: float = 0.0           # 0 = ignore vibe, 1 = vibe steers strongly
 
 
 class SetCreateRequest(BaseModel):

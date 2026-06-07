@@ -1098,6 +1098,25 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
                   (f" [dim](skipped {skipped} with existing tags)[/]" if skipped else ""))
 
 
+@autotag_group.command("vibe")
+def autotag_vibe():
+    """Read each track's vibe — brightness (dark↔bright) and density (spacious↔busy).
+
+    Derives both from features already in your library (key, spectral shape,
+    danceability), so it runs in seconds with no audio re-analysis.
+    """
+    from kiku.db.models import get_session
+    from kiku.vibe import backfill_vibe
+
+    session = get_session()
+    console.print("[cyan]Listening for the vibe across your library...[/]")
+    result = backfill_vibe(session, recalibrate=True)
+    console.print(
+        f"[green]Read the vibe on {result['updated']} tracks[/]"
+        + (f" [dim]({result['skipped']} had too little signal)[/]" if result["skipped"] else "")
+    )
+
+
 @cli.command()
 @click.argument("url")
 @click.option("--no-comments", is_flag=True, help="Skip fetching comments (faster)")

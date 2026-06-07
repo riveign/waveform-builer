@@ -97,6 +97,8 @@ class AudioFeatures(Base):
     mood_sad = Column(Float)
     mood_aggressive = Column(Float)
     mood_relaxed = Column(Float)
+    vibe_brightness = Column(Float)  # 0 (dark) .. 1 (bright) — derived, see kiku.vibe
+    vibe_density = Column(Float)     # 0 (spacious) .. 1 (busy) — derived, see kiku.vibe
     ml_genre = Column(String)
     ml_genre_confidence = Column(Float)
     energy_intro = Column(Float)

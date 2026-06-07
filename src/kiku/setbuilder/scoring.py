@@ -10,6 +10,7 @@ from kiku.config import BPM_TOLERANCE, SCORING_WEIGHTS
 from kiku.db.models import Track
 from kiku.setbuilder.camelot import harmonic_score
 from kiku.setbuilder.constraints import dir_energy_to_numeric, zone_to_numeric
+from kiku.vibe import resolve_vibe, vibe_distance
 
 # ── Genre Families ──────────────────────────────────────────────────────
 GENRE_FAMILIES: dict[str, list[str]] = {
@@ -389,6 +390,56 @@ def _best_genre_str(track: Track) -> str | None:
     return track.dir_genre or track.rb_genre
 
 
+# ── Vibe ─────────────────────────────────────────────────────────────────
+# Vibe enters scoring as a bounded additive term (like genre-momentum and
+# BPM-progression bonuses) so the five normalized weights — and their
+# validation and the weights UI — are untouched. At full strength the term
+# shifts a transition score by roughly ±0.3.
+_VIBE_SPAN = 0.3  # max ± shift at vibe_strength = 1.0
+
+
+def vibe_target_fit(track: Track, target_vibe: tuple[float, float]) -> float:
+    """How close a track's vibe sits to the target vibe (1 = on target)."""
+    v = resolve_vibe(track)
+    return 1.0 - vibe_distance((v.brightness, v.density), target_vibe)
+
+
+def vibe_continuity(from_track: Track, to_track: Track) -> float:
+    """How smoothly two adjacent tracks' vibes connect (1 = no jump).
+
+    A low score is the jarring dark→happy clash the DJ wants to catch.
+    """
+    a = resolve_vibe(from_track)
+    b = resolve_vibe(to_track)
+    return 1.0 - vibe_distance((a.brightness, a.density), (b.brightness, b.density))
+
+
+def vibe_term(
+    from_track: Track | None,
+    to_track: Track,
+    target_vibe: tuple[float, float] | None,
+    vibe_strength: float,
+) -> tuple[float, dict | None]:
+    """Bounded additive vibe contribution and a breakdown for transparency.
+
+    Returns (contribution, breakdown). contribution is 0.0 when vibe is off.
+    """
+    if vibe_strength <= 0 or target_vibe is None:
+        return 0.0, None
+    fit = vibe_target_fit(to_track, target_vibe)
+    cont = vibe_continuity(from_track, to_track) if from_track is not None else fit
+    # Fit leads (it's what steers toward the chosen vibe); continuity smooths.
+    combined = 0.7 * fit + 0.3 * cont
+    # Map [0,1] combined → [-span, +span], scaled by strength.
+    contribution = vibe_strength * _VIBE_SPAN * (combined - 0.5) * 2.0
+    breakdown = {
+        "target_fit": round(fit, 3),
+        "continuity": round(cont, 3),
+        "contribution": round(contribution, 3),
+    }
+    return contribution, breakdown
+
+
 def transition_score(
     from_track: Track,
     to_track: Track,
@@ -397,11 +448,15 @@ def transition_score(
     weights: dict[str, float] | None = None,
     discovery_density: float = 0.0,
     set_appearance_counts: dict[int, int] | None = None,
+    target_vibe: tuple[float, float] | None = None,
+    vibe_strength: float = 0.0,
 ) -> float:
     """Compute overall transition score between two tracks.
 
     Args:
         weights: Optional per-request weight overrides. Falls back to global SCORING_WEIGHTS.
+        target_vibe: Optional (brightness, density) target for this point in the set.
+        vibe_strength: How strongly vibe steers selection (0 = off, 1 = full).
     """
     w = weights if weights is not None else SCORING_WEIGHTS
 
@@ -415,8 +470,10 @@ def transition_score(
     sac = (set_appearance_counts or {}).get(to_track.id, 0)
     q, _ = track_quality(to_track, prefer_playlists, discovery_density, sac)
 
-    return (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
+    base = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
             + w["genre_coherence"] * g + w["track_quality"] * q)
+    vibe_contribution, _ = vibe_term(from_track, to_track, target_vibe, vibe_strength)
+    return base + vibe_contribution
 
 
 def score_replacement(
@@ -427,11 +484,14 @@ def score_replacement(
     weights: dict[str, float] | None = None,
     discovery_density: float = 0.0,
     set_appearance_counts: dict[int, int] | None = None,
+    target_vibe: tuple[float, float] | None = None,
+    vibe_strength: float = 0.0,
 ) -> tuple[float, dict | None, dict | None]:
     """Score a candidate as a replacement considering both neighbors.
 
     Returns (combined_score, incoming_breakdown, outgoing_breakdown).
-    Breakdowns are dicts with keys: harmonic, energy_fit, bpm_compat, genre_coherence, track_quality, total.
+    Breakdowns are dicts with keys: harmonic, energy_fit, bpm_compat,
+    genre_coherence, track_quality, vibe, total.
     """
     w = weights if weights is not None else SCORING_WEIGHTS
 
@@ -445,15 +505,17 @@ def score_replacement(
         )
         sac = (set_appearance_counts or {}).get(to_t.id, 0)
         q, label = track_quality(to_t, discovery_density=discovery_density, set_appearance_count=sac)
-        total = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
-                 + w["genre_coherence"] * g + w["track_quality"] * q)
+        base = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
+                + w["genre_coherence"] * g + w["track_quality"] * q)
+        vibe_contribution, vibe_bd = vibe_term(from_t, to_t, target_vibe, vibe_strength)
         return {
             "harmonic": round(h, 3),
             "energy_fit": round(e, 3),
             "bpm_compat": round(b, 3),
             "genre_coherence": round(g, 3),
             "track_quality": round(q, 3),
-            "total": round(total, 3),
+            "vibe": vibe_bd,
+            "total": round(base + vibe_contribution, 3),
             "discovery_label": label,
             "set_appearances": sac,
         }

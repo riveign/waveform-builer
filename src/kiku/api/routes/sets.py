@@ -239,6 +239,21 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                     return
                 seed_title = track.title
 
+            end_title = None
+            if body.end_track_id is not None:
+                end_track = db.get(Track, body.end_track_id)
+                if not end_track:
+                    yield _sse_event("error", json.dumps({"detail": "Ending track not found"}))
+                    return
+                end_title = end_track.title
+
+            # Resolve the optional vibe preset to a (brightness, density) target
+            from kiku.vibe import resolve_preset
+            preset_vibe = resolve_preset(body.vibe_preset)
+            if body.vibe_preset and preset_vibe is None:
+                yield _sse_event("error", json.dumps({"detail": f"Unknown vibe '{body.vibe_preset}'"}))
+                return
+
             # Convert per-request weight overrides if provided
             weights_dict = body.weights.model_dump() if body.weights else None
             if weights_dict:
@@ -257,6 +272,9 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                 prefer_playlists=body.playlist_preference,
                 weights=weights_dict,
                 discovery_density=body.discovery_density,
+                end_title=end_title,
+                preset_vibe=preset_vibe,
+                vibe_intensity=body.vibe_intensity,
             )
 
             if result is None:
@@ -269,9 +287,11 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
 
             ordered_tracks = sorted(result.tracks, key=lambda st: st.position)
             total_tracks = len(ordered_tracks)
+            from kiku.vibe import resolve_vibe
             for st in ordered_tracks:
                 t = st.track
                 te = get_track_energy(t) if t else None
+                tv = resolve_vibe(t) if t else None
                 yield _sse_event("track_added", json.dumps({
                     "track_id": st.track_id,
                     "title": t.title if t else None,
@@ -283,6 +303,9 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                     "resolved_energy": te.zone if te else None,
                     "energy_value": te.numeric if te else None,
                     "energy_source": te.source if te else None,
+                    "vibe_brightness": round(tv.brightness, 3) if tv else None,
+                    "vibe_density": round(tv.density, 3) if tv else None,
+                    "vibe_label": tv.label if tv else None,
                     "score": round(st.transition_score, 3) if st.transition_score else None,
                     "total_tracks_so_far": st.position,
                     "total_tracks": total_tracks,
@@ -314,6 +337,24 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
             yield _sse_event("error", json.dumps({"detail": str(exc)}))
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@router.get("/vibe-presets")
+def get_vibe_presets():
+    """List the vibe presets a DJ can build toward, with their vibe coordinates."""
+    from kiku.vibe import VIBE_PRESETS, vibe_label
+
+    return {
+        "presets": [
+            {
+                "name": name,
+                "brightness": brightness,
+                "density": density,
+                "label": vibe_label(brightness, density),
+            }
+            for name, (brightness, density) in VIBE_PRESETS.items()
+        ]
+    }
 
 
 @router.post("", response_model=SetResponse, status_code=201)
