@@ -32,20 +32,20 @@
 		return '#';
 	}
 
-	// Sections preserve the order in `albums` (backend already sorted).
+	// Sections preserve first-seen order in `albums` (backend already sorted),
+	// but collapse all non-contiguous runs of the same label into one bucket —
+	// otherwise non-ASCII artists like "ÅMRTÜM" sort after Z and create a second
+	// '#' section, violating the keyed {#each}.
 	let sections = $derived.by(() => {
 		if (!grouped) return [];
-		const out: { label: string; albums: Album[] }[] = [];
+		const buckets = new Map<string, Album[]>();
 		for (const a of albums) {
 			const label = sectionLabelFor(a, sort);
-			const last = out[out.length - 1];
-			if (last && last.label === label) {
-				last.albums.push(a);
-			} else {
-				out.push({ label, albums: [a] });
-			}
+			const existing = buckets.get(label);
+			if (existing) existing.push(a);
+			else buckets.set(label, [a]);
 		}
-		return out;
+		return Array.from(buckets, ([label, albums]) => ({ label, albums }));
 	});
 
 	async function load(reset = true) {
@@ -86,10 +86,13 @@
 
 	function jumpTo(label: string) {
 		if (!scrollEl) return;
-		const header = scrollEl.querySelector(`[data-section="${cssEscape(label)}"]`);
-		if (header) {
-			(header as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
-		}
+		const header = scrollEl.querySelector<HTMLElement>(`[data-section="${cssEscape(label)}"]`);
+		// Measure the non-sticky section wrapper, not the sticky header — a stuck
+		// header reports the bottom of its section, which would overshoot.
+		const section = header?.closest<HTMLElement>('.album-section');
+		if (!section) return;
+		const delta = section.getBoundingClientRect().top - scrollEl.getBoundingClientRect().top;
+		scrollEl.scrollTo({ top: scrollEl.scrollTop + delta, behavior: 'smooth' });
 	}
 
 	function cssEscape(s: string): string {
@@ -127,33 +130,35 @@
 			<div class="scroll" bind:this={scrollEl}>
 				{#if grouped}
 					{#each sections as section (section.label)}
-						<div class="section-header" data-section={section.label}>
-							<span class="section-label">{section.label}</span>
-							<span class="section-count">{section.albums.length}</span>
-						</div>
-						<div class="grid">
-							{#each section.albums as album (album.album_key)}
-								<button class="card" onclick={() => onselect(album)}>
-									<div class="cover">
-										<img
-											src={getAlbumCoverUrl(album.album_key)}
-											alt=""
-											loading="lazy"
-											onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
-										/>
-									</div>
-									<div class="info">
-										<div class="title" title={album.album}>{album.album}</div>
-										<div class="artist" title={album.artist}>{album.artist}</div>
-										<div class="meta-line">
-											{#if album.year}{album.year} ·{/if}
-											{album.track_count} track{album.track_count === 1 ? '' : 's'}
-											{#if album.is_compilation} · compilation{/if}
+						<section class="album-section">
+							<div class="section-header" data-section={section.label}>
+								<span class="section-label">{section.label}</span>
+								<span class="section-count">{section.albums.length}</span>
+							</div>
+							<div class="grid">
+								{#each section.albums as album (album.album_key)}
+									<button class="card" onclick={() => onselect(album)}>
+										<div class="cover">
+											<img
+												src={getAlbumCoverUrl(album.album_key)}
+												alt=""
+												loading="lazy"
+												onerror={(e) => ((e.currentTarget as HTMLImageElement).style.display = 'none')}
+											/>
 										</div>
-									</div>
-								</button>
-							{/each}
-						</div>
+										<div class="info">
+											<div class="title" title={album.album}>{album.album}</div>
+											<div class="artist" title={album.artist}>{album.artist}</div>
+											<div class="meta-line">
+												{#if album.year}{album.year} ·{/if}
+												{album.track_count} track{album.track_count === 1 ? '' : 's'}
+												{#if album.is_compilation} · compilation{/if}
+											</div>
+										</div>
+									</button>
+								{/each}
+							</div>
+						</section>
 					{/each}
 				{:else}
 					<div class="grid">
@@ -190,7 +195,16 @@
 			</div>
 
 			{#if grouped && sections.length > 1}
-				<nav class="rail" aria-label="Jump to section">
+				<nav
+					class="rail"
+					aria-label="Jump to section"
+					onwheel={(e) => {
+						if (scrollEl) {
+							scrollEl.scrollTop += e.deltaY;
+							e.preventDefault();
+						}
+					}}
+				>
 					{#each sections as section (section.label)}
 						<button
 							class="rail-item"
@@ -267,6 +281,13 @@
 		flex: 1 1 auto;
 		overflow-y: auto;
 		padding-bottom: 16px;
+		position: relative; /* containing block for the sticky section headers */
+	}
+
+	/* Per-section wrapper: each header's containing block, so sticky headers
+	   un-stick at their section boundary instead of stacking at the top. */
+	.album-section {
+		display: block;
 	}
 
 	.section-header {
@@ -407,7 +428,6 @@
 		gap: 1px;
 		padding: 8px 4px;
 		border-left: 1px solid var(--border);
-		overflow-y: auto;
 		background: var(--bg-secondary, transparent);
 	}
 	.rail-item {

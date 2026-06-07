@@ -46,81 +46,92 @@ def _album_key(album: str, artist: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
 
 
-def _resolve_album_artist(session: Session, album: str) -> tuple[str, bool]:
-    """Return (album_artist, is_compilation) for an album name.
+def _classify_artist(artist_count: int, any_artist: str | None) -> tuple[str, bool]:
+    """Resolve album_artist + is_compilation from aggregate counts.
 
-    Compilation if 2+ distinct non-null artists, otherwise the single artist.
+    COUNT(DISTINCT) and MIN() both ignore NULLs in SQL, so:
+      0 → all NULL → "Unknown Artist"
+      1 → single artist → use it
+      >1 → "Various Artists" + compilation
     """
-    rows = (
-        session.query(Track.artist)
-        .filter(Track.album == album, Track.artist.isnot(None))
-        .distinct()
-        .all()
-    )
-    artists = sorted({a[0] for a in rows if a[0]})
-    if len(artists) > 1:
+    if artist_count > 1:
         return "Various Artists", True
-    if artists:
-        return artists[0], False
+    if artist_count == 1 and any_artist:
+        return any_artist, False
     return "Unknown Artist", False
 
 
-def _build_album_response(
-    session: Session,
-    album: str,
-    artist: str,
-    year: int | None,
-    label: str | None,
-    track_count: int,
-    is_compilation: bool,
-) -> AlbumResponse:
-    key = _album_key(album, artist)
-
-    # Pick cover track: lowest (disc_number, track_number, file_path) for this album
-    cover_row = (
-        session.query(Track.id)
+def _resolve_album_artist(session: Session, album: str) -> tuple[str, bool]:
+    """Single-album lookup used by detail endpoints (tracks / cover / MB)."""
+    row = (
+        session.query(
+            func.count(func.distinct(Track.artist)).label("artist_count"),
+            func.min(Track.artist).label("any_artist"),
+        )
         .filter(Track.album == album)
-        .order_by(
+        .one()
+    )
+    return _classify_artist(row.artist_count or 0, row.any_artist)
+
+
+def _batch_cover_track_ids(session: Session, album_names: list[str]) -> dict[str, int]:
+    """Return {album_name: cover_track_id} for the given albums in one query.
+
+    Cover track = lowest (disc_number, track_number, file_path) per album.
+    """
+    if not album_names:
+        return {}
+    row_num = func.row_number().over(
+        partition_by=Track.album,
+        order_by=(
             Track.disc_number.is_(None),
             Track.disc_number.asc(),
             Track.track_number.is_(None),
             Track.track_number.asc(),
             Track.file_path.asc(),
-        )
-        .limit(1)
-        .first()
+        ),
+    ).label("rn")
+    subq = (
+        session.query(Track.id.label("tid"), Track.album.label("alb"), row_num)
+        .filter(Track.album.in_(album_names))
+        .subquery()
     )
-    cover_id = cover_row[0] if cover_row else None
-
-    md = session.get(AlbumMetadata, key)
-    return AlbumResponse(
-        album_key=key,
-        album=album,
-        artist=artist,
-        year=year,
-        label=label,
-        track_count=track_count,
-        cover_track_id=cover_id,
-        is_compilation=is_compilation,
-        mb_release_id=md.mb_release_id if md else None,
-        match_status=md.match_status if md else None,
-    )
+    rows = session.query(subq.c.alb, subq.c.tid).filter(subq.c.rn == 1).all()
+    return {alb: tid for alb, tid in rows}
 
 
-def _find_album_by_key(session: Session, album_key: str) -> tuple[str, str, bool] | None:
-    """Find the (album, album_artist, is_compilation) tuple matching an album_key.
+def _find_album_by_key(
+    session: Session, album_key: str
+) -> tuple[list[str], str, bool] | None:
+    """Find the (album_names, album_artist, is_compilation) tuple matching an album_key.
 
-    We don't store album→key mapping, so we iterate distinct albums and re-derive keys.
-    For 3k+ albums this is fine; if it grows we can persist the mapping.
+    Multiple raw album names can normalize to the same key (e.g. casing variants
+    like "Hard Work" / "Hard work"). All variants are returned so downstream
+    queries can span them via `Track.album.in_(names)`.
     """
-    albums = session.query(Track.album).filter(Track.album.isnot(None)).distinct().all()
-    for (album,) in albums:
+    rows = (
+        session.query(
+            Track.album.label("album"),
+            func.count(func.distinct(Track.artist)).label("artist_count"),
+            func.min(Track.artist).label("any_artist"),
+        )
+        .filter(Track.album.isnot(None), Track.album != "")
+        .group_by(Track.album)
+        .all()
+    )
+    matches: list[tuple[str, str, bool]] = []
+    for album, artist_count, any_artist in rows:
         if not album:
             continue
-        artist, is_comp = _resolve_album_artist(session, album)
+        artist, is_comp = _classify_artist(artist_count or 0, any_artist)
         if _album_key(album, artist) == album_key:
-            return album, artist, is_comp
-    return None
+            matches.append((album, artist, is_comp))
+    if not matches:
+        return None
+    names = [m[0] for m in matches]
+    artist = matches[0][1]
+    is_comp = any(m[2] for m in matches)
+    return names, artist, is_comp
 
 
 @router.get("", response_model=PaginatedAlbumsResponse)
@@ -135,7 +146,8 @@ def list_albums(
     offset: int = 0,
     db: Session = Depends(get_db),
 ) -> PaginatedAlbumsResponse:
-    # Aggregate per-album metadata first
+    # One aggregation gives us everything we need to classify each album.
+    # MIN(artist) doubles as the representative artist when artist_count == 1.
     agg = (
         db.query(
             Track.album.label("album"),
@@ -144,6 +156,7 @@ def list_albums(
             func.count(Track.id).label("track_count"),
             func.max(Track.date_added).label("latest_added"),
             func.count(func.distinct(Track.artist)).label("artist_count"),
+            func.min(Track.artist).label("any_artist"),
         )
         .filter(Track.album.isnot(None), Track.album != "")
         .group_by(Track.album)
@@ -161,32 +174,85 @@ def list_albums(
 
     rows = agg.all()
 
-    # Resolve album_artist per row + filter by artist if requested
-    enriched: list[tuple[str, str, int | None, str | None, int, bool, str | None]] = []
+    # Merge raw album rows that normalize to the same album_key (casing/whitespace
+    # variants). The first variant wins for display; track counts sum; year takes
+    # the earliest; latest_added takes the max. `names` holds every raw album
+    # string in this group so cover/track lookups can span all variants.
+    merged: dict[str, list] = {}  # album_key → [names, artist, year, label, count, is_comp, latest_added]
     for r in rows:
-        album_name = r.album
-        a_artist, is_comp = _resolve_album_artist(db, album_name)
+        a_artist, is_comp = _classify_artist(r.artist_count or 0, r.any_artist)
         if artist and a_artist not in artist:
             continue
-        enriched.append((
-            album_name, a_artist, r.year, r.label, r.track_count, is_comp, r.latest_added
-        ))
+        key = _album_key(r.album, a_artist)
+        if key in merged:
+            existing = merged[key]
+            existing[0].append(r.album)
+            existing[4] += r.track_count
+            if r.year is not None and (existing[2] is None or r.year < existing[2]):
+                existing[2] = r.year
+            if existing[3] is None and r.label:
+                existing[3] = r.label
+            if r.latest_added and (existing[6] is None or r.latest_added > existing[6]):
+                existing[6] = r.latest_added
+            existing[5] = existing[5] or is_comp
+        else:
+            merged[key] = [
+                [r.album], a_artist, r.year, r.label, r.track_count, is_comp, r.latest_added,
+            ]
+    # Pack as (album_key, [names], artist, year, label, count, is_comp, latest_added)
+    enriched: list[tuple[str, list[str], str, int | None, str | None, int, bool, str | None]] = [
+        (k, *v) for k, v in merged.items()  # type: ignore[misc]
+    ]
 
-    # Sort
     if sort == "year":
-        enriched.sort(key=lambda x: (x[2] is None, -(x[2] or 0)))
+        enriched.sort(key=lambda x: (x[3] is None, -(x[3] or 0)))
     elif sort == "recent":
-        enriched.sort(key=lambda x: (x[6] is None, x[6] or ""), reverse=True)
+        enriched.sort(key=lambda x: (x[7] is None, x[7] or ""), reverse=True)
     else:
-        enriched.sort(key=lambda x: (x[1].lower(), x[0].lower()))
+        enriched.sort(key=lambda x: (x[2].lower(), x[1][0].lower()))
 
     total = len(enriched)
     page = enriched[offset:offset + limit]
 
-    items = [
-        _build_album_response(db, album, artist_, year, lbl, cnt, is_comp)
-        for album, artist_, year, lbl, cnt, is_comp, _ in page
-    ]
+    # Batch cover lookup across ALL name variants on the page, then re-key by album_key.
+    all_page_names = [n for entry in page for n in entry[1]]
+    cover_by_name = _batch_cover_track_ids(db, all_page_names)
+    cover_by_key = {entry[0]: cover_by_name.get(entry[1][0]) for entry in page}
+    # If the display name had no tracks (shouldn't happen but be safe), fall back to any variant.
+    for entry in page:
+        key = entry[0]
+        if cover_by_key.get(key) is None:
+            for n in entry[1]:
+                if n in cover_by_name:
+                    cover_by_key[key] = cover_by_name[n]
+                    break
+    page_keys = [entry[0] for entry in page]
+    metadata_map: dict[str, AlbumMetadata] = (
+        {
+            md.album_key: md
+            for md in db.query(AlbumMetadata)
+            .filter(AlbumMetadata.album_key.in_(page_keys))
+            .all()
+        }
+        if page_keys
+        else {}
+    )
+
+    items: list[AlbumResponse] = []
+    for key, names, art, year, lbl, cnt, is_comp, _ in page:
+        md = metadata_map.get(key)
+        items.append(AlbumResponse(
+            album_key=key,
+            album=names[0],
+            artist=art,
+            year=year,
+            label=lbl,
+            track_count=cnt,
+            cover_track_id=cover_by_key.get(key),
+            is_compilation=is_comp,
+            mb_release_id=md.mb_release_id if md else None,
+            match_status=md.match_status if md else None,
+        ))
     return PaginatedAlbumsResponse(items=items, total=total, offset=offset, limit=limit)
 
 
@@ -195,11 +261,11 @@ def album_tracks(album_key: str, db: Session = Depends(get_db)) -> AlbumTracksRe
     resolved = _find_album_by_key(db, album_key)
     if not resolved:
         raise HTTPException(status_code=404, detail="Album not found")
-    album_name, artist, is_comp = resolved
+    album_names, artist, is_comp = resolved
 
     tracks = (
         db.query(Track)
-        .filter(Track.album == album_name)
+        .filter(Track.album.in_(album_names))
         .order_by(
             Track.disc_number.is_(None),
             Track.disc_number.asc(),
@@ -212,8 +278,21 @@ def album_tracks(album_key: str, db: Session = Depends(get_db)) -> AlbumTracksRe
 
     year = next((t.release_year for t in tracks if t.release_year), None)
     label = next((t.label for t in tracks if t.label), None)
+    cover_id = tracks[0].id if tracks else None
 
-    album = _build_album_response(db, album_name, artist, year, label, len(tracks), is_comp)
+    md = db.get(AlbumMetadata, album_key)
+    album = AlbumResponse(
+        album_key=album_key,
+        album=album_names[0],
+        artist=artist,
+        year=year,
+        label=label,
+        track_count=len(tracks),
+        cover_track_id=cover_id,
+        is_compilation=is_comp,
+        mb_release_id=md.mb_release_id if md else None,
+        match_status=md.match_status if md else None,
+    )
     return AlbumTracksResponse(
         album=album,
         tracks=[_track_to_response(t) for t in tracks],
@@ -259,10 +338,10 @@ def album_cover(album_key: str, db: Session = Depends(get_db)):
     # 3. Fallback: redirect to the embedded artwork of the album's cover track
     resolved = _find_album_by_key(db, album_key)
     if resolved:
-        album_name, _, _ = resolved
+        album_names, _, _ = resolved
         cover_row = (
             db.query(Track.id)
-            .filter(Track.album == album_name)
+            .filter(Track.album.in_(album_names))
             .order_by(
                 Track.disc_number.is_(None),
                 Track.disc_number.asc(),
@@ -292,11 +371,12 @@ def match_musicbrainz(album_key: str, db: Session = Depends(get_db)) -> MBMatchR
     resolved = _find_album_by_key(db, album_key)
     if not resolved:
         raise HTTPException(status_code=404, detail="Album not found")
-    album_name, artist, _ = resolved
+    album_names, artist, _ = resolved
+    album_name = album_names[0]
 
     tracks = (
         db.query(Track)
-        .filter(Track.album == album_name)
+        .filter(Track.album.in_(album_names))
         .order_by(Track.file_path.asc())
         .all()
     )
@@ -381,10 +461,11 @@ def apply_mb_mapping(
     resolved = _find_album_by_key(db, album_key)
     if not resolved:
         raise HTTPException(status_code=404, detail="Album not found")
-    album_name, artist, _ = resolved
+    album_names, artist, _ = resolved
+    album_name = album_names[0]
 
     valid_track_ids = {
-        tid for (tid,) in db.query(Track.id).filter(Track.album == album_name).all()
+        tid for (tid,) in db.query(Track.id).filter(Track.album.in_(album_names)).all()
     }
 
     updated = 0
