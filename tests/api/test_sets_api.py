@@ -103,6 +103,56 @@ def test_build_set_sse_bad_seed(client):
     assert "Seed track not found" in body
 
 
+def test_vibe_presets_endpoint(client):
+    resp = client.get("/api/sets/vibe-presets")
+    assert resp.status_code == 200
+    presets = resp.json()["presets"]
+    names = {p["name"] for p in presets}
+    assert "dark & deep" in names and "euphoric" in names
+    dark = next(p for p in presets if p["name"] == "dark & deep")
+    assert dark["brightness"] < 0.3 and "label" in dark
+
+
+def test_build_set_with_vibe(client):
+    resp = client.post("/api/sets/build", json={
+        "name": "Dark Set",
+        "duration_min": 30,
+        "energy_preset": "journey",
+        "beam_width": 2,
+        "vibe_preset": "dark & deep",
+        "vibe_intensity": 0.8,
+    })
+    assert resp.status_code == 200
+    body = resp.text
+    assert "event: complete" in body or "event: error" in body
+    if "event: complete" in body:
+        # track_added events should carry the derived vibe
+        assert "vibe_brightness" in body
+
+
+def test_build_set_unknown_vibe(client):
+    resp = client.post("/api/sets/build", json={
+        "name": "Bad Vibe",
+        "vibe_preset": "nonexistent vibe",
+        "vibe_intensity": 0.5,
+    })
+    assert resp.status_code == 200
+    body = resp.text
+    assert "event: error" in body
+    assert "Unknown vibe" in body
+
+
+def test_build_set_bad_end_track(client):
+    resp = client.post("/api/sets/build", json={
+        "name": "Bad End",
+        "end_track_id": 99999,
+    })
+    assert resp.status_code == 200
+    body = resp.text
+    assert "event: error" in body
+    assert "Ending track not found" in body
+
+
 # ── Track mutation tests ──
 
 
