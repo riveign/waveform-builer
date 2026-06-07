@@ -93,6 +93,95 @@ export function getAlbumCoverUrl(albumKey: string): string {
 	return `/api/albums/${albumKey}/cover`;
 }
 
+// ── Multi-source metadata correction (spec 016) ──────────────────────────
+
+export interface SourceInfo {
+	name: string;
+	lookup_mode: 'url' | 'search' | 'files';
+	available: boolean;
+}
+
+export interface CorrectionFieldChange {
+	field: string;
+	old: string | number | null;
+	new: string | number | null;
+	changed: boolean;
+}
+
+export interface CorrectionTrackItem {
+	track_id: number;
+	track_title: string | null;
+	matched_title: string | null;
+	confidence: number;
+	changes: CorrectionFieldChange[];
+}
+
+export interface CorrectionPreview {
+	source: string;
+	source_ref: string | null;
+	album: string | null;
+	artist: string | null;
+	label: string | null;
+	year: number | null;
+	track_count: number;
+	items: CorrectionTrackItem[];
+}
+
+export interface CorrectionMatchRequest {
+	url?: string;
+	query?: string;
+	artist?: string;
+	candidate_index?: number;
+	fields?: string[];
+}
+
+export interface ApplyCorrectionItem {
+	track_id: number;
+	values: Record<string, string | number | null>;
+}
+
+export interface ApplyCorrectionRequest {
+	source: string;
+	source_ref: string | null;
+	fields: string[];
+	items: ApplyCorrectionItem[];
+}
+
+export interface ApplyCorrectionResponse {
+	updated_count: number;
+	album_key: string;
+}
+
+export async function listMetadataSources(): Promise<{ sources: SourceInfo[] }> {
+	return fetchJson<{ sources: SourceInfo[] }>(`/api/albums/sources`);
+}
+
+export async function matchAlbumSource(
+	albumKey: string,
+	source: string,
+	body: CorrectionMatchRequest,
+): Promise<CorrectionPreview> {
+	return fetchJson<CorrectionPreview>(
+		`/api/albums/${albumKey}/match-source?source=${encodeURIComponent(source)}`,
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body),
+		},
+	);
+}
+
+export async function applyAlbumCorrection(
+	albumKey: string,
+	body: ApplyCorrectionRequest,
+): Promise<ApplyCorrectionResponse> {
+	return fetchJson<ApplyCorrectionResponse>(`/api/albums/${albumKey}/apply-correction`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body),
+	});
+}
+
 export async function listAlbums(params: ListAlbumsParams = {}): Promise<PaginatedAlbums> {
 	const qs = new URLSearchParams();
 	for (const [k, v] of Object.entries(params)) {

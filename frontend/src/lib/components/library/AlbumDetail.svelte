@@ -4,6 +4,7 @@
 	import { getAlbumTracks, getAlbumCoverUrl, type Album } from '$lib/api/albums';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import MusicBrainzMatchModal from './MusicBrainzMatchModal.svelte';
+	import FixMetadataModal from './FixMetadataModal.svelte';
 
 	let {
 		albumKey,
@@ -22,6 +23,7 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let mbModalOpen = $state(false);
+	let fixModalOpen = $state(false);
 
 	async function load() {
 		loading = true;
@@ -70,6 +72,10 @@
 		load();
 	}
 
+	function onFixApplied() {
+		load();
+	}
+
 	onMount(load);
 </script>
 
@@ -108,6 +114,9 @@
 					<button class="secondary" onclick={() => (mbModalOpen = true)}>
 						Match on MusicBrainz
 					</button>
+					<button class="secondary" onclick={() => (fixModalOpen = true)}>
+						Check &amp; fix metadata
+					</button>
 				</div>
 
 				{#if album.match_status === 'applied' && album.mb_release_id}
@@ -143,6 +152,13 @@
 	{albumKey}
 	kikuTracks={tracks}
 	onapply={onMBApplied}
+/>
+
+<FixMetadataModal
+	bind:open={fixModalOpen}
+	{albumKey}
+	albumName={album?.album ?? ''}
+	onapply={onFixApplied}
 />
 
 <style>
