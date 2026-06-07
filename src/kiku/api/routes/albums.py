@@ -1,10 +1,8 @@
-"""Album browsing + MusicBrainz enrichment endpoints."""
+"""Album browsing + multi-source metadata-correction endpoints."""
 
 from __future__ import annotations
 
-import hashlib
 import logging
-import re
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,52 +24,17 @@ from kiku.api.schemas import (
     PaginatedAlbumsResponse,
 )
 from kiku.db.models import AlbumMetadata, Track
+from kiku.metadata.album_key import (
+    album_key as _album_key,
+    classify_artist as _classify_artist,
+    find_album_by_key as _find_album_by_key,
+    normalize as _normalize,
+    resolve_album_artist as _resolve_album_artist,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/albums", tags=["albums"])
-
-
-_WS_RE = re.compile(r"\s+")
-
-
-def _normalize(s: str | None) -> str:
-    if not s:
-        return ""
-    return _WS_RE.sub(" ", s.strip().lower())
-
-
-def _album_key(album: str, artist: str) -> str:
-    raw = f"{_normalize(album)}|{_normalize(artist)}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
-
-
-def _classify_artist(artist_count: int, any_artist: str | None) -> tuple[str, bool]:
-    """Resolve album_artist + is_compilation from aggregate counts.
-
-    COUNT(DISTINCT) and MIN() both ignore NULLs in SQL, so:
-      0 → all NULL → "Unknown Artist"
-      1 → single artist → use it
-      >1 → "Various Artists" + compilation
-    """
-    if artist_count > 1:
-        return "Various Artists", True
-    if artist_count == 1 and any_artist:
-        return any_artist, False
-    return "Unknown Artist", False
-
-
-def _resolve_album_artist(session: Session, album: str) -> tuple[str, bool]:
-    """Single-album lookup used by detail endpoints (tracks / cover / MB)."""
-    row = (
-        session.query(
-            func.count(func.distinct(Track.artist)).label("artist_count"),
-            func.min(Track.artist).label("any_artist"),
-        )
-        .filter(Track.album == album)
-        .one()
-    )
-    return _classify_artist(row.artist_count or 0, row.any_artist)
 
 
 def _batch_cover_track_ids(session: Session, album_names: list[str]) -> dict[str, int]:
@@ -98,40 +61,6 @@ def _batch_cover_track_ids(session: Session, album_names: list[str]) -> dict[str
     )
     rows = session.query(subq.c.alb, subq.c.tid).filter(subq.c.rn == 1).all()
     return {alb: tid for alb, tid in rows}
-
-
-def _find_album_by_key(
-    session: Session, album_key: str
-) -> tuple[list[str], str, bool] | None:
-    """Find the (album_names, album_artist, is_compilation) tuple matching an album_key.
-
-    Multiple raw album names can normalize to the same key (e.g. casing variants
-    like "Hard Work" / "Hard work"). All variants are returned so downstream
-    queries can span them via `Track.album.in_(names)`.
-    """
-    rows = (
-        session.query(
-            Track.album.label("album"),
-            func.count(func.distinct(Track.artist)).label("artist_count"),
-            func.min(Track.artist).label("any_artist"),
-        )
-        .filter(Track.album.isnot(None), Track.album != "")
-        .group_by(Track.album)
-        .all()
-    )
-    matches: list[tuple[str, str, bool]] = []
-    for album, artist_count, any_artist in rows:
-        if not album:
-            continue
-        artist, is_comp = _classify_artist(artist_count or 0, any_artist)
-        if _album_key(album, artist) == album_key:
-            matches.append((album, artist, is_comp))
-    if not matches:
-        return None
-    names = [m[0] for m in matches]
-    artist = matches[0][1]
-    is_comp = any(m[2] for m in matches)
-    return names, artist, is_comp
 
 
 @router.get("", response_model=PaginatedAlbumsResponse)

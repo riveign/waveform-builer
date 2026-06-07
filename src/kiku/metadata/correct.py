@@ -184,8 +184,17 @@ def apply_correction(
         if wrote:
             touched += 1
 
-    if candidate is not None and album_key is not None:
-        _record_source(session, album_key, candidate)
+    if candidate is not None:
+        # Discovery-based corrections arrive without an album_key; once the
+        # album/artist are corrected the release IS groupable, so derive the
+        # key from the candidate to record provenance.
+        from kiku.metadata.album_key import album_key as derive_album_key
+
+        key = album_key
+        if key is None and candidate.album:
+            key = derive_album_key(candidate.album, candidate.artist or "")
+        if key is not None:
+            _record_source(session, key, candidate)
 
     if commit:
         session.commit()
