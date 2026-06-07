@@ -258,13 +258,15 @@ class OAuthToken(Base):
 
 
 class AlbumMetadata(Base):
-    """Per-album cache for MusicBrainz match state. Keyed by stable album_key hash."""
+    """Per-album cache for metadata-correction state. Keyed by stable album_key hash."""
     __tablename__ = "album_metadata"
 
     album_key = Column(String, primary_key=True)
     album = Column(String, nullable=False)
     album_artist = Column(String, nullable=False)
     mb_release_id = Column(String)
+    source = Column(String)  # "bandcamp" | "musicbrainz" | "discogs" | "tags"
+    source_ref = Column(String)  # source-specific id/url the correction came from
     last_matched_at = Column(DateTime)
     match_status = Column(String)  # "applied", "skipped"
 
