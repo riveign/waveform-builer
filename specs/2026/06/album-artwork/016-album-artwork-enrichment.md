@@ -91,7 +91,54 @@ Implement Phase A → B → C, each independently shippable. Phase A alone kills
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+### External API shapes (verified live, 2026-06-07)
+- **iTunes Search** — `GET https://itunes.apple.com/search?term=<artist+album>&entity=album&limit=5` (no auth). Response: `{ "resultCount", "results": [ { "artistName", "collectionName", "artworkUrl100", "collectionType":"Album", "trackCount", ... } ] }`.
+  - Upscale: replace the trailing `100x100bb.jpg` in `artworkUrl100` with `600x600bb.jpg` — verified `200 image/jpeg` for a real URL. Higher sizes (`1000x1000bb`) also resolve; 600 is a safe default.
+  - Filter `collectionType == "Album"` to skip non-album entities.
+- **Deezer Search** — `GET https://api.deezer.com/search/album?q=<artist album>&limit=5` (no auth). Response: `{ "data": [ { "title", "artist": { "name", ... }, "cover", "cover_big" (500px), "cover_xl" (1000px), "nb_tracks" } ] }`.
+  - `cover_xl` / `cover_big` are direct CDN image URLs — **no upscale step needed**. Note `artist` is a nested object → match on `artist.name`.
+
+### Reusable codebase patterns
+- **HTTP client template**: `src/kiku/musicbrainz/client.py` — `MusicBrainzClient` is the exact shape to mirror: `__init__(*, user_agent, transport: httpx.BaseTransport | None, timeout)`, an `httpx.Client(base_url=..., headers={"User-Agent": ...})`, context-manager (`__enter__/__exit__/close`), and a **process-wide throttle** via class vars `_last_request_at: float` + `threading.Lock` in `_throttle()`. iTunes/Deezer clients copy this (throttle gentler: ~3 req/s is fine, both are no-auth public).
+- **Query normalizer**: `src/kiku/musicbrainz/match.py:normalize_title()` strips `(Original Mix)`/`feat.`/remix parens, lowercases, collapses whitespace. Reuse for building the search term and for scoring. Scoring helper `_score()` wraps `thefuzz.fuzz.token_set_ratio / 100.0` (graceful when `thefuzz` import missing). `thefuzz[speedup]` is already a core dep.
+- **CAA fetcher**: `src/kiku/musicbrainz/cover_art.py` already implements the disk-cache + `.missing` sentinel contract used by the resolver: `cover_art_dir()`, `cached_cover_path(album_key)` (checks `jpg/png/jpeg`), `is_cover_known_missing()`, `mark_cover_missing()`, `fetch_front_cover(mb_release_id, album_key, *, transport=None)`. The new resolver generalizes this: write `data/cover_art/{album_key}.{ext}` for ANY source, not just CAA. **Gap found**: `.missing` is a bare `touch()` with no timestamp check → needs a TTL (compare `mtime` vs now) so late-added art can be retried.
+
+### Endpoints to modify
+- `src/kiku/api/routes/albums.py` `album_cover()` (~line 302) — currently inlines the cache→CAA→embedded-redirect→404 chain. Refactor to call `artwork.resolver.resolve_album_cover(db, album_key)` and record the winning source on `AlbumMetadata`.
+- `src/kiku/api/routes/tracks.py` `track_artwork()` (lines 188–250) — the `500` source is the bare `except Exception: raise HTTPException(500)` at line 249–250 (covers mutagen parse errors / OS errors on present-but-odd files; missing files already 404 at line 204). Phase A makes embedded extraction a helper that **returns `bytes | None`** (never raises); Phase C adds: if no embedded art, resolve the track's album cover (look up `Track.album` → album_key → resolver) and serve/redirect that.
+
+### Data model & migration
+- `src/kiku/db/models.py:260` `AlbumMetadata` — add `cover_source = Column(String)` (`embedded|caa|itunes|deezer`) and `cover_fetched_at = Column(DateTime)`. Both nullable.
+- Alembic head is `e5f6a7b8c9d0` (verified `alembic heads`). New revision sets `down_revision = "e5f6a7b8c9d0"`, `op.add_column("album_metadata", ...)` ×2 in `upgrade`, drops in `downgrade`. Additive only.
+
+### Test patterns
+- `tests/test_musicbrainz_client.py` is the template: `httpx.MockTransport(handler)` injected via the client's `transport=` kwarg; an **autouse fixture resets the throttle class var** between tests; handlers assert request URL/headers and return `httpx.Response(200, json=...)`. New tests: `tests/artwork/test_itunes.py`, `test_deezer.py`, `test_resolver.py`.
+- `tests/api/test_albums_api.py` + `tests/api/conftest.py` (in-memory SQLite, `get_db` override, seeded albums) — extend with cover-endpoint cases (resolver order, soft-fail on a crafted bad file, track inheritance). The resolver must accept an injected transport / source set so API tests stay offline.
+
+### Strategy
+
+**Sequencing — one IMPLEMENT, three internal phases (mirror spec 015's bundling):**
+
+**Phase A — Resolver + cache + de-500.**
+1. New `src/kiku/artwork/__init__.py`, `src/kiku/artwork/resolver.py`. Resolver owns the ordered chain and the disk cache. Define a small `CoverSource` protocol: `name: str`, `fetch(artist, album, album_key) -> bytes | None`.
+2. Extract embedded-art reading from `tracks.py` into `resolver.embedded_cover_bytes(track) -> bytes | None` (swallows mutagen/OS errors → `None`, the de-500 fix). `album_cover` and `track_artwork` both call the resolver.
+3. Add `.missing` TTL: `is_cover_known_missing(album_key, ttl_days=30)` checks sentinel `mtime`. Keep signature back-compatible (default TTL).
+4. `AlbumMetadata.cover_source/cover_fetched_at` + migration `<rev>_add_album_cover_source` (down_revision `e5f6a7b8c9d0`). Run `alembic upgrade head` against `data/dj_library.db`.
+
+**Phase B — iTunes + Deezer clients.**
+5. `src/kiku/artwork/itunes.py` (`ItunesClient`) and `deezer.py` (`DeezerClient`) — mirror `MusicBrainzClient` (injectable transport, throttle, UA). Each exposes `search_cover(artist, album) -> bytes | None`: query → pick best candidate by `token_set_ratio(normalize(artist|album), candidate) ≥ THRESHOLD` (start 80; album-only match for `Various Artists`) → download (`artworkUrl100`→`600x600bb` for iTunes; `cover_xl` for Deezer) with size cap → return bytes.
+6. Wire into resolver chain after CAA: iTunes then Deezer. On success, cache to disk + set `cover_source`.
+
+**Phase C — Track inheritance + attribution.**
+7. `track_artwork`: no embedded art → resolve album cover via `Track.album`→album_key→resolver; serve bytes or 302 to `/api/albums/{key}/cover`.
+8. Frontend: add `cover_source` to the album-detail DTO; `AlbumDetail.svelte` shows a quiet "art via iTunes/Deezer" line. Grid/table need no change (already use `getAlbumCoverUrl`/`getTrackArtworkUrl`).
+
+**Testing strategy**
+- **Unit** (`tests/artwork/`): URL upscaling (iTunes 100→600), Deezer cover-size pick, candidate threshold accept/reject (correct album vs wrong-artist decoy), `.missing` TTL boundary (fresh sentinel = missing, stale = retry), embedded soft-fail returns `None` on a crafted unreadable file.
+- **API** (`tests/api/test_albums_api.py`): resolver order with `MockTransport` (cache miss → iTunes hit; iTunes miss → Deezer hit; both miss → 404 + sentinel written); `GET /api/tracks/{id}/artwork` inherits album cover; cover endpoint **never 500s** on a bad embedded file. Inject transports/sources so no real network in CI.
+- **Coverage target**: resolver chain branches + both clients' happy/threshold-reject/network-error paths; ≥1 API test per resolution tier. Reuse the throttle-reset autouse fixture pattern.
+- **Manual E2E**: real library Albums grid — blank tiles fill in; a deliberately mistitled album does NOT get a wrong cover; AlbumDetail shows source.
 
 ## Plan
 <!-- Filled by /spec PLAN -->
