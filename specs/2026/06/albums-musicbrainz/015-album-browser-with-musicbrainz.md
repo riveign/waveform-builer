@@ -204,7 +204,538 @@ Critical: AI can ONLY modify this section.
 - Add `thefuzz[speedup]>=0.22` to core `dependencies` (currently in `hunting` extra).
 
 ## Plan
-<!-- Filled by /spec PLAN -->
+
+### Files
+
+**Backend (new)**
+- `src/kiku/db/filename_track_numbers.py` — leading-digit parser
+- `src/kiku/musicbrainz/__init__.py`
+- `src/kiku/musicbrainz/client.py` — httpx client with 1 req/s throttle
+- `src/kiku/musicbrainz/match.py` — normalization + fuzzy mapping
+- `src/kiku/api/routes/albums.py` — list, detail, MB match, MB apply
+- `alembic/versions/e5f6a7b8c9d0_add_track_numbers_and_album_metadata.py`
+
+**Backend (modified)**
+- `src/kiku/db/models.py` — Track adds `track_number`, `disc_number`; new `AlbumMetadata`
+- `src/kiku/db/sync.py:181–202` — capture TrackNo/DiscNo; post-loop filename backfill
+- `src/kiku/api/main.py:20–46` — register albums router
+- `src/kiku/api/schemas.py` — Album/MB DTOs
+- `pyproject.toml` — add `httpx` and `thefuzz[speedup]` to core deps
+
+**Frontend (new)**
+- `frontend/src/lib/api/albums.ts`
+- `frontend/src/lib/components/library/AlbumGrid.svelte`
+- `frontend/src/lib/components/library/AlbumDetail.svelte`
+- `frontend/src/lib/components/library/MusicBrainzMatchModal.svelte`
+
+**Frontend (modified)**
+- `frontend/src/lib/components/library/LibraryBrowser.svelte` — view-mode toggle
+
+**Tests (new)**
+- `tests/db/test_filename_track_numbers.py`
+- `tests/musicbrainz/test_match.py`
+- `tests/musicbrainz/test_client.py`
+- `tests/api/test_albums_api.py`
+- `tests/api/conftest.py` — extend with album fixtures
+
+### Tasks
+
+#### Task 1 — `src/kiku/db/models.py`: Add track_number, disc_number, AlbumMetadata
+Tools: editor
+
+Add `track_number` and `disc_number` columns to Track. Add new `AlbumMetadata` model at end of file (before any non-model code).
+
+````diff
+--- a/src/kiku/db/models.py
++++ b/src/kiku/db/models.py
+@@
+     release_year = Column(Integer)
++    track_number = Column(Integer)
++    disc_number = Column(Integer)
+     acquired_month = Column(String)
+@@
+ # End of models
++
++
++class AlbumMetadata(Base):
++    __tablename__ = "album_metadata"
++
++    album_key = Column(String, primary_key=True)
++    album = Column(String, nullable=False)
++    album_artist = Column(String, nullable=False)
++    mb_release_id = Column(String)
++    last_matched_at = Column(DateTime)
++    match_status = Column(String)
+````
+
+Verification:
+- `python -c "from kiku.db.models import Track, AlbumMetadata; print(Track.track_number, AlbumMetadata.album_key)"`
+
+#### Task 2 — Alembic migration
+Tools: editor
+
+Create `alembic/versions/e5f6a7b8c9d0_add_track_numbers_and_album_metadata.py`:
+
+````diff
+--- /dev/null
++++ b/alembic/versions/e5f6a7b8c9d0_add_track_numbers_and_album_metadata.py
+@@
++"""add track_number, disc_number, album_metadata
++
++Revision ID: e5f6a7b8c9d0
++Revises: d4e5f6a7b8c9
++Create Date: 2026-06-07 11:00:00.000000
++"""
++from typing import Sequence, Union
++
++from alembic import op
++import sqlalchemy as sa
++
++
++revision: str = "e5f6a7b8c9d0"
++down_revision: Union[str, None] = "d4e5f6a7b8c9"
++branch_labels: Union[str, Sequence[str], None] = None
++depends_on: Union[str, Sequence[str], None] = None
++
++
++def upgrade() -> None:
++    op.add_column("tracks", sa.Column("track_number", sa.Integer(), nullable=True))
++    op.add_column("tracks", sa.Column("disc_number", sa.Integer(), nullable=True))
++    op.create_index("ix_tracks_album", "tracks", ["album"])
++
++    op.create_table(
++        "album_metadata",
++        sa.Column("album_key", sa.String(), nullable=False),
++        sa.Column("album", sa.String(), nullable=False),
++        sa.Column("album_artist", sa.String(), nullable=False),
++        sa.Column("mb_release_id", sa.String(), nullable=True),
++        sa.Column("last_matched_at", sa.DateTime(), nullable=True),
++        sa.Column("match_status", sa.String(), nullable=True),
++        sa.PrimaryKeyConstraint("album_key"),
++    )
++
++
++def downgrade() -> None:
++    op.drop_table("album_metadata")
++    op.drop_index("ix_tracks_album", table_name="tracks")
++    op.drop_column("tracks", "disc_number")
++    op.drop_column("tracks", "track_number")
+````
+
+Verification:
+- `source .venv/bin/activate && alembic upgrade head` (against `data/dj_library.db` — should advance head to e5f6a7b8c9d0)
+- `sqlite3 data/dj_library.db "PRAGMA table_info(tracks);" | grep -E "track_number|disc_number"`
+
+#### Task 3 — `src/kiku/db/filename_track_numbers.py`: leading-digit parser
+Tools: editor
+
+Create the file with two regex patterns: `disc-track` (e.g. `01-18 Title`) and `track-only` (e.g. `09. Title`, `09 - Title`). Returns `(disc_number, track_number)` tuple with `None` for missing parts.
+
+````diff
+--- /dev/null
++++ b/src/kiku/db/filename_track_numbers.py
+@@
++"""Parse leading disc/track numbers from filenames as a fallback when Rekordbox lacks them."""
++from __future__ import annotations
++
++import os
++import re
++
++
++_DISC_TRACK = re.compile(r"^(\d{1,2})[-_](\d{1,2})[\s._-]")
++_TRACK_ONLY = re.compile(r"^(\d{1,2})[\s._-]")
++
++
++def parse_track_position(file_path: str) -> tuple[int | None, int | None]:
++    """Return (disc_number, track_number) extracted from filename.
++
++    Returns (None, None) if no leading numeric prefix is present.
++    Disc-track form `01-18 Title.flac` -> (1, 18).
++    Track-only form `09 - Title.flac` -> (None, 9).
++    Single digits accepted; values > 99 ignored.
++    """
++    base = os.path.basename(file_path or "")
++    m = _DISC_TRACK.match(base)
++    if m:
++        disc = int(m.group(1))
++        track = int(m.group(2))
++        if 0 < disc <= 99 and 0 < track <= 99:
++            return disc, track
++    m = _TRACK_ONLY.match(base)
++    if m:
++        track = int(m.group(1))
++        if 0 < track <= 99:
++            return None, track
++    return None, None
+````
+
+Verification:
+- Unit tests cover this in Task 14.
+
+#### Task 4 — `src/kiku/db/sync.py`: capture TrackNo/DiscNo + post-loop backfill
+Tools: editor
+
+In `_process_tracks`, add the two fields to `track_data`, and after the main loop call a new helper `_backfill_filename_track_numbers(session)`.
+
+````diff
+--- a/src/kiku/db/sync.py
++++ b/src/kiku/db/sync.py
+@@
+         track_data = dict(
+             title=title,
+             artist=artist,
+             album=rb_track.AlbumName,
+             label=rb_track.LabelName,
+@@
+             release_year=rb_track.ReleaseYear,
++            track_number=int(rb_track.TrackNo) if getattr(rb_track, "TrackNo", None) else None,
++            disc_number=int(rb_track.DiscNo) if getattr(rb_track, "DiscNo", None) else None,
+             acquired_month=dir_meta.acquired_month if dir_meta else None,
+             last_synced=now,
+         )
+````
+
+And add at module bottom (before `if __name__`-style guards if any):
+
+````diff
+--- a/src/kiku/db/sync.py
++++ b/src/kiku/db/sync.py
+@@
++from kiku.db.filename_track_numbers import parse_track_position
++
++
++def _backfill_filename_track_numbers(session) -> int:
++    """Fill NULL track_number/disc_number from filename leading digits. Returns count updated."""
++    updated = 0
++    rows = session.query(Track).filter(
++        Track.album.isnot(None),
++        Track.track_number.is_(None),
++        Track.file_path.isnot(None),
++    ).all()
++    for tr in rows:
++        disc, track = parse_track_position(tr.file_path)
++        if track is None:
++            continue
++        if tr.track_number is None:
++            tr.track_number = track
++            updated += 1
++        if tr.disc_number is None and disc is not None:
++            tr.disc_number = disc
++    if updated:
++        session.commit()
++    return updated
+````
+
+Then call `_backfill_filename_track_numbers(session)` inside `_process_tracks` after the main `session.commit()` and before playlist tagging. Locate by reading sync.py and inserting the call at the right line.
+
+Verification:
+- After sync runs, `SELECT COUNT(*) FROM tracks WHERE track_number IS NOT NULL;` returns ≥737.
+
+#### Task 5 — `src/kiku/api/schemas.py`: Album + MB DTOs
+Tools: editor
+
+Append to schemas.py:
+
+````diff
+--- a/src/kiku/api/schemas.py
++++ b/src/kiku/api/schemas.py
+@@
++class AlbumResponse(BaseModel):
++    album_key: str
++    album: str
++    artist: str
++    year: int | None = None
++    label: str | None = None
++    track_count: int
++    cover_track_id: int | None = None
++    is_compilation: bool = False
++    mb_release_id: str | None = None
++
++
++class PaginatedAlbumsResponse(BaseModel):
++    items: list[AlbumResponse]
++    total: int
++    offset: int
++    limit: int
++
++
++class AlbumTracksResponse(BaseModel):
++    album: AlbumResponse
++    tracks: list[TrackResponse]
++
++
++class MBCandidateRecording(BaseModel):
++    position: int
++    disc: int
++    title: str
++    length_ms: int | None = None
++
++
++class MBCandidate(BaseModel):
++    mb_release_id: str
++    title: str
++    artist: str
++    year: int | None = None
++    country: str | None = None
++    label: str | None = None
++    track_count: int
++    recordings: list[MBCandidateRecording]
++    score: float
++
++
++class MBMatchResponse(BaseModel):
++    candidates: list[MBCandidate]
++
++
++class MBMappingItem(BaseModel):
++    track_id: int
++    disc_number: int | None = None
++    track_number: int | None = None
++    mb_position: int | None = None
++    confidence: float = 0.0
++
++
++class MBApplyRequest(BaseModel):
++    mb_release_id: str
++    mappings: list[MBMappingItem]
++
++
++class MBApplyResponse(BaseModel):
++    updated_count: int
++    album_key: str
++    mb_release_id: str
+````
+
+Verification:
+- `python -c "from kiku.api.schemas import AlbumResponse, MBApplyRequest"`
+
+#### Task 6 — `src/kiku/musicbrainz/`: client + match
+Tools: editor
+
+Create `src/kiku/musicbrainz/__init__.py` (empty), `client.py`, `match.py`.
+
+`client.py`:
+- `class MusicBrainzClient` with `httpx.Client` (sync), base URL `https://musicbrainz.org/ws/2`
+- `User-Agent: Kiku/0.1 (riveign@gmail.com)`
+- `_throttle()` enforces ≥1.0s gap between requests using a class-level last-request timestamp
+- `search_releases(album, artist, limit=3) -> list[dict]` — calls `/release/?query=...&fmt=json&limit=N`, returns parsed list with id, title, artist-credit, date, country, label-info, track-count, score
+- `get_release(mb_release_id) -> dict` — calls `/release/{id}?inc=recordings&fmt=json`
+
+`match.py`:
+- `normalize_title(s: str) -> str` — lowercase, strip `(Original Mix|Extended Mix|Radio Edit|Club Mix|Original)`, `feat. X` / `ft. X`, `(... Remix)` suffix, collapse whitespace
+- `match_tracklist(kiku_tracks: list, mb_recordings: list) -> list[dict]` — greedy bipartite by `rapidfuzz.fuzz.token_set_ratio` on normalized titles. Returns per-kiku-track `{track_id, mb_position, disc_number, confidence}`.
+
+Full content shown inline in IMPLEMENT.
+
+Verification:
+- Unit tests in Task 14.
+
+#### Task 7 — `src/kiku/api/routes/albums.py`: endpoints
+Tools: editor
+
+Create the file with:
+- `router = APIRouter(prefix="/api/albums", tags=["albums"])`
+- `GET /` — list aggregated albums with filters and pagination
+- `GET /{album_key}/tracks` — return album + ordered tracks
+- `POST /{album_key}/match-musicbrainz` — call MB client, return candidates with pre-computed per-track mapping confidence
+- `POST /{album_key}/apply-mb-mapping` — write `track_number`/`disc_number`, upsert AlbumMetadata
+
+Album aggregation strategy: SQL-side group by `LOWER(TRIM(album))`, compute `album_artist` via subquery (distinct artist count > 1 → "Various Artists", else MIN(artist)). Build `album_key = sha256(normalized_album + "|" + normalized_artist)[:12]`. Cover track id = track with lowest `(disc_number, track_number, file_path)` in the album.
+
+Full content shown inline in IMPLEMENT.
+
+Verification:
+- `curl http://localhost:8000/api/albums?limit=5` returns JSON with items[].
+
+#### Task 8 — `src/kiku/api/main.py`: register router
+Tools: editor
+
+````diff
+--- a/src/kiku/api/main.py
++++ b/src/kiku/api/main.py
+@@
+-from kiku.api.routes import (
+-    tracks, audio, waveforms, sets, stats, tinder, export, config, hunt, soundcloud,
+-)
++from kiku.api.routes import (
++    tracks, audio, waveforms, sets, stats, tinder, export, config, hunt, soundcloud, albums,
++)
+@@
+     app.include_router(soundcloud.router)
++    app.include_router(albums.router)
+     return app
+````
+
+Verification:
+- App starts, `/api/albums` is in `/docs`.
+
+#### Task 9 — `pyproject.toml`: pin httpx + thefuzz in core
+Tools: editor
+
+````diff
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@
+ dependencies = [
+   "sqlalchemy>=2.0",
+   "click>=8.0",
+   "rich>=13.0",
+   "numpy>=1.21",
+   "mutagen>=1.45",
+   "tomli_w>=1.0",
+   "alembic>=1.12",
++  "httpx>=0.27",
++  "thefuzz[speedup]>=0.22",
+ ]
+````
+
+Verification:
+- `source .venv/bin/activate && python -m pip install -e '.[api]'` succeeds.
+
+#### Task 10 — `frontend/src/lib/api/albums.ts`
+Tools: editor
+
+Create with: `listAlbums(params)`, `getAlbumTracks(albumKey)`, `matchAlbumMusicBrainz(albumKey)`, `applyAlbumMusicBrainz(albumKey, body)`. Types mirror backend schemas. Full content in IMPLEMENT.
+
+Verification:
+- `cd frontend && npx svelte-check --tsconfig ./tsconfig.json` passes.
+
+#### Task 11 — `LibraryBrowser.svelte`: view-mode toggle
+Tools: editor
+
+Add a top-strip toggle (Tracks / Albums). When `mode === 'albums'`, render `<AlbumGrid>` instead of `<SearchFilters>+<TrackTable>`. Persist mode in localStorage. Track view unchanged.
+
+Verification:
+- Manual toggle in dev server.
+
+#### Task 12 — `AlbumGrid.svelte` + `AlbumDetail.svelte`
+Tools: editor
+
+`AlbumGrid.svelte`:
+- Props: `{ onselect: (album) => void }`
+- On mount: `listAlbums({limit: 60})` and render responsive grid (200px cards: artwork via `getTrackArtworkUrl(cover_track_id)`, title, artist, "YEAR · N tracks")
+- Search input + sort dropdown (recent/artist/year)
+
+`AlbumDetail.svelte`:
+- Props: `{ albumKey: string, onback: () => void }`
+- Fetches `getAlbumTracks(albumKey)`
+- Header: artwork + title + artist + year + label
+- Buttons: ▶ Play Album (calls `getPlayerStore().playSet(-(hash(albumKey)), tracks, 0)`), "Match on MusicBrainz" (opens MusicBrainzMatchModal)
+- Track list with `{disc.position}. {title} — {artist}` and play row buttons
+
+Verification:
+- Manual click-through in dev server.
+
+#### Task 13 — `MusicBrainzMatchModal.svelte`
+Tools: editor
+
+`<dialog>` pattern (mirror ImportPlaylistDialog).
+- Props: `{ open: $bindable(false), albumKey: string, kikuTracks: Track[], onapply: () => void }`
+- Step 1: on open, fetch candidates via `matchAlbumMusicBrainz(albumKey)`. Show 1–3 cards with year/label/country/track count/score; user picks one.
+- Step 2: render mapping table (your track ↔ MB position, confidence color: green ≥85, yellow 70–84, red <70). User can override `mb_position` per row via dropdown.
+- Apply button → `applyAlbumMusicBrainz(albumKey, {mb_release_id, mappings})` → fire onapply.
+
+Verification:
+- Manual on a real album with NULL track numbers.
+
+#### Task 14 — Tests: unit
+Tools: editor
+
+Create:
+- `tests/db/__init__.py` (if missing), `tests/db/test_filename_track_numbers.py`
+- `tests/musicbrainz/__init__.py`, `tests/musicbrainz/test_match.py`, `tests/musicbrainz/test_client.py`
+
+Filename tests cover: `01-18 X.flac`, `09 - X.mp3`, `09. X.mp3`, `X.mp3`, `100 X.mp3` (out of range), unicode.
+
+Match tests cover: normalization strips `(Original Mix)`, `feat.`, remix suffix; greedy bipartite picks correct positions on a 5-track mock.
+
+Client tests use `httpx.MockTransport` to fake MB responses and verify throttle (≥1.0s gap between two calls). Full content in IMPLEMENT.
+
+Verification:
+- `source .venv/bin/activate && python -m pytest tests/db tests/musicbrainz -x -q`
+
+#### Task 15 — Tests: API integration
+Tools: editor
+
+Extend `tests/api/conftest.py` to seed multi-album fixtures:
+- Album A "Numbered EP" — 3 tracks with track_number 1/2/3
+- Album B "Unnumbered LP" — 4 tracks with no track_number
+- Album C "Mix Compilation" — 5 tracks, varying artists (compilation)
+
+Create `tests/api/test_albums_api.py`:
+- `test_list_albums` — total 3, all expected keys present
+- `test_album_compilation_detected` — Album C `is_compilation=true`, artist="Various Artists"
+- `test_album_tracks_ordering` — Album A returns positions 1/2/3 in order
+- `test_album_search_by_artist` — filter narrows to expected album
+- `test_match_musicbrainz_mocked` — patches `MusicBrainzClient.search_releases` to return canned data
+- `test_apply_mb_mapping_writes_track_numbers` — POST `apply-mb-mapping`, verify DB rows updated
+
+Verification:
+- `source .venv/bin/activate && python -m pytest tests/api/test_albums_api.py -x -q`
+
+#### Task 16 — Lint
+Tools: shell
+
+````
+source .venv/bin/activate && ruff check src/kiku/db/filename_track_numbers.py src/kiku/musicbrainz/ src/kiku/api/routes/albums.py src/kiku/api/schemas.py src/kiku/db/models.py src/kiku/db/sync.py src/kiku/api/main.py
+````
+
+Frontend type-check:
+````
+cd frontend && npx svelte-check --tsconfig ./tsconfig.json 2>&1 | tail -30
+````
+
+#### Task 17 — E2E sanity
+Tools: shell
+
+- Apply migration: `source .venv/bin/activate && alembic upgrade head`
+- Restart API, hit `/api/albums?limit=3` — verify shape
+- Toggle to Albums in dev UI, open an album, Play Album, verify A/B deck queues
+- MB match flow on an unnumbered album (mock-friendly via dev real call)
+
+#### Task 18 — Commit
+Tools: git
+
+Single IMPLEMENT commit at the end:
+````
+git add -- src/kiku/db/models.py src/kiku/db/sync.py src/kiku/db/filename_track_numbers.py \
+  alembic/versions/e5f6a7b8c9d0_*.py \
+  src/kiku/musicbrainz/ \
+  src/kiku/api/main.py src/kiku/api/routes/albums.py src/kiku/api/schemas.py \
+  pyproject.toml \
+  frontend/src/lib/api/albums.ts \
+  frontend/src/lib/components/library/LibraryBrowser.svelte \
+  frontend/src/lib/components/library/AlbumGrid.svelte \
+  frontend/src/lib/components/library/AlbumDetail.svelte \
+  frontend/src/lib/components/library/MusicBrainzMatchModal.svelte \
+  tests/db/ tests/musicbrainz/ tests/api/test_albums_api.py tests/api/conftest.py \
+  specs/2026/06/albums-musicbrainz/015-album-browser-with-musicbrainz.md
+git commit -m "spec(015): IMPLEMENT - album-browser-with-musicbrainz"
+````
+
+### Validate
+
+- HLO album browsing view (L8) — covered by Task 7, 10, 11, 12.
+- HLO play in order (L8) — covered by Task 12 (`playSet(...)`).
+- HLO track-number sync from Rekordbox (L8) — Task 4.
+- HLO filename fallback (L8) — Task 3 + Task 4 backfill.
+- HLO MusicBrainz on-demand (L8) — Tasks 6, 7, 13.
+- MLO Phase A migration (L11) — Task 1, 2.
+- MLO sync TrackNo/DiscNo (L12) — Task 4.
+- MLO filename backfill (L13–L14) — Tasks 3, 4 (backfill helper).
+- MLO `GET /api/albums` + filters + pagination (L17–L19) — Task 7.
+- MLO `GET /api/albums/{album_key}/tracks` (L20) — Task 7.
+- MLO LibraryBrowser toggle (L21) — Task 11.
+- MLO AlbumGrid (L22) + AlbumDetail (L23) — Task 12.
+- MLO Compilations as "Various Artists" (L24) — Task 7 aggregation logic.
+- MLO album_metadata table (L27) — Task 1, 2.
+- MLO `POST .../match-musicbrainz` (L28) — Task 7.
+- MLO `POST .../apply-mb-mapping` (L29) — Task 7.
+- MLO fuzzy matching (L30) — Task 6 (`match.py`).
+- MLO MB client rate limit + UA (L31) — Task 6 (`client.py`).
+- MLO MB match modal (L32) — Task 13.
+- DT branding (CTA wording, "Does this look right?") — Task 13 copy.
+- DT testing (L94–L117) — Tasks 14, 15.
 
 ## Plan Review
 <!-- Filled if required to validate plan -->
