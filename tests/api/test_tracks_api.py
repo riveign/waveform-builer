@@ -2,6 +2,23 @@
 
 from __future__ import annotations
 
+from kiku.db.models import AudioFeatures
+
+
+def test_track_features_includes_vibe(client, db_session):
+    """The features endpoint must serve the derived vibe (regression: the
+    route builds the response manually and once omitted these fields)."""
+    db_session.add(AudioFeatures(
+        track_id=1, energy=0.6, spectral_centroid=1600.0, spectral_complexity=8.0,
+        danceability=0.5, vibe_brightness=0.34, vibe_density=0.74,
+    ))
+    db_session.commit()
+    resp = client.get("/api/tracks/1/features")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["vibe_brightness"] == 0.34
+    assert data["vibe_density"] == 0.74
+
 
 def test_search_tracks_default(client):
     resp = client.get("/api/tracks/search")
