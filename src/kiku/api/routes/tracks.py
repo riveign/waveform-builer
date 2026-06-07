@@ -76,6 +76,8 @@ def _track_to_response(t: Track) -> TrackResponse:
         energy_conflict=conflict_resp,
         date_added=t.date_added,
         release_year=t.release_year,
+        track_number=t.track_number,
+        disc_number=t.disc_number,
         comment=t.comment,
         playlist_tags=tags,
         genre_family=family,

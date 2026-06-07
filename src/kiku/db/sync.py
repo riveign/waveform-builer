@@ -13,6 +13,7 @@ from rich.console import Console
 from rich.progress import Progress
 from sqlalchemy.orm import Session
 
+from kiku.db.filename_track_numbers import parse_track_position
 from kiku.db.models import Track, get_session
 from kiku.db.paths import normalize_path as _normalize_path
 from kiku.parsing.directory import parse_track_path
@@ -197,6 +198,8 @@ def _process_tracks(
                 date_added=rb_track.DateCreated,
                 play_count=_safe_int(rb_track.DJPlayCount),
                 release_year=rb_track.ReleaseYear,
+                track_number=_safe_int(getattr(rb_track, "TrackNo", None)) or None,
+                disc_number=_safe_int(getattr(rb_track, "DiscNo", None)) or None,
                 acquired_month=dir_meta.acquired_month if dir_meta else None,
                 last_synced=now,
             )
@@ -222,6 +225,10 @@ def _process_tracks(
         # Sync playlist membership
         console.print("[bold]Syncing playlist tags...[/]")
         _sync_playlist_tags(db, session)
+        # Fill missing track numbers from filename prefixes (NULL-only, safe)
+        backfilled = _backfill_filename_track_numbers(session)
+        if backfilled:
+            console.print(f"  Filled track numbers from filenames for {backfilled} tracks")
         session.commit()
 
     return {
@@ -232,6 +239,33 @@ def _process_tracks(
         "artists_parsed": artists_parsed,
         "labels_added": labels_added,
     }
+
+
+def _backfill_filename_track_numbers(session: Session) -> int:
+    """Fill NULL track_number/disc_number from filename leading digits.
+
+    Only touches rows with an album and a file_path where track_number is NULL.
+    Returns count of rows updated.
+    """
+    updated = 0
+    rows = (
+        session.query(Track)
+        .filter(
+            Track.album.isnot(None),
+            Track.track_number.is_(None),
+            Track.file_path.isnot(None),
+        )
+        .all()
+    )
+    for tr in rows:
+        disc, track = parse_track_position(tr.file_path)
+        if track is None:
+            continue
+        tr.track_number = track
+        if tr.disc_number is None and disc is not None:
+            tr.disc_number = disc
+        updated += 1
+    return updated
 
 
 def _print_preview(stats: dict) -> None:

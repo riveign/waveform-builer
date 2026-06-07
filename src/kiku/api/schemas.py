@@ -46,6 +46,8 @@ class TrackResponse(BaseModel):
     energy_conflict: EnergyConflictResponse | None = None
     date_added: str | None = None
     release_year: int | None = None
+    track_number: int | None = None
+    disc_number: int | None = None
     comment: str | None = None
     playlist_tags: list[str] = []
     genre_family: str | None = None
@@ -704,3 +706,83 @@ class ScoreSequenceRequest(BaseModel):
 class ScoreSequenceResponse(BaseModel):
     total_score: float
     energy_curve: list[float]
+
+
+# ───── Albums / MusicBrainz ─────
+
+
+class AlbumResponse(BaseModel):
+    album_key: str
+    album: str
+    artist: str
+    year: int | None = None
+    label: str | None = None
+    track_count: int
+    cover_track_id: int | None = None
+    is_compilation: bool = False
+    mb_release_id: str | None = None
+    match_status: str | None = None
+
+
+class PaginatedAlbumsResponse(BaseModel):
+    items: list[AlbumResponse]
+    total: int
+    offset: int
+    limit: int
+
+
+class AlbumTracksResponse(BaseModel):
+    album: AlbumResponse
+    tracks: list[TrackResponse]
+
+
+class MBCandidateRecording(BaseModel):
+    position: int
+    disc: int = 1
+    title: str
+    length_ms: int | None = None
+
+
+class MBCandidate(BaseModel):
+    mb_release_id: str
+    title: str
+    artist: str
+    year: int | None = None
+    country: str | None = None
+    label: str | None = None
+    track_count: int
+    recordings: list[MBCandidateRecording]
+    score: float
+    mapping_preview: list["MBMappingPreviewItem"] = []
+
+
+class MBMappingPreviewItem(BaseModel):
+    track_id: int
+    track_title: str | None = None
+    mb_position: int | None = None
+    mb_disc: int | None = None
+    mb_title: str | None = None
+    confidence: float = 0.0
+
+
+class MBMatchResponse(BaseModel):
+    candidates: list[MBCandidate]
+
+
+class MBMappingItem(BaseModel):
+    track_id: int
+    disc_number: int | None = None
+    track_number: int | None = None
+    mb_position: int | None = None
+    confidence: float = 0.0
+
+
+class MBApplyRequest(BaseModel):
+    mb_release_id: str
+    mappings: list[MBMappingItem]
+
+
+class MBApplyResponse(BaseModel):
+    updated_count: int
+    album_key: str
+    mb_release_id: str

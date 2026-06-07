@@ -28,6 +28,8 @@ export interface Track {
 	energy_conflict: EnergyConflict | null;
 	date_added: string | null;
 	release_year: number | null;
+	track_number: number | null;
+	disc_number: number | null;
 	comment: string | null;
 	playlist_tags: string[];
 	genre_family: string | null;

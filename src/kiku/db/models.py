@@ -58,6 +58,8 @@ class Track(Base):
     play_count = Column(Integer, default=0)
     kiku_play_count = Column(Integer, default=0)
     release_year = Column(Integer)
+    track_number = Column(Integer)
+    disc_number = Column(Integer)
     acquired_month = Column(String)
     playlist_tags = Column(Text)  # JSON list of playlist names this track belongs to
     last_synced = Column(String)
@@ -253,6 +255,18 @@ class OAuthToken(Base):
     user_id = Column(String)  # Provider user ID
     username = Column(String)
     avatar_url = Column(String)
+
+
+class AlbumMetadata(Base):
+    """Per-album cache for MusicBrainz match state. Keyed by stable album_key hash."""
+    __tablename__ = "album_metadata"
+
+    album_key = Column(String, primary_key=True)
+    album = Column(String, nullable=False)
+    album_artist = Column(String, nullable=False)
+    mb_release_id = Column(String)
+    last_matched_at = Column(DateTime)
+    match_status = Column(String)  # "applied", "skipped"
 
 
 def _set_wal_mode(dbapi_conn, connection_record):

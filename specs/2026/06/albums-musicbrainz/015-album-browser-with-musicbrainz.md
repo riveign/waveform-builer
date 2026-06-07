@@ -741,10 +741,59 @@ git commit -m "spec(015): IMPLEMENT - album-browser-with-musicbrainz"
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+### Backend (Phase A — Foundation)
+- **Migration `e5f6a7b8c9d0`** (`alembic/versions/e5f6a7b8c9d0_add_track_numbers_and_album_metadata.py`): adds `track_number` + `disc_number` columns on `tracks`, creates `album_metadata` table, adds `ix_tracks_album` index. Down-revision `d4e5f6a7b8c9`.
+- **Model**: `Track.track_number` / `Track.disc_number` (Integer, nullable) added in `src/kiku/db/models.py`. New `AlbumMetadata` model at end of same file, PK `album_key`.
+- **Sync** (`src/kiku/db/sync.py`): reads `TrackNo` / `DiscNo` from Rekordbox `DjmdContent` via existing pyrekordbox loop. Inserts/updates on every `kiku sync`. After the playlist-tag pass, `_backfill_filename_track_numbers(session)` runs filename parsing for any track where `track_number IS NULL`.
+- **Filename parser** (`src/kiku/db/filename_track_numbers.py`): two regexes — `_DISC_TRACK = ^(\d{1,2})[-_](\d{1,2})[\s._-]` for `01-18 Title.flac`, `_TRACK_ONLY = ^(\d{1,2})[\s._-]` for `09 - Title.flac`. Values clamped to 1..99.
+
+### Backend (Phase B — Albums API)
+- **Schemas** (`src/kiku/api/schemas.py`): `AlbumResponse`, `PaginatedAlbumsResponse`, `AlbumTracksResponse`, plus `track_number` / `disc_number` added to `TrackResponse`.
+- **Router** (`src/kiku/api/routes/albums.py`): `GET /api/albums` aggregates per-album with search/artist/label/year filters and sort by `artist|year|recent`. Compilation detection: >1 distinct artist for the album → artist becomes `Various Artists`. `album_key = sha256(normalize(album)|normalize(artist))[:12]`.
+- **Tracks endpoint**: `GET /api/albums/{album_key}/tracks` orders by `(disc_number NULLS LAST, track_number NULLS LAST, file_path)`.
+- **Cover selection**: lowest position track by `(disc, track, file_path)` so the album art mirrors the on-disc opener.
+- **Tracks route patch** (`src/kiku/api/routes/tracks.py`): `_track_to_response` now emits `track_number` / `disc_number`.
+- **Wire-up** (`src/kiku/api/main.py`): `app.include_router(albums.router)`.
+
+### Backend (Phase C — MusicBrainz enrichment)
+- **MB client** (`src/kiku/musicbrainz/client.py`): raw httpx with process-wide 1 req/s throttle (`_last_request_at` + `threading.Lock`), User-Agent `Kiku/0.1 ( riveign@gmail.com )` per MB etiquette. `search_releases(album, artist, limit=3)` and `get_release(id)`. `_escape()` strips Lucene-reserved characters.
+- **Fuzzy match** (`src/kiku/musicbrainz/match.py`): `normalize_title` strips `(Original Mix)` / `feat.` / remix suffixes and lowercases. `match_tracklist` does greedy bipartite assignment using `fuzz.token_set_ratio`. Unmatched Kiku tracks get `mb_position=None, confidence=0.0`.
+- **Match endpoint** (`POST /api/albums/{album_key}/match-musicbrainz`): searches MB, fetches each candidate's full release (recordings + artist-credits + labels), runs `match_tracklist` per candidate, returns `MBCandidate[]` with `mapping_preview` inline.
+- **Apply endpoint** (`POST /api/albums/{album_key}/apply-mb-mapping`): validates `track_id ∈ album`, writes `track_number` / `disc_number` per mapping, upserts `AlbumMetadata` (`mb_release_id`, `last_matched_at`, `match_status='applied'`). Returns `updated_count`.
+
+### Frontend
+- **API client** (`frontend/src/lib/api/albums.ts`): typed `listAlbums`, `getAlbumTracks`, `matchAlbumMusicBrainz`, `applyAlbumMusicBrainz`. Mirrors backend Pydantic shapes.
+- **Type extension** (`frontend/src/lib/types/index.ts`): `track_number` / `disc_number` added to `Track`.
+- **LibraryBrowser**: Tracks / Albums view-mode toggle, persisted to `localStorage` (`kiku:libraryViewMode`). `openAlbumKey` state drives AlbumDetail navigation.
+- **AlbumGrid**: card grid with 250 ms debounced search, artist/year/recent sort, paginated load-more (60 per page). Uses `getTrackArtworkUrl(cover_track_id)` for covers.
+- **AlbumDetail**: 200×200 cover, title, artist, year/track count/label/compilation badge. `▶ Play album` calls `player.playSet(-hashKey(albumKey), tracks, startIndex)` — synthetic negative set id avoids collision with real set IDs. `Match on MusicBrainz` CTA opens the MB modal. Track list shows `positionLabel` (`"01"` or `"2.05"` for multi-disc).
+- **MusicBrainzMatchModal**: 5 stages (`loading` → `pick` → `review` → `applying` → `error`). Candidate picker shows year / label / country / track count / score. Mapping review: 4-column grid `(your track | MB position dropdown | MB title | confidence %)`. Confidence color: green ≥85%, yellow ≥70%, red <70%. Per-row override of MB position. Apply submits `MBApplyRequest` with `track_number = mb_position`.
+
+### Branding alignment
+- CTA reads "Match on MusicBrainz", never "Auto-fill" — preserves *Show the Why*.
+- Confirmation modal asks "Does this mapping look right?" — *Opinions You Can See Through*.
+- Mapping confidence rendered per-row, color-coded — *Opinions You Can See Through*.
+- DJ must click Apply on the previewed mapping — never a silent write — *Grow the Ear*.
 
 ## Test Evidence & Outputs
-<!-- Filled by explicit testing after /spec IMPLEMENT -->
+
+### Unit tests (new)
+- `tests/test_filename_track_numbers.py` — 15 cases covering disc-track, track-only, no-prefix, zero-track rejection, dir-stripping. **15/15 pass**.
+- `tests/test_musicbrainz_match.py` — 10 cases covering paren/feat/remix stripping, perfect match, remix-suffix tolerance, unmatched track handling, greedy global-best selection, multi-disc preservation. **10/10 pass**.
+- `tests/test_musicbrainz_client.py` — 4 cases using `httpx.MockTransport`: query+User-Agent, get_release inc-recordings, 1s throttle (monkeypatched `time.monotonic`/`time.sleep`), HTTP error propagation. **4/4 pass**.
+
+### API integration tests (new)
+- `tests/api/test_albums_api.py` — 10 cases against seeded in-memory SQLite with three album flavors (numbered EP / unnumbered LP / compilation): list, search, year filter, year-sort, track-number ordering, file-path fallback, 404 unknown key, apply writes track_number + caches AlbumMetadata, apply skips unknown track_ids, MB match (patched `kiku.musicbrainz.client.MusicBrainzClient`). **10/10 pass**.
+
+### Full suite
+- `python -m pytest tests/ --ignore=tests/test_energy.py -q` → **190 passed**. The single `test_energy::test_build_at_boundary` failure pre-exists on `main` (verified via `git stash`) and is unrelated to this spec.
+
+### Frontend type-check
+- `npx svelte-check` → **0 errors, 4 pre-existing warnings** (CSS line-clamp, unused selector, a11y on FillReorderDialog/ReplaceTrackModal — all unrelated files).
+
+### End-to-end smoke
+- Production DB (1,703 albums) — `GET /api/albums?limit=3` returns correctly-grouped releases; `GET /api/albums/{key}/tracks` returns ordered tracks (NULL track_numbers correctly fall through to file_path sort, ready for MusicBrainz enrichment).
 
 ## Updated Doc
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->

@@ -42,6 +42,8 @@
 			label: null,
 			date_added: null,
 			release_year: null,
+			track_number: null,
+			disc_number: null,
 			comment: null,
 			playlist_tags: [],
 			genre_family: null,
