@@ -60,6 +60,15 @@
 		return String(trackNo).padStart(2, '0');
 	}
 
+	function coverSourceLabel(source: string): string {
+		const labels: Record<string, string> = {
+			itunes: 'iTunes',
+			deezer: 'Deezer',
+			caa: 'Cover Art Archive',
+		};
+		return labels[source] ?? source;
+	}
+
 	function formatDuration(sec: number | null | undefined): string {
 		if (!sec || sec <= 0) return '';
 		const m = Math.floor(sec / 60);
@@ -121,6 +130,9 @@
 
 				{#if album.match_status === 'applied' && album.mb_release_id}
 					<div class="mb-note">Matched on MusicBrainz</div>
+				{/if}
+				{#if album.cover_source && album.cover_source !== 'embedded'}
+					<div class="art-credit">art via {coverSourceLabel(album.cover_source)}</div>
 				{/if}
 			</div>
 		</div>
@@ -264,6 +276,13 @@
 		font-size: 11px;
 		color: var(--text-dim);
 		margin-top: 8px;
+		font-style: italic;
+	}
+
+	.art-credit {
+		font-size: 11px;
+		color: var(--text-dim);
+		margin-top: 4px;
 		font-style: italic;
 	}
 

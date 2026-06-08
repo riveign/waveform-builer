@@ -223,15 +223,22 @@ def test_apply_mb_mapping_ignores_unknown_track_ids(albums_client, albums_db) ->
     assert res.json()["updated_count"] == 1  # only track 1 was updated
 
 
-def test_album_cover_redirects_to_track_artwork_when_no_mb(albums_client) -> None:
-    """With no AlbumMetadata + no cached CAA cover, /cover should 302 to track artwork."""
+def test_album_cover_404_when_nothing_resolves(albums_client, tmp_path, monkeypatch) -> None:
+    """No metadata, no embedded art (files absent), external sources miss → clean 404.
+
+    (The resolver replaced the old 302-to-track-artwork redirect: it now reads
+    embedded bytes directly and only the network sources remain — patched off here
+    to keep the test offline.)
+    """
+    monkeypatch.setenv("KIKU_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr("kiku.artwork.itunes.ItunesClient.search_cover", lambda self, a, b: None)
+    monkeypatch.setattr("kiku.artwork.deezer.DeezerClient.search_cover", lambda self, a, b: None)
+
     res = albums_client.get("/api/albums", params={"search": "solar"})
     key = res.json()["items"][0]["album_key"]
 
     res = albums_client.get(f"/api/albums/{key}/cover", follow_redirects=False)
-    assert res.status_code == 302
-    # Track id 1 is the cover for Solar EP (lowest disc/track/file_path)
-    assert "/api/tracks/1/artwork" in res.headers["location"]
+    assert res.status_code == 404
 
 
 def test_album_cover_serves_cached_file(
@@ -285,9 +292,8 @@ def test_album_cover_fetches_caa_when_mb_known(
         out.write_bytes(payload)
         return out
 
-    monkeypatch.setattr(
-        "kiku.musicbrainz.cover_art.fetch_front_cover", fake_fetch
-    )
+    # Resolver binds fetch_front_cover at import; patch it on the resolver module.
+    monkeypatch.setattr("kiku.artwork.resolver.fetch_front_cover", fake_fetch)
 
     res = albums_client.get(f"/api/albums/{key}/cover")
     assert res.status_code == 200

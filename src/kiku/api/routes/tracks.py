@@ -187,67 +187,56 @@ def record_played(track_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{track_id}/artwork")
 def track_artwork(track_id: int, db: Session = Depends(get_db)):
-    """Extract embedded artwork from a track's audio file."""
+    """Serve a track's artwork: its own embedded art, else its album's cover.
+
+    Never 500s — embedded extraction soft-fails to None, and a track with no
+    embedded art inherits the album cover via the resolver (so the Tracks table
+    and Now Playing bar fill in too). A clean 404 is the only failure the client
+    sees; the frontend hides the <img> on 404.
+    """
+    import os
+
+    from fastapi.responses import FileResponse
+
+    from kiku.artwork.resolver import embedded_cover_bytes, resolve_album_cover
+    from kiku.db.paths import normalize_path
+
     track = db.get(Track, track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    if not track.file_path:
-        raise HTTPException(status_code=404, detail="No file path for this track")
 
-    from kiku.db.paths import normalize_path
+    # 1. Embedded artwork on the file itself (soft-fail, never raises).
+    if track.file_path:
+        file_path = normalize_path(track.file_path)
+        if os.path.isfile(file_path):
+            emb = embedded_cover_bytes(file_path)
+            if emb:
+                content, mime = emb
+                return Response(
+                    content=content,
+                    media_type=mime,
+                    headers={"Cache-Control": "public, max-age=3600"},
+                )
 
-    file_path = normalize_path(track.file_path)
+    # 2. Inherit the album cover (resolver: cache → CAA → iTunes → Deezer).
+    if track.album:
+        from kiku.metadata.album_key import album_key, resolve_album_artist
 
-    import os
+        artist, _ = resolve_album_artist(db, track.album)
+        result = resolve_album_cover(db, album_key(track.album, artist))
+        if result is not None:
+            path, _source = result
+            return FileResponse(
+                path,
+                media_type=_image_media_type(path.suffix),
+                headers={"Cache-Control": "public, max-age=86400"},
+            )
 
-    if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="Audio file not found")
+    raise HTTPException(status_code=404, detail="No artwork available")
 
-    try:
-        import mutagen
 
-        audio = mutagen.File(file_path)
-        if audio is None:
-            raise HTTPException(status_code=404, detail="Could not read audio file")
-
-        image_data: bytes | None = None
-        mime_type = "image/jpeg"
-
-        # ID3 (MP3, AIFF)
-        if hasattr(audio, "tags") and audio.tags:
-            for key in audio.tags:
-                if key.startswith("APIC"):
-                    apic = audio.tags[key]
-                    image_data = apic.data
-                    mime_type = apic.mime or "image/jpeg"
-                    break
-
-        # MP4/M4A
-        if image_data is None and hasattr(audio, "tags") and audio.tags and "covr" in audio.tags:
-            covers = audio.tags["covr"]
-            if covers:
-                image_data = bytes(covers[0])
-                mime_type = "image/jpeg"
-
-        # FLAC
-        if image_data is None and hasattr(audio, "pictures"):
-            pics = audio.pictures
-            if pics:
-                image_data = pics[0].data
-                mime_type = pics[0].mime or "image/jpeg"
-
-        if not image_data:
-            raise HTTPException(status_code=404, detail="No embedded artwork")
-
-        return Response(
-            content=image_data,
-            media_type=mime_type,
-            headers={"Cache-Control": "public, max-age=3600"},
-        )
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to extract artwork")
+def _image_media_type(suffix: str) -> str:
+    return "image/png" if suffix.lower().lstrip(".") == "png" else "image/jpeg"
 
 
 @router.get("/{track_id}/sets", response_model=list[TrackSetAppearance])

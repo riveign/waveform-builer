@@ -727,6 +727,7 @@ class AlbumResponse(BaseModel):
     is_compilation: bool = False
     mb_release_id: str | None = None
     match_status: str | None = None
+    cover_source: str | None = None
 
 
 class PaginatedAlbumsResponse(BaseModel):

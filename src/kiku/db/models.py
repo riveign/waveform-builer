@@ -271,6 +271,8 @@ class AlbumMetadata(Base):
     source_ref = Column(String)  # source-specific id/url the correction came from
     last_matched_at = Column(DateTime)
     match_status = Column(String)  # "applied", "skipped"
+    cover_source = Column(String)  # "embedded" | "caa" | "itunes" | "deezer"
+    cover_fetched_at = Column(DateTime)
 
 
 def _set_wal_mode(dbapi_conn, connection_record):

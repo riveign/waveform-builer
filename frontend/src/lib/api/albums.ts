@@ -12,6 +12,7 @@ export interface Album {
 	is_compilation: boolean;
 	mb_release_id: string | null;
 	match_status: string | null;
+	cover_source: string | null;
 }
 
 export interface PaginatedAlbums {
