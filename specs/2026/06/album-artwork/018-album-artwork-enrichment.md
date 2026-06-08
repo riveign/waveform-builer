@@ -141,13 +141,31 @@ Critical: AI can ONLY modify this section.
 - **Manual E2E**: real library Albums grid — blank tiles fill in; a deliberately mistitled album does NOT get a wrong cover; AlbumDetail shows source.
 
 ## Plan
-<!-- Filled by /spec PLAN -->
+
+> Renumbered 016 → **018** on implementation: 016 is the metadata-correction track, 017 is vibe-aware-sets. RESEARCH above is preserved verbatim (verified API facts). Built as one IMPLEMENT over the three internal phases, reusing the spec-016 `src/kiku/metadata/album_key` + `src/kiku/musicbrainz/cover_art` cache rather than duplicating.
+
+**Architecture** — cover art is orthogonal to the textual `ReleaseCandidate`, so it lives in a parallel package `src/kiku/artwork/`, NOT inside the source `.search()` path:
+- `artwork/util.py` — `download_image(url, *, transport) -> (bytes, content_type) | None` (soft-fail, UA, 8 MB cap, follow redirects).
+- `artwork/match.py` — `score_candidate()` / `accept()` using `token_sort_ratio ≥ 0.85` on artist+album (album-only for Various Artists), reusing `musicbrainz.match.normalize_title`.
+- `artwork/itunes.py` `ItunesClient`, `artwork/deezer.py` `DeezerClient` — mirror `MusicBrainzClient` (injectable transport + process-wide throttle); each exposes `search_cover(artist, album) -> (bytes, ct) | None`.
+- `artwork/resolver.py` — `embedded_cover_bytes(path)` (the de-500 helper) + `resolve_album_cover(db, album_key, *, transport)` running the chain and recording `cover_source`.
+- `cover_art.py` — added `.missing` TTL (`is_cover_known_missing(key, ttl_days=30)`, stale sentinel removed) + generic `store_cover()`.
+- `albums.py` `album_cover` delegates to the resolver; `tracks.py` `track_artwork` = embedded soft-fail → album-cover inheritance, never 500.
+- DB: `AlbumMetadata.cover_source` + `.cover_fetched_at`; migration `b8c9d0e1f2a3` (down_revision `a7b8c9d0e1f2`, the current head — stacks on the vibe migration which stacked on spec-016's `f6a7b8c9d0e1`).
 
 ## Test Evidence & Outputs
-<!-- Filled by /spec IMPLEMENT -->
+
+Implemented all three phases. Backend: **294 passed** (5 pre-existing `test_energy.py::TestNumericToZone` calibration-drift failures unrelated to artwork). Frontend `svelte-check`: 0 errors.
+
+New tests (all offline via `httpx.MockTransport` + autouse throttle-reset, mirroring `test_musicbrainz_client.py`):
+- `tests/artwork/test_itunes.py` — match/upscale (100→600), wrong-artist reject, VA album-only match, empty/network soft-fail.
+- `tests/artwork/test_deezer.py` — `cover_xl`>`cover_big`>`cover` preference, nested `artist.name` match, threshold reject, network soft-fail.
+- `tests/artwork/test_resolver.py` — chain order (iTunes hit → records source; iTunes miss → Deezer; CAA-before-external when mb known; all-miss → `.missing` sentinel; cache-hit short-circuits network), embedded soft-fail on a corrupt/absent file, `.missing` TTL boundary (fresh=missing, 31d-old=retry+cleared).
+- `tests/api/test_album_cover_api.py` — track inherits album cover via mocked iTunes; **`track_artwork` returns 404 (never 500) on a corrupt file**; album cover records `cover_source` and the album-tracks DTO surfaces it.
+- Updated `tests/api/test_albums_api.py`: the old 302-redirect and CAA-monkeypatch cover tests rewritten for the resolver contract (serves bytes directly; patch `kiku.artwork.resolver.fetch_front_cover`).
 
 ## Updated Doc
-<!-- Filled by explicit documentation updates after /spec IMPLEMENT -->
+- Memory topic `album-cover-art` added; MEMORY.md index updated.
 
 ## Post-Implement Review
 <!-- Filled by /spec REVIEW -->
