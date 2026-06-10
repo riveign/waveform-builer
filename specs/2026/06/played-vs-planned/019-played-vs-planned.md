@@ -50,7 +50,56 @@ You are a senior engineer on Kiku. Honor the 7 product principles (BRANDING.md) 
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+### Data model & migrations
+- `Set` (src/kiku/db/models.py:131-144): already has `source` ("kiku"/"manual"/"m3u8"/"rb_playlist"), `source_ref`, `is_analyzed` (Integer 0/1), `analysis_cache` (Text JSON). New columns needed: `planned_set_id` (FK sets.id, nullable) + `comparison_cache` (Text JSON) + reuse the 0/1-flag pattern if needed.
+- `SetTrack` (models.py:148-160): composite PK (set_id, position), `track_id`, `transition_score`, `inferred_energy`, `inference_source` ("interpolation"/"position"). Imported sets resolve to library track IDs, so the diff is **ID-based** — no fuzzy matching needed.
+- Alembic pattern (alembic/versions/, 11 files): plain `op.add_column()` / `op.create_index()`, no batch_alter_table; linear `down_revision` chain. Most recent style: `4b88935a2dcc_add_import_columns_and_file_path_index.py`.
+
+### Import flow (hook point for candidate suggestion)
+- `import_playlist()` (src/kiku/import_playlist/service.py:111-217): dedups on `source_ref` (134-148), calls `match_tracks()` (66-108; exact_path → nocase_path → fuzzy_filename), creates Set with `source="m3u8"` (180-187), inserts SetTracks (190-195), returns `ImportResult` dataclass (24-34).
+- Candidate-suggestion hook: after set creation (~line 187) compute track-overlap (Jaccard on track_id sets) against sets with `source="kiku"`, return ranked candidates in `ImportResult` → surfaces in `ImportResultResponse` (schemas.py:543-553) for one-click linking in UI.
+
+### Analysis engine (reuse, don't rebuild)
+- `analyze_set()` (src/kiku/analysis/set_analyzer.py:66-122) returns `SetAnalysisResult` {transitions: list[TransitionAnalysis], arc: ArcAnalysis, overall_score, set_patterns, analyzed_at}; writes `analysis_cache` + `is_analyzed=1` at 118-120.
+- `ArcAnalysis` (40-48): `energy_curve: list[float]`, `energy_shape` ("flat"/"ramp-up"/"wind-down"/"peak-valley"/"roller-coaster"/"journey"), `key_journey`, `key_style`, `bpm_range`, `bpm_drift`, `bpm_style`, `genre_segments` — directly comparable per side.
+- Teaching engine (src/kiku/analysis/teaching.py): `transition_teaching_moment()` (12-45, tiered ≥0.8 / 0.6-0.8 / <0.6) and `detect_set_patterns()` (152-215). New deviation moments follow the same module/style.
+- Energy inference: `_infer_energy()` (set_analyzer.py:138-179) fills `inferred_energy` via neighbor interpolation or position ratio; `get_track_energy()` (src/kiku/energy.py:146-189) returns `TrackEnergy` {zone, numeric, source, confidence, label}; target curve via `EnergyProfile.target_energy_at()` (src/kiku/setbuilder/constraints.py:28-46); `zone_to_numeric()` (constraints.py:135-139).
+- Cache invalidation precedent: add/remove/reorder track mutations in src/kiku/api/routes/sets.py:452-487 set `is_analyzed=0; analysis_cache=None` — `comparison_cache` must be cleared in the same places (on either linked set).
+
+### API & CLI patterns
+- Analyze endpoints as the model (routes/sets.py:182-212): `POST /{set_id}/analyze` (computes + caches), `GET /{set_id}/analysis` (404 if no cache); ValueError → 404 pattern. Schemas: `SetAnalysisResponse`/`ArcAnalysisResponse`/`TransitionAnalysisResponse` (schemas.py:559-587).
+- CLI model: `analyze_set_cmd` (src/kiku/cli.py:621-684) — resolves set by ID or fuzzy name, prints summary + transition table + pattern bullets.
+
+### Frontend
+- `SetView.svelte` swaps `timeline-scroll` content between SetTimeline and TransitionDetail via `activeTransitionIndex` (lines 229-247, 354-380); analysis loads via `ui.pendingAnalysis` → `getSetAnalysis()` fallback → auto-analyze (179-217). A comparison mode slots into this same swap mechanism.
+- `EnergyFlowChart.svelte` already renders dual datasets (actual colored-by-deviation + dashed target, lines 100-136) and parses both JSON and string `energy_profile` (33-70); extending with a third "played" curve = one more dataset entry.
+- `SetTrackCard.svelte` title-row already hosts conditional badges (EnergyConflictBadge at 116-118) — deviation badges (kept/moved/cut/added) follow the same slot; BpmBadge's deviation color pattern is the style reference.
+- `TransitionDetail.svelte` `.two-col` grid (222-227) is the proven side-by-side layout to reuse for planned|played columns.
+- `ImportPlaylistDialog.svelte`: link-to-planned step fits after the force checkbox, before the result panel; `SetPicker.svelte` (props `{onselect, refreshSignal}`) is reusable as the planned-set selector.
+- `ui.svelte.ts` fields (6-12) include `selectedSetId`, `timelineViewMode`, `pendingAnalysis`; comparison state can extend here.
+- API client (src/lib/api/sets.ts): `analyzeSet`/`getSetAnalysis`/`importPlaylist` are the function templates; types in src/lib/types/index.ts (`SetAnalysis`, `ArcAnalysis`, `ImportResult` at 550-561).
+
+### Test landscape
+- Unit (tests/test_set_analysis.py:1-197): MagicMock-based track/set synthesis (`_mock_track()`), direct calls to private analyzers (`_classify_energy_shape`, `_detect_genre_segments`) — deviation engine tests follow this style.
+- API (tests/api/conftest.py:18-102): `db_session` fixture seeds 20 tracks + 1 set with 5 SetTracks; `client` fixture overrides `get_db`. test_sets_api.py shows endpoint test pattern. Gap noted: planner/filler/reorder untested (out of scope here).
+
+### Strategy
+
+**Backend first, pure-diff core, UI last.**
+1. **Migration**: add `planned_set_id` (nullable FK) + `comparison_cache` (Text) to sets — one Alembic revision, plain `op.add_column()`.
+2. **Deviation engine** — new module `src/kiku/analysis/set_compare.py`: `compare_sets(db, played_id, planned_id) -> SetComparisonResult`. Track diff on track_id multisets → kept/moved (with displacement)/cut/added; arc diff reuses `analyze_set()` per side (`ArcAnalysis` vs `ArcAnalysis`) plus planned `energy_profile` target curve vs played resolved energies (via `get_track_energy()` + `inferred_energy` fallback). Zone-jump detection: consecutive played energies vs planned curve at same elapsed position, flag jumps ≥2 zone boundaries.
+3. **Deviation teaching moments** — extend `teaching.py` with `deviation_teaching_moment(kind, context)` per taxonomy entry + `detect_deviation_patterns()` (e.g. "your adds cluster in the peak — you reach for energy under pressure"). Voice per BRANDING.md: room-speaking framing, never blame.
+4. **API**: `PUT /api/sets/{id}/link` + `DELETE /api/sets/{id}/link` (set/clear `planned_set_id`), `POST /api/sets/{id}/compare` (compute + cache), `GET /api/sets/{id}/comparison` (cached, 404 if none) — mirrors analyze/analysis pair. Candidate suggestion added to `ImportResult` (Jaccard ≥ ~0.3, top 3).
+5. **CLI**: `kiku compare <played> [<planned>]` (planned defaults to linked set) modeled on `analyze_set_cmd` output style.
+6. **Frontend**: comparison mode in SetView (banner when a set is linked / candidates exist), reuse `.two-col` for planned|played timelines with deviation badges on SetTrackCard, third dataset on EnergyFlowChart, teaching-moments panel reusing analysis-bar styling; link step in ImportPlaylistDialog using SetPicker.
+7. **Cache invalidation**: clear `comparison_cache` wherever `analysis_cache` is cleared, on both sides of the link (lookup by `planned_set_id` reverse FK).
+
+**Testing strategy**
+- Unit `tests/test_set_compare.py`: synthetic pairs — identical (all kept), full reorder (all moved + displacement signs), cut/added mixes, energy-jump fixtures; teaching-moment selection per deviation kind; candidate-suggestion Jaccard ranking.
+- API `tests/api/test_compare_api.py`: link/unlink (200/404/self-link 400), compare (200 report, 404 unlinked), cache hit + invalidation on track mutation.
+- E2E acceptance (manual): import real Rekordbox M3U8 → auto-suggested candidate → link → comparison view renders.
+- Expected coverage: deviation engine + teaching fully unit-tested; all new endpoints covered; frontend type-checked via svelte-check (no frontend test harness exists yet).
 
 ## Plan
 <!-- Filled by /spec PLAN -->
