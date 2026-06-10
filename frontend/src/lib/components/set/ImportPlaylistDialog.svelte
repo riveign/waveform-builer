@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ImportResult } from '$lib/types';
-	import { importPlaylist } from '$lib/api/sets';
+	import { importPlaylist, linkSet } from '$lib/api/sets';
 
 	let {
 		open = $bindable(false),
@@ -18,6 +18,9 @@
 	let error = $state('');
 	let result = $state<ImportResult | null>(null);
 	let dragOver = $state(false);
+	let linkedSetId = $state<number | null>(null);
+	let linking = $state(false);
+	let linkError = $state('');
 
 	$effect(() => {
 		if (open && dialogEl) {
@@ -35,6 +38,9 @@
 		loading = false;
 		error = '';
 		result = null;
+		linkedSetId = null;
+		linking = false;
+		linkError = '';
 	}
 
 	function handleClose() {
@@ -82,6 +88,20 @@
 			error = err instanceof Error ? err.message : 'Import failed';
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function doLink(plannedSetId: number) {
+		if (!result || linking) return;
+		linking = true;
+		linkError = '';
+		try {
+			await linkSet(result.set_id, plannedSetId);
+			linkedSetId = plannedSetId;
+		} catch (err) {
+			linkError = err instanceof Error ? err.message : "Couldn't link the sets";
+		} finally {
+			linking = false;
 		}
 	}
 </script>
@@ -179,6 +199,29 @@
 						{#each result.warnings as w}
 							<p class="warning">{w}</p>
 						{/each}
+					</div>
+				{/if}
+
+				{#if result.planned_candidates.length > 0}
+					<div class="candidates">
+						<p class="candidates-title">
+							This looks like a set you planned in Kiku — link it to see how the night deviated:
+						</p>
+						{#each result.planned_candidates as c}
+							<button
+								class="candidate"
+								class:linked={linkedSetId === c.set_id}
+								onclick={() => doLink(c.set_id)}
+								disabled={linking || linkedSetId !== null}
+							>
+								{c.name ?? `Set ${c.set_id}`}
+								<span class="overlap">{Math.round(c.overlap * 100)}% shared</span>
+								{#if linkedSetId === c.set_id}<span class="linked-mark">linked</span>{/if}
+							</button>
+						{/each}
+						{#if linkError}
+							<p class="error">{linkError}</p>
+						{/if}
 					</div>
 				{/if}
 
@@ -409,5 +452,45 @@
 		color: var(--color-yellow, #f39c12);
 		font-size: 12px;
 		margin: 4px 0;
+	}
+
+	.candidates {
+		margin-bottom: 12px;
+	}
+
+	.candidates-title {
+		font-size: 13px;
+		color: var(--text-dim);
+		margin: 0 0 8px;
+	}
+
+	.candidate {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		width: 100%;
+		text-align: left;
+		margin-bottom: 6px;
+		background: var(--bg-secondary);
+		color: var(--text-primary);
+	}
+
+	.candidate.linked {
+		border-color: var(--accent);
+	}
+
+	.candidate:disabled:not(.linked) {
+		opacity: 0.5;
+	}
+
+	.overlap {
+		font-size: 11px;
+		color: var(--text-dim);
+		margin-left: auto;
+	}
+
+	.linked-mark {
+		font-size: 11px;
+		color: var(--accent);
 	}
 </style>
