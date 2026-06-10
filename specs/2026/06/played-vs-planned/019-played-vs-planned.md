@@ -2530,7 +2530,56 @@ Every Human Section requirement and how this Plan complies:
 Implementation commit: 6baf4c1
 
 ## Test Evidence & Outputs
-<!-- Filled by explicit testing after /spec IMPLEMENT -->
+
+### Manual Acceptance Plan (execute and check off)
+
+**Prerequisites**
+- Backend + frontend running: `source .venv/bin/activate && kiku serve` and `cd frontend && npm run dev`
+- A Kiku-built set in the library (source="kiku")
+- A "played" M3U8. Real option: export from Rekordbox history. Quick simulation (no gig needed):
+  1. `kiku export "<your set>"` → produces an M3U8
+  2. Edit the file: reorder a few lines, delete 2 tracks, add 2 library tracks (copy paths from another export)
+  3. This simulates a night where you deviated from the plan
+
+**Scenario 1 — Import suggests the planned set**
+- [ ] Import the edited M3U8 via the import dialog (give it a new name)
+- [ ] Success panel shows "This looks like a set you planned in Kiku — link it to see how the night deviated:" with the original set listed and a "% shared" figure
+- [ ] Clicking the candidate links it (button shows linked state, no error)
+
+**Scenario 2 — Comparison view renders**
+- [ ] Open the imported set in Set Timeline → "Planned vs played" and "Unlink" buttons appear (and do NOT appear on unlinked sets)
+- [ ] Click "Planned vs played" → summary counts render (N kept / N moved / N cut / N added)
+- [ ] Two columns: "Planned — <name>" and "Played — <name>" with colored badges: kept green, moved amber with ±N displacement, cut red (dimmed row, planned column only), added blue (played column only)
+- [ ] "What the room told you" panel shows deviation teaching moments, energy delta badges where relevant
+
+**Scenario 3 — Deviation correctness spot-check**
+- [ ] A track you moved shows the correct displacement (e.g. position 3→7 shows "moved +4")
+- [ ] The 2 deleted tracks appear as cut; the 2 added tracks appear as added
+- [ ] Energy chart shows the planned curve overlay while comparison is open; hides when closed
+
+**Scenario 4 — Teaching voice**
+- [ ] Read every teaching moment: no blame, frames deviations as the room speaking, allows that your ear may have been right
+- [ ] Zone-jump phrasing appears if your edit created an early peak / skipped warmup
+
+**Scenario 5 — Cache + invalidation**
+- [ ] Reload the page, reopen the set → comparison loads instantly (cached)
+- [ ] Add or remove a track in either linked set → cached comparison is cleared; "Planned vs played" recomputes fresh
+
+**Scenario 6 — Unlink + CLI**
+- [ ] "Unlink" removes the link; comparison buttons disappear
+- [ ] `kiku compare <played_set>` errors warmly when unlinked; `kiku compare <played> <planned>` works explicitly
+- [ ] Re-link via CLI/API works (`PUT /api/sets/{id}/link`)
+
+**Scenario 7 — Edge cases**
+- [ ] Import the unedited M3U8 export → comparison reports all kept ("exactly as planned" framing)
+- [ ] Self-link rejected (400) via API
+
+**Known limitation to evaluate during acceptance**: the only UI path to link is at import time — an already-imported set can only be linked via CLI/API. If this hurts in practice, add a "Link to a planned set" picker in SetView as a follow-up.
+
+### Automated evidence (from IMPLEMENT, 2026-06-10)
+- `tests/test_set_compare.py`: 22 passed; `tests/api/test_compare_api.py`: 11 passed; full suite 327 passed (+5 pre-existing test_energy.py failures from stale calibration, unrelated)
+- svelte-check: 0 errors (matches pre-change baseline)
+- Scripted E2E loop: export → import → candidate (overlap 1.0) → link → compare (10 kept) → cached GET → CLI compare, all green
 
 ## Updated Doc
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
