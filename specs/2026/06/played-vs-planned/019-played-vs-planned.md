@@ -2497,7 +2497,37 @@ Every Human Section requirement and how this Plan complies:
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+- [x] Task 1 — Alembic migration: planned_set_id + comparison_cache — Status: Done
+- [x] Task 2 — models.py: Set columns — Status: Done
+- [x] Task 3 — teaching.py: deviation teaching moments + patterns — Status: Done
+- [x] Task 4 — set_compare.py: deviation engine (NEW module) — Status: Done
+- [x] Task 5 — schemas.py: comparison + candidate + link models — Status: Done
+- [x] Task 6 — import service: planned-set candidate suggestion — Status: Done
+- [x] Task 7 — routes/sets.py: link + compare endpoints — Status: Done
+- [x] Task 8 — routes/sets.py: cache invalidation + candidates + set_detail — Status: Done
+- [x] Task 9 — cli.py: `kiku compare` command — Status: Done
+- [x] Task 10 — frontend types — Status: Done
+- [x] Task 11 — frontend API client — Status: Done
+- [x] Task 12 — EnergyFlowChart: plannedCurve overlay prop — Status: Done
+- [x] Task 13 — SetComparison.svelte (NEW component) — Status: Done
+- [x] Task 14 — SetView.svelte: comparison mode — Status: Done
+- [x] Task 15 — ImportPlaylistDialog: one-click link step — Status: Done
+- [x] Task 16 — unit tests: tests/test_set_compare.py (NEW) — Status: Done (22 passed)
+- [x] Task 17 — API tests: tests/api/test_compare_api.py (NEW) — Status: Done (11 passed)
+- [x] Task 18 — Lint & type-check all changed files — Status: Done (py_compile OK; svelte-check 0 errors, 4 pre-existing warnings = baseline)
+- [x] Task 19 — Full backend test suite — Status: Done (327 passed, 33 new; 5 failures in tests/test_energy.py are PRE-EXISTING at HEAD — stale data/energy_calibration.json shifts calibrated zone boundaries; unrelated to spec 019)
+- [x] Task 20 — E2E: import → suggest → link → compare — Status: Done (adapted: no source="kiku" sets existed in DB — temporarily tagged set 20 as kiku, ran the closed loop [export → import → candidate overlap 1.0 → link → compare 10 kept + "exactly as planned" → cached GET → set detail planned_set_id=20 → CLI compare], then restored source=NULL and deleted the E2E import. Manual UI acceptance deferred to the DJ.)
+- [x] Task 21 — Commit implementation files — Status: Done
+
+### Notes
+- All 21 tasks complete. 33 new tests (22 unit + 11 API), all passing.
+- Pre-existing failure surfaced (NOT spec 019): 5 tests in tests/test_energy.py fail at HEAD too — stale data/energy_calibration.json (2026-04-25) shifts calibrated zone boundaries away from the fixed-boundary test expectations.
+- svelte-check: 0 errors, 4 warnings — identical to pre-change baseline.
+- E2E adaptation: live DB had no `source="kiku"` sets (older sets predate source tracking); set 20 was temporarily tagged for the closed-loop test and restored afterward. Manual UI acceptance (import real Rekordbox M3U8 → candidate → link → comparison view) deferred to the DJ.
+- DB backup taken before migration: /tmp/dj_library_backup_spec019.db.
+
+Implementation commit: 6baf4c1
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
