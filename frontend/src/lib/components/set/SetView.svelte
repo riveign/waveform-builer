@@ -7,6 +7,7 @@
 	import TransitionDetail from './TransitionDetail.svelte';
 	import EnergyFlowChart from './EnergyFlowChart.svelte';
 	import SetEnergyReview from './SetEnergyReview.svelte';
+	import FillReorderDialog from './FillReorderDialog.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
@@ -41,6 +42,8 @@
 			label: null,
 			date_added: null,
 			release_year: null,
+			track_number: null,
+			disc_number: null,
 			comment: null,
 			playlist_tags: [],
 			genre_family: null,
@@ -70,6 +73,7 @@
 	let exportMsg = $state<string | null>(null);
 	let exportFormat = $state<'m3u8' | 'rekordbox'>('m3u8');
 	let showEnergyReview = $state(false);
+	let showAssist = $state(false);
 	let confirmDelete = $state(false);
 	let deleting = $state(false);
 	let pickerRefresh = $state(0);
@@ -282,6 +286,11 @@
 					Live Builder
 				</button>
 			{/if}
+			{#if waveformTracks.length >= 3}
+				<button class="assist-btn" onclick={() => { showAssist = true; }}>
+					Assist
+				</button>
+			{/if}
 			<select bind:value={exportFormat} class="export-select">
 				<option value="m3u8">M3U8</option>
 				<option value="rekordbox">XML</option>
@@ -380,6 +389,18 @@
 		</div>
 	{/if}
 
+	{#if showAssist && selectedSet}
+		<FillReorderDialog
+			setId={selectedSet.id}
+			setName={selectedSet.name ?? 'set'}
+			trackCount={selectedSet.track_count}
+			durationMin={selectedSet.duration_min ?? 0}
+			energyProfile={setDetail?.energy_profile}
+			onclose={() => { showAssist = false; }}
+			onapplied={handleTracksChanged}
+		/>
+	{/if}
+
 	{#if showEnergyReview}
 		<SetEnergyReview
 			trackIds={tracksNeedingReview.map((t) => t.track_id)}
@@ -460,6 +481,23 @@
 	}
 
 	.play-set-btn.builder:hover:not(:disabled) {
+		background: var(--accent);
+		color: #000;
+		border-color: var(--accent);
+	}
+
+	.assist-btn {
+		padding: 4px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		transition: all 0.15s;
+	}
+
+	.assist-btn:hover {
 		background: var(--accent);
 		color: #000;
 		border-color: var(--accent);

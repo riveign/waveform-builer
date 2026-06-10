@@ -513,6 +513,7 @@
 					<span class="section-label">Zone</span>
 					<select class="small-select" bind:value={energyZone} onchange={onEnergyZoneChange}>
 						<option value="">Any</option>
+						<option value="intro">Intro</option>
 						<option value="warmup">Warmup</option>
 						<option value="build">Build</option>
 						<option value="drive">Drive</option>

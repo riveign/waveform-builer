@@ -44,8 +44,8 @@ def db_session(tmp_path):
     s = Set(id=1, name="Test Set", duration_min=60)
     session.add(s)
     session.flush()
-    for pos in range(1, 6):
-        session.add(SetTrack(set_id=1, position=pos, track_id=pos, transition_score=0.75))
+    for pos in range(5):
+        session.add(SetTrack(set_id=1, position=pos, track_id=pos + 1, transition_score=0.75))
 
     # Seed tinder queue: tracks 1-10 have auto predictions at varying confidence
     for i in range(1, 11):

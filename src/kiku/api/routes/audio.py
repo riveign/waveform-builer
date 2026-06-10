@@ -117,4 +117,5 @@ def _transcode_stream(path: Path) -> StreamingResponse:
     return StreamingResponse(
         iter_chunks(),
         media_type="audio/mpeg",
+        headers={"Accept-Ranges": "none"},
     )

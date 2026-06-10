@@ -69,14 +69,8 @@ function loadAndPlay(track: Track) {
 	listenedSeconds = 0;
 	lastTimeUpdate = 0;
 	status = 'loading';
-
-	if (!ws) {
-		// No player registered yet — state is set, player will pick it up on register
-		return;
-	}
-
-	ws.load(audioUrl(track.id));
-	// 'ready' handler (bound in registerPlayer) will call ws.play()
+	// NowPlayingBar's $effect detects currentTrack change and handles ws.load()
+	// with peaks data. We do NOT call ws.load() here to avoid a double-load race.
 }
 
 /**
@@ -146,10 +140,8 @@ function registerPlayer(instance: WaveSurfer): () => void {
 	instance.on('finish', onFinish);
 	instance.on('ready', onReady);
 
-	// If there's a pending track to load (set before player was registered)
-	if (currentTrack && status === 'loading') {
-		instance.load(audioUrl(currentTrack.id));
-	}
+	// Pending track loading is handled by NowPlayingBar's $effect, not here.
+	// The $effect watches currentTrack and calls createPlayer() with peaks data.
 
 	return () => {
 		instance.un('timeupdate', onTimeUpdate);

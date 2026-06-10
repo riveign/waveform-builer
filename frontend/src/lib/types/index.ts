@@ -28,6 +28,8 @@ export interface Track {
 	energy_conflict: EnergyConflict | null;
 	date_added: string | null;
 	release_year: number | null;
+	track_number: number | null;
+	disc_number: number | null;
 	comment: string | null;
 	playlist_tags: string[];
 	genre_family: string | null;
@@ -51,6 +53,8 @@ export interface TrackFeatures {
 	mood_sad: number | null;
 	mood_aggressive: number | null;
 	mood_relaxed: number | null;
+	vibe_brightness: number | null;
+	vibe_density: number | null;
 	ml_genre: string | null;
 	ml_genre_confidence: number | null;
 	energy_intro: number | null;
@@ -325,10 +329,20 @@ export interface SetBuildParams {
 	bpm_min?: number | null;
 	bpm_max?: number | null;
 	seed_track_id?: number | null;
+	end_track_id?: number | null;
 	beam_width?: number;
 	playlist_preference?: string[] | null;
 	weights?: ScoringWeights;
 	discovery_density?: number;
+	vibe_preset?: string | null;
+	vibe_intensity?: number;
+}
+
+export interface VibePreset {
+	name: string;
+	brightness: number;
+	density: number;
+	label: string;
 }
 
 export interface SetBuildComplete {
@@ -342,6 +356,7 @@ export interface SetCreateParams {
 	name: string;
 	energy_profile?: string | null;
 	genre_filter?: string[] | null;
+	source?: string | null;
 }
 
 export interface SetUpdateParams {

@@ -36,6 +36,14 @@ from kiku.api.schemas import (
     TransitionScoreBreakdown,
     UnmatchedTrack,
 )
+from kiku.api.schemas import (
+    OrderChangeResponse,
+    ScoreSequenceRequest,
+    ScoreSequenceResponse,
+    SetFillRequest,
+    SetOptimizeOrderRequest,
+    SetOptimizeOrderResponse,
+)
 from kiku.db.models import Set, Track, TransitionCue
 from kiku.db.store import (
     add_track_to_set,
@@ -231,6 +239,21 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                     return
                 seed_title = track.title
 
+            end_title = None
+            if body.end_track_id is not None:
+                end_track = db.get(Track, body.end_track_id)
+                if not end_track:
+                    yield _sse_event("error", json.dumps({"detail": "Ending track not found"}))
+                    return
+                end_title = end_track.title
+
+            # Resolve the optional vibe preset to a (brightness, density) target
+            from kiku.vibe import resolve_preset
+            preset_vibe = resolve_preset(body.vibe_preset)
+            if body.vibe_preset and preset_vibe is None:
+                yield _sse_event("error", json.dumps({"detail": f"Unknown vibe '{body.vibe_preset}'"}))
+                return
+
             # Convert per-request weight overrides if provided
             weights_dict = body.weights.model_dump() if body.weights else None
             if weights_dict:
@@ -249,6 +272,9 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                 prefer_playlists=body.playlist_preference,
                 weights=weights_dict,
                 discovery_density=body.discovery_density,
+                end_title=end_title,
+                preset_vibe=preset_vibe,
+                vibe_intensity=body.vibe_intensity,
             )
 
             if result is None:
@@ -261,9 +287,11 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
 
             ordered_tracks = sorted(result.tracks, key=lambda st: st.position)
             total_tracks = len(ordered_tracks)
+            from kiku.vibe import resolve_vibe
             for st in ordered_tracks:
                 t = st.track
                 te = get_track_energy(t) if t else None
+                tv = resolve_vibe(t) if t else None
                 yield _sse_event("track_added", json.dumps({
                     "track_id": st.track_id,
                     "title": t.title if t else None,
@@ -275,6 +303,9 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                     "resolved_energy": te.zone if te else None,
                     "energy_value": te.numeric if te else None,
                     "energy_source": te.source if te else None,
+                    "vibe_brightness": round(tv.brightness, 3) if tv else None,
+                    "vibe_density": round(tv.density, 3) if tv else None,
+                    "vibe_label": tv.label if tv else None,
                     "score": round(st.transition_score, 3) if st.transition_score else None,
                     "total_tracks_so_far": st.position,
                     "total_tracks": total_tracks,
@@ -308,6 +339,24 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
     return StreamingResponse(generate(), media_type="text/event-stream")
 
 
+@router.get("/vibe-presets")
+def get_vibe_presets():
+    """List the vibe presets a DJ can build toward, with their vibe coordinates."""
+    from kiku.vibe import VIBE_PRESETS, vibe_label
+
+    return {
+        "presets": [
+            {
+                "name": name,
+                "brightness": brightness,
+                "density": density,
+                "label": vibe_label(brightness, density),
+            }
+            for name, (brightness, density) in VIBE_PRESETS.items()
+        ]
+    }
+
+
 @router.post("", response_model=SetResponse, status_code=201)
 def create_set(body: SetCreateRequest, db: Session = Depends(get_db)):
     """Create an empty set."""
@@ -315,6 +364,7 @@ def create_set(body: SetCreateRequest, db: Session = Depends(get_db)):
         name=body.name,
         energy_profile=body.energy_profile,
         genre_filter=json.dumps(body.genre_filter) if body.genre_filter else None,
+        source=body.source,
     )
     db.add(set_)
     db.commit()
@@ -368,11 +418,44 @@ def delete_set(set_id: int, db: Session = Depends(get_db)):
 def add_track(set_id: int, body: SetAddTrackRequest, db: Session = Depends(get_db)):
     """Add a track to a set at a specific position."""
     try:
-        tracks = add_track_to_set(db, set_id, body.track_id, body.position)
+        add_track_to_set(db, set_id, body.track_id, body.position)
     except ValueError as exc:
         detail = str(exc)
         code = 404 if "not found" in detail.lower() else 400
         raise HTTPException(status_code=code, detail=detail)
+
+    # Compute transition_score for the newly added track and its neighbor
+    from kiku.setbuilder.scoring import transition_score as compute_transition
+
+    set_ = db.get(Set, set_id)
+    sorted_tracks = sorted(set_.tracks, key=lambda st: st.position)
+    new_st = next((st for st in sorted_tracks if st.track_id == body.track_id), None)
+    if new_st and new_st.track:
+        idx = sorted_tracks.index(new_st)
+        if idx > 0:
+            prev_st = sorted_tracks[idx - 1]
+            if prev_st.track:
+                new_st.transition_score = round(
+                    compute_transition(prev_st.track, new_st.track), 3
+                )
+        if idx < len(sorted_tracks) - 1:
+            next_st = sorted_tracks[idx + 1]
+            if next_st.track:
+                next_st.transition_score = round(
+                    compute_transition(new_st.track, next_st.track), 3
+                )
+
+    # Recompute duration_min
+    total_sec = sum(st.track.duration_sec or 0 for st in sorted_tracks if st.track)
+    set_.duration_min = round(total_sec / 60)
+
+    # Invalidate analysis cache
+    set_.is_analyzed = 0
+    set_.analysis_cache = None
+
+    db.commit()
+    db.refresh(set_)
+    tracks = sorted(set_.tracks, key=lambda st: st.position)
     return [_set_track_response(st) for st in tracks]
 
 
@@ -385,6 +468,24 @@ def remove_track(set_id: int, track_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=str(exc))
     if not removed:
         raise HTTPException(status_code=404, detail="Track not in set")
+
+    # Recompute duration_min and invalidate analysis
+    set_ = db.get(Set, set_id)
+    if set_:
+        sorted_tracks = sorted(set_.tracks, key=lambda st: st.position)
+        total_sec = sum(st.track.duration_sec or 0 for st in sorted_tracks if st.track)
+        set_.duration_min = round(total_sec / 60) if sorted_tracks else None
+        # Recompute transition_score for the track that now follows the gap
+        from kiku.setbuilder.scoring import transition_score as compute_transition
+
+        for i, st in enumerate(sorted_tracks):
+            if i > 0 and sorted_tracks[i - 1].track and st.track:
+                st.transition_score = round(compute_transition(sorted_tracks[i - 1].track, st.track), 3)
+            elif i == 0:
+                st.transition_score = None
+        set_.is_analyzed = 0
+        set_.analysis_cache = None
+        db.commit()
     return Response(status_code=204)
 
 
@@ -399,7 +500,161 @@ def reorder_tracks(
         detail = str(exc)
         code = 404 if "not found" in detail.lower() else 400
         raise HTTPException(status_code=code, detail=detail)
+
+    # Invalidate analysis cache
+    set_ = db.get(Set, set_id)
+    if set_:
+        set_.is_analyzed = 0
+        set_.analysis_cache = None
+        db.commit()
+
     return [_set_track_response(st) for st in tracks]
+
+
+@router.post("/{set_id}/fill")
+def fill_set_sse(set_id: int, body: SetFillRequest, db: Session = Depends(get_db)):
+    """Fill gaps in a set via SSE streaming."""
+    from kiku.setbuilder.constraints import parse_energy_string
+    from kiku.setbuilder.filler import fill_set
+
+    energy_profile = None
+    if body.energy_profile:
+        try:
+            energy_profile = parse_energy_string(body.energy_profile)
+        except Exception:
+            pass
+
+    weights_dict = None
+    if body.weights:
+        weights_dict = {
+            "harmonic": body.weights.harmonic,
+            "energy_fit": body.weights.energy_fit,
+            "bpm_compat": body.weights.bpm_compat,
+            "genre_coherence": body.weights.genre_coherence,
+            "track_quality": body.weights.track_quality,
+        }
+
+    def generate():
+        for event in fill_set(
+            db, set_id,
+            energy_profile=energy_profile,
+            target_duration_min=body.target_duration_min,
+            max_fill_tracks=body.max_fill_tracks,
+            genre_filter=body.genre_filter,
+            gap_threshold=body.gap_threshold,
+            discovery_density=body.discovery_density,
+            weights=weights_dict,
+        ):
+            yield f"event: {event.event}\ndata: {json.dumps(event.data)}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@router.post("/{set_id}/optimize-order", response_model=SetOptimizeOrderResponse)
+def optimize_order(set_id: int, body: SetOptimizeOrderRequest, db: Session = Depends(get_db)):
+    """Propose an optimized track order for the set."""
+    from kiku.setbuilder.constraints import parse_energy_json, parse_energy_string
+    from kiku.setbuilder.reorder import (
+        get_energy_curve,
+        optimize_full,
+        optimize_gentle,
+        score_full_sequence,
+    )
+
+    set_ = db.get(Set, set_id)
+    if not set_:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    set_tracks = sorted(set_.tracks, key=lambda st: st.position)
+    tracks = [st.track for st in set_tracks if st.track]
+    if len(tracks) < 3:
+        raise HTTPException(status_code=400, detail="Need at least 3 tracks to optimize order")
+
+    energy_profile = None
+    ep_str = body.energy_profile or set_.energy_profile
+    if ep_str:
+        try:
+            energy_profile = parse_energy_json(ep_str)
+        except Exception:
+            try:
+                energy_profile = parse_energy_string(ep_str)
+            except Exception:
+                pass
+
+    weights_dict = None
+    if body.weights:
+        weights_dict = {
+            "harmonic": body.weights.harmonic,
+            "energy_fit": body.weights.energy_fit,
+            "bpm_compat": body.weights.bpm_compat,
+            "genre_coherence": body.weights.genre_coherence,
+            "track_quality": body.weights.track_quality,
+        }
+
+    current_score = score_full_sequence(tracks, energy_profile, weights_dict)
+    current_curve = get_energy_curve(tracks, energy_profile)
+
+    if body.strategy == "full":
+        proposed, changes = optimize_full(tracks, energy_profile, weights_dict)
+    else:
+        proposed, changes = optimize_gentle(tracks, energy_profile, weights_dict)
+
+    proposed_score = score_full_sequence(proposed, energy_profile, weights_dict)
+    proposed_curve = get_energy_curve(proposed, energy_profile)
+
+    return SetOptimizeOrderResponse(
+        current_score=round(current_score, 3),
+        proposed_score=round(proposed_score, 3),
+        proposed_order=[t.id for t in proposed],
+        changes=[
+            OrderChangeResponse(
+                track_id=c.track_id,
+                track_title=c.track_title,
+                from_position=c.from_position,
+                to_position=c.to_position,
+                explanation=c.explanation,
+            ) for c in changes
+        ],
+        current_energy_curve=[round(v, 3) for v in current_curve],
+        proposed_energy_curve=[round(v, 3) for v in proposed_curve],
+    )
+
+
+@router.post("/{set_id}/score-sequence", response_model=ScoreSequenceResponse)
+def score_sequence(set_id: int, body: ScoreSequenceRequest, db: Session = Depends(get_db)):
+    """Score a proposed track order without saving."""
+    from kiku.setbuilder.constraints import parse_energy_string
+    from kiku.setbuilder.reorder import get_energy_curve, score_full_sequence
+
+    tracks = [db.get(Track, tid) for tid in body.track_ids]
+    tracks = [t for t in tracks if t is not None]
+    if len(tracks) < 2:
+        raise HTTPException(status_code=400, detail="Need at least 2 tracks to score")
+
+    energy_profile = None
+    if body.energy_profile:
+        try:
+            energy_profile = parse_energy_string(body.energy_profile)
+        except Exception:
+            pass
+
+    weights_dict = None
+    if body.weights:
+        weights_dict = {
+            "harmonic": body.weights.harmonic,
+            "energy_fit": body.weights.energy_fit,
+            "bpm_compat": body.weights.bpm_compat,
+            "genre_coherence": body.weights.genre_coherence,
+            "track_quality": body.weights.track_quality,
+        }
+
+    total = score_full_sequence(tracks, energy_profile, weights_dict)
+    curve = get_energy_curve(tracks, energy_profile)
+
+    return ScoreSequenceResponse(
+        total_score=round(total, 3),
+        energy_curve=[round(v, 3) for v in curve],
+    )
 
 
 @router.get("", response_model=list[SetResponse])

@@ -13,10 +13,68 @@ from kiku.config import ARTIST_COOLDOWN, DEFAULT_BEAM_WIDTH
 from kiku.db.models import Set, SetTrack, Track
 from kiku.db.store import get_track_by_title
 from kiku.energy import get_track_energy
+from kiku.setbuilder.camelot import harmonic_score
 from kiku.setbuilder.constraints import EnergyProfile
-from kiku.setbuilder.scoring import transition_score
+from kiku.setbuilder.scoring import bpm_compatibility, transition_score, vibe_continuity
+from kiku.vibe import resolve_vibe
 
 console = Console()
+
+
+def _lerp_vibe(
+    a: tuple[float, float], b: tuple[float, float], t: float
+) -> tuple[float, float]:
+    t = max(0.0, min(1.0, t))
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+
+
+def _make_vibe_arc(
+    start_vibe: tuple[float, float] | None,
+    end_vibe: tuple[float, float] | None,
+    preset_vibe: tuple[float, float] | None,
+):
+    """Return a callable(progress) -> target_vibe, or None if vibe is off.
+
+    The preset is what the DJ asked for, so it leads. Anchors only bend the
+    target near the ends of the set (where the actual start/end tracks live).
+
+    - both anchors + preset: hold the preset through the body, easing toward
+      the start vibe at the very front and the end vibe at the very back.
+    - both anchors only: linear arc from start to end vibe.
+    - preset only (or preset + start): flat target at the preset.
+    - start anchor only: flat target at the start vibe (stay consistent).
+    """
+    if preset_vibe and end_vibe:
+        # Preset everywhere, easing to the anchors only in the first/last ~15%.
+        def arc(progress: float) -> tuple[float, float]:
+            if progress < 0.15 and start_vibe:
+                return _lerp_vibe(start_vibe, preset_vibe, progress / 0.15)
+            if progress > 0.85:
+                return _lerp_vibe(preset_vibe, end_vibe, (progress - 0.85) / 0.15)
+            return preset_vibe
+        return arc
+    if preset_vibe:
+        return lambda _progress: preset_vibe
+    if start_vibe and end_vibe:
+        return lambda progress: _lerp_vibe(start_vibe, end_vibe, progress)
+    if start_vibe:
+        return lambda _progress: start_vibe
+    return None
+
+
+def _end_pull(progress: float) -> float:
+    """Soft landing strength: 0 until 80% through, ramping to ~0.25 at the end."""
+    if progress <= 0.8:
+        return 0.0
+    return min((progress - 0.8) / 0.2, 1.0) * 0.25
+
+
+def _end_affinity(candidate: Track, end_track: Track) -> float:
+    """How well a candidate sits next to the end anchor (harmonic + BPM + vibe)."""
+    h = harmonic_score(candidate.key, end_track.key)
+    b = bpm_compatibility(candidate.bpm, end_track.bpm)
+    v = vibe_continuity(candidate, end_track)
+    return 0.5 * h + 0.3 * b + 0.2 * v
 
 
 def _get_candidate_pool(
@@ -29,6 +87,7 @@ def _get_candidate_pool(
 
     if genres:
         conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genres]
+        conditions += [Track.rb_genre.ilike(f"%{g}%") for g in genres]
         q = q.filter(or_(*conditions))
 
     if bpm_range:
@@ -83,8 +142,16 @@ def build_set(
     prefer_playlists: list[str] | None = None,
     weights: dict[str, float] | None = None,
     discovery_density: float = 0.0,
+    end_title: str | None = None,
+    preset_vibe: tuple[float, float] | None = None,
+    vibe_intensity: float = 0.0,
 ) -> Set | None:
     """Generate a DJ set using beam search.
+
+    Args:
+        end_title: Optional ending-track anchor (soft — pulls the tail toward it).
+        preset_vibe: Optional (brightness, density) target vibe from a preset.
+        vibe_intensity: How strongly vibe steers selection (0 = off, 1 = full).
 
     Returns a saved Set object with SetTrack entries, or None on failure.
     """
@@ -115,6 +182,25 @@ def build_set(
 
     console.print(f"Seed: [cyan]{seed.title}[/] — {seed.artist}")
 
+    # Resolve the optional ending anchor and build the vibe arc.
+    end_track: Track | None = None
+    if end_title:
+        end_track = get_track_by_title(session, end_title)
+        if end_track:
+            console.print(f"Landing on: [cyan]{end_track.title}[/] — {end_track.artist}")
+
+    vibe_on = vibe_intensity > 0
+    start_vibe = None
+    end_vibe = None
+    if vibe_on:
+        # Anchors define the arc endpoints; the preset shapes the target.
+        sv = resolve_vibe(seed)
+        start_vibe = (sv.brightness, sv.density)
+        if end_track:
+            ev = resolve_vibe(end_track)
+            end_vibe = (ev.brightness, ev.density)
+    vibe_arc = _make_vibe_arc(start_vibe, end_vibe, preset_vibe) if vibe_on else None
+
     # Beam search
     # Each beam is (track_sequence, cumulative_score, elapsed_minutes)
     avg_track_min = 6.0  # Assume ~6 min average track length
@@ -139,12 +225,18 @@ def build_set(
             used_ids = {t.id for t in seq}
             current = seq[-1]
             target_e = energy_profile.target_energy_at(elapsed)
+            progress = min(elapsed / target_duration, 1.0) if target_duration > 0 else 1.0
+
+            # Target vibe at this point in the arc (None when vibe is off)
+            target_vibe = vibe_arc(progress) if vibe_arc else None
 
             # Compute target BPM at this point if BPM range given
             target_bpm = None
             if bpm_range:
-                progress = min(elapsed / target_duration, 1.0)
                 target_bpm = bpm_range[0] + (bpm_range[1] - bpm_range[0]) * progress
+
+            # Soft pull toward the ending anchor in the final stretch
+            pull = _end_pull(progress) if end_track else 0.0
 
             # Score all candidates not yet in sequence
             scored_candidates = []
@@ -162,7 +254,7 @@ def build_set(
                         if not (0.47 < ratio < 0.53 or 1.88 < ratio < 2.12):
                             continue
 
-                score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts)
+                score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts, target_vibe=target_vibe, vibe_strength=vibe_intensity)
 
                 # BPM progression bonus: reward tracks closer to target BPM at this point
                 if target_bpm and cand.bpm:
@@ -170,6 +262,10 @@ def build_set(
                     bpm_range_span = bpm_range[1] - bpm_range[0]
                     bpm_prog_score = max(0.0, 1.0 - bpm_diff / max(bpm_range_span, 1.0))
                     score += 0.15 * bpm_prog_score
+
+                # Soft landing: bias the tail toward the ending anchor
+                if pull > 0 and end_track is not None and cand.id != end_track.id:
+                    score += pull * _end_affinity(cand, end_track)
 
                 scored_candidates.append((cand, score))
 
@@ -227,7 +323,7 @@ def build_set(
         t_score = transition_score(prev_track, track, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts) if prev_track else None
         st = SetTrack(
             set_id=set_.id,
-            position=i + 1,
+            position=i,
             track_id=track.id,
             transition_score=t_score,
         )

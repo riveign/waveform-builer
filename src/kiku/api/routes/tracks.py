@@ -8,9 +8,13 @@ from sqlalchemy.orm import Session
 
 from kiku.api.deps import get_db
 from kiku.api.schemas import (
+    AffinityListItem,
     PaginatedTracksResponse,
     SuggestNextItem,
     SuggestNextResponse,
+    TrackAffinitiesResponse,
+    TrackAffinityRequest,
+    TrackAffinityResponse,
     TrackFeaturesResponse,
     TrackRatingRequest,
     TrackResponse,
@@ -72,6 +76,8 @@ def _track_to_response(t: Track) -> TrackResponse:
         energy_conflict=conflict_resp,
         date_added=t.date_added,
         release_year=t.release_year,
+        track_number=t.track_number,
+        disc_number=t.disc_number,
         comment=t.comment,
         playlist_tags=tags,
         genre_family=family,
@@ -181,67 +187,56 @@ def record_played(track_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{track_id}/artwork")
 def track_artwork(track_id: int, db: Session = Depends(get_db)):
-    """Extract embedded artwork from a track's audio file."""
+    """Serve a track's artwork: its own embedded art, else its album's cover.
+
+    Never 500s — embedded extraction soft-fails to None, and a track with no
+    embedded art inherits the album cover via the resolver (so the Tracks table
+    and Now Playing bar fill in too). A clean 404 is the only failure the client
+    sees; the frontend hides the <img> on 404.
+    """
+    import os
+
+    from fastapi.responses import FileResponse
+
+    from kiku.artwork.resolver import embedded_cover_bytes, resolve_album_cover
+    from kiku.db.paths import normalize_path
+
     track = db.get(Track, track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    if not track.file_path:
-        raise HTTPException(status_code=404, detail="No file path for this track")
 
-    from kiku.db.paths import normalize_path
+    # 1. Embedded artwork on the file itself (soft-fail, never raises).
+    if track.file_path:
+        file_path = normalize_path(track.file_path)
+        if os.path.isfile(file_path):
+            emb = embedded_cover_bytes(file_path)
+            if emb:
+                content, mime = emb
+                return Response(
+                    content=content,
+                    media_type=mime,
+                    headers={"Cache-Control": "public, max-age=3600"},
+                )
 
-    file_path = normalize_path(track.file_path)
+    # 2. Inherit the album cover (resolver: cache → CAA → iTunes → Deezer).
+    if track.album:
+        from kiku.metadata.album_key import album_key, resolve_album_artist
 
-    import os
+        artist, _ = resolve_album_artist(db, track.album)
+        result = resolve_album_cover(db, album_key(track.album, artist))
+        if result is not None:
+            path, _source = result
+            return FileResponse(
+                path,
+                media_type=_image_media_type(path.suffix),
+                headers={"Cache-Control": "public, max-age=86400"},
+            )
 
-    if not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="Audio file not found")
+    raise HTTPException(status_code=404, detail="No artwork available")
 
-    try:
-        import mutagen
 
-        audio = mutagen.File(file_path)
-        if audio is None:
-            raise HTTPException(status_code=404, detail="Could not read audio file")
-
-        image_data: bytes | None = None
-        mime_type = "image/jpeg"
-
-        # ID3 (MP3, AIFF)
-        if hasattr(audio, "tags") and audio.tags:
-            for key in audio.tags:
-                if key.startswith("APIC"):
-                    apic = audio.tags[key]
-                    image_data = apic.data
-                    mime_type = apic.mime or "image/jpeg"
-                    break
-
-        # MP4/M4A
-        if image_data is None and hasattr(audio, "tags") and audio.tags and "covr" in audio.tags:
-            covers = audio.tags["covr"]
-            if covers:
-                image_data = bytes(covers[0])
-                mime_type = "image/jpeg"
-
-        # FLAC
-        if image_data is None and hasattr(audio, "pictures"):
-            pics = audio.pictures
-            if pics:
-                image_data = pics[0].data
-                mime_type = pics[0].mime or "image/jpeg"
-
-        if not image_data:
-            raise HTTPException(status_code=404, detail="No embedded artwork")
-
-        return Response(
-            content=image_data,
-            media_type=mime_type,
-            headers={"Cache-Control": "public, max-age=3600"},
-        )
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to extract artwork")
+def _image_media_type(suffix: str) -> str:
+    return "image/png" if suffix.lower().lstrip(".") == "png" else "image/jpeg"
 
 
 @router.get("/{track_id}/sets", response_model=list[TrackSetAppearance])
@@ -284,6 +279,8 @@ def suggest_next(
     w_genre_coherence: float | None = Query(default=None, description="Genre coherence weight override"),
     w_track_quality: float | None = Query(default=None, description="Track quality weight override"),
     discovery_density: float = Query(default=0.0, ge=-1.0, le=1.0, description="Discovery/density bias (-1=fresh, +1=proven)"),
+    position_min: float | None = Query(default=None, description="Elapsed minutes at this position in the set"),
+    energy_profile: str | None = Query(default=None, description="Energy profile string for position-aware energy target"),
     db: Session = Depends(get_db),
 ):
     """Suggest best next tracks based on transition scoring."""
@@ -327,13 +324,25 @@ def suggest_next(
             raise HTTPException(status_code=422, detail=str(exc))
 
     genres = [g.strip() for g in genre_filter.split(",")] if genre_filter else None
-    scored = score_transitions(db, track, n=n, genre_filter=genres, weights=weights_dict, exclude_ids=exclude_ids, discovery_density=discovery_density)
+
+    # Compute position-aware energy target
+    target_energy = 0.5  # default neutral
+    if position_min is not None and energy_profile:
+        from kiku.setbuilder.constraints import parse_energy_string
+
+        try:
+            ep = parse_energy_string(energy_profile)
+            target_energy = ep.target_energy_at(position_min)
+        except Exception:
+            pass  # Fall back to neutral
+
+    scored = score_transitions(db, track, n=n, genre_filter=genres, weights=weights_dict, exclude_ids=exclude_ids, discovery_density=discovery_density, target_energy=target_energy)
 
     w = weights_dict if weights_dict else SCORING_WEIGHTS
     suggestions = []
     for cand, total_score in scored:
         h = harmonic_score(track.key, cand.key)
-        e = energy_fit(cand, 0.5)
+        e = energy_fit(cand, target_energy)
         b = bpm_compatibility(track.bpm, cand.bpm)
         g = genre_coherence(
             track.dir_genre or track.rb_genre,
@@ -378,6 +387,8 @@ def track_features(track_id: int, db: Session = Depends(get_db)):
         mood_sad=af.mood_sad,
         mood_aggressive=af.mood_aggressive,
         mood_relaxed=af.mood_relaxed,
+        vibe_brightness=af.vibe_brightness,
+        vibe_density=af.vibe_density,
         ml_genre=af.ml_genre,
         ml_genre_confidence=af.ml_genre_confidence,
         energy_intro=af.energy_intro,
@@ -386,3 +397,127 @@ def track_features(track_id: int, db: Session = Depends(get_db)):
         verified_bpm=af.verified_bpm,
         verified_key=af.verified_key,
     )
+
+
+# ── Track Affinity endpoints ──────────────────────────────────────────
+
+
+def _canonical_pair(id_a: int, id_b: int) -> tuple[int, int]:
+    """Return (smaller, larger) for canonical storage ordering."""
+    return (min(id_a, id_b), max(id_a, id_b))
+
+
+@router.post("/{track_id}/affinity", response_model=TrackAffinityResponse)
+def set_affinity(
+    track_id: int,
+    body: TrackAffinityRequest,
+    db: Session = Depends(get_db),
+):
+    """Mark two tracks as 'good' or 'bad' together. Upserts if pair exists."""
+    from kiku.db.models import TrackAffinity
+
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    other = db.get(Track, body.other_track_id)
+    if not other:
+        raise HTTPException(status_code=404, detail="Other track not found")
+
+    if track_id == body.other_track_id:
+        raise HTTPException(status_code=422, detail="Cannot create affinity between a track and itself")
+
+    a_id, b_id = _canonical_pair(track_id, body.other_track_id)
+
+    existing = (
+        db.query(TrackAffinity)
+        .filter(TrackAffinity.track_a_id == a_id, TrackAffinity.track_b_id == b_id)
+        .first()
+    )
+
+    if existing:
+        existing.affinity = body.affinity
+        db.commit()
+        db.refresh(existing)
+        return TrackAffinityResponse(
+            id=existing.id,
+            track_a_id=existing.track_a_id,
+            track_b_id=existing.track_b_id,
+            affinity=existing.affinity,
+        )
+
+    new = TrackAffinity(track_a_id=a_id, track_b_id=b_id, affinity=body.affinity)
+    db.add(new)
+    db.commit()
+    db.refresh(new)
+    return TrackAffinityResponse(
+        id=new.id,
+        track_a_id=new.track_a_id,
+        track_b_id=new.track_b_id,
+        affinity=new.affinity,
+    )
+
+
+@router.delete("/{track_id}/affinity/{other_id}", status_code=204)
+def delete_affinity(
+    track_id: int,
+    other_id: int,
+    db: Session = Depends(get_db),
+):
+    """Remove affinity between two tracks."""
+    from kiku.db.models import TrackAffinity
+
+    a_id, b_id = _canonical_pair(track_id, other_id)
+
+    row = (
+        db.query(TrackAffinity)
+        .filter(TrackAffinity.track_a_id == a_id, TrackAffinity.track_b_id == b_id)
+        .first()
+    )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Affinity not found for this pair")
+
+    db.delete(row)
+    db.commit()
+
+
+@router.get("/{track_id}/affinities", response_model=TrackAffinitiesResponse)
+def list_affinities(
+    track_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return all affinities for a track, with full TrackResponse for each partner."""
+    from sqlalchemy import or_
+
+    from kiku.db.models import TrackAffinity
+
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    rows = (
+        db.query(TrackAffinity)
+        .filter(
+            or_(
+                TrackAffinity.track_a_id == track_id,
+                TrackAffinity.track_b_id == track_id,
+            )
+        )
+        .all()
+    )
+
+    items = []
+    for row in rows:
+        partner_id = row.track_b_id if row.track_a_id == track_id else row.track_a_id
+        partner = db.get(Track, partner_id)
+        if partner:
+            items.append(
+                AffinityListItem(
+                    track_id=partner_id,
+                    affinity=row.affinity,
+                    track=_track_to_response(partner),
+                )
+            )
+
+    return TrackAffinitiesResponse(affinities=items)

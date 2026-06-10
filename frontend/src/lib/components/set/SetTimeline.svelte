@@ -6,6 +6,7 @@
 	import SetTrackCard from './SetTrackCard.svelte';
 	import TransitionIndicator from './TransitionIndicator.svelte';
 	import ReplaceTrackModal from './ReplaceTrackModal.svelte';
+	import InSetTrackSearch from './InSetTrackSearch.svelte';
 
 	let {
 		tracks,
@@ -38,9 +39,10 @@
 	let replacePosition = $state<number | null>(null);
 
 	// Sync items when tracks prop changes (but not during drag)
+	// Use position (not track_id) as id — a track can appear multiple times in a set
 	$effect(() => {
 		if (!reordering) {
-			items = tracks.map((t) => ({ ...t, id: t.track_id }));
+			items = tracks.map((t, i) => ({ ...t, id: t.position ?? i }));
 		}
 	});
 
@@ -101,7 +103,7 @@
 			onTracksChanged?.();
 		} catch (err) {
 			// Revert on failure — re-sync from props
-			items = tracks.map((t) => ({ ...t, id: t.track_id }));
+			items = tracks.map((t, i) => ({ ...t, id: t.position ?? i }));
 			console.error('Failed to reorder tracks:', err);
 		}
 	}
@@ -308,6 +310,15 @@
 			</div>
 		{/if}
 	{/if}
+
+	<InSetTrackSearch
+		{setId}
+		lastTrackId={items.length > 0 ? items[items.length - 1].track_id : null}
+		excludeTrackIds={items.map((i) => i.track_id)}
+		{energyProfile}
+		positionMin={items.length > 0 ? items.reduce((sum, i) => sum + (i.duration_sec ?? 0), 0) / 60 : null}
+		ontrackadded={onTracksChanged}
+	/>
 </div>
 
 {#if replacePosition !== null && items[replacePosition]}

@@ -6,13 +6,17 @@ from datetime import datetime
 
 from sqlalchemy import (
     Column,
+    DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
+    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 from sqlalchemy.pool import NullPool
@@ -54,6 +58,8 @@ class Track(Base):
     play_count = Column(Integer, default=0)
     kiku_play_count = Column(Integer, default=0)
     release_year = Column(Integer)
+    track_number = Column(Integer)
+    disc_number = Column(Integer)
     acquired_month = Column(String)
     playlist_tags = Column(Text)  # JSON list of playlist names this track belongs to
     last_synced = Column(String)
@@ -91,6 +97,8 @@ class AudioFeatures(Base):
     mood_sad = Column(Float)
     mood_aggressive = Column(Float)
     mood_relaxed = Column(Float)
+    vibe_brightness = Column(Float)  # 0 (dark) .. 1 (bright) — derived, see kiku.vibe
+    vibe_density = Column(Float)     # 0 (spacious) .. 1 (busy) — derived, see kiku.vibe
     ml_genre = Column(String)
     ml_genre_confidence = Column(Float)
     energy_intro = Column(Float)
@@ -214,6 +222,31 @@ class HuntTrack(Base):
     matched_track = relationship("Track")
 
 
+class TrackAffinity(Base):
+    """DJ-defined pair affinity: two tracks are 'good' or 'bad' together.
+
+    Always stored with track_a_id < track_b_id (canonical ordering)
+    so (A,B) and (B,A) resolve to the same row.
+    """
+    __tablename__ = "track_affinities"
+
+    id = Column(Integer, primary_key=True)
+    track_a_id = Column(Integer, ForeignKey("tracks.id"), nullable=False)
+    track_b_id = Column(Integer, ForeignKey("tracks.id"), nullable=False)
+    affinity = Column(String, nullable=False)  # "good" or "bad"
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("track_a_id", "track_b_id", name="uq_track_affinity_pair"),
+        Index("ix_track_affinity_a", "track_a_id"),
+        Index("ix_track_affinity_b", "track_b_id"),
+    )
+
+    track_a = relationship("Track", foreign_keys=[track_a_id])
+    track_b = relationship("Track", foreign_keys=[track_b_id])
+
+
 class OAuthToken(Base):
     __tablename__ = "oauth_tokens"
 
@@ -224,6 +257,22 @@ class OAuthToken(Base):
     user_id = Column(String)  # Provider user ID
     username = Column(String)
     avatar_url = Column(String)
+
+
+class AlbumMetadata(Base):
+    """Per-album cache for metadata-correction state. Keyed by stable album_key hash."""
+    __tablename__ = "album_metadata"
+
+    album_key = Column(String, primary_key=True)
+    album = Column(String, nullable=False)
+    album_artist = Column(String, nullable=False)
+    mb_release_id = Column(String)
+    source = Column(String)  # "bandcamp" | "musicbrainz" | "discogs" | "tags"
+    source_ref = Column(String)  # source-specific id/url the correction came from
+    last_matched_at = Column(DateTime)
+    match_status = Column(String)  # "applied", "skipped"
+    cover_source = Column(String)  # "embedded" | "caa" | "itunes" | "deezer"
+    cover_fetched_at = Column(DateTime)
 
 
 def _set_wal_mode(dbapi_conn, connection_record):

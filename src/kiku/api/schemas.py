@@ -46,6 +46,8 @@ class TrackResponse(BaseModel):
     energy_conflict: EnergyConflictResponse | None = None
     date_added: str | None = None
     release_year: int | None = None
+    track_number: int | None = None
+    disc_number: int | None = None
     comment: str | None = None
     playlist_tags: list[str] = []
     genre_family: str | None = None
@@ -64,6 +66,8 @@ class TrackFeaturesResponse(BaseModel):
     mood_sad: float | None = None
     mood_aggressive: float | None = None
     mood_relaxed: float | None = None
+    vibe_brightness: float | None = None
+    vibe_density: float | None = None
     ml_genre: str | None = None
     ml_genre_confidence: float | None = None
     energy_intro: float | None = None
@@ -259,16 +263,20 @@ class SetBuildRequest(BaseModel):
     bpm_min: float | None = None
     bpm_max: float | None = None
     seed_track_id: int | None = None
+    end_track_id: int | None = None       # Soft ending anchor — pulls the tail toward it
     beam_width: int = 5
     playlist_preference: list[str] | None = None
     weights: ScoringWeightsRequest | None = None
     discovery_density: float = 0.0
+    vibe_preset: str | None = None        # e.g. "dark & deep", "euphoric" — see VIBE_PRESETS
+    vibe_intensity: float = 0.0           # 0 = ignore vibe, 1 = vibe steers strongly
 
 
 class SetCreateRequest(BaseModel):
     name: str
     energy_profile: str | None = None
     genre_filter: list[str] | None = None
+    source: str | None = None  # "manual", "kiku", "m3u8", etc.
 
 
 class SetUpdateRequest(BaseModel):
@@ -622,3 +630,228 @@ class SCChaseRequest(BaseModel):
     playlist_id: int | None = None
     track_ids: list[int] | None = None
     source: str = "soundcloud_playlist"  # or "soundcloud_likes"
+
+
+# ── Track Affinity models ──
+
+
+class TrackAffinityRequest(BaseModel):
+    other_track_id: int
+    affinity: str  # "good" or "bad"
+
+    @field_validator('affinity')
+    @classmethod
+    def validate_affinity(cls, v: str) -> str:
+        if v not in ("good", "bad"):
+            raise ValueError('affinity must be "good" or "bad"')
+        return v
+
+
+class TrackAffinityResponse(BaseModel):
+    id: int
+    track_a_id: int
+    track_b_id: int
+    affinity: str
+
+    model_config = {"from_attributes": True}
+
+
+class AffinityListItem(BaseModel):
+    track_id: int
+    affinity: str
+    track: TrackResponse
+
+
+class TrackAffinitiesResponse(BaseModel):
+    affinities: list[AffinityListItem]
+
+
+# ── Manual set builder: fill, reorder, score-sequence ──
+
+
+class SetFillRequest(BaseModel):
+    energy_profile: str | None = None
+    target_duration_min: int | None = None
+    genre_filter: list[str] | None = None
+    max_fill_tracks: int = 10
+    gap_threshold: float = 0.6
+    discovery_density: float = 0.0
+    weights: ScoringWeightsRequest | None = None
+
+
+class SetOptimizeOrderRequest(BaseModel):
+    strategy: str = "gentle"  # "gentle" | "full"
+    energy_profile: str | None = None
+    weights: ScoringWeightsRequest | None = None
+
+
+class OrderChangeResponse(BaseModel):
+    track_id: int
+    track_title: str | None
+    from_position: int
+    to_position: int
+    explanation: str
+
+
+class SetOptimizeOrderResponse(BaseModel):
+    current_score: float
+    proposed_score: float
+    proposed_order: list[int]
+    changes: list[OrderChangeResponse]
+    current_energy_curve: list[float]
+    proposed_energy_curve: list[float]
+
+
+class ScoreSequenceRequest(BaseModel):
+    track_ids: list[int]
+    energy_profile: str | None = None
+    weights: ScoringWeightsRequest | None = None
+
+
+class ScoreSequenceResponse(BaseModel):
+    total_score: float
+    energy_curve: list[float]
+
+
+# ───── Albums / MusicBrainz ─────
+
+
+class AlbumResponse(BaseModel):
+    album_key: str
+    album: str
+    artist: str
+    year: int | None = None
+    label: str | None = None
+    track_count: int
+    cover_track_id: int | None = None
+    is_compilation: bool = False
+    mb_release_id: str | None = None
+    match_status: str | None = None
+    cover_source: str | None = None
+
+
+class PaginatedAlbumsResponse(BaseModel):
+    items: list[AlbumResponse]
+    total: int
+    offset: int
+    limit: int
+
+
+class AlbumTracksResponse(BaseModel):
+    album: AlbumResponse
+    tracks: list[TrackResponse]
+
+
+class MBCandidateRecording(BaseModel):
+    position: int
+    disc: int = 1
+    title: str
+    length_ms: int | None = None
+
+
+class MBCandidate(BaseModel):
+    mb_release_id: str
+    title: str
+    artist: str
+    year: int | None = None
+    country: str | None = None
+    label: str | None = None
+    track_count: int
+    recordings: list[MBCandidateRecording]
+    score: float
+    mapping_preview: list["MBMappingPreviewItem"] = []
+
+
+class MBMappingPreviewItem(BaseModel):
+    track_id: int
+    track_title: str | None = None
+    mb_position: int | None = None
+    mb_disc: int | None = None
+    mb_title: str | None = None
+    confidence: float = 0.0
+
+
+class MBMatchResponse(BaseModel):
+    candidates: list[MBCandidate]
+
+
+class MBMappingItem(BaseModel):
+    track_id: int
+    disc_number: int | None = None
+    track_number: int | None = None
+    mb_position: int | None = None
+    confidence: float = 0.0
+
+
+class MBApplyRequest(BaseModel):
+    mb_release_id: str
+    mappings: list[MBMappingItem]
+
+
+class MBApplyResponse(BaseModel):
+    updated_count: int
+    album_key: str
+    mb_release_id: str
+
+
+# ── Multi-source metadata correction (spec 016) ──────────────────────────
+
+class SourceInfo(BaseModel):
+    name: str
+    lookup_mode: str  # "url" | "search" | "files"
+    available: bool
+
+
+class SourcesResponse(BaseModel):
+    sources: list[SourceInfo]
+
+
+class CorrectionFieldChange(BaseModel):
+    field: str
+    old: str | int | None = None
+    new: str | int | None = None
+    changed: bool
+
+
+class CorrectionTrackItem(BaseModel):
+    track_id: int
+    track_title: str | None = None
+    matched_title: str | None = None
+    confidence: float = 0.0
+    changes: list[CorrectionFieldChange] = []
+
+
+class CorrectionPreviewResponse(BaseModel):
+    source: str
+    source_ref: str | None = None
+    album: str | None = None
+    artist: str | None = None
+    label: str | None = None
+    year: int | None = None
+    track_count: int = 0
+    items: list[CorrectionTrackItem] = []
+
+
+class CorrectionMatchRequest(BaseModel):
+    url: str | None = None
+    query: str | None = None  # defaults to the album's name when omitted
+    artist: str | None = None
+    candidate_index: int = 0
+    fields: list[str] | None = None
+
+
+class ApplyCorrectionItem(BaseModel):
+    track_id: int
+    values: dict[str, str | int | None]
+
+
+class ApplyCorrectionRequest(BaseModel):
+    source: str
+    source_ref: str | None = None
+    fields: list[str]
+    items: list[ApplyCorrectionItem]
+
+
+class ApplyCorrectionResponse(BaseModel):
+    updated_count: int
+    album_key: str

@@ -20,10 +20,7 @@
 		onselect(track);
 	}
 
-	// Load initial tracks once on mount (not $effect which re-runs on every render)
-	onMount(() => {
-		store.search({});
-	});
+	onMount(() => store.search({}));
 </script>
 
 <div class="library-browser">

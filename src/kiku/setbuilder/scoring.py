@@ -10,6 +10,7 @@ from kiku.config import BPM_TOLERANCE, SCORING_WEIGHTS
 from kiku.db.models import Track
 from kiku.setbuilder.camelot import harmonic_score
 from kiku.setbuilder.constraints import dir_energy_to_numeric, zone_to_numeric
+from kiku.vibe import resolve_vibe, vibe_distance
 
 # ── Genre Families ──────────────────────────────────────────────────────
 GENRE_FAMILIES: dict[str, list[str]] = {
@@ -142,14 +143,63 @@ COMPATIBLE_FAMILIES: set[frozenset[str]] = {
     frozenset({"techno", "electronic"}),
     frozenset({"house", "groove"}),
     frozenset({"house", "electronic"}),
+    frozenset({"house", "trance"}),       # progressive house <-> trance
+    frozenset({"groove", "electronic"}),   # disco/funk <-> electronica
+    frozenset({"breaks", "electronic"}),   # breakbeat <-> electronic
+    frozenset({"techno", "trance"}),       # hard trance <-> techno overlap
 }
+
+# Keyword fallback for dir_genre values not in _GENRE_TO_FAMILY.
+# Order matters: more specific keywords first to avoid false positives.
+_KEYWORD_FALLBACKS: list[tuple[str, str]] = [
+    ("techno", "techno"),
+    ("house", "house"),
+    ("trance", "trance"),
+    ("breakbeat", "breaks"),
+    ("drum and bass", "breaks"),
+    ("dnb", "breaks"),
+    ("breaks", "breaks"),
+    ("groove", "groove"),
+    ("disco", "groove"),
+    ("funk", "groove"),
+    ("hypno", "techno"),
+]
 
 
 def genre_to_family(genre: str | None) -> str:
-    """Map a genre name to its family. Returns 'other' if unrecognized."""
+    """Map a genre name to its family. Returns 'other' if unrecognized.
+
+    Tries exact dict lookup first, then keyword-based fallback for
+    dir_genre values like "Hard Techno Dark", "Techno Acid", "House Deep".
+    """
     if not genre:
         return "other"
-    return _GENRE_TO_FAMILY.get(genre.lower().strip(), "other")
+    key = genre.lower().strip()
+    # Exact match (covers both GENRE_FAMILIES and RB_GENRE_TO_FAMILY)
+    family = _GENRE_TO_FAMILY.get(key)
+    if family:
+        return family
+    # Keyword fallback for custom dir_genre names
+    for keyword, fam in _KEYWORD_FALLBACKS:
+        if keyword in key:
+            return fam
+    return "other"
+
+
+def _resolve_genre_family(track: Track) -> str:
+    """Resolve the best genre family for a track.
+
+    Tries dir_genre first, then rb_genre.  Prefers whichever yields a
+    non-"other" family so that a rich rb_genre isn't shadowed by an
+    unmapped dir_genre folder name.
+    """
+    for genre_str in [track.dir_genre, track.rb_genre]:
+        if genre_str:
+            family = genre_to_family(genre_str)
+            if family != "other":
+                return family
+    # Both mapped to "other" or both None — return whatever we got
+    return genre_to_family(track.dir_genre or track.rb_genre)
 
 
 def bpm_compatibility(bpm_a: float | None, bpm_b: float | None) -> float:
@@ -181,7 +231,11 @@ def bpm_compatibility(bpm_a: float | None, bpm_b: float | None) -> float:
 
 
 def genre_coherence(genre_a: str | None, genre_b: str | None) -> float:
-    """Score genre compatibility between two tracks."""
+    """Score genre compatibility between two tracks.
+
+    Uses genre_to_family() which includes keyword fallback, so custom
+    dir_genre names like "Hard Techno Dark" resolve correctly.
+    """
     if not genre_a or not genre_b:
         return 0.5
 
@@ -191,17 +245,50 @@ def genre_coherence(genre_a: str | None, genre_b: str | None) -> float:
     if ga == gb:
         return 1.0
 
-    family_a = _GENRE_TO_FAMILY.get(ga)
-    family_b = _GENRE_TO_FAMILY.get(gb)
+    family_a = genre_to_family(genre_a)
+    family_b = genre_to_family(genre_b)
 
-    if family_a and family_b:
-        if family_a == family_b:
-            return 0.8
-        if frozenset({family_a, family_b}) in COMPATIBLE_FAMILIES:
-            return 0.5
-        return 0.2
+    if family_a == family_b:
+        return 0.8
+    if frozenset({family_a, family_b}) in COMPATIBLE_FAMILIES:
+        return 0.5
+    # Both are "other" — we can't tell, give neutral score
+    if family_a == "other" and family_b == "other":
+        return 0.4
+    return 0.2
 
-    return 0.3
+
+def genre_momentum_bonus(
+    preceding_tracks: list[Track],
+    candidate: Track,
+    window: int = 3,
+) -> float:
+    """Bonus/penalty for genre continuity with recent tracks.
+
+    Returns a value in [-0.1, +0.1] that should be added to the
+    transition score.  Rewards staying in-family, mildly rewards
+    compatible-family moves, penalizes random jumps.
+    """
+    if not preceding_tracks:
+        return 0.0
+    recent = preceding_tracks[-window:]
+    families = [_resolve_genre_family(t) for t in recent]
+    cand_family = _resolve_genre_family(candidate)
+
+    same_count = sum(1 for f in families if f == cand_family)
+    compat_count = sum(
+        1 for f in families
+        if f != cand_family
+        and (
+            frozenset({f, cand_family}) in COMPATIBLE_FAMILIES
+            or f == "other"
+            or cand_family == "other"
+        )
+    )
+
+    ratio = (same_count + 0.5 * compat_count) / len(families)
+    # Map ratio to bonus: 1.0 → +0.1, 0.5 → 0.0, 0.0 → -0.1
+    return (ratio - 0.5) * 0.2
 
 
 def energy_fit(track: Track, target_energy: float) -> float:
@@ -291,6 +378,68 @@ def track_quality(
     return score, discovery_label
 
 
+def _best_genre_str(track: Track) -> str | None:
+    """Return the genre string that maps to the best (non-'other') family.
+
+    Tries dir_genre first, falls back to rb_genre.  Returns whichever
+    maps to a real family, or whichever is available.
+    """
+    for g in [track.dir_genre, track.rb_genre]:
+        if g and genre_to_family(g) != "other":
+            return g
+    return track.dir_genre or track.rb_genre
+
+
+# ── Vibe ─────────────────────────────────────────────────────────────────
+# Vibe enters scoring as a bounded additive term (like genre-momentum and
+# BPM-progression bonuses) so the five normalized weights — and their
+# validation and the weights UI — are untouched. At full strength the term
+# shifts a transition score by roughly ±0.3.
+_VIBE_SPAN = 0.3  # max ± shift at vibe_strength = 1.0
+
+
+def vibe_target_fit(track: Track, target_vibe: tuple[float, float]) -> float:
+    """How close a track's vibe sits to the target vibe (1 = on target)."""
+    v = resolve_vibe(track)
+    return 1.0 - vibe_distance((v.brightness, v.density), target_vibe)
+
+
+def vibe_continuity(from_track: Track, to_track: Track) -> float:
+    """How smoothly two adjacent tracks' vibes connect (1 = no jump).
+
+    A low score is the jarring dark→happy clash the DJ wants to catch.
+    """
+    a = resolve_vibe(from_track)
+    b = resolve_vibe(to_track)
+    return 1.0 - vibe_distance((a.brightness, a.density), (b.brightness, b.density))
+
+
+def vibe_term(
+    from_track: Track | None,
+    to_track: Track,
+    target_vibe: tuple[float, float] | None,
+    vibe_strength: float,
+) -> tuple[float, dict | None]:
+    """Bounded additive vibe contribution and a breakdown for transparency.
+
+    Returns (contribution, breakdown). contribution is 0.0 when vibe is off.
+    """
+    if vibe_strength <= 0 or target_vibe is None:
+        return 0.0, None
+    fit = vibe_target_fit(to_track, target_vibe)
+    cont = vibe_continuity(from_track, to_track) if from_track is not None else fit
+    # Fit leads (it's what steers toward the chosen vibe); continuity smooths.
+    combined = 0.7 * fit + 0.3 * cont
+    # Map [0,1] combined → [-span, +span], scaled by strength.
+    contribution = vibe_strength * _VIBE_SPAN * (combined - 0.5) * 2.0
+    breakdown = {
+        "target_fit": round(fit, 3),
+        "continuity": round(cont, 3),
+        "contribution": round(contribution, 3),
+    }
+    return contribution, breakdown
+
+
 def transition_score(
     from_track: Track,
     to_track: Track,
@@ -299,26 +448,32 @@ def transition_score(
     weights: dict[str, float] | None = None,
     discovery_density: float = 0.0,
     set_appearance_counts: dict[int, int] | None = None,
+    target_vibe: tuple[float, float] | None = None,
+    vibe_strength: float = 0.0,
 ) -> float:
     """Compute overall transition score between two tracks.
 
     Args:
         weights: Optional per-request weight overrides. Falls back to global SCORING_WEIGHTS.
+        target_vibe: Optional (brightness, density) target for this point in the set.
+        vibe_strength: How strongly vibe steers selection (0 = off, 1 = full).
     """
     w = weights if weights is not None else SCORING_WEIGHTS
 
     h = harmonic_score(from_track.key, to_track.key)
     e = energy_fit(to_track, target_energy)
     b = bpm_compatibility(from_track.bpm, to_track.bpm)
-    g = genre_coherence(
-        from_track.dir_genre or from_track.rb_genre,
-        to_track.dir_genre or to_track.rb_genre,
-    )
+    # Use _resolve_genre_family to pick the best genre string per track
+    from_genre = _best_genre_str(from_track)
+    to_genre = _best_genre_str(to_track)
+    g = genre_coherence(from_genre, to_genre)
     sac = (set_appearance_counts or {}).get(to_track.id, 0)
     q, _ = track_quality(to_track, prefer_playlists, discovery_density, sac)
 
-    return (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
+    base = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
             + w["genre_coherence"] * g + w["track_quality"] * q)
+    vibe_contribution, _ = vibe_term(from_track, to_track, target_vibe, vibe_strength)
+    return base + vibe_contribution
 
 
 def score_replacement(
@@ -329,11 +484,14 @@ def score_replacement(
     weights: dict[str, float] | None = None,
     discovery_density: float = 0.0,
     set_appearance_counts: dict[int, int] | None = None,
+    target_vibe: tuple[float, float] | None = None,
+    vibe_strength: float = 0.0,
 ) -> tuple[float, dict | None, dict | None]:
     """Score a candidate as a replacement considering both neighbors.
 
     Returns (combined_score, incoming_breakdown, outgoing_breakdown).
-    Breakdowns are dicts with keys: harmonic, energy_fit, bpm_compat, genre_coherence, track_quality, total.
+    Breakdowns are dicts with keys: harmonic, energy_fit, bpm_compat,
+    genre_coherence, track_quality, vibe, total.
     """
     w = weights if weights is not None else SCORING_WEIGHTS
 
@@ -342,20 +500,22 @@ def score_replacement(
         e = energy_fit(to_t, target_energy)
         b = bpm_compatibility(from_t.bpm, to_t.bpm)
         g = genre_coherence(
-            from_t.dir_genre or from_t.rb_genre,
-            to_t.dir_genre or to_t.rb_genre,
+            _best_genre_str(from_t),
+            _best_genre_str(to_t),
         )
         sac = (set_appearance_counts or {}).get(to_t.id, 0)
         q, label = track_quality(to_t, discovery_density=discovery_density, set_appearance_count=sac)
-        total = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
-                 + w["genre_coherence"] * g + w["track_quality"] * q)
+        base = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
+                + w["genre_coherence"] * g + w["track_quality"] * q)
+        vibe_contribution, vibe_bd = vibe_term(from_t, to_t, target_vibe, vibe_strength)
         return {
             "harmonic": round(h, 3),
             "energy_fit": round(e, 3),
             "bpm_compat": round(b, 3),
             "genre_coherence": round(g, 3),
             "track_quality": round(q, 3),
-            "total": round(total, 3),
+            "vibe": vibe_bd,
+            "total": round(base + vibe_contribution, 3),
             "discovery_label": label,
             "set_appearances": sac,
         }
@@ -384,6 +544,7 @@ def score_transitions(
     exclude_ids: list[int] | None = None,
     discovery_density: float = 0.0,
     set_appearance_counts: dict[int, int] | None = None,
+    target_energy: float = 0.5,
 ) -> list[tuple[Track, float]]:
     """Find and score best transitions from a given track."""
     q = session.query(Track).filter(Track.id != from_track.id)
@@ -391,27 +552,78 @@ def score_transitions(
     if exclude_ids:
         q = q.filter(Track.id.notin_(exclude_ids))
 
-    # BPM pre-filter
+    # BPM pre-filter — include direct range, double-time, and half-time
+    from sqlalchemy import or_ as sql_or
+
     if from_track.bpm and from_track.bpm > 0:
-        bpm_lo = from_track.bpm * (1 - BPM_TOLERANCE * 2)
-        bpm_hi = from_track.bpm * (1 + BPM_TOLERANCE * 2)
-        q = q.filter(Track.bpm.between(bpm_lo, bpm_hi))
+        tol = BPM_TOLERANCE * 2  # 12% window each side
+        bpm = from_track.bpm
+        bpm_lo = bpm * (1 - tol)
+        bpm_hi = bpm * (1 + tol)
+        # Double-time range (e.g. 70 BPM source → 126-154 BPM candidates)
+        dbl_lo = (bpm * 2) * (1 - tol)
+        dbl_hi = (bpm * 2) * (1 + tol)
+        # Half-time range (e.g. 140 BPM source → 61.6-78.4 BPM candidates)
+        half_lo = (bpm * 0.5) * (1 - tol)
+        half_hi = (bpm * 0.5) * (1 + tol)
+        q = q.filter(
+            sql_or(
+                Track.bpm.between(bpm_lo, bpm_hi),
+                Track.bpm.between(dbl_lo, dbl_hi),
+                Track.bpm.between(half_lo, half_hi),
+                Track.bpm.is_(None),  # don't exclude tracks missing BPM
+            )
+        )
 
     if genre_filter:
         genre_conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genre_filter]
-        q = q.filter(
-            Track.dir_genre.isnot(None),
-            *[],  # SQLAlchemy or_
-        )
-        from sqlalchemy import or_
-        q = q.filter(or_(*genre_conditions))
+        genre_conditions += [Track.rb_genre.ilike(f"%{g}%") for g in genre_filter]
+        q = q.filter(sql_or(*genre_conditions))
 
     candidates = q.all()
 
+    # Load affinities for the source track to boost/penalize suggestions
+    affinities = _load_affinities(session, from_track.id)
+
     scored = []
     for track in candidates:
-        score = transition_score(from_track, track, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts)
+        score = transition_score(from_track, track, target_energy=target_energy, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts)
+        # Apply affinity modifier: "good" → +10%, "bad" → -20%
+        aff = affinities.get(track.id)
+        if aff == "good":
+            score = min(score * 1.10, 1.0)
+        elif aff == "bad":
+            score = score * 0.80
         scored.append((track, score))
 
     scored.sort(key=lambda x: x[1], reverse=True)
     return scored[:n]
+
+
+def _load_affinities(session: Session, track_id: int) -> dict[int, str]:
+    """Load all affinities for a track as {partner_id: 'good'|'bad'}.
+
+    Returns empty dict if the table doesn't exist yet (pre-migration).
+    """
+    try:
+        from kiku.db.models import TrackAffinity
+        from sqlalchemy import or_
+
+        rows = (
+            session.query(TrackAffinity)
+            .filter(
+                or_(
+                    TrackAffinity.track_a_id == track_id,
+                    TrackAffinity.track_b_id == track_id,
+                )
+            )
+            .all()
+        )
+        result = {}
+        for row in rows:
+            partner = row.track_b_id if row.track_a_id == track_id else row.track_a_id
+            result[partner] = row.affinity
+        return result
+    except Exception:
+        # Table may not exist yet if migration hasn't run
+        return {}

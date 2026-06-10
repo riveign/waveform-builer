@@ -965,7 +965,7 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
             table.add_column("F1", justify="right", style="green")
             table.add_column("Support", justify="right", style="dim")
 
-            for zone in ["warmup", "build", "drive", "peak", "close"]:
+            for zone in ["intro", "warmup", "build", "drive", "peak", "close"]:
                 if zone in metrics:
                     m = metrics[zone]
                     table.add_row(
@@ -1098,6 +1098,25 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
                   (f" [dim](skipped {skipped} with existing tags)[/]" if skipped else ""))
 
 
+@autotag_group.command("vibe")
+def autotag_vibe():
+    """Read each track's vibe — brightness (dark↔bright) and density (spacious↔busy).
+
+    Derives both from features already in your library (key, spectral shape,
+    danceability), so it runs in seconds with no audio re-analysis.
+    """
+    from kiku.db.models import get_session
+    from kiku.vibe import backfill_vibe
+
+    session = get_session()
+    console.print("[cyan]Listening for the vibe across your library...[/]")
+    result = backfill_vibe(session, recalibrate=True)
+    console.print(
+        f"[green]Read the vibe on {result['updated']} tracks[/]"
+        + (f" [dim]({result['skipped']} had too little signal)[/]" if result["skipped"] else "")
+    )
+
+
 @cli.command()
 @click.argument("url")
 @click.option("--no-comments", is_flag=True, help="Skip fetching comments (faster)")
@@ -1226,3 +1245,152 @@ def hunt(url: str, no_comments: bool, as_json: bool):
         console.print("[dim]Hunt session saved. View purchase links in the UI or run with --json-output.[/]")
     else:
         console.print(f"\n[green]You own all {len(matched)} tracks![/] Time to learn from this set.")
+
+
+def _infer_source(url: str | None, query: str | None) -> str | None:
+    """Guess the source from a URL, falling back to MusicBrainz for a text query."""
+    if url:
+        u = url.lower()
+        if "bandcamp.com" in u:
+            return "bandcamp"
+        if "discogs.com" in u:
+            return "discogs"
+        return None
+    if query:
+        return "musicbrainz"
+    return None
+
+
+@cli.command("fix-album")
+@click.argument("query", required=False)
+@click.option("--url", default=None, help="Release URL to read (Bandcamp album page or Discogs release)")
+@click.option("--source", "source_name", default=None,
+              type=click.Choice(["bandcamp", "musicbrainz", "discogs", "tags"]),
+              help="Where to check metadata against (inferred from --url when omitted)")
+@click.option("--album-key", default=None, help="Correct an album already grouped in your library")
+@click.option("--track-ids", default=None, help="Comma-separated track ids to correct")
+@click.option("--artist", "-a", default=None, help="Artist, to sharpen a search query")
+@click.option("--like", default=None, help="Scope URL-based discovery to file paths matching this SQL LIKE pattern")
+@click.option("--candidate", "candidate_index", default=0, type=int, help="Pick the Nth search candidate (0-based)")
+@click.option("--fields", default=None,
+              help="Comma-separated fields to write (default: title,artist,album,label,release_year,track_number,disc_number)")
+@click.option("--dry-run", is_flag=True, help="Show the diff without writing anything")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation and apply")
+def fix_album(query, url, source_name, album_key, track_ids, artist, like,
+              candidate_index, fields, dry_run, yes):
+    """Check and correct an album's metadata against an external source.
+
+    Point it at a release — a Bandcamp URL, a library album, or a search —
+    pick the source, see a before→after diff, and apply only what you confirm.
+
+    \b
+    Examples:
+      kiku fix-album --url https://artist.bandcamp.com/album/the-ep
+      kiku fix-album "Bite The Hand That Feeds You" -a Hadone --source musicbrainz
+      kiku fix-album --album-key 3f2a91b4c0de --source discogs
+      kiku fix-album --album-key 3f2a91b4c0de --source tags   # re-read the files
+    """
+    from kiku.db.models import get_session
+    from kiku.metadata.models import CORRECTABLE_FIELDS
+    from kiku.metadata.correct import apply_correction
+    from kiku.metadata.service import correct_from_source
+    from kiku.metadata.sources.base import LookupUnsupported, SourceUnavailable
+
+    source_name = source_name or _infer_source(url, query)
+    if not source_name:
+        console.print("[red]Couldn't tell which source to use.[/] Pass --source or a recognizable --url.")
+        return
+
+    chosen_fields = (
+        tuple(f.strip() for f in fields.split(",") if f.strip())
+        if fields else CORRECTABLE_FIELDS
+    )
+    unknown = set(chosen_fields) - set(CORRECTABLE_FIELDS)
+    if unknown:
+        console.print(f"[red]Don't recognize these fields:[/] {', '.join(sorted(unknown))}")
+        console.print(f"[dim]Valid fields: {', '.join(CORRECTABLE_FIELDS)}[/]")
+        return
+
+    ids = None
+    if track_ids:
+        try:
+            ids = [int(x) for x in track_ids.split(",") if x.strip()]
+        except ValueError:
+            console.print("[red]--track-ids should be comma-separated numbers.[/]")
+            return
+
+    session = get_session()
+    console.print(f"[cyan]Checking against {source_name}…[/]")
+    try:
+        candidate, tracks, corrections = correct_from_source(
+            session, source_name,
+            album_key=album_key, track_ids=ids, url=url,
+            album=query, artist=artist, like=like,
+            candidate_index=candidate_index, fields=chosen_fields,
+        )
+    except SourceUnavailable as e:
+        console.print(f"[red]{e}[/]")
+        return
+    except LookupUnsupported as e:
+        console.print(f"[yellow]{e}[/]")
+        return
+
+    if candidate is None:
+        console.print("[yellow]No matching release found at that source.[/] Try a different query or source.")
+        return
+
+    console.print(
+        f"\n[bold]{candidate.album or '—'}[/] · {candidate.artist or '—'}"
+        f" · {candidate.label or '—'} · {candidate.year or '—'}"
+        f"  [dim]({candidate.track_count} tracks via {candidate.source})[/]"
+    )
+
+    if not tracks:
+        console.print("[yellow]Couldn't find matching tracks in your library.[/] "
+                      "Try --album-key, --track-ids, or a --like path scope.")
+        return
+
+    changed = [c for c in corrections if c.has_changes]
+    if not changed:
+        console.print(f"\n[green]Nothing to fix — your {len(tracks)} tracks already match.[/]")
+        return
+
+    table = Table(title="Proposed corrections", show_lines=True)
+    table.add_column("Track", style="dim", justify="right")
+    table.add_column("Conf", justify="right")
+    table.add_column("Field")
+    table.add_column("Now", style="red")
+    table.add_column("→ New", style="green")
+    for c in sorted(changed, key=lambda c: (c.changes and 99, c.track_id)):
+        conf_color = "green" if c.confidence >= 0.85 else "yellow" if c.confidence >= 0.70 else "red"
+        first = True
+        for ch in c.changes:
+            if not ch.changed:
+                continue
+            table.add_row(
+                str(c.track_id) if first else "",
+                f"[{conf_color}]{c.confidence:.0%}[/]" if first else "",
+                ch.field,
+                "—" if ch.old in (None, "") else str(ch.old),
+                str(ch.new),
+            )
+            first = False
+    console.print(table)
+
+    field_summary = ", ".join(chosen_fields)
+    console.print(f"\n[dim]Writing fields: {field_summary}[/]")
+
+    if dry_run:
+        console.print("[dim]Dry run — nothing written.[/]")
+        return
+
+    if not yes:
+        if not click.confirm(f"Apply to {len(changed)} track(s)?", default=False):
+            console.print("[dim]Left your library untouched.[/]")
+            return
+
+    touched = apply_correction(
+        session, corrections,
+        fields=chosen_fields, candidate=candidate, album_key=album_key,
+    )
+    console.print(f"[bold green]Fixed {touched} track(s).[/] {candidate.album or ''}")

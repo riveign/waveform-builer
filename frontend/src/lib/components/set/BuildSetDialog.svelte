@@ -5,6 +5,8 @@
 	import EnergyPresetPicker from './EnergyPresetPicker.svelte';
 	import ScoringWeightsSliders from './ScoringWeights.svelte';
 	import DiscoveryDensitySlider from './DiscoveryDensitySlider.svelte';
+	import VibePresetPicker from './VibePresetPicker.svelte';
+	import type { Track } from '$lib/types';
 
 	interface GenreFamily {
 		family_name: string;
@@ -56,6 +58,9 @@
 	let beamWidth = $state(5);
 	let scoringWeights = $state<ScoringWeights>({ ...DEFAULT_WEIGHTS });
 	let discoveryDensity = $state(0);
+	let vibePreset = $state<string | null>(null);
+	let vibeIntensity = $state(60);
+	let endTrack = $state<Track | null>(null);
 
 	// ── Dialog element ref ──
 	let dialogEl = $state<HTMLDialogElement | null>(null);
@@ -117,6 +122,9 @@
 		beamWidth = 5;
 		scoringWeights = { ...DEFAULT_WEIGHTS };
 		discoveryDensity = 0;
+		vibePreset = null;
+		vibeIntensity = 60;
+		endTrack = null;
 	}
 
 	function handleSubmit() {
@@ -160,6 +168,17 @@
 		// Seed track
 		if (seedTrack) {
 			params.seed_track_id = seedTrack.id;
+		}
+
+		// Ending track anchor (soft — pulls the tail toward it)
+		if (endTrack) {
+			params.end_track_id = endTrack.id;
+		}
+
+		// Vibe — a preset target plus how strongly it should steer
+		if (vibePreset) {
+			params.vibe_preset = vibePreset;
+			params.vibe_intensity = vibeIntensity / 100;
 		}
 
 		onbuild?.(params);
@@ -262,6 +281,12 @@
 			<div class="field">
 				<span class="field-label">Energy arc</span>
 				<EnergyPresetPicker bind:value={energyPreset} />
+			</div>
+
+			<!-- Vibe -->
+			<div class="field">
+				<span class="field-label">Vibe</span>
+				<VibePresetPicker bind:preset={vibePreset} bind:intensity={vibeIntensity} />
 			</div>
 
 			<!-- Discovery / Density -->
@@ -384,6 +409,41 @@
 							</button>
 						{:else}
 							<span class="seed-empty-text">Random start — select a track in the library to use as seed</span>
+						{/if}
+					</div>
+				{/if}
+			</div>
+
+			<!-- Ending Track (soft anchor) -->
+			<div class="field">
+				<span class="field-label">Ending track</span>
+				{#if endTrack}
+					<div class="seed-track">
+						<span class="seed-track-info">
+							{endTrack.title ?? 'Untitled'} &mdash; {endTrack.artist ?? 'Unknown'}
+						</span>
+						<button
+							class="seed-clear-btn"
+							onclick={() => { endTrack = null; }}
+							type="button"
+							aria-label="Remove ending track"
+						>
+							&times;
+						</button>
+					</div>
+				{:else}
+					<div class="seed-empty">
+						{#if ui.selectedTrack}
+							<span class="seed-empty-text">Land the set near a track — pulls the tail toward it</span>
+							<button
+								class="seed-restore-btn"
+								onclick={() => { endTrack = ui.selectedTrack; }}
+								type="button"
+							>
+								Use selected
+							</button>
+						{:else}
+							<span class="seed-empty-text">No ending anchor — select a track in the library to land on</span>
 						{/if}
 					</div>
 				{/if}

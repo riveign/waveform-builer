@@ -1,255 +1,192 @@
 <script lang="ts">
 	import type { SuggestNextItem } from '$lib/types';
-	import { suggestNext } from '$lib/api/tracks';
-	import { getCamelotColor } from '$lib/utils/camelot';
-	import ScoreBreakdown from '../set/ScoreBreakdown.svelte';
+	import { suggestNext, getTrackAffinities, type TrackAffinity } from '$lib/api/tracks';
+	import SimilarTrackCard from '../library/SimilarTrackCard.svelte';
+	import Spinner from '../Spinner.svelte';
 
-	let { trackId, trackKey = null }: { trackId: number; trackKey?: string | null } = $props();
+	let { trackId, trackKey = null, parentBpm = null }: { trackId: number; trackKey?: string | null; parentBpm?: number | null } = $props();
 
-	let expanded = $state(false);
-	let suggestions = $state<SuggestNextItem[]>([]);
-	let loaded = $state(false);
+	let pool = $state<SuggestNextItem[]>([]);
+	let rejectedIds = $state<Set<number>>(new Set());
 	let loading = $state(false);
-	let expandedIdx = $state<number | null>(null);
+	let showAll = $state(false);
+	let affinityMap = $state<Record<number, string>>({});
+	let dismissing = $state<Set<number>>(new Set());
+	const VISIBLE_COUNT = 12;
+	const FETCH_COUNT = 30;
 
-	// Reset when track changes
+	// Filter out rejected tracks from the pool
+	let available = $derived(
+		pool.filter((item) => !rejectedIds.has(item.track.id))
+	);
+
+	let visibleSuggestions = $derived(
+		showAll ? available : available.slice(0, VISIBLE_COUNT)
+	);
+	let hasMore = $derived(available.length > VISIBLE_COUNT);
+
+	// Auto-load when track changes
 	$effect(() => {
-		trackId;
-		expanded = false;
-		loaded = false;
-		suggestions = [];
-		expandedIdx = null;
+		const id = trackId;
+		loading = true;
+		pool = [];
+		rejectedIds = new Set();
+		showAll = false;
+		affinityMap = {};
+		dismissing = new Set();
+
+		Promise.all([
+			suggestNext(id, FETCH_COUNT),
+			getTrackAffinities(id).catch(() => [] as TrackAffinity[]),
+		])
+			.then(([res, affinities]) => {
+				pool = res.suggestions;
+				const map: Record<number, string> = {};
+				const rejected = new Set<number>();
+				for (const a of affinities) {
+					map[a.track_id] = a.affinity;
+					if (a.affinity === 'bad') rejected.add(a.track_id);
+				}
+				affinityMap = map;
+				rejectedIds = rejected;
+			})
+			.catch(() => {
+				pool = [];
+			})
+			.finally(() => {
+				loading = false;
+			});
 	});
 
-	async function toggle() {
-		expanded = !expanded;
-		if (expanded && !loaded) {
-			loading = true;
-			try {
-				const res = await suggestNext(trackId, 8);
-				suggestions = res.suggestions;
-			} catch {
-				suggestions = [];
-			} finally {
-				loading = false;
-				loaded = true;
+	function handleAffinityChange(trackIdChanged: number, newAffinity: string | null) {
+		if (newAffinity === 'bad') {
+			// Animate out, then remove from visible pool
+			dismissing = new Set([...dismissing, trackIdChanged]);
+			setTimeout(() => {
+				rejectedIds = new Set([...rejectedIds, trackIdChanged]);
+				dismissing = new Set([...dismissing].filter((id) => id !== trackIdChanged));
+			}, 300);
+			affinityMap = { ...affinityMap, [trackIdChanged]: newAffinity };
+		} else if (newAffinity) {
+			affinityMap = { ...affinityMap, [trackIdChanged]: newAffinity };
+		} else {
+			// Remove opinion — if it was rejected, bring it back
+			const next = { ...affinityMap };
+			delete next[trackIdChanged];
+			affinityMap = next;
+			if (rejectedIds.has(trackIdChanged)) {
+				const updated = new Set(rejectedIds);
+				updated.delete(trackIdChanged);
+				rejectedIds = updated;
 			}
 		}
 	}
-
-	function toggleBreakdown(idx: number) {
-		expandedIdx = expandedIdx === idx ? null : idx;
-	}
-
-	function scoreColor(score: number): string {
-		if (score >= 0.75) return 'var(--accent)';
-		if (score >= 0.5) return 'var(--energy-mid, #f39c12)';
-		return 'var(--energy-high, #e74c3c)';
-	}
 </script>
 
-<div class="card">
-	<button class="card-header" onclick={toggle}>
-		<div class="card-icon">
-			<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-				<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
-				<path d="M12 1v4M12 19v4M23 12h-4M5 12H1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-				<path d="M19.8 4.2l-2.8 2.8M7 17l-2.8 2.8M19.8 19.8l-2.8-2.8M7 7L4.2 4.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-			</svg>
-		</div>
-		<span class="card-title">Sounds like</span>
-		{#if loaded}
-			<span class="count">{suggestions.length}</span>
-		{/if}
-		<span class="chevron" class:open={expanded}>&#9662;</span>
-	</button>
+<div class="similar-section">
+	<h3 class="section-title">Sounds like</h3>
 
-	{#if expanded}
-		<div class="card-body">
-			{#if loading}
-				<p class="muted">Listening to your library...</p>
-			{:else if suggestions.length === 0}
-				<p class="muted">No similar tracks found</p>
-			{:else}
-				{#each suggestions as item, idx}
-					<button class="similar-row" onclick={() => toggleBreakdown(idx)}>
-						<span class="score" style="color: {scoreColor(item.score)}">
-							{(item.score * 100).toFixed(0)}
-						</span>
-						<div class="track-info">
-							<span class="title">{item.track.title ?? 'Unknown'}</span>
-							<span class="artist">{item.track.artist ?? 'Unknown'}</span>
-						</div>
-						<div class="badges">
-							<span class="badge" style="color: {getCamelotColor(item.track.key)}">{item.track.key ?? '?'}</span>
-							<span class="badge">{item.track.bpm ? Math.round(item.track.bpm) : '?'}</span>
-						</div>
-					</button>
-					{#if expandedIdx === idx}
-						<div class="breakdown-wrapper">
-							<ScoreBreakdown
-								breakdown={item.breakdown}
-								keyA={trackKey}
-								keyB={item.track.key}
-							/>
-						</div>
-					{/if}
-				{/each}
-			{/if}
+	{#if loading}
+		<Spinner label="Listening to your library..." />
+	{:else if available.length === 0}
+		<p class="muted">No similar tracks found</p>
+	{:else}
+		<div class="cards-grid">
+			{#each visibleSuggestions as item (item.track.id)}
+				<div class="card-slot" class:dismissing={dismissing.has(item.track.id)}>
+					<SimilarTrackCard
+						{item}
+						parentTrackId={trackId}
+						{parentBpm}
+						affinity={affinityMap[item.track.id] ?? null}
+						onaffinitychange={handleAffinityChange}
+					/>
+				</div>
+			{/each}
 		</div>
+		{#if hasMore && !showAll}
+			<button class="show-more" onclick={() => { showAll = true; }}>
+				Show {available.length - VISIBLE_COUNT} more
+			</button>
+		{/if}
 	{/if}
 </div>
 
 <style>
-	.card {
-		background: var(--bg-secondary);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		overflow: hidden;
-		transition: border-color 0.15s;
-	}
-
-	.card:hover {
-		border-color: var(--text-dim);
-	}
-
-	.card-header {
-		width: 100%;
+	.similar-section {
 		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 14px 16px;
-		background: none;
-		border: none;
-		color: var(--text-primary);
-		font-size: 13px;
-		cursor: pointer;
+		flex-direction: column;
+		gap: 12px;
+		min-width: 0;
+		overflow: hidden;
 	}
 
-	.card-icon {
-		width: 20px;
-		height: 20px;
-		flex-shrink: 0;
-		color: var(--accent);
-	}
-
-	.card-icon svg {
-		width: 20px;
-		height: 20px;
-	}
-
-	.card-title {
-		flex: 1;
-		text-align: left;
-		font-weight: 500;
-	}
-
-	.count {
-		font-size: 11px;
-		color: var(--text-dim);
-		background: var(--bg-tertiary);
-		padding: 1px 6px;
-		border-radius: 8px;
-		font-variant-numeric: tabular-nums;
-	}
-
-	.chevron {
-		font-size: 10px;
-		color: var(--text-dim);
-		transition: transform 0.15s;
-	}
-
-	.chevron.open {
-		transform: rotate(0deg);
-	}
-
-	.chevron:not(.open) {
-		transform: rotate(-90deg);
-	}
-
-	.card-body {
-		padding: 4px 16px 14px;
-		border-top: 1px solid var(--border);
+	.section-title {
+		font-size: 12px;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: var(--text-secondary);
+		margin: 0;
 	}
 
 	.muted {
 		font-size: 12px;
 		color: var(--text-dim);
-		margin: 8px 0 0;
+		margin: 0;
 	}
 
-	.similar-row {
-		display: flex;
-		align-items: center;
-		gap: 10px;
+	.cards-grid {
+		display: grid;
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+		gap: 12px;
+	}
+
+	@media (max-width: 1200px) {
+		.cards-grid {
+			grid-template-columns: repeat(4, minmax(0, 1fr));
+		}
+	}
+
+	@media (max-width: 900px) {
+		.cards-grid {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
+	}
+
+	@media (max-width: 600px) {
+		.cards-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	.card-slot {
+		position: relative;
+		transition: opacity 0.3s, transform 0.3s;
+	}
+
+	.card-slot.dismissing {
+		opacity: 0;
+		transform: scale(0.9);
+		pointer-events: none;
+	}
+
+	.show-more {
+		display: block;
 		width: 100%;
-		padding: 6px 8px;
-		margin-top: 4px;
+		padding: 8px;
 		background: none;
-		border: none;
-		border-radius: 4px;
-		color: var(--text-primary);
-		font-size: 13px;
-		cursor: pointer;
-		text-align: left;
-		transition: background 0.1s;
-	}
-
-	.similar-row:hover {
-		background: var(--bg-tertiary);
-	}
-
-	.score {
-		font-size: 13px;
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
-		width: 28px;
-		text-align: right;
-		flex-shrink: 0;
-	}
-
-	.track-info {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-	}
-
-	.title {
-		font-size: 12px;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.artist {
-		font-size: 11px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
 		color: var(--text-secondary);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		font-size: 12px;
+		cursor: pointer;
+		transition: background 0.1s, color 0.1s;
 	}
 
-	.badges {
-		display: flex;
-		gap: 6px;
-		flex-shrink: 0;
+	.show-more:hover {
+		background: var(--bg-tertiary);
+		color: var(--text-primary);
 	}
 
-	.badge {
-		font-size: 11px;
-		font-weight: 500;
-		font-variant-numeric: tabular-nums;
-	}
 
-	.breakdown-wrapper {
-		padding: 4px 8px 8px 46px;
-		animation: slide-in 0.15s ease-out;
-	}
-
-	@keyframes slide-in {
-		from { opacity: 0; transform: translateY(-4px); }
-		to   { opacity: 1; transform: translateY(0); }
-	}
 </style>

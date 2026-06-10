@@ -1,9 +1,12 @@
 <script lang="ts">
-	import type { SetTrack, EnergyConflict } from '$lib/types';
+	import type { SetTrack, Track, EnergyConflict } from '$lib/types';
 	import { getCamelotColor } from '$lib/utils/camelot';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { getTrackEnergyNumeric, energyColor as getEnergyColor } from '$lib/utils/energy';
+	import { getTrack } from '$lib/api/tracks';
 	import EnergyConflictBadge from './EnergyConflictBadge.svelte';
+	import ContextMenu from '../ContextMenu.svelte';
+	import TrackContextMenu from '../library/TrackContextMenu.svelte';
 
 	let {
 		track,
@@ -24,6 +27,12 @@
 	} = $props();
 
 	const ui = getUiStore();
+
+	let contextMenuOpen = $state(false);
+	let contextMenuX = $state(0);
+	let contextMenuY = $state(0);
+	let contextMenuFullTrack = $state<Track | null>(null);
+	let loadingContextTrack = $state(false);
 
 	/** Indicator for energy vs target: match, above, below, or none */
 	function energyFitIndicator(norm: number | null, target: number | undefined): { label: string; color: string } | null {
@@ -47,6 +56,24 @@
 		e.stopPropagation();
 		onplay?.(track.track_id);
 	}
+
+	async function handleContextMenu(e: MouseEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		contextMenuX = e.clientX;
+		contextMenuY = e.clientY;
+		contextMenuOpen = true;
+		if (!contextMenuFullTrack || contextMenuFullTrack.id !== track.track_id) {
+			loadingContextTrack = true;
+			try {
+				contextMenuFullTrack = await getTrack(track.track_id);
+			} catch {
+				contextMenuFullTrack = null;
+			} finally {
+				loadingContextTrack = false;
+			}
+		}
+	}
 </script>
 
 <div
@@ -55,6 +82,7 @@
 	class:playing={isPlaying}
 	data-track-id={track.track_id}
 	onclick={handleClick}
+	oncontextmenu={handleContextMenu}
 	role="button"
 	tabindex="0"
 	onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(); } }}
@@ -117,6 +145,19 @@
 		{/if}
 	</div>
 </div>
+
+{#if contextMenuOpen}
+	<ContextMenu bind:open={contextMenuOpen} x={contextMenuX} y={contextMenuY}>
+		{#if loadingContextTrack}
+			<div style="padding: 12px; font-size: 13px; color: var(--text-secondary);">Loading...</div>
+		{:else if contextMenuFullTrack}
+			<TrackContextMenu
+				track={contextMenuFullTrack}
+				onclose={() => contextMenuOpen = false}
+			/>
+		{/if}
+	</ContextMenu>
+{/if}
 
 <style>
 	.set-track-card {

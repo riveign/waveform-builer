@@ -82,6 +82,7 @@ def parse_energy_json(s: str) -> EnergyProfile:
 
 # Map directory energy tags to approximate numeric values
 ENERGY_TAG_VALUES = {
+    "intro": 0.1,
     "low": 0.2,
     "warmup": 0.25,
     "mid": 0.5,
