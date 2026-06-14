@@ -9,6 +9,7 @@
 	import SetEnergyReview from './SetEnergyReview.svelte';
 	import SetComparison from './SetComparison.svelte';
 	import FillReorderDialog from './FillReorderDialog.svelte';
+	import AddFromArtistPanel from './AddFromArtistPanel.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
@@ -75,6 +76,7 @@
 	let exportFormat = $state<'m3u8' | 'rekordbox'>('m3u8');
 	let showEnergyReview = $state(false);
 	let showAssist = $state(false);
+	let showArtistPicks = $state(false);
 	let confirmDelete = $state(false);
 	let deleting = $state(false);
 	let pickerRefresh = $state(0);
@@ -395,6 +397,9 @@
 					Assist
 				</button>
 			{/if}
+			<button class="assist-btn" onclick={() => { showArtistPicks = !showArtistPicks; }}>
+				Add from an artist
+			</button>
 			<select bind:value={exportFormat} class="export-select">
 				<option value="m3u8">M3U8</option>
 				<option value="rekordbox">XML</option>
@@ -515,6 +520,14 @@
 				showEnergyReview = false;
 				if (reviewed && selectedSet) loadSetData(selectedSet.id);
 			}}
+		/>
+	{/if}
+
+	{#if showArtistPicks && selectedSet}
+		<AddFromArtistPanel
+			setId={selectedSet.id}
+			onInserted={handleTracksChanged}
+			onclose={() => { showArtistPicks = false; }}
 		/>
 	{/if}
 </div>

@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from kiku.api.deps import get_db
 from kiku.api.schemas import (
+    ArtistPickItem,
+    ArtistPicksResponse,
     CueCreateRequest,
     CueResponse,
     ImportResultResponse,
@@ -1134,3 +1136,49 @@ def replace_track(
         code = 404 if "not found" in detail.lower() else 400
         raise HTTPException(status_code=code, detail=detail)
     return [_set_track_response(st) for st in tracks]
+
+
+@router.get("/{set_id}/artist-picks", response_model=ArtistPicksResponse)
+def get_artist_picks(
+    set_id: int,
+    artist: str,
+    n: int = 5,
+    discovery_density: float = 0.0,
+    db: Session = Depends(get_db),
+):
+    """Rank an artist's owned tracks by their best fit anywhere in the set.
+
+    Library excavation only — every pick is a track the DJ already owns.
+    Returns an empty pick list (200) when the artist owns nothing new here.
+    """
+    from kiku.setbuilder.artist_picks import rank_artist_picks
+
+    s = db.get(Set, set_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    ranked = rank_artist_picks(
+        db, set_id, artist, n=n, discovery_density=discovery_density,
+    )
+
+    _BD_FIELDS = {
+        "harmonic", "energy_fit", "bpm_compat", "genre_coherence",
+        "track_quality", "total", "discovery_label", "set_appearances",
+    }
+    picks = [
+        ArtistPickItem(
+            track=_track_response(p.track),
+            position=p.position,
+            score=p.score,
+            breakdown=(
+                TransitionScoreBreakdown(
+                    **{k: v for k, v in p.breakdown.items() if k in _BD_FIELDS}
+                )
+                if p.breakdown
+                else None
+            ),
+            reason=p.reason,
+        )
+        for p in ranked
+    ]
+    return ArtistPicksResponse(set_id=set_id, artist=artist, picks=picks)
