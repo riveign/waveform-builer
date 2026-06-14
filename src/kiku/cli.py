@@ -739,6 +739,92 @@ def analyze_set_cmd(set_name_or_id: str):
     console.print("\n[dim]Analysis cached. View in the app or re-run to update.[/]")
 
 
+@cli.command("compare")
+@click.argument("played_set")
+@click.argument("planned_set", required=False)
+def compare_cmd(played_set: str, planned_set: str | None):
+    """Compare a played set against the plan it came from.
+
+    Shows where you deviated — and what the room was telling you.
+    Pass set ids or name fragments. Planned defaults to the linked set.
+    """
+    from kiku.analysis.set_compare import compare_sets
+    from kiku.db.models import Set, get_session
+
+    session = get_session()
+
+    def _resolve(ref: str) -> Set | None:
+        try:
+            return session.get(Set, int(ref))
+        except ValueError:
+            return session.query(Set).filter(Set.name.ilike(f"%{ref}%")).first()
+
+    played = _resolve(played_set)
+    if not played:
+        console.print(f"[red]Couldn't find set '{played_set}'.[/]")
+        return
+
+    if planned_set:
+        planned = _resolve(planned_set)
+        if not planned:
+            console.print(f"[red]Couldn't find set '{planned_set}'.[/]")
+            return
+    elif played.planned_set_id:
+        planned = session.get(Set, played.planned_set_id)
+        if not planned:
+            console.print("[red]The linked planned set no longer exists.[/]")
+            return
+    else:
+        console.print(
+            "[yellow]No planned set linked. Pass it explicitly: "
+            "kiku compare <played> <planned>[/]"
+        )
+        return
+
+    console.print(f"[cyan]Comparing '{played.name}' against the plan '{planned.name}'...[/]")
+    try:
+        result = compare_sets(session, played.id, planned.id)
+    except ValueError as e:
+        console.print(f"[red]{e}[/]")
+        return
+
+    console.print(f"\n[bold]{played.name}[/] vs plan [bold]{planned.name}[/]")
+    console.print(
+        f"Kept: [green]{result.kept_count}[/] | Moved: [yellow]{result.moved_count}[/] | "
+        f"Cut: [red]{result.cut_count}[/] | Added: [cyan]{result.added_count}[/]"
+    )
+    console.print(
+        f"Arc: planned [cyan]{result.arc.planned_shape}[/] → played [cyan]{result.arc.played_shape}[/] | "
+        f"BPM drift delta: [cyan]{result.arc.bpm_drift_delta:+.1f}[/]"
+    )
+
+    deviations = [d for d in result.track_deviations if d.kind != "kept"]
+    if deviations:
+        table = Table()
+        table.add_column("Track")
+        table.add_column("Deviation")
+        table.add_column("What it says", style="dim")
+        for d in deviations:
+            if d.kind == "moved" and d.displacement is not None:
+                label = f"moved {d.displacement:+d}"
+            else:
+                label = d.kind
+            table.add_row(d.title or f"#{d.track_id}", label, d.teaching_moment)
+        console.print(table)
+
+    if result.energy_deviations:
+        console.print("\n[bold]Energy jumps:[/]")
+        for ed in result.energy_deviations:
+            console.print(f"  Track {ed.position + 1}: {ed.delta:+.2f} — {ed.teaching_moment}")
+
+    if result.deviation_patterns:
+        console.print("\n[bold]What the room told you:[/]")
+        for p in result.deviation_patterns:
+            console.print(f"  {p}")
+
+    console.print("\n[dim]Comparison cached. View it in the app or re-run to update.[/]")
+
+
 @cli.command()
 @click.option("--port", default=8000, help="HTTP port for the API server")
 @click.option("--host", default="0.0.0.0", help="Host to bind to")

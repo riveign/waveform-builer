@@ -141,6 +141,8 @@ class Set(Base):
     source_ref = Column(Text)  # Original filename or playlist name
     is_analyzed = Column(Integer, default=0)  # Whether analysis has been run
     analysis_cache = Column(Text)  # JSON blob for cached analysis (Phase 2)
+    planned_set_id = Column(Integer, ForeignKey("sets.id"), nullable=True)  # Played set -> the plan it came from
+    comparison_cache = Column(Text)  # JSON blob for cached played-vs-planned comparison
 
     tracks = relationship("SetTrack", back_populates="set_", cascade="all, delete-orphan")
 

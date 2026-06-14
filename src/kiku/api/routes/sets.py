@@ -18,7 +18,10 @@ from kiku.api.schemas import (
     CueCreateRequest,
     CueResponse,
     ImportResultResponse,
+    PlannedSetCandidate,
     SetAnalysisResponse,
+    SetComparisonResponse,
+    SetLinkRequest,
     ReplaceTrackRequest,
     ReplacementCandidate,
     ReplacementBreakdown,
@@ -178,6 +181,7 @@ async def import_m3u8_playlist(
         unmatched_paths=[UnmatchedTrack(**u) for u in result.unmatched],
         match_methods=result.match_methods,
         warnings=result.warnings,
+        planned_candidates=[PlannedSetCandidate(**c) for c in result.planned_candidates],
     )
 
 
@@ -212,6 +216,87 @@ def get_set_analysis(set_id: int, db: Session = Depends(get_db)):
         )
 
     return json.loads(s.analysis_cache)
+
+
+# ── Played vs Planned (link + compare) ──
+
+
+def _clear_comparison_caches(db: Session, set_: Set) -> None:
+    """Clear comparison caches touching this set — its own and any played set linked to it."""
+    set_.comparison_cache = None
+    for linked in db.query(Set).filter(Set.planned_set_id == set_.id).all():
+        linked.comparison_cache = None
+
+
+@router.put("/{set_id}/link")
+def link_set(set_id: int, body: SetLinkRequest, db: Session = Depends(get_db)):
+    """Link a played (imported) set to the planned Kiku set it was based on."""
+    s = db.get(Set, set_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+    if body.planned_set_id == set_id:
+        raise HTTPException(
+            status_code=400,
+            detail="A set can't be its own plan — pick the set you built in Kiku",
+        )
+    planned = db.get(Set, body.planned_set_id)
+    if not planned:
+        raise HTTPException(status_code=404, detail="Planned set not found")
+
+    s.planned_set_id = body.planned_set_id
+    s.comparison_cache = None
+    db.commit()
+    return {"set_id": set_id, "planned_set_id": body.planned_set_id}
+
+
+@router.delete("/{set_id}/link", status_code=204)
+def unlink_set(set_id: int, db: Session = Depends(get_db)):
+    """Remove the planned-set link. Linking is optional and reversible."""
+    s = db.get(Set, set_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+    s.planned_set_id = None
+    s.comparison_cache = None
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/{set_id}/compare", response_model=SetComparisonResponse)
+def compare_set_endpoint(set_id: int, db: Session = Depends(get_db)):
+    """Compare a played set against its linked plan. Computes and caches the deviation report."""
+    from dataclasses import asdict
+
+    from kiku.analysis.set_compare import compare_sets
+
+    s = db.get(Set, set_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+    if not s.planned_set_id:
+        raise HTTPException(
+            status_code=404,
+            detail="No planned set linked — link one first with PUT /link",
+        )
+
+    try:
+        result = compare_sets(db, set_id, s.planned_set_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return asdict(result)
+
+
+@router.get("/{set_id}/comparison", response_model=SetComparisonResponse)
+def get_set_comparison(set_id: int, db: Session = Depends(get_db)):
+    """Get the cached played-vs-planned comparison. 404 if not compared yet."""
+    s = db.get(Set, set_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+    if not s.comparison_cache:
+        raise HTTPException(
+            status_code=404,
+            detail="Set hasn't been compared yet. Use POST /compare first.",
+        )
+    return json.loads(s.comparison_cache)
 
 
 @router.post("/build")
@@ -454,6 +539,7 @@ def add_track(set_id: int, body: SetAddTrackRequest, db: Session = Depends(get_d
     # Invalidate analysis cache
     set_.is_analyzed = 0
     set_.analysis_cache = None
+    _clear_comparison_caches(db, set_)
 
     db.commit()
     db.refresh(set_)
@@ -487,6 +573,7 @@ def remove_track(set_id: int, track_id: int, db: Session = Depends(get_db)):
                 st.transition_score = None
         set_.is_analyzed = 0
         set_.analysis_cache = None
+        _clear_comparison_caches(db, set_)
         db.commit()
     return Response(status_code=204)
 
@@ -508,6 +595,7 @@ def reorder_tracks(
     if set_:
         set_.is_analyzed = 0
         set_.analysis_cache = None
+        _clear_comparison_caches(db, set_)
         db.commit()
 
     return [_set_track_response(st) for st in tracks]
@@ -696,6 +784,8 @@ def set_detail(set_id: int, db: Session = Depends(get_db)):
         duration_min=s.duration_min,
         energy_profile=s.energy_profile,
         genre_filter=s.genre_filter,
+        source=s.source,
+        planned_set_id=s.planned_set_id,
         tracks=[_set_track_response(st) for st in tracks],
     )
 

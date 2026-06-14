@@ -7,6 +7,7 @@ import type {
 	SetAnalysis,
 	SetBuildComplete,
 	SetBuildParams,
+	SetComparison,
 	SetCreateParams,
 	SetDetail,
 	SetTrack,
@@ -266,6 +267,38 @@ export async function getSetAnalysis(setId: number): Promise<SetAnalysis> {
 	return res.json();
 }
 
+
+// ── Played vs Planned: link + compare ──
+
+export async function linkSet(setId: number, plannedSetId: number): Promise<void> {
+	await fetchJson(`/api/sets/${setId}/link`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ planned_set_id: plannedSetId }),
+	});
+}
+
+export async function unlinkSet(setId: number): Promise<void> {
+	await fetch(`${API_BASE}/api/sets/${setId}/link`, { method: 'DELETE' });
+}
+
+export async function compareSet(setId: number): Promise<SetComparison> {
+	const res = await fetch(`${API_BASE}/api/sets/${setId}/compare`, { method: 'POST' });
+	if (!res.ok) {
+		const err = await res.json().catch(() => ({ detail: "Couldn't compare this set" }));
+		throw new Error(err.detail || "Couldn't compare this set");
+	}
+	return res.json();
+}
+
+export async function getSetComparison(setId: number): Promise<SetComparison> {
+	const res = await fetch(`${API_BASE}/api/sets/${setId}/comparison`);
+	if (!res.ok) {
+		const err = await res.json().catch(() => ({ detail: 'Not compared yet' }));
+		throw new Error(err.detail || 'Not compared yet');
+	}
+	return res.json();
+}
 
 // ── Manual set builder: fill, reorder, score-sequence ──
 
