@@ -2574,7 +2574,14 @@ Implementation commit: 6baf4c1
 - [ ] Import the unedited M3U8 export → comparison reports all kept ("exactly as planned" framing)
 - [ ] Self-link rejected (400) via API
 
-**Known limitation to evaluate during acceptance**: the only UI path to link is at import time — an already-imported set can only be linked via CLI/API. If this hurts in practice, add a "Link to a planned set" picker in SetView as a follow-up.
+**Scenario 8 — Link an already-imported set from SetView** (follow-up, commit `78dabc5`)
+- [ ] Open an imported set that is NOT linked → a dashed "Link to a plan" button appears in the controls (absent on Kiku-built plans and on already-linked sets)
+- [ ] Click it → inline dropdown "Which set did you plan from?" lists your Kiku-built sets (this set excluded)
+- [ ] Choose a plan + "Link" → set links and the comparison opens immediately
+- [ ] With no Kiku-built sets present, the picker shows "No planned sets to link yet — build one first." with a Cancel
+- [ ] "Cancel" dismisses the picker without linking
+
+~~Known limitation~~ **Resolved**: an already-imported set can now be linked from the UI (SetView controls), not just at import time or via CLI/API.
 
 ### Automated evidence (from IMPLEMENT, 2026-06-10)
 - `tests/test_set_compare.py`: 22 passed; `tests/api/test_compare_api.py`: 11 passed; full suite 327 passed (+5 pre-existing test_energy.py failures from stale calibration, unrelated)
