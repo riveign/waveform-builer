@@ -101,6 +101,8 @@ export interface SetDetail {
 	duration_min: number | null;
 	energy_profile: string | null;
 	genre_filter: string | null;
+	source: string | null;
+	planned_set_id: number | null;
 	tracks: SetTrack[];
 }
 
@@ -539,6 +541,20 @@ export interface ReplacementSuggestionsResponse {
 	candidates: ReplacementCandidate[];
 }
 
+export interface ArtistPick {
+	track: Track;
+	position: number;
+	score: number;
+	breakdown: TransitionScoreBreakdown | null;
+	reason: string;
+}
+
+export interface ArtistPicksResponse {
+	set_id: number;
+	artist: string;
+	picks: ArtistPick[];
+}
+
 // ── Import Playlist types ──
 
 export interface UnmatchedTrack {
@@ -558,6 +574,66 @@ export interface ImportResult {
 	match_methods: Record<string, number>;
 	warnings: string[];
 	duplicate_set_id: number | null;
+	planned_candidates: PlannedSetCandidate[];
+}
+
+export interface PlannedSetCandidate {
+	set_id: number;
+	name: string | null;
+	overlap: number;
+	shared_tracks: number;
+}
+
+// ── Played vs Planned comparison types ──
+
+export interface TrackDeviation {
+	kind: 'kept' | 'moved' | 'cut' | 'added';
+	track_id: number;
+	title: string | null;
+	artist: string | null;
+	planned_position: number | null;
+	played_position: number | null;
+	displacement: number | null;
+	teaching_moment: string;
+}
+
+export interface EnergyDeviation {
+	position: number;
+	track_id: number;
+	planned_energy: number;
+	played_energy: number;
+	delta: number;
+	teaching_moment: string;
+}
+
+export interface ArcComparison {
+	planned_shape: string;
+	played_shape: string;
+	planned_key_style: string;
+	played_key_style: string;
+	planned_bpm_style: string;
+	played_bpm_style: string;
+	planned_bpm_range: number[];
+	played_bpm_range: number[];
+	bpm_drift_delta: number;
+	planned_curve: number[];
+	played_curve: number[];
+}
+
+export interface SetComparison {
+	played_set_id: number;
+	planned_set_id: number;
+	played_name: string | null;
+	planned_name: string | null;
+	kept_count: number;
+	moved_count: number;
+	cut_count: number;
+	added_count: number;
+	track_deviations: TrackDeviation[];
+	energy_deviations: EnergyDeviation[];
+	arc: ArcComparison;
+	deviation_patterns: string[];
+	compared_at: string;
 }
 
 // ── SoundCloud types ──

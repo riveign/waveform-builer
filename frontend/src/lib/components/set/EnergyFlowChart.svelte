@@ -20,9 +20,10 @@
 		energyProfile?: string | null;
 		selectedIndex?: number;
 		onTrackClick?: (index: number) => void;
+		plannedCurve?: number[] | null;
 	}
 
-	let { tracks, energyProfile, selectedIndex, onTrackClick }: Props = $props();
+	let { tracks, energyProfile, selectedIndex, onTrackClick, plannedCurve = null }: Props = $props();
 
 	let canvas = $state<HTMLCanvasElement>(null!);
 	let chart: Chart | null = null;
@@ -135,6 +136,22 @@
 			});
 		}
 
+		// Planned curve overlay (played-vs-planned comparison)
+		if (plannedCurve && plannedCurve.length === tracks.length) {
+			datasets.push({
+				label: 'Planned',
+				data: plannedCurve,
+				borderColor: 'rgba(186, 104, 200, 0.8)',
+				borderWidth: 1.5,
+				borderDash: [2, 3],
+				pointRadius: 0,
+				pointHoverRadius: 0,
+				tension: 0.3,
+				fill: false,
+				order: 3,
+			});
+		}
+
 		return { labels, datasets };
 	}
 
@@ -163,7 +180,7 @@
 				},
 				plugins: {
 					legend: {
-						display: targetValues.some((v) => v !== null),
+						display: targetValues.some((v) => v !== null) || (plannedCurve?.length ?? 0) > 0,
 						position: 'bottom',
 						labels: {
 							color: '#A0A1A7',
@@ -211,9 +228,9 @@
 									}
 									return lines;
 								}
-								// Target dataset
+								// Target / Planned overlay datasets
 								const val = ctx.parsed.y;
-								if (val !== null) return `Target: ${val.toFixed(2)}`;
+								if (val !== null) return `${ctx.dataset.label ?? 'Target'}: ${val.toFixed(2)}`;
 								return '';
 							},
 						},
@@ -268,6 +285,11 @@
 		const { labels, datasets } = buildChartData();
 		chart.data.labels = labels;
 		chart.data.datasets = datasets;
+		const targetValues = parseEnergyProfile(energyProfile, tracks.length);
+		if (chart.options.plugins?.legend) {
+			chart.options.plugins.legend.display =
+				targetValues.some((v) => v !== null) || (plannedCurve?.length ?? 0) > 0;
+		}
 		chart.update('default');
 	}
 
@@ -289,6 +311,7 @@
 		void tracks;
 		void energyProfile;
 		void selectedIndex;
+		void plannedCurve;
 
 		if (chart) {
 			updateChart();

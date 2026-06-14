@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
 from sqlalchemy.orm import Session
@@ -32,6 +32,7 @@ class ImportResult:
     match_methods: dict[str, int]
     warnings: list[str]
     duplicate_set_id: int | None = None  # Set if source_ref already exists
+    planned_candidates: list[dict] = field(default_factory=list)  # [{set_id, name, overlap, shared_tracks}]
 
 
 def _build_path_index(
@@ -106,6 +107,47 @@ def match_tracks(
             results.append(TrackMatchResult(mt, None, "unmatched"))
 
     return results
+
+
+def suggest_planned_sets(
+    session: Session,
+    track_ids: list[int],
+    *,
+    exclude_set_id: int | None = None,
+    threshold: float = 0.3,
+    top_n: int = 3,
+) -> list[dict]:
+    """Rank Kiku-built sets by Jaccard track overlap with an imported set.
+
+    Returns up to `top_n` candidates with overlap >= threshold:
+    [{"set_id", "name", "overlap", "shared_tracks"}, ...]
+    """
+    played = set(track_ids)
+    if not played:
+        return []
+
+    q = session.query(Set).filter(Set.source == "kiku")
+    if exclude_set_id is not None:
+        q = q.filter(Set.id != exclude_set_id)
+
+    candidates: list[dict] = []
+    for s in q.all():
+        planned = {st.track_id for st in s.tracks}
+        if not planned:
+            continue
+        shared = len(played & planned)
+        union = len(played | planned)
+        overlap = shared / union if union else 0.0
+        if overlap >= threshold:
+            candidates.append({
+                "set_id": s.id,
+                "name": s.name,
+                "overlap": round(overlap, 3),
+                "shared_tracks": shared,
+            })
+
+    candidates.sort(key=lambda c: c["overlap"], reverse=True)
+    return candidates[:top_n]
 
 
 def import_playlist(
@@ -196,6 +238,13 @@ def import_playlist(
 
     session.commit()
 
+    # Suggest candidate planned sets (Jaccard overlap on track ids)
+    candidates = suggest_planned_sets(
+        session,
+        [m.matched_track.id for m in matched],
+        exclude_set_id=new_set.id,
+    )
+
     # Count match methods
     method_counts: dict[str, int] = {}
     for m in matched:
@@ -214,4 +263,5 @@ def import_playlist(
         ],
         match_methods=method_counts,
         warnings=parse_result.warnings,
+        planned_candidates=candidates,
     )

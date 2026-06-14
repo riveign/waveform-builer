@@ -420,6 +420,61 @@ def suggest_next(query: str, num: int):
     console.print(table)
 
 
+@cli.command("artist-picks")
+@click.argument("set_name_or_id")
+@click.argument("artist")
+@click.option("-n", "--num", default=5, help="Number of picks")
+def artist_picks_cmd(set_name_or_id: str, artist: str, num: int):
+    """Pull an artist's best-fitting owned tracks into a set you're building.
+
+    Ranks tracks you already own by that artist (collaborations included)
+    by where they fit best across the whole set.
+    """
+    from kiku.db.models import Set, get_session
+    from kiku.setbuilder.artist_picks import rank_artist_picks
+
+    session = get_session()
+
+    # Resolve set by ID or name
+    try:
+        set_id = int(set_name_or_id)
+        s = session.get(Set, set_id)
+    except ValueError:
+        s = session.query(Set).filter(Set.name.ilike(f"%{set_name_or_id}%")).first()
+
+    if not s:
+        console.print(f"[yellow]Couldn't find set '{set_name_or_id}'.[/]")
+        return
+
+    picks = rank_artist_picks(session, s.id, artist, n=num)
+    if not picks:
+        console.print(
+            f"[yellow]Nothing new from '{artist}' to add to '{s.name}' — "
+            f"either you don't own tracks by them, or they're all already in the set.[/]"
+        )
+        return
+
+    table = Table(title=f"{artist} — best fits in '{s.name}'")
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Title", style="cyan")
+    table.add_column("Artist")
+    table.add_column("Placement", style="magenta")
+    table.add_column("Score", justify="right", style="green")
+    table.add_column("Why", style="dim")
+
+    for i, p in enumerate(picks, 1):
+        table.add_row(
+            str(i),
+            p.track.title or "?",
+            p.track.artist or "?",
+            f"→ pos {p.position + 1}",
+            f"{p.score:.3f}",
+            p.reason,
+        )
+
+    console.print(table)
+
+
 @cli.command()
 @click.option("--duration", default=120, help="Set duration in minutes")
 @click.option("--energy", default="journey",
@@ -682,6 +737,92 @@ def analyze_set_cmd(set_name_or_id: str):
             console.print(f"  {p}")
 
     console.print("\n[dim]Analysis cached. View in the app or re-run to update.[/]")
+
+
+@cli.command("compare")
+@click.argument("played_set")
+@click.argument("planned_set", required=False)
+def compare_cmd(played_set: str, planned_set: str | None):
+    """Compare a played set against the plan it came from.
+
+    Shows where you deviated — and what the room was telling you.
+    Pass set ids or name fragments. Planned defaults to the linked set.
+    """
+    from kiku.analysis.set_compare import compare_sets
+    from kiku.db.models import Set, get_session
+
+    session = get_session()
+
+    def _resolve(ref: str) -> Set | None:
+        try:
+            return session.get(Set, int(ref))
+        except ValueError:
+            return session.query(Set).filter(Set.name.ilike(f"%{ref}%")).first()
+
+    played = _resolve(played_set)
+    if not played:
+        console.print(f"[red]Couldn't find set '{played_set}'.[/]")
+        return
+
+    if planned_set:
+        planned = _resolve(planned_set)
+        if not planned:
+            console.print(f"[red]Couldn't find set '{planned_set}'.[/]")
+            return
+    elif played.planned_set_id:
+        planned = session.get(Set, played.planned_set_id)
+        if not planned:
+            console.print("[red]The linked planned set no longer exists.[/]")
+            return
+    else:
+        console.print(
+            "[yellow]No planned set linked. Pass it explicitly: "
+            "kiku compare <played> <planned>[/]"
+        )
+        return
+
+    console.print(f"[cyan]Comparing '{played.name}' against the plan '{planned.name}'...[/]")
+    try:
+        result = compare_sets(session, played.id, planned.id)
+    except ValueError as e:
+        console.print(f"[red]{e}[/]")
+        return
+
+    console.print(f"\n[bold]{played.name}[/] vs plan [bold]{planned.name}[/]")
+    console.print(
+        f"Kept: [green]{result.kept_count}[/] | Moved: [yellow]{result.moved_count}[/] | "
+        f"Cut: [red]{result.cut_count}[/] | Added: [cyan]{result.added_count}[/]"
+    )
+    console.print(
+        f"Arc: planned [cyan]{result.arc.planned_shape}[/] → played [cyan]{result.arc.played_shape}[/] | "
+        f"BPM drift delta: [cyan]{result.arc.bpm_drift_delta:+.1f}[/]"
+    )
+
+    deviations = [d for d in result.track_deviations if d.kind != "kept"]
+    if deviations:
+        table = Table()
+        table.add_column("Track")
+        table.add_column("Deviation")
+        table.add_column("What it says", style="dim")
+        for d in deviations:
+            if d.kind == "moved" and d.displacement is not None:
+                label = f"moved {d.displacement:+d}"
+            else:
+                label = d.kind
+            table.add_row(d.title or f"#{d.track_id}", label, d.teaching_moment)
+        console.print(table)
+
+    if result.energy_deviations:
+        console.print("\n[bold]Energy jumps:[/]")
+        for ed in result.energy_deviations:
+            console.print(f"  Track {ed.position + 1}: {ed.delta:+.2f} — {ed.teaching_moment}")
+
+    if result.deviation_patterns:
+        console.print("\n[bold]What the room told you:[/]")
+        for p in result.deviation_patterns:
+            console.print(f"  {p}")
+
+    console.print("\n[dim]Comparison cached. View it in the app or re-run to update.[/]")
 
 
 @cli.command()

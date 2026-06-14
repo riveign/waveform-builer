@@ -145,6 +145,8 @@ class SetDetailResponse(BaseModel):
     duration_min: int | None = None
     energy_profile: str | None = None
     genre_filter: str | None = None
+    source: str | None = None
+    planned_set_id: int | None = None
     tracks: list[SetTrackResponse] = []
 
     model_config = {"from_attributes": True}
@@ -306,6 +308,20 @@ class SuggestNextItem(BaseModel):
 class SuggestNextResponse(BaseModel):
     source_track_id: int
     suggestions: list[SuggestNextItem]
+
+
+class ArtistPickItem(BaseModel):
+    track: TrackResponse
+    position: int
+    score: float
+    breakdown: TransitionScoreBreakdown | None = None
+    reason: str
+
+
+class ArtistPicksResponse(BaseModel):
+    set_id: int
+    artist: str
+    picks: list[ArtistPickItem]
 
 
 # ── Paginated tracks response ──
@@ -540,6 +556,13 @@ class UnmatchedTrack(BaseModel):
     line: int
 
 
+class PlannedSetCandidate(BaseModel):
+    set_id: int
+    name: str | None = None
+    overlap: float  # Jaccard overlap (0-1) on track ids
+    shared_tracks: int
+
+
 class ImportResultResponse(BaseModel):
     set_id: int
     name: str
@@ -551,6 +574,7 @@ class ImportResultResponse(BaseModel):
     match_methods: dict[str, int] = {}
     warnings: list[str] = []
     duplicate_set_id: int | None = None
+    planned_candidates: list[PlannedSetCandidate] = []
 
 
 # ── Set Analysis models ──
@@ -585,6 +609,63 @@ class SetAnalysisResponse(BaseModel):
     overall_score: float
     set_patterns: list[str]
     analyzed_at: str
+
+
+# ── Set Comparison models (played vs planned) ──
+
+
+class SetLinkRequest(BaseModel):
+    planned_set_id: int
+
+
+class TrackDeviationResponse(BaseModel):
+    kind: str  # "kept" | "moved" | "cut" | "added"
+    track_id: int
+    title: str | None = None
+    artist: str | None = None
+    planned_position: int | None = None
+    played_position: int | None = None
+    displacement: int | None = None
+    teaching_moment: str
+
+
+class EnergyDeviationResponse(BaseModel):
+    position: int
+    track_id: int
+    planned_energy: float
+    played_energy: float
+    delta: float
+    teaching_moment: str
+
+
+class ArcComparisonResponse(BaseModel):
+    planned_shape: str
+    played_shape: str
+    planned_key_style: str
+    played_key_style: str
+    planned_bpm_style: str
+    played_bpm_style: str
+    planned_bpm_range: list[float]
+    played_bpm_range: list[float]
+    bpm_drift_delta: float
+    planned_curve: list[float]
+    played_curve: list[float]
+
+
+class SetComparisonResponse(BaseModel):
+    played_set_id: int
+    planned_set_id: int
+    played_name: str | None = None
+    planned_name: str | None = None
+    kept_count: int
+    moved_count: int
+    cut_count: int
+    added_count: int
+    track_deviations: list[TrackDeviationResponse]
+    energy_deviations: list[EnergyDeviationResponse]
+    arc: ArcComparisonResponse
+    deviation_patterns: list[str]
+    compared_at: str
 
 
 # ── SoundCloud models ──
