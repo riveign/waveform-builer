@@ -19,9 +19,17 @@ from kiku.energy import (
 
 @pytest.fixture(autouse=True)
 def _reset_calibration():
-    """Ensure tests start with clean calibration state."""
+    """Isolate tests from any on-disk calibration file.
+
+    A real ``data/energy_calibration.json`` (regenerated whenever the DJ
+    retrains) would otherwise shift the zone boundaries these tests assert,
+    making the suite pass or fail depending on the machine. Default every
+    test to the fallback boundaries; tests that exercise calibrated behaviour
+    override this with their own ``patch("kiku.energy._load_calibration", ...)``.
+    """
     reset_calibration_cache()
-    yield
+    with patch("kiku.energy._load_calibration", return_value=None):
+        yield
     reset_calibration_cache()
 
 
