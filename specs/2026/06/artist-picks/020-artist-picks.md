@@ -48,7 +48,51 @@ You are a senior engineer on Kiku. Honor the 7 product principles (BRANDING.md) 
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+### The key reuse: `score_replacement()` IS the best-gap scorer
+- `score_replacement(candidate, prev_track, next_track, target_energy=0.5, weights=None, discovery_density=0.0, set_appearance_counts=None, target_vibe=None, vibe_strength=0.0) -> tuple[float, dict|None, dict|None]` (src/kiku/setbuilder/scoring.py:479-536) scores a candidate against BOTH neighbors (prev→candidate AND candidate→next), returning `(combined_score, incoming_breakdown, outgoing_breakdown)`. Breakdown dicts: `harmonic, energy_fit, bpm_compat, genre_coherence, track_quality, vibe, total`. This is exactly an insertion score — for inserting at gap `g` (between ordered[g-1] and ordered[g]): `prev=ordered[g-1].track` (or None at gap 0), `next=ordered[g].track` (or None at the tail gap). No new scorer needed.
+- Underlying single-step: `transition_score(from_track, to_track, target_energy=0.5, ..., weights, discovery_density, target_vibe, vibe_strength) -> float` (scoring.py:443-477). Batch ranker `score_transitions(session, from_track, n=10, genre_filter, weights, exclude_ids, discovery_density, set_appearance_counts, target_energy) -> list[(Track, float)]` (scoring.py:538-601) — single-neighbor only, NOT used here (we need both-neighbor insertion via score_replacement).
+
+### Set loading + per-position energy target (copy from existing endpoints)
+- Ordered tracks + neighbors (routes/sets.py:954-961): `ordered = sorted(s.tracks, key=lambda st: st.position)`; `prev = ordered[i-1].track if i>0 else None`; `next = ordered[i+1].track if i<len-1 else None`.
+- Energy target at a position (routes/sets.py:965-979, mirrors suggest-next tracks.py:328-337): parse `s.energy_profile` via `parse_energy_json()` then fallback `parse_energy_string()` (src/kiku/setbuilder/constraints.py); `elapsed = (position / max(total_tracks-1, 1)) * (s.duration_min or 120)`; `target = profile.target_energy_at(elapsed)`. For an insertion at gap `g`, use the gap's positional fraction `g / max(len(ordered), 1)` to derive elapsed → energy target.
+
+### Artist data + querying owned tracks
+- `Track.artist` is a plain string (models.py:42). Autocomplete: `autocomplete_artists(session, q, limit=20)` (src/kiku/db/store.py:23-33) — `Track.artist.ilike("%q%")`, distinct, ordered. Used by the typeahead.
+- To get an artist's candidate pool: query `Track.artist.ilike("%name%")` to narrow at the DB level, THEN filter in Python with the new token matcher for precision (ilike is the coarse prefilter; token match is the exact gate). `search_tracks(session, artist=..., limit=...)` exists (store.py:49-138) but the direct ilike query is simpler here.
+
+### Collaboration token matcher (new shared utility)
+- Nothing parses collaborations today (confirmed: no `feat`/`&` splitting anywhere). New module (e.g. `src/kiku/artists.py`) with `artist_tokens(s: str) -> set[str]` (split on `,`, `&`, `feat.`, `ft.`, `x`, `vs`, `with`, `+`; lowercase; strip) and `artist_matches(requested: str, candidate_artist: str) -> bool` (requested token ∈ candidate tokens). Built standalone + tested so Phases B/C reuse it. Care: split on `x`/`vs`/`with` only as whole word-boundary tokens, not substrings (avoid splitting "Maxx" on "x").
+
+### API & CLI patterns to mirror
+- suggest-next route (routes/tracks.py:270-369): pool build + `exclude_ids` from set + target_energy block + `SuggestNextResponse{source_track_id, suggestions:[{track, score, breakdown}]}`. The new endpoint mirrors this shape but per-pick adds `position` + reason.
+- CLI: `suggest_next` (cli.py:382-420) for the ranked rich Table; set resolution by id-or-name (cli.py:634-638): `try int(...) -> session.get(Set, id)` except `Set.name.ilike("%...%").first()`.
+
+### Frontend
+- `addTrackToSet(setId, trackId, position?)` (src/lib/api/sets.ts:154-164) → `POST /api/sets/{id}/tracks` body `{track_id, position}`; position optional (defaults to end). Pass the suggested gap index to insert in place. Adding a track recomputes transition scores + invalidates analysis (and now comparison cache) server-side.
+- Artist typeahead exists: `Typeahead.svelte` (src/lib/components/library/Typeahead.svelte) props `placeholder`, bindable `selected`, `fetchSuggestions(q)=>Promise<string[]>`; wire to `autocompleteArtists(q, limit)` (src/lib/api/tracks.ts:38-40). Used in SearchFilters.svelte.
+- Mount point: SetView.svelte alongside the existing panels (it already hosts SetEnergyReview, FillReorderDialog, etc.). New component `AddFromArtistPanel.svelte` (or a dialog like ReplaceTrackModal) shows typeahead → ranked pick cards (placement + breakdown + why) → one-click insert at suggested position. After insert, call the existing `onTracksChanged` reload path.
+
+### Test landscape
+- Unit: tests/test_scoring.py exists for scoring; new tests/test_artists.py for the token matcher (MagicMock not needed — pure strings); best-gap ranker testable with MagicMock tracks like tests/test_set_analysis.py `_mock_track()`.
+- API: tests/api/conftest.py `db_session` seeds 20 tracks + a 5-track set (id=1); `client` fixture. New tests/api/test_artist_picks_api.py follows test_sets_api.py patterns.
+
+### Strategy
+
+**Pure utility → ranker → API → CLI → UI, reusing score_replacement throughout.**
+1. **Artist-token matcher** — new `src/kiku/artists.py`: `artist_tokens()` + `artist_matches()`. Word-boundary aware separators. Fully unit-tested first (it gates everything and Phases B/C depend on it).
+2. **Best-gap ranker** — new `src/kiku/setbuilder/artist_picks.py` (or function in scoring.py): `rank_artist_picks(session, set_id, artist, n=5, weights=None, discovery_density=0.0) -> list[ArtistPick]`. Steps: load ordered set tracks + set's energy profile; build candidate pool (ilike prefilter → `artist_matches` gate → exclude track IDs already in set); for each candidate, iterate all gaps `g in 0..len`, compute per-gap target_energy, call `score_replacement(cand, prev, next, target_energy, ...)`, keep the best gap; rank candidates by best-gap combined score; return top n with `{track, best_position, score, breakdown_at_gap, reason}`. `reason` built in mentor voice from the dominant breakdown dimension at the chosen gap (harmonic lock / energy lift / bpm glue), reusing the phrasing approach in teaching.py.
+3. **Schemas** (api/schemas.py): `ArtistPickItem{track: TrackResponse, position: int, score: float, breakdown: TransitionScoreBreakdown, reason: str}` + `ArtistPicksResponse{set_id, artist, picks: list[ArtistPickItem]}`.
+4. **API** (routes/sets.py): `GET /api/sets/{set_id}/artist-picks?artist=<str>&n=5&discovery_density=...` → 404 missing set, 200 with picks (empty list + warm message when artist owns nothing new). Reuse weight-override query params optionally (defer unless trivial).
+5. **CLI** (cli.py): `kiku artist-picks <set> <artist>` — set id-or-name resolution, rich Table of picks with `→ pos N`, score, and reason.
+6. **Frontend**: API client `getArtistPicks(setId, artist, n)` + types; `AddFromArtistPanel.svelte` (Typeahead + ranked cards with placement/why + insert button calling `addTrackToSet(setId, trackId, position)`); mount in SetView with an "Add from an artist" entry near the existing set actions; reload via `onTracksChanged`.
+
+**Testing strategy**
+- Unit `tests/test_artists.py`: token matcher — "Bicep" matches "Bicep & Chroma", "X feat. Bicep", "Bicep, Other"; does NOT match "Bicepz"/"Maxx" (word-boundary); case/whitespace; empty/None.
+- Unit `tests/test_artist_picks.py`: best-gap ranker on synthetic sets — correct best gap chosen (harmonic/energy planted), in-set exclusion, end-gap single-neighbor (prev or next None), n cap, empty pool.
+- API `tests/api/test_artist_picks_api.py`: 200 ranked with positions + reasons; 404 missing set; artist with no new owned tracks → 200 empty + message; n cap.
+- E2E (manual): open a set → "Add from an artist" → type artist → pick a card → it inserts at the suggested position.
+- Coverage: matcher + ranker fully unit-tested; endpoint covered; frontend type-checked via svelte-check (no FE test harness).
 
 ## Plan
 <!-- Filled by /spec PLAN -->
