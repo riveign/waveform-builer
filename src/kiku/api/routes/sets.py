@@ -362,6 +362,8 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
                 end_title=end_title,
                 preset_vibe=preset_vibe,
                 vibe_intensity=body.vibe_intensity,
+                preferred_artists=body.preferred_artists,
+                artist_intensity=body.artist_intensity,
             )
 
             if result is None:

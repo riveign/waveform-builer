@@ -6,6 +6,7 @@ import json
 
 from sqlalchemy.orm import Session
 
+from kiku.artists import artist_matches
 from kiku.config import BPM_TOLERANCE, SCORING_WEIGHTS
 from kiku.db.models import Track
 from kiku.setbuilder.camelot import harmonic_score
@@ -397,6 +398,12 @@ def _best_genre_str(track: Track) -> str | None:
 # shifts a transition score by roughly ±0.3.
 _VIBE_SPAN = 0.3  # max ± shift at vibe_strength = 1.0
 
+# ── Featured artists ─────────────────────────────────────────────────────
+# When the DJ names artists to feature, a candidate from one of them earns a
+# small positive-only nudge — a visible soft bias, never a filter. Smaller
+# than _VIBE_SPAN so it tilts the odds without ever dominating harmony/energy.
+_ARTIST_SPAN = 0.2  # max + bonus at artist_intensity = 1.0
+
 
 def vibe_target_fit(track: Track, target_vibe: tuple[float, float]) -> float:
     """How close a track's vibe sits to the target vibe (1 = on target)."""
@@ -440,6 +447,42 @@ def vibe_term(
     return contribution, breakdown
 
 
+def artist_matches_any(
+    candidate_artist: str | None,
+    preferred: list[str] | None,
+) -> bool:
+    """True when the candidate's artist matches any preferred artist.
+
+    Uses the collaboration-aware token matcher, so a featured "Bicep" also
+    matches "Bicep & Chroma".
+    """
+    if not preferred:
+        return False
+    return any(artist_matches(p, candidate_artist) for p in preferred)
+
+
+def artist_term(
+    to_track: Track,
+    preferred_artists: list[str] | None,
+    artist_intensity: float,
+) -> tuple[float, dict | None]:
+    """Bounded positive-only bonus when the DJ asked for this track's artist.
+
+    Returns (contribution, breakdown). contribution is 0.0 when the feature
+    is off or the artist does not match. A soft bias, never a filter.
+    """
+    if artist_intensity <= 0 or not preferred_artists:
+        return 0.0, None
+    if not artist_matches_any(to_track.artist, preferred_artists):
+        return 0.0, None
+    contribution = artist_intensity * _ARTIST_SPAN
+    breakdown = {
+        "matched": True,
+        "contribution": round(contribution, 3),
+    }
+    return contribution, breakdown
+
+
 def transition_score(
     from_track: Track,
     to_track: Track,
@@ -450,6 +493,8 @@ def transition_score(
     set_appearance_counts: dict[int, int] | None = None,
     target_vibe: tuple[float, float] | None = None,
     vibe_strength: float = 0.0,
+    preferred_artists: list[str] | None = None,
+    artist_intensity: float = 0.0,
 ) -> float:
     """Compute overall transition score between two tracks.
 
@@ -457,6 +502,8 @@ def transition_score(
         weights: Optional per-request weight overrides. Falls back to global SCORING_WEIGHTS.
         target_vibe: Optional (brightness, density) target for this point in the set.
         vibe_strength: How strongly vibe steers selection (0 = off, 1 = full).
+        preferred_artists: Artists the DJ asked to feature (soft bias, never a filter).
+        artist_intensity: How strongly to nudge toward preferred artists (0 = off, 1 = strong).
     """
     w = weights if weights is not None else SCORING_WEIGHTS
 
@@ -473,7 +520,8 @@ def transition_score(
     base = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
             + w["genre_coherence"] * g + w["track_quality"] * q)
     vibe_contribution, _ = vibe_term(from_track, to_track, target_vibe, vibe_strength)
-    return base + vibe_contribution
+    artist_contribution, _ = artist_term(to_track, preferred_artists, artist_intensity)
+    return base + vibe_contribution + artist_contribution
 
 
 def score_replacement(
@@ -486,12 +534,14 @@ def score_replacement(
     set_appearance_counts: dict[int, int] | None = None,
     target_vibe: tuple[float, float] | None = None,
     vibe_strength: float = 0.0,
+    preferred_artists: list[str] | None = None,
+    artist_intensity: float = 0.0,
 ) -> tuple[float, dict | None, dict | None]:
     """Score a candidate as a replacement considering both neighbors.
 
     Returns (combined_score, incoming_breakdown, outgoing_breakdown).
     Breakdowns are dicts with keys: harmonic, energy_fit, bpm_compat,
-    genre_coherence, track_quality, vibe, total.
+    genre_coherence, track_quality, vibe, artist, total.
     """
     w = weights if weights is not None else SCORING_WEIGHTS
 
@@ -508,6 +558,7 @@ def score_replacement(
         base = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
                 + w["genre_coherence"] * g + w["track_quality"] * q)
         vibe_contribution, vibe_bd = vibe_term(from_t, to_t, target_vibe, vibe_strength)
+        artist_contribution, artist_bd = artist_term(to_t, preferred_artists, artist_intensity)
         return {
             "harmonic": round(h, 3),
             "energy_fit": round(e, 3),
@@ -515,7 +566,8 @@ def score_replacement(
             "genre_coherence": round(g, 3),
             "track_quality": round(q, 3),
             "vibe": vibe_bd,
-            "total": round(base + vibe_contribution, 3),
+            "artist": artist_bd,
+            "total": round(base + vibe_contribution + artist_contribution, 3),
             "discovery_label": label,
             "set_appearances": sac,
         }

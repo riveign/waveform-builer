@@ -338,6 +338,8 @@ export interface SetBuildParams {
 	discovery_density?: number;
 	vibe_preset?: string | null;
 	vibe_intensity?: number;
+	preferred_artists?: string[] | null;
+	artist_intensity?: number;
 }
 
 export interface VibePreset {
