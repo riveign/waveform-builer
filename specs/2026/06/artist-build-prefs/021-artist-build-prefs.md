@@ -735,7 +735,37 @@ Commands:
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+### TODO
+- [x] Task 1 — schemas.py: add preferred_artists + artist_intensity to SetBuildRequest — Status: Done
+- [x] Task 2 — scoring.py: add _ARTIST_SPAN, artist_matches_any, artist_term — Status: Done
+- [x] Task 3 — scoring.py: thread artist params through transition_score — Status: Done
+- [x] Task 4 — scoring.py: thread artist params through score_replacement — Status: Done
+- [x] Task 5 — planner.py: add params to build_set, thread into both transition_score calls — Status: Done
+- [x] Task 6 — routes/sets.py: thread request fields into build_set — Status: Done
+- [x] Task 7 — frontend types: extend SetBuildParams — Status: Done
+- [x] Task 8 — BuildSetDialog.svelte: Featured artists Typeahead + intensity slider — Status: Done
+- [x] Task 9 — Unit tests: tests/test_artist_bias.py — Status: Done (adapted: mock needs audio_features/resolved_energy_zone; StaticPool for in-memory schema persistence)
+- [x] Task 10 — Planner soft-bias test (append) — Status: Done (st.track.artist via Set.tracks→SetTrack.track relationship confirmed in models.py)
+- [x] Task 11 — API smoke test: tests/api/test_sets_api.py — Status: Done
+- [x] Task 12 — Lint / type-check / test (changed files only) — Status: Done (py_compile OK; pytest 366 passed; svelte-check 0 errors / 4 warnings = baseline)
+- [ ] Task 13 — E2E (manual acceptance) — Status: Deferred (manual — see acceptance steps below)
+- [x] Task 14 — Commit — Status: Done
+
+### Result
+- All implementation tasks complete (Tasks 1-12 + 14). Task 13 is manual E2E (deferred).
+- Backend: 366 passed (15 new in test_artist_bias.py: 14 unit + 1 planner soft-bias; 1 new API smoke test). py_compile OK.
+- Frontend: svelte-check 0 errors / 4 warnings (baseline unchanged).
+- Soft-bias contract verified: `artist_term` is additive positive-only; `candidate_set`/cooldown untouched; `test_planner_pool_not_filtered_by_preferred_artists` asserts pool not filtered and set not all-that-artist.
+- Adaptations: (Task 9) mock tracks need `audio_features`/`resolved_energy_zone` for `energy_fit`; in-memory SQLite uses `StaticPool` (not `NullPool`) so the schema persists across connections.
+- Code+tests commit: 51a7a95
+
+#### Manual E2E acceptance (Task 13)
+- Start backend + frontend dev server.
+- Open Build a Set dialog → add a featured artist via the typeahead → set intensity → Build.
+- Confirm more of that artist's tracks appear, but the set is NOT all-that-artist (soft bias holds).
+- Confirm default (no featured artist) build is unchanged.
+
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
