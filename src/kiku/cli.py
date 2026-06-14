@@ -420,6 +420,61 @@ def suggest_next(query: str, num: int):
     console.print(table)
 
 
+@cli.command("artist-picks")
+@click.argument("set_name_or_id")
+@click.argument("artist")
+@click.option("-n", "--num", default=5, help="Number of picks")
+def artist_picks_cmd(set_name_or_id: str, artist: str, num: int):
+    """Pull an artist's best-fitting owned tracks into a set you're building.
+
+    Ranks tracks you already own by that artist (collaborations included)
+    by where they fit best across the whole set.
+    """
+    from kiku.db.models import Set, get_session
+    from kiku.setbuilder.artist_picks import rank_artist_picks
+
+    session = get_session()
+
+    # Resolve set by ID or name
+    try:
+        set_id = int(set_name_or_id)
+        s = session.get(Set, set_id)
+    except ValueError:
+        s = session.query(Set).filter(Set.name.ilike(f"%{set_name_or_id}%")).first()
+
+    if not s:
+        console.print(f"[yellow]Couldn't find set '{set_name_or_id}'.[/]")
+        return
+
+    picks = rank_artist_picks(session, s.id, artist, n=num)
+    if not picks:
+        console.print(
+            f"[yellow]Nothing new from '{artist}' to add to '{s.name}' — "
+            f"either you don't own tracks by them, or they're all already in the set.[/]"
+        )
+        return
+
+    table = Table(title=f"{artist} — best fits in '{s.name}'")
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Title", style="cyan")
+    table.add_column("Artist")
+    table.add_column("Placement", style="magenta")
+    table.add_column("Score", justify="right", style="green")
+    table.add_column("Why", style="dim")
+
+    for i, p in enumerate(picks, 1):
+        table.add_row(
+            str(i),
+            p.track.title or "?",
+            p.track.artist or "?",
+            f"→ pos {p.position + 1}",
+            f"{p.score:.3f}",
+            p.reason,
+        )
+
+    console.print(table)
+
+
 @cli.command()
 @click.option("--duration", default=120, help="Set duration in minutes")
 @click.option("--energy", default="journey",

@@ -308,6 +308,20 @@ class SuggestNextResponse(BaseModel):
     suggestions: list[SuggestNextItem]
 
 
+class ArtistPickItem(BaseModel):
+    track: TrackResponse
+    position: int
+    score: float
+    breakdown: TransitionScoreBreakdown | None = None
+    reason: str
+
+
+class ArtistPicksResponse(BaseModel):
+    set_id: int
+    artist: str
+    picks: list[ArtistPickItem]
+
+
 # ── Paginated tracks response ──
 
 

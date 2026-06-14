@@ -539,6 +539,20 @@ export interface ReplacementSuggestionsResponse {
 	candidates: ReplacementCandidate[];
 }
 
+export interface ArtistPick {
+	track: Track;
+	position: number;
+	score: number;
+	breakdown: TransitionScoreBreakdown | null;
+	reason: string;
+}
+
+export interface ArtistPicksResponse {
+	set_id: number;
+	artist: string;
+	picks: ArtistPick[];
+}
+
 // ── Import Playlist types ──
 
 export interface UnmatchedTrack {

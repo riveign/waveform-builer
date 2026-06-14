@@ -1,4 +1,5 @@
 import type {
+	ArtistPicksResponse,
 	Cue,
 	DJSet,
 	ImportResult,
@@ -186,6 +187,15 @@ export async function getReplacements(
 	return fetchJson<ReplacementSuggestionsResponse>(
 		`/api/sets/${setId}/tracks/${position}/replacements?${qs}`
 	);
+}
+
+export async function getArtistPicks(
+	setId: number,
+	artist: string,
+	n = 5
+): Promise<ArtistPicksResponse> {
+	const qs = new URLSearchParams({ artist, n: String(n) });
+	return fetchJson<ArtistPicksResponse>(`/api/sets/${setId}/artist-picks?${qs}`);
 }
 
 export async function replaceTrackInSet(
