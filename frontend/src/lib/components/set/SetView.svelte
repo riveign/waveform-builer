@@ -1,12 +1,13 @@
 <script lang="ts">
-	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData, SetAnalysis } from '$lib/types';
-	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8, deleteSet, analyzeSet, getSetAnalysis } from '$lib/api/sets';
+	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData, SetAnalysis, SetComparison as SetComparisonType } from '$lib/types';
+	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8, deleteSet, analyzeSet, getSetAnalysis, compareSet, getSetComparison, linkSet, unlinkSet, listSets } from '$lib/api/sets';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import SetPicker from './SetPicker.svelte';
 	import SetTimeline from './SetTimeline.svelte';
 	import TransitionDetail from './TransitionDetail.svelte';
 	import EnergyFlowChart from './EnergyFlowChart.svelte';
 	import SetEnergyReview from './SetEnergyReview.svelte';
+	import SetComparison from './SetComparison.svelte';
 	import FillReorderDialog from './FillReorderDialog.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
@@ -81,6 +82,13 @@
 	let timelineContainerEl = $state<HTMLDivElement>(null!);
 	let analysis = $state<SetAnalysis | null>(null);
 	let analyzingSet = $state(false);
+	let comparison = $state<SetComparisonType | null>(null);
+	let comparing = $state(false);
+	let showComparison = $state(false);
+	let showLinkPicker = $state(false);
+	let plannedSets = $state<DJSet[]>([]);
+	let linkTargetId = $state<number | null>(null);
+	let linking = $state(false);
 
 	/** Tracks that need energy review (not yet approved) */
 	let tracksNeedingReview = $derived(
@@ -176,12 +184,69 @@
 		}
 	}
 
+	async function handleCompare() {
+		if (!selectedSet || comparing) return;
+		comparing = true;
+		try {
+			comparison = await compareSet(selectedSet.id);
+			showComparison = true;
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			comparing = false;
+		}
+	}
+
+	async function handleUnlink() {
+		if (!selectedSet) return;
+		try {
+			await unlinkSet(selectedSet.id);
+			comparison = null;
+			showComparison = false;
+			if (setDetail) setDetail = { ...setDetail, planned_set_id: null };
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		}
+	}
+
+	async function openLinkPicker() {
+		if (!selectedSet) return;
+		try {
+			const all = await listSets();
+			// Offer the DJ's planned (Kiku-built) sets, never this set itself
+			plannedSets = all.filter((s) => s.source === 'kiku' && s.id !== selectedSet!.id);
+		} catch {
+			plannedSets = [];
+		}
+		linkTargetId = null;
+		showLinkPicker = true;
+	}
+
+	async function confirmLink() {
+		if (!selectedSet || linkTargetId === null || linking) return;
+		linking = true;
+		try {
+			await linkSet(selectedSet.id, linkTargetId);
+			if (setDetail) setDetail = { ...setDetail, planned_set_id: linkTargetId };
+			showLinkPicker = false;
+			// Show how the night deviated right away
+			await handleCompare();
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			linking = false;
+		}
+	}
+
 	async function loadSetData(setId: number) {
 		loading = true;
 		error = null;
 		transition = null;
 		activeTransitionIndex = -1;
 		analysis = null;
+		comparison = null;
+		showComparison = false;
+		showLinkPicker = false;
 		try {
 			const [detail, waveforms] = await Promise.all([
 				getSet(setId),
@@ -206,6 +271,15 @@
 			// Auto-analyze if no analysis exists and set has enough tracks
 			if (!analysis && waveforms.length >= 2) {
 				handleAnalyze();
+			}
+
+			// Load the cached comparison when this set is linked to a plan
+			if (detail.planned_set_id) {
+				try {
+					comparison = await getSetComparison(setId);
+				} catch {
+					comparison = null;
+				}
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -270,6 +344,36 @@
 			{:else if waveformTracks.length >= 2 && analyzingSet}
 				<span class="analyzing-status">Analyzing...</span>
 			{/if}
+			{#if setDetail?.planned_set_id}
+				<button class="compare-btn" onclick={handleCompare} disabled={comparing}>
+					{comparing ? 'Comparing...' : 'Planned vs played'}
+				</button>
+				<button class="unlink-btn" onclick={handleUnlink} title="Remove the link to the planned set">
+					Unlink
+				</button>
+			{:else if setDetail && setDetail.source !== 'kiku'}
+				{#if showLinkPicker}
+					{#if plannedSets.length === 0}
+						<span class="link-empty">No planned sets to link yet — build one first.</span>
+						<button class="unlink-btn" onclick={() => (showLinkPicker = false)}>Cancel</button>
+					{:else}
+						<select class="link-select" bind:value={linkTargetId} aria-label="Choose the planned set">
+							<option value={null}>Which set did you plan from?</option>
+							{#each plannedSets as p (p.id)}
+								<option value={p.id}>{p.name} ({p.track_count} tracks)</option>
+							{/each}
+						</select>
+						<button class="compare-btn" onclick={confirmLink} disabled={linkTargetId === null || linking}>
+							{linking ? 'Linking...' : 'Link'}
+						</button>
+						<button class="unlink-btn" onclick={() => (showLinkPicker = false)}>Cancel</button>
+					{/if}
+				{:else}
+					<button class="link-btn" onclick={openLinkPicker} title="Link this set to the plan you built it from">
+						Link to a plan
+					</button>
+				{/if}
+			{/if}
 			{#if waveformTracks.length >= 2}
 				<button
 					class="play-set-btn"
@@ -322,6 +426,7 @@
 						<EnergyFlowChart
 							tracks={waveformTracks}
 							energyProfile={setDetail?.energy_profile}
+							plannedCurve={showComparison && comparison ? comparison.arc.planned_curve : null}
 							selectedIndex={selectedChartIndex}
 							onTrackClick={handleChartTrackClick}
 						/>
@@ -352,7 +457,9 @@
 				{/if}
 
 				<div class="timeline-scroll">
-					{#if loadingTransition}
+					{#if showComparison && comparison}
+						<SetComparison {comparison} onback={() => { showComparison = false; }} />
+					{:else if loadingTransition}
 						<div class="status">Analyzing the transition...</div>
 					{:else if transition}
 						<TransitionDetail
@@ -638,6 +745,72 @@
 	.analyze-btn:disabled {
 		opacity: 0.5;
 		cursor: default;
+	}
+
+	.compare-btn {
+		padding: 4px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		transition: all 0.15s;
+	}
+
+	.compare-btn:hover:not(:disabled) {
+		background: var(--accent);
+		color: #000;
+		border-color: var(--accent);
+	}
+
+	.compare-btn:disabled {
+		opacity: 0.5;
+		cursor: default;
+	}
+
+	.unlink-btn {
+		padding: 4px 8px;
+		font-size: 11px;
+		color: var(--text-dim);
+		background: transparent;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+	}
+
+	.unlink-btn:hover {
+		color: var(--text-primary);
+	}
+
+	.link-btn {
+		padding: 4px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-dim);
+		background: transparent;
+		border: 1px dashed var(--border);
+		border-radius: 4px;
+		transition: all 0.15s;
+	}
+
+	.link-btn:hover {
+		color: var(--text-primary);
+		border-color: var(--accent);
+	}
+
+	.link-select {
+		padding: 4px 8px;
+		font-size: 12px;
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		max-width: 220px;
+	}
+
+	.link-empty {
+		font-size: 12px;
+		color: var(--text-dim);
 	}
 
 	.analysis-bar {

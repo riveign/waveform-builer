@@ -213,3 +213,112 @@ def detect_set_patterns(
         )
 
     return patterns
+
+
+# ── Deviation Teaching (played vs planned) ──────────────────────────────
+
+
+def deviation_teaching_moment(
+    kind: str,
+    *,
+    title: str | None = None,
+    displacement: int | None = None,
+    delta: float | None = None,
+    position: int | None = None,
+) -> str:
+    """Explain a played-vs-planned deviation — the room speaking, never a mistake."""
+    name = title or "This track"
+
+    if kind == "kept":
+        return f"{name} landed right where you planned it — the room agreed."
+
+    if kind == "moved":
+        d = displacement or 0
+        if d < 0:
+            return (
+                f"You pulled {name} {abs(d)} slot{'s' if abs(d) != 1 else ''} earlier — "
+                "the floor probably asked for it sooner."
+            )
+        return (
+            f"You held {name} back {d} slot{'s' if d != 1 else ''} — "
+            "you waited until the room was ready for it."
+        )
+
+    if kind == "cut":
+        return f"{name} stayed in the bag — the night told you it didn't fit."
+
+    if kind == "added":
+        return f"{name} wasn't in the plan — your instinct reached for what the room needed."
+
+    if kind == "energy_jump":
+        pos_label = f"track {position + 1}" if position is not None else "this point"
+        if delta is not None and delta > 0:
+            return (
+                f"You ran {delta:+.2f} above the planned curve at {pos_label} — "
+                "the floor probably asked for it early."
+            )
+        return (
+            f"You eased {abs(delta or 0):.2f} below the planned curve at {pos_label} — "
+            "reading the room beats following the script."
+        )
+
+    return "The plan and the night disagreed here — listen to what the room was saying."
+
+
+def detect_deviation_patterns(
+    deviations: list[tuple[str, int | None]],
+    energy_deltas: list[float],
+    played_count: int,
+) -> list[str]:
+    """Detect set-level deviation patterns across a played-vs-planned comparison.
+
+    `deviations` is (kind, played_position) per track entry; `energy_deltas`
+    is played minus planned energy per played position.
+    """
+    patterns: list[str] = []
+    if not deviations:
+        return patterns
+
+    kinds = [k for k, _ in deviations]
+    planned_total = kinds.count("kept") + kinds.count("moved") + kinds.count("cut")
+
+    # Played the plan straight through
+    if all(k == "kept" for k in kinds):
+        patterns.append(
+            "You played it exactly as planned — either discipline, "
+            "or a plan that already knew the room."
+        )
+        return patterns
+
+    # Adds clustering late — reaching for energy under pressure
+    add_positions = [p for k, p in deviations if k == "added" and p is not None]
+    if played_count >= 3 and len(add_positions) >= 2:
+        late = sum(1 for p in add_positions if p >= played_count * 2 / 3)
+        if late / len(add_positions) > 0.6:
+            patterns.append(
+                "Your adds cluster late in the set — under pressure you reach "
+                "for energy. Stock your peak shelf deeper next time."
+            )
+
+    # Heavy cuts — plans longer than the room wants
+    if planned_total > 0 and kinds.count("cut") / planned_total > 0.3:
+        patterns.append(
+            "You cut over a third of the plan — your plans may be longer "
+            "than your rooms want."
+        )
+
+    # Running hotter/cooler than the plan
+    if energy_deltas:
+        avg_delta = sum(energy_deltas) / len(energy_deltas)
+        if avg_delta > 0.15:
+            patterns.append(
+                "You ran hotter than the plan all night — your warmups may be "
+                "longer than your rooms want."
+            )
+        elif avg_delta < -0.15:
+            patterns.append(
+                "You ran cooler than the plan — the room wanted depth, not lift. "
+                "Trust that read."
+            )
+
+    return patterns
