@@ -51,6 +51,12 @@
 		};
 	}
 
+	function handlePlaySet() {
+		if (!selectedSet || waveformTracks.length === 0) return;
+		// Play the whole set through the global queue (NowPlayingBar), like albums
+		player.playSet(selectedSet.id, waveformTracks.map(toTrack), 0);
+	}
+
 	function handleTrackPlay(trackId: number) {
 		// Toggle off if same track
 		if (player.isPlaying && player.currentTrack?.id === trackId) {
@@ -319,6 +325,11 @@
 			{:else if waveformTracks.length >= 2 && analyzingSet}
 				<span class="analyzing-status">Analyzing...</span>
 			{/if}
+			{#if waveformTracks.length >= 1}
+				<button class="play-set-btn play-all" onclick={handlePlaySet} title="Play the whole set in order">
+					▶ Play
+				</button>
+			{/if}
 			{#if waveformTracks.length >= 2}
 				<button
 					class="play-set-btn"
@@ -554,6 +565,12 @@
 	.play-set-btn:disabled {
 		opacity: 0.4;
 		cursor: default;
+	}
+
+	.play-set-btn.play-all {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
 	}
 
 	.play-set-btn.builder {
