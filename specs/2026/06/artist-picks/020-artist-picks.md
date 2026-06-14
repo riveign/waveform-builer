@@ -1218,7 +1218,28 @@ Each Human Section requirement → compliance note with line refs.
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+### TODO
+1. New `src/kiku/artists.py` — artist-token matcher — Status: Done (adapted `_SEPARATOR_RE`: plan's `\bfeat\.?\b` left a stray ". " on tokens and `\bx\b` dropped a leading bare "X" artist; reworked to flush punctuation `,&+/` + whitespace-flanked word separators `feat/ft/vs/x/with` — all spec Task 10 cases pass)
+2. New `src/kiku/setbuilder/artist_picks.py` — ArtistPick + ranker — Status: Done
+3. Schemas — `ArtistPickItem` + `ArtistPicksResponse` — Status: Done
+4. API endpoint — `GET /{set_id}/artist-picks` in `routes/sets.py` — Status: Done
+5. CLI — `kiku artist-picks <set> <artist>` — Status: Done
+6. Frontend types — `ArtistPick`, `ArtistPicksResponse` — Status: Done
+7. Frontend API client — `getArtistPicks()` — Status: Done
+8. Frontend component — `AddFromArtistPanel.svelte` — Status: Done
+9. Frontend mount — wire panel into `SetView.svelte` — Status: Done
+10. Unit test — `tests/test_artists.py` — Status: Done (8 passed)
+11. Unit test — `tests/test_artist_picks.py` — Status: Done (6 passed; adapted `_track` mock to set `audio_features=None` + real `resolved_energy_zone` tuple + `playlist_tags=None` so the real scoring internals run against mocks)
+12. API test — `tests/api/test_artist_picks_api.py` — Status: Done (4 passed)
+13. Lint / type-check (py_compile + svelte-check + pytest) — Status: Done (py_compile OK; svelte-check 0 errors / 4 warnings = baseline; pytest 312 passed, 5 pre-existing test_energy.py failures unrelated to this spec)
+14. Commit changed files — Status: Done
+
+### Result
+- Code + tests committed: `806029d` (12 files, +787).
+- Tests: 8 matcher + 6 ranker + 4 API = 18 new, all green. Full suite 312 passed (5 pre-existing test_energy.py failures unrelated).
+- svelte-check: 0 errors / 4 warnings (= baseline).
+- Manual E2E pending: open a set → "Add from an artist" → type artist → pick a card → confirm it inserts at the suggested position and the timeline reloads.
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
