@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData, SetAnalysis } from '$lib/types';
-	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8, deleteSet, analyzeSet, getSetAnalysis } from '$lib/api/sets';
+	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8, deleteSet, analyzeSet, getSetAnalysis, updateSet } from '$lib/api/sets';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import SetPicker from './SetPicker.svelte';
+	import SetGrid from './SetGrid.svelte';
 	import SetTimeline from './SetTimeline.svelte';
 	import TransitionDetail from './TransitionDetail.svelte';
 	import EnergyFlowChart from './EnergyFlowChart.svelte';
@@ -77,6 +78,10 @@
 	let confirmDelete = $state(false);
 	let deleting = $state(false);
 	let pickerRefresh = $state(0);
+	let renaming = $state(false);
+	let renameValue = $state('');
+	let savingName = $state(false);
+	let renameInputEl = $state<HTMLInputElement | null>(null);
 	let error = $state<string | null>(null);
 	let timelineContainerEl = $state<HTMLDivElement>(null!);
 	let analysis = $state<SetAnalysis | null>(null);
@@ -218,7 +223,37 @@
 
 	async function handleSetSelect(set: DJSet) {
 		selectedSet = set;
+		renaming = false;
 		await loadSetData(set.id);
+	}
+
+	function startRename() {
+		if (!selectedSet) return;
+		renameValue = selectedSet.name ?? '';
+		renaming = true;
+		setTimeout(() => renameInputEl?.select(), 0);
+	}
+
+	async function saveRename() {
+		if (!selectedSet || savingName) return;
+		const name = renameValue.trim();
+		// Nothing to save — just close
+		if (!name || name === selectedSet.name) {
+			renaming = false;
+			return;
+		}
+		savingName = true;
+		try {
+			await updateSet(selectedSet.id, { name });
+			selectedSet = { ...selectedSet, name };
+			if (setDetail) setDetail = { ...setDetail, name };
+			renaming = false;
+			pickerRefresh++;
+		} catch (e) {
+			error = e instanceof Error ? e.message : "Couldn't rename the set";
+		} finally {
+			savingName = false;
+		}
 	}
 
 	async function handleTracksChanged() {
@@ -252,7 +287,21 @@
 
 	{#if selectedSet}
 		<div class="timeline-controls">
-			<span class="set-name">{selectedSet.name}</span>
+			{#if renaming}
+				<input
+					bind:this={renameInputEl}
+					class="set-name-input"
+					bind:value={renameValue}
+					disabled={savingName}
+					onkeydown={(e) => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') renaming = false; }}
+					onblur={saveRename}
+				/>
+			{:else}
+				<button class="set-name" onclick={startRename} title="Rename this set">
+					{selectedSet.name ?? 'Untitled set'}
+					<span class="rename-hint">✎</span>
+				</button>
+			{/if}
 			<span class="set-meta">{selectedSet.track_count} tracks, {selectedSet.duration_min}min</span>
 			{#if tracksNeedingReview.length > 0}
 				<button class="review-energy-btn" onclick={() => { showEnergyReview = true; }}>
@@ -384,9 +433,7 @@
 			<div class="status">An empty set — your story starts here</div>
 		{/if}
 	{:else}
-		<div class="empty-state">
-			Choose a set to see your journey
-		</div>
+		<SetGrid onselect={handleSetSelect} refreshSignal={pickerRefresh} />
 	{/if}
 
 	{#if showAssist && selectedSet}
@@ -431,6 +478,41 @@
 	.set-name {
 		font-weight: 600;
 		font-size: 14px;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 2px 6px;
+		border: 1px solid transparent;
+		border-radius: 4px;
+		background: transparent;
+		color: var(--text-primary);
+		cursor: text;
+	}
+
+	.set-name:hover {
+		border-color: var(--border);
+	}
+
+	.rename-hint {
+		font-size: 11px;
+		color: var(--text-dim);
+		opacity: 0;
+		transition: opacity 0.15s;
+	}
+
+	.set-name:hover .rename-hint {
+		opacity: 1;
+	}
+
+	.set-name-input {
+		font-weight: 600;
+		font-size: 14px;
+		padding: 2px 6px;
+		border: 1px solid var(--accent);
+		border-radius: 4px;
+		background: var(--bg-secondary);
+		color: var(--text-primary);
+		min-width: 180px;
 	}
 
 	.set-meta {
@@ -604,14 +686,6 @@
 		color: var(--energy-high);
 	}
 
-	.empty-state {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex: 1;
-		color: var(--text-dim);
-		font-size: 14px;
-	}
 
 	.analyzing-status {
 		font-size: 12px;
