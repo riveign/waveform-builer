@@ -6,6 +6,8 @@
 	import ScoringWeightsSliders from './ScoringWeights.svelte';
 	import DiscoveryDensitySlider from './DiscoveryDensitySlider.svelte';
 	import VibePresetPicker from './VibePresetPicker.svelte';
+	import Typeahead from '$lib/components/library/Typeahead.svelte';
+	import { autocompleteArtists } from '$lib/api/tracks';
 	import type { Track } from '$lib/types';
 
 	interface GenreFamily {
@@ -60,6 +62,8 @@
 	let discoveryDensity = $state(0);
 	let vibePreset = $state<string | null>(null);
 	let vibeIntensity = $state(60);
+	let preferredArtists = $state<string[]>([]);
+	let artistIntensity = $state(0);
 	let endTrack = $state<Track | null>(null);
 
 	// ── Dialog element ref ──
@@ -124,6 +128,8 @@
 		discoveryDensity = 0;
 		vibePreset = null;
 		vibeIntensity = 60;
+		preferredArtists = [];
+		artistIntensity = 0;
 		endTrack = null;
 	}
 
@@ -179,6 +185,12 @@
 		if (vibePreset) {
 			params.vibe_preset = vibePreset;
 			params.vibe_intensity = vibeIntensity / 100;
+		}
+
+		// Featured artists — a soft nudge toward the artists you asked for, never a filter
+		if (preferredArtists.length) {
+			params.preferred_artists = preferredArtists;
+			params.artist_intensity = artistIntensity / 100;
 		}
 
 		onbuild?.(params);
@@ -287,6 +299,36 @@
 			<div class="field">
 				<span class="field-label">Vibe</span>
 				<VibePresetPicker bind:preset={vibePreset} bind:intensity={vibeIntensity} />
+			</div>
+
+			<!-- Featured artists — soft nudge, never a filter -->
+			<div class="field">
+				<span class="field-label">Featured artists</span>
+				<Typeahead
+					bind:selected={preferredArtists}
+					placeholder="Artists to favor..."
+					fetchSuggestions={(q) => autocompleteArtists(q, 10)}
+				/>
+				{#if preferredArtists.length > 0}
+					<label class="field-label" for="artist-intensity">
+						How strongly to lean in
+						<span class="field-hint">({artistIntensity}%)</span>
+					</label>
+					<input
+						id="artist-intensity"
+						type="range"
+						class="field-slider"
+						min={0}
+						max={100}
+						step={5}
+						bind:value={artistIntensity}
+					/>
+					<div class="slider-range">
+						<span>Just a nudge</span>
+						<span>Lean in</span>
+					</div>
+					<span class="field-subtext">A gentle tilt toward the artists you asked for — the rest of your library still plays.</span>
+				{/if}
 			</div>
 
 			<!-- Discovery / Density -->

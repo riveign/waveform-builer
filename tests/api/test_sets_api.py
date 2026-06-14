@@ -130,6 +130,21 @@ def test_build_set_with_vibe(client):
         assert "vibe_brightness" in body
 
 
+def test_build_set_with_preferred_artists(client):
+    resp = client.post("/api/sets/build", json={
+        "name": "Featured Set",
+        "duration_min": 30,
+        "energy_preset": "journey",
+        "beam_width": 2,
+        "preferred_artists": ["Artist 1"],
+        "artist_intensity": 0.8,
+    })
+    assert resp.status_code == 200
+    body = resp.text
+    assert "event: started" in body
+    assert "event: complete" in body or "event: error" in body
+
+
 def test_build_set_unknown_vibe(client):
     resp = client.post("/api/sets/build", json={
         "name": "Bad Vibe",

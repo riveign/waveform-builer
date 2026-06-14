@@ -145,6 +145,8 @@ def build_set(
     end_title: str | None = None,
     preset_vibe: tuple[float, float] | None = None,
     vibe_intensity: float = 0.0,
+    preferred_artists: list[str] | None = None,
+    artist_intensity: float = 0.0,
 ) -> Set | None:
     """Generate a DJ set using beam search.
 
@@ -152,6 +154,10 @@ def build_set(
         end_title: Optional ending-track anchor (soft — pulls the tail toward it).
         preset_vibe: Optional (brightness, density) target vibe from a preset.
         vibe_intensity: How strongly vibe steers selection (0 = off, 1 = full).
+        preferred_artists: Artists the DJ asked to feature — a soft bias during
+            scoring, never a filter. The candidate pool stays whole.
+        artist_intensity: How strongly to nudge toward preferred artists
+            (0 = off, 1 = strong). The artist cooldown still wins over the bias.
 
     Returns a saved Set object with SetTrack entries, or None on failure.
     """
@@ -254,7 +260,7 @@ def build_set(
                         if not (0.47 < ratio < 0.53 or 1.88 < ratio < 2.12):
                             continue
 
-                score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts, target_vibe=target_vibe, vibe_strength=vibe_intensity)
+                score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts, target_vibe=target_vibe, vibe_strength=vibe_intensity, preferred_artists=preferred_artists, artist_intensity=artist_intensity)
 
                 # BPM progression bonus: reward tracks closer to target BPM at this point
                 if target_bpm and cand.bpm:
@@ -320,7 +326,7 @@ def build_set(
 
     prev_track = None
     for i, track in enumerate(best_seq):
-        t_score = transition_score(prev_track, track, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts) if prev_track else None
+        t_score = transition_score(prev_track, track, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts, preferred_artists=preferred_artists, artist_intensity=artist_intensity) if prev_track else None
         st = SetTrack(
             set_id=set_.id,
             position=i,

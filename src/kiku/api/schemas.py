@@ -272,6 +272,8 @@ class SetBuildRequest(BaseModel):
     discovery_density: float = 0.0
     vibe_preset: str | None = None        # e.g. "dark & deep", "euphoric" — see VIBE_PRESETS
     vibe_intensity: float = 0.0           # 0 = ignore vibe, 1 = vibe steers strongly
+    preferred_artists: list[str] | None = None  # artists the DJ asked to feature — soft bias, never a filter
+    artist_intensity: float = 0.0         # 0 = ignore, 1 = strong nudge toward preferred artists
 
 
 class SetCreateRequest(BaseModel):
