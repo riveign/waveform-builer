@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { DJSet, SetDetail as SetDetailType, SetWaveformTrack, TransitionDetail as TransitionData, SetAnalysis, SetComparison as SetComparisonType } from '$lib/types';
-	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8, deleteSet, analyzeSet, getSetAnalysis, compareSet, getSetComparison, unlinkSet } from '$lib/api/sets';
+	import { getSet, getSetWaveforms, getTransition, exportRekordbox, exportM3U8, deleteSet, analyzeSet, getSetAnalysis, compareSet, getSetComparison, linkSet, unlinkSet, listSets } from '$lib/api/sets';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import SetPicker from './SetPicker.svelte';
 	import SetTimeline from './SetTimeline.svelte';
@@ -85,6 +85,10 @@
 	let comparison = $state<SetComparisonType | null>(null);
 	let comparing = $state(false);
 	let showComparison = $state(false);
+	let showLinkPicker = $state(false);
+	let plannedSets = $state<DJSet[]>([]);
+	let linkTargetId = $state<number | null>(null);
+	let linking = $state(false);
 
 	/** Tracks that need energy review (not yet approved) */
 	let tracksNeedingReview = $derived(
@@ -205,6 +209,35 @@
 		}
 	}
 
+	async function openLinkPicker() {
+		if (!selectedSet) return;
+		try {
+			const all = await listSets();
+			// Offer the DJ's planned (Kiku-built) sets, never this set itself
+			plannedSets = all.filter((s) => s.source === 'kiku' && s.id !== selectedSet!.id);
+		} catch {
+			plannedSets = [];
+		}
+		linkTargetId = null;
+		showLinkPicker = true;
+	}
+
+	async function confirmLink() {
+		if (!selectedSet || linkTargetId === null || linking) return;
+		linking = true;
+		try {
+			await linkSet(selectedSet.id, linkTargetId);
+			if (setDetail) setDetail = { ...setDetail, planned_set_id: linkTargetId };
+			showLinkPicker = false;
+			// Show how the night deviated right away
+			await handleCompare();
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			linking = false;
+		}
+	}
+
 	async function loadSetData(setId: number) {
 		loading = true;
 		error = null;
@@ -213,6 +246,7 @@
 		analysis = null;
 		comparison = null;
 		showComparison = false;
+		showLinkPicker = false;
 		try {
 			const [detail, waveforms] = await Promise.all([
 				getSet(setId),
@@ -317,6 +351,28 @@
 				<button class="unlink-btn" onclick={handleUnlink} title="Remove the link to the planned set">
 					Unlink
 				</button>
+			{:else if setDetail && setDetail.source !== 'kiku'}
+				{#if showLinkPicker}
+					{#if plannedSets.length === 0}
+						<span class="link-empty">No planned sets to link yet — build one first.</span>
+						<button class="unlink-btn" onclick={() => (showLinkPicker = false)}>Cancel</button>
+					{:else}
+						<select class="link-select" bind:value={linkTargetId} aria-label="Choose the planned set">
+							<option value={null}>Which set did you plan from?</option>
+							{#each plannedSets as p (p.id)}
+								<option value={p.id}>{p.name} ({p.track_count} tracks)</option>
+							{/each}
+						</select>
+						<button class="compare-btn" onclick={confirmLink} disabled={linkTargetId === null || linking}>
+							{linking ? 'Linking...' : 'Link'}
+						</button>
+						<button class="unlink-btn" onclick={() => (showLinkPicker = false)}>Cancel</button>
+					{/if}
+				{:else}
+					<button class="link-btn" onclick={openLinkPicker} title="Link this set to the plan you built it from">
+						Link to a plan
+					</button>
+				{/if}
 			{/if}
 			{#if waveformTracks.length >= 2}
 				<button
@@ -724,6 +780,37 @@
 
 	.unlink-btn:hover {
 		color: var(--text-primary);
+	}
+
+	.link-btn {
+		padding: 4px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--text-dim);
+		background: transparent;
+		border: 1px dashed var(--border);
+		border-radius: 4px;
+		transition: all 0.15s;
+	}
+
+	.link-btn:hover {
+		color: var(--text-primary);
+		border-color: var(--accent);
+	}
+
+	.link-select {
+		padding: 4px 8px;
+		font-size: 12px;
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		max-width: 220px;
+	}
+
+	.link-empty {
+		font-size: 12px;
+		color: var(--text-dim);
 	}
 
 	.analysis-bar {
