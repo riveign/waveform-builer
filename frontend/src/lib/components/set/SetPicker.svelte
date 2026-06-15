@@ -3,6 +3,9 @@
 	import { listSets, createSet } from '$lib/api/sets';
 	import { onMount } from 'svelte';
 	import ImportPlaylistDialog from './ImportPlaylistDialog.svelte';
+	import { getUiStore } from '$lib/stores/ui.svelte';
+
+	const ui = getUiStore();
 
 	let { onselect, refreshSignal = 0 }: { onselect: (set: DJSet) => void; refreshSignal?: number } = $props();
 
@@ -85,6 +88,9 @@
 					+ New
 				</button>
 			{/if}
+			<button class="build-btn" onclick={() => ui.requestBuild()} title="Build a set with energy, genre and vibe">
+				Build
+			</button>
 			<button class="import-btn" onclick={() => importOpen = true} title="Import playlist">
 				Import
 			</button>
@@ -137,6 +143,22 @@
 		cursor: pointer;
 		white-space: nowrap;
 		font-weight: 600;
+	}
+
+	.build-btn {
+		padding: 8px 12px;
+		font-size: 12px;
+		border: 1px solid var(--accent);
+		border-radius: 6px;
+		background: var(--accent);
+		color: #000;
+		cursor: pointer;
+		white-space: nowrap;
+		font-weight: 600;
+	}
+
+	.build-btn:hover {
+		opacity: 0.85;
 	}
 
 	.new-set-input {
