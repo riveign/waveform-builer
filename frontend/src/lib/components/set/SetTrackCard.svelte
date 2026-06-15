@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { SetTrack, Track, EnergyConflict } from '$lib/types';
-	import { getCamelotColor } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { getTrackEnergyNumeric, energyColor as getEnergyColor } from '$lib/utils/energy';
 	import { getTrack } from '$lib/api/tracks';
@@ -122,7 +122,7 @@
 
 	<div class="meta">
 		<span class="key-badge" style="color: {getCamelotColor(track.key)}">
-			{track.key ?? '?'}
+			{formatKey(track.key) || '?'}
 		</span>
 		<span class="bpm">{track.bpm ? Math.round(track.bpm) : '?'}</span>
 	</div>

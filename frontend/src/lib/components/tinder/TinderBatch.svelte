@@ -2,6 +2,7 @@
 	import type { TinderQueueItem, TinderDecision, TinderBatchDecision } from '$lib/types';
 	import { ZONES, ZONE_COLORS as zoneColors } from '../library/EnergyZonePicker.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
+	import { formatKey } from '$lib/utils/camelot';
 
 	const player = getPlayerStore();
 
@@ -87,7 +88,7 @@
 					<div class="row-meta">
 						<span class="row-artist">{item.track.artist ?? 'Unknown'}</span>
 						<span>{item.track.bpm ? `${Math.round(item.track.bpm)} BPM` : ''}</span>
-						<span>{item.track.key ?? ''}</span>
+						<span>{formatKey(item.track.key)}</span>
 					</div>
 				</div>
 

@@ -4,7 +4,7 @@
 	import { updateTrackRating } from '$lib/api/tracks';
 	import { submitDecision } from '$lib/api/tinder';
 	import { getWaveformDetail } from '$lib/api/waveforms';
-	import { getCamelotColor } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
 	import { formatTime } from '$lib/utils/waveform';
 	import WavesurferPlayer from './WavesurferPlayer.svelte';
 	import TrackArtwork from './TrackArtwork.svelte';
@@ -194,7 +194,7 @@
 			</div>
 			<div class="track-meta">
 				<span class="meta-badge" style="color: {getCamelotColor(track.key)}">
-					{track.key ?? '?'}
+					{formatKey(track.key) || '?'}
 				</span>
 				<span class="meta-badge">{track.bpm ? Math.round(track.bpm) : '?'} BPM</span>
 				<div class="zone-badge-wrapper" bind:this={zoneWrapperEl}>

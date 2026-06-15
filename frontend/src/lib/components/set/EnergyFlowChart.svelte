@@ -12,6 +12,7 @@
 	} from 'chart.js';
 	import type { SetWaveformTrack } from '$lib/types';
 	import { getTrackEnergyNumeric } from '$lib/utils/energy';
+	import { formatKey } from '$lib/utils/camelot';
 
 	Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
 
@@ -222,7 +223,7 @@
 									const val = ctx.parsed.y;
 									if (val !== null) lines.push(`Energy: ${(val * 9).toFixed(0)}/9`);
 									if (t.bpm) lines.push(`BPM: ${t.bpm}`);
-									if (t.key) lines.push(`Key: ${t.key}`);
+									if (t.key) lines.push(`Key: ${formatKey(t.key)}`);
 									if (t.transition_score !== null && t.transition_score !== undefined) {
 										lines.push(`Transition: ${(t.transition_score * 100).toFixed(0)}%`);
 									}

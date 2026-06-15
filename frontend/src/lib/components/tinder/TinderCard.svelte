@@ -5,6 +5,7 @@
 	import MoodRadar from './MoodRadar.svelte';
 	import EnergyConflictBadge from '../set/EnergyConflictBadge.svelte';
 	import { ZONES, ZONE_COLORS as zoneColors } from '../library/EnergyZonePicker.svelte';
+	import { formatKey } from '$lib/utils/camelot';
 
 	let {
 		item,
@@ -60,7 +61,7 @@
 		<div class="artist">{item.track.artist ?? 'Unknown'}</div>
 		<div class="meta">
 			<span>{item.track.bpm ? `${Math.round(item.track.bpm)} BPM` : ''}</span>
-			<span>{item.track.key ?? ''}</span>
+			<span>{formatKey(item.track.key)}</span>
 			<span>{item.track.genre ?? ''}</span>
 			{#if item.track.energy_conflict}
 				<EnergyConflictBadge conflict={item.track.energy_conflict} />

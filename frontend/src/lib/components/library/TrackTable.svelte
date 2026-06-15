@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Track } from '$lib/types';
-	import { getCamelotColor } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
 	import { formatTime } from '$lib/utils/waveform';
 	import { energyColor, normalizeEnergy } from '$lib/utils/energy';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
@@ -113,7 +113,7 @@
 					</td>
 					<td class="col-key">
 						<span class="key-badge" style="color: {getCamelotColor(track.key)}">
-							{track.key ?? '?'}
+							{formatKey(track.key) || '?'}
 						</span>
 					</td>
 					<td class="col-bpm">
