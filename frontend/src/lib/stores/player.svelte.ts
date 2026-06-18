@@ -42,6 +42,13 @@ let setId = $state<number | null>(null);
 /** The registered WaveSurfer instance — set by the persistent audio component */
 let ws = $state<WaveSurfer | null>(null);
 
+/**
+ * True between starting to load a track and playback actually beginning.
+ * Used to ignore the stray 'finish' a WaveSurfer media swap can emit, which
+ * would otherwise double-advance the queue and skip a track.
+ */
+let swapping = false;
+
 /** Listen-time tracking for play count recording */
 let listenedSeconds = $state(0);
 let lastTimeUpdate = $state(0);
@@ -69,6 +76,7 @@ function loadAndPlay(track: Track) {
 	listenedSeconds = 0;
 	lastTimeUpdate = 0;
 	status = 'loading';
+	swapping = true;
 	// NowPlayingBar's $effect detects currentTrack change and handles ws.load()
 	// with peaks data. We do NOT call ws.load() here to avoid a double-load race.
 }
@@ -99,6 +107,9 @@ function registerPlayer(instance: WaveSurfer): () => void {
 	};
 
 	const onPlay = () => {
+		// Playback has truly begun — the swap (if any) is done, so a 'finish' from
+		// here on is a real track end.
+		swapping = false;
 		status = 'playing';
 	};
 
@@ -110,6 +121,15 @@ function registerPlayer(instance: WaveSurfer): () => void {
 	};
 
 	const onFinish = () => {
+		// Ignore spurious 'finish' events fired during a track swap. When we load
+		// the next track, the WaveSurfer media swap can emit a stray 'finish'; if we
+		// acted on it the queue would double-advance and skip a track. `swapping`
+		// is true only between starting a load and playback actually beginning, so a
+		// real track end (which fires while playing, swapping already cleared) still
+		// advances normally. (Status can't be used here: a natural end fires the
+		// media 'pause' before 'finish', so status is 'paused' by this point.)
+		if (swapping) return;
+
 		if (mode === 'set') {
 			// Auto-advance in set mode
 			const nextIdx = queueIndex + 1;
@@ -290,6 +310,7 @@ function stop() {
 	queue = [];
 	queueIndex = 0;
 	setId = null;
+	swapping = false;
 }
 
 export function getPlayerStore() {
