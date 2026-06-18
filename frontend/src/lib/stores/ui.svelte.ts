@@ -10,6 +10,8 @@ let selectedTrackInSet = $state<number | null>(null);
 let timelineViewMode = $state<TimelineViewMode>('linear');
 let playingTrackId = $state<number | null>(null);
 let pendingAnalysis = $state<SetAnalysis | null>(null);
+/** Bumped to ask the page to open the Build a Set dialog (decouples the trigger from the dialog owner). */
+let buildRequested = $state(0);
 
 export function getUiStore() {
 	return {
@@ -27,5 +29,8 @@ export function getUiStore() {
 		set playingTrackId(v: number | null) { playingTrackId = v; },
 		get pendingAnalysis() { return pendingAnalysis; },
 		set pendingAnalysis(v: SetAnalysis | null) { pendingAnalysis = v; },
+		get buildRequested() { return buildRequested; },
+		/** Ask the page to open the Build a Set dialog. */
+		requestBuild() { buildRequested += 1; },
 	};
 }

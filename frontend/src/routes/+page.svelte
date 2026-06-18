@@ -28,9 +28,11 @@
 		ui.selectedTrack = track;
 	}
 
-	function handleOpenBuildDialog() {
-		showBuildDialog = true;
-	}
+	// Open the build dialog when something (e.g. the Build button in the set toolbar)
+	// requests it via the ui store. Decouples the trigger from this dialog owner.
+	$effect(() => {
+		if (ui.buildRequested > 0) showBuildDialog = true;
+	});
 
 	async function handleBuild(params: SetBuildParams) {
 		showBuildDialog = false;
@@ -100,7 +102,6 @@
 		}
 	}
 
-	let showBuildButton = $derived(ui.activeTab === 'set' && buildState === 'idle');
 </script>
 
 <div class="two-panel">
@@ -120,11 +121,6 @@
 			</div>
 		{/if}
 		<Workspace />
-		{#if showBuildButton}
-			<button class="build-set-btn" onclick={handleOpenBuildDialog} aria-label="Open build set dialog">
-				Build Set
-			</button>
-		{/if}
 	</main>
 </div>
 
@@ -158,34 +154,5 @@
 		justify-content: center;
 		background: rgba(0, 0, 0, 0.55);
 		padding: 24px;
-	}
-
-	/* ── Build Set floating action button ── */
-	.build-set-btn {
-		position: absolute;
-		bottom: 20px;
-		right: 20px;
-		z-index: 5;
-		padding: 10px 22px;
-		font-size: 13px;
-		font-weight: 600;
-		color: #000;
-		background: var(--accent);
-		border: none;
-		border-radius: 8px;
-		cursor: pointer;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-		transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
-	}
-
-	.build-set-btn:hover {
-		background: var(--accent-dim);
-		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-	}
-
-	.build-set-btn:active {
-		transform: translateY(0);
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 	}
 </style>
