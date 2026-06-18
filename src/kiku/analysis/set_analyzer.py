@@ -81,8 +81,11 @@ def analyze_set(db: Session, set_id: int) -> SetAnalysisResult:
     # 1. Infer energy for untagged tracks
     _infer_energy(db, set_tracks, tracks)
 
+    # 1b. Per-position energy targets from the set's own arc
+    targets = _energy_targets(set_tracks, tracks)
+
     # 2. Score all transitions
-    transitions = _score_transitions(tracks, set_tracks)
+    transitions = _score_transitions(tracks, set_tracks, targets)
 
     # 3. Compute arc analysis
     arc = _compute_arc(tracks)
@@ -179,10 +182,45 @@ def _infer_energy(db: Session, set_tracks: list[SetTrack], tracks: list[Track]) 
     db.flush()
 
 
+def _resolved_energy(st: SetTrack, track: Track) -> float | None:
+    """Energy for a track on the same scale energy_fit uses, falling back to inferred."""
+    e = _get_track_energy(track)
+    if e is not None:
+        return e
+    return st.inferred_energy
+
+
+def _energy_targets(set_tracks: list[SetTrack], tracks: list[Track]) -> list[float]:
+    """Per-index energy target = the neighbour-trend of the set's own energies.
+
+    Scoring a track against the mean energy of its neighbours measures how smoothly
+    it sits in the flow. Falls back to the track's own energy when it has no neighbour
+    with energy, and to 0.5 only when nothing is known. Same scale as energy_fit().
+    """
+    energies = [_resolved_energy(st, t) for st, t in zip(set_tracks, tracks)]
+    n = len(tracks)
+    targets: list[float] = []
+    for i in range(n):
+        neighbours = []
+        if i > 0 and energies[i - 1] is not None:
+            neighbours.append(energies[i - 1])
+        if i < n - 1 and energies[i + 1] is not None:
+            neighbours.append(energies[i + 1])
+        if neighbours:
+            targets.append(sum(neighbours) / len(neighbours))
+        elif energies[i] is not None:
+            targets.append(energies[i])
+        else:
+            targets.append(0.5)
+    return targets
+
+
 # ── Transition Scoring ──────────────────────────────────────────────────
 
 
-def _score_transitions(tracks: list[Track], set_tracks: list[SetTrack]) -> list[TransitionAnalysis]:
+def _score_transitions(
+    tracks: list[Track], set_tracks: list[SetTrack], targets: list[float]
+) -> list[TransitionAnalysis]:
     """Score all adjacent transitions in the set."""
     w = SCORING_WEIGHTS
     results = []
@@ -191,9 +229,8 @@ def _score_transitions(tracks: list[Track], set_tracks: list[SetTrack]) -> list[
         t_a, t_b = tracks[i], tracks[i + 1]
 
         h = harmonic_score(t_a.key, t_b.key)
-        # Use inferred energy if available for target
-        st_b = set_tracks[i + 1]
-        target_e = st_b.inferred_energy if st_b.inferred_energy is not None else 0.5
+        # Target = neighbour-trend of the incoming track within the set's own arc
+        target_e = targets[i + 1]
         e = energy_fit(t_b, target_e)
         b = bpm_compatibility(t_a.bpm, t_b.bpm)
         g = genre_coherence(

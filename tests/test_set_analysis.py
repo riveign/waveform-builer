@@ -9,6 +9,8 @@ from kiku.analysis.set_analyzer import (
     _classify_energy_shape,
     _classify_key_style,
     _detect_genre_segments,
+    _energy_targets,
+    _score_transitions,
 )
 from unittest.mock import MagicMock
 
@@ -194,3 +196,114 @@ def test_genre_segments_transition():
     assert len(segs) == 2
     assert segs[0]["genre_family"] == "techno"
     assert segs[1]["genre_family"] == "house"
+
+
+# ── Energy Targets (neighbour-trend) ───────────────────────────────────
+
+
+def _energy_track(energy: float | None, tid: int = 0, genre: str = "Techno") -> MagicMock:
+    """Mock Track exposing the fields energy/scoring functions read."""
+    t = MagicMock()
+    t.id = tid
+    t.key = "8A"
+    t.bpm = 128.0
+    t.dir_genre = genre
+    t.rb_genre = genre
+    # track_quality reads these — give numeric/None so scoring doesn't choke on MagicMock
+    t.rating = 0
+    t.play_count = 0
+    t.kiku_play_count = 0
+    t.playlist_tags = None
+    if energy is None:
+        t.audio_features = None
+    else:
+        t.audio_features = MagicMock()
+        t.audio_features.energy = energy
+    # resolved_energy_zone is consulted only when audio_features.energy is missing
+    t.resolved_energy_zone = (None, "none", 0.0)
+    return t
+
+
+def _set_track(inferred: float | None = None) -> MagicMock:
+    st = MagicMock()
+    st.inferred_energy = inferred
+    return st
+
+
+def test_energy_targets_flat():
+    """A flat set: every target equals the surrounding energy."""
+    tracks = [_energy_track(0.9, i) for i in range(4)]
+    sts = [_set_track() for _ in tracks]
+    targets = _energy_targets(sts, tracks)
+    assert all(abs(t - 0.9) < 1e-9 for t in targets)
+
+
+def test_energy_targets_jumpy():
+    """A roller-coaster set: a spike's target pulls toward its low neighbours."""
+    energies = [0.9, 0.3, 0.9, 0.3]
+    tracks = [_energy_track(e, i) for i, e in enumerate(energies)]
+    sts = [_set_track() for _ in tracks]
+    targets = _energy_targets(sts, tracks)
+    # index 1 (0.3) sits between 0.9 and 0.9 → target 0.9, far from its own 0.3
+    assert abs(targets[1] - 0.9) < 1e-9
+    # index 2 (0.9) sits between 0.3 and 0.3 → target 0.3, far from its own 0.9
+    assert abs(targets[2] - 0.3) < 1e-9
+
+
+def test_energy_targets_missing_neighbour():
+    """A track lacking energy still yields a sensible neighbour-mean target."""
+    tracks = [_energy_track(0.8, 0), _energy_track(None, 1), _energy_track(0.6, 2)]
+    # _infer_energy would populate inferred_energy for the missing one; simulate it
+    sts = [_set_track(), _set_track(inferred=0.7), _set_track()]
+    targets = _energy_targets(sts, tracks)
+    # middle track's own resolved energy comes from inferred (0.7), and its target
+    # is the mean of its neighbours (0.8, 0.6) = 0.7 — not the bare 0.5 fallback
+    assert abs(targets[1] - 0.7) < 1e-9
+    # neighbours of the ends include the inferred middle value
+    assert abs(targets[0] - 0.7) < 1e-9  # only neighbour is middle (0.7)
+    assert abs(targets[2] - 0.7) < 1e-9
+
+
+def test_energy_targets_single_neighbour_ends():
+    """End positions use their one available neighbour."""
+    energies = [0.4, 0.6, 0.8]
+    tracks = [_energy_track(e, i) for i, e in enumerate(energies)]
+    sts = [_set_track() for _ in tracks]
+    targets = _energy_targets(sts, tracks)
+    assert abs(targets[0] - 0.6) < 1e-9  # neighbour = index 1
+    assert abs(targets[1] - 0.6) < 1e-9  # mean(0.4, 0.8)
+    assert abs(targets[2] - 0.6) < 1e-9  # neighbour = index 1
+
+
+def test_energy_targets_all_unknown_falls_back_to_half():
+    """Nothing known anywhere → neutral 0.5 (last-resort)."""
+    tracks = [_energy_track(None, i) for i in range(3)]
+    sts = [_set_track() for _ in tracks]
+    targets = _energy_targets(sts, tracks)
+    assert all(t == 0.5 for t in targets)
+
+
+# ── Transition energy_fit semantics ────────────────────────────────────
+
+
+def test_score_transitions_flat_high_energy_fit():
+    """A consistent high-energy set scores near-perfect energy_fit per transition."""
+    tracks = [_energy_track(0.9, i) for i in range(4)]
+    sts = [_set_track() for _ in tracks]
+    targets = _energy_targets(sts, tracks)
+    transitions = _score_transitions(tracks, sts, targets)
+    assert len(transitions) == 3
+    for tr in transitions:
+        assert tr.scores["energy_fit"] >= 0.99
+
+
+def test_score_transitions_jumpy_low_energy_fit():
+    """A roller-coaster set scores low energy_fit at the jumps."""
+    energies = [0.9, 0.3, 0.9, 0.3]
+    tracks = [_energy_track(e, i) for i, e in enumerate(energies)]
+    sts = [_set_track() for _ in tracks]
+    targets = _energy_targets(sts, tracks)
+    transitions = _score_transitions(tracks, sts, targets)
+    # incoming tracks are indices 1,2,3: each is ~0.6 away from its target → fit ~0
+    for tr in transitions:
+        assert tr.scores["energy_fit"] < 0.5
