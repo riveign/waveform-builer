@@ -2,7 +2,7 @@
 	import type { SuggestNextItem } from '$lib/types';
 	import { suggestNext } from '$lib/api/tracks';
 	import { addTrackToSet } from '$lib/api/sets';
-	import { getCamelotColor } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
 
 	let {
 		trackId,
@@ -80,7 +80,7 @@
 						<span class="suggest-artist">{item.track.artist ?? '?'}</span>
 					</div>
 					{#if item.track.key}
-						<span class="key-badge" style="color: {getCamelotColor(item.track.key)}">{item.track.key}</span>
+						<span class="key-badge" style="color: {getCamelotColor(item.track.key)}">{formatKey(item.track.key)}</span>
 					{/if}
 					{#if item.track.bpm}
 						<span class="bpm-badge">{Math.round(item.track.bpm)}</span>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { formatKey } from '$lib/utils/camelot';
+
 	type BuildEvent = {
 		type: 'started' | 'track_added' | 'complete' | 'analyzed' | 'error';
 		data: any;
@@ -66,7 +68,7 @@
 							<span class="track-bpm">{Math.round(event.data.bpm)}</span>
 						{/if}
 						{#if event.data?.key}
-							<span class="track-key">{event.data.key}</span>
+							<span class="track-key">{formatKey(event.data.key)}</span>
 						{/if}
 					</div>
 				</div>

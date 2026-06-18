@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type WaveSurfer from 'wavesurfer.js';
 	import type { TransitionDetail as TransitionData, TransitionAnalysis } from '$lib/types';
-	import { getCamelotColor } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
 	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
 	import CueOverlay from '../waveform/CueOverlay.svelte';
 	import ScoreBreakdown from './ScoreBreakdown.svelte';
@@ -70,7 +70,7 @@
 			<div class="track-card">
 				<div class="track-header">
 					<span class="track-label">Playing</span>
-					<span class="badge" style="color: {getCamelotColor(transition.key_a)}">{transition.key_a ?? '?'}</span>
+					<span class="badge" style="color: {getCamelotColor(transition.key_a)}">{formatKey(transition.key_a) || '?'}</span>
 					<span class="badge">{transition.bpm_a ? Math.round(transition.bpm_a) : '?'} BPM</span>
 				</div>
 				<div class="track-name">{a.title ?? '?'}</div>
@@ -94,7 +94,7 @@
 			<div class="track-card">
 				<div class="track-header">
 					<span class="track-label">Coming up</span>
-					<span class="badge" style="color: {getCamelotColor(transition.key_b)}">{transition.key_b ?? '?'}</span>
+					<span class="badge" style="color: {getCamelotColor(transition.key_b)}">{formatKey(transition.key_b) || '?'}</span>
 					<span class="badge">{transition.bpm_b ? Math.round(transition.bpm_b) : '?'} BPM</span>
 				</div>
 				<div class="track-name">{b.title ?? '?'}</div>

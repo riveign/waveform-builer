@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ReplacementCandidate, ReplacementContext, SetTrack } from '$lib/types';
 	import { getReplacements, replaceTrackInSet } from '$lib/api/sets';
-	import { getCamelotColor } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
 	import { API_BASE } from '$lib/api/client';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
@@ -142,7 +142,7 @@
 			<div class="context-bar">
 				<div class="neighbor" class:empty={!context.prev_track}>
 					{#if context.prev_track}
-						<span class="neighbor-key" style="color: {getCamelotColor(context.prev_track.key ?? null)}">{context.prev_track.key ?? '?'}</span>
+						<span class="neighbor-key" style="color: {getCamelotColor(context.prev_track.key ?? null)}">{formatKey(context.prev_track.key) || '?'}</span>
 						<span class="neighbor-bpm">{context.prev_track.bpm ? Math.round(context.prev_track.bpm) : '?'}</span>
 						<span class="neighbor-title">{context.prev_track.title ?? ''}</span>
 					{:else}
@@ -157,7 +157,7 @@
 				</div>
 				<div class="neighbor" class:empty={!context.next_track}>
 					{#if context.next_track}
-						<span class="neighbor-key" style="color: {getCamelotColor(context.next_track.key ?? null)}">{context.next_track.key ?? '?'}</span>
+						<span class="neighbor-key" style="color: {getCamelotColor(context.next_track.key ?? null)}">{formatKey(context.next_track.key) || '?'}</span>
 						<span class="neighbor-bpm">{context.next_track.bpm ? Math.round(context.next_track.bpm) : '?'}</span>
 						<span class="neighbor-title">{context.next_track.title ?? ''}</span>
 					{:else}
@@ -206,7 +206,7 @@
 
 						<div class="meta">
 							<span class="key-badge" style="color: {getCamelotColor(cand.track.key ?? null)}">
-								{cand.track.key ?? '?'}
+								{formatKey(cand.track.key) || '?'}
 							</span>
 							<span class="bpm">{cand.track.bpm ? Math.round(cand.track.bpm) : '?'}</span>
 							{#if cand.track.energy}

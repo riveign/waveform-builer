@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getCamelotColor, harmonicRelationship } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor, harmonicRelationship } from '$lib/utils/camelot';
 
 	let { keyA, keyB }: { keyA: string | null; keyB: string | null } = $props();
 
@@ -23,9 +23,9 @@
 </script>
 
 <div class="harmonic-badge" style="border-color: {borderColor}">
-	<span class="key" style="color: {getCamelotColor(keyA)}">{keyA ?? '?'}</span>
+	<span class="key" style="color: {getCamelotColor(keyA)}">{formatKey(keyA) || '?'}</span>
 	<span class="arrow">→</span>
-	<span class="key" style="color: {getCamelotColor(keyB)}">{keyB ?? '?'}</span>
+	<span class="key" style="color: {getCamelotColor(keyB)}">{formatKey(keyB) || '?'}</span>
 	<span class="rel-label" style="color: {borderColor}">{rel.label}</span>
 </div>
 

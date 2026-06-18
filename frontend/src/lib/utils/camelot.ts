@@ -70,6 +70,17 @@ function toCamelot(key: string): string | null {
 	// Already Camelot notation?
 	if (/^\d{1,2}[AB]$/i.test(k)) return k.toUpperCase();
 
+	// Open Key notation: "<n>m" (minor) / "<n>d" (major), e.g. "12m".
+	// Open Key is Camelot rotated by 7 around the wheel (1d = C = 8B).
+	const openKey = k.match(/^(\d{1,2})([md])$/i);
+	if (openKey) {
+		const n = parseInt(openKey[1], 10);
+		if (n >= 1 && n <= 12) {
+			const camNum = ((n + 6) % 12) + 1;
+			return `${camNum}${openKey[2].toLowerCase() === 'm' ? 'A' : 'B'}`;
+		}
+	}
+
 	// Normalize: strip "min/minor/maj/major", detect minor via trailing "m"
 	const normalized = k
 		.replace(/\s*(minor|min)\s*$/i, 'm')
@@ -96,6 +107,39 @@ export function parseCamelot(key: string | null | undefined): CamelotKey | null 
 	const num = parseInt(match[1], 10);
 	if (num < 1 || num > 12) return null;
 	return { number: num, letter: match[2] as 'A' | 'B' };
+}
+
+/**
+ * Canonical musical name per Camelot position. Spellings match how keys are
+ * already stored in the library (e.g. Abm, Dbm, F#m) so a converted Camelot key
+ * looks identical to one that was stored musically.
+ */
+const CAMELOT_TO_MUSICAL: Record<string, string> = {
+	'1A': 'Abm', '1B': 'B',
+	'2A': 'Ebm', '2B': 'F#',
+	'3A': 'Bbm', '3B': 'Db',
+	'4A': 'Fm', '4B': 'Ab',
+	'5A': 'Cm', '5B': 'Eb',
+	'6A': 'Gm', '6B': 'Bb',
+	'7A': 'Dm', '7B': 'F',
+	'8A': 'Am', '8B': 'C',
+	'9A': 'Em', '9B': 'G',
+	'10A': 'Bm', '10B': 'D',
+	'11A': 'F#m', '11B': 'A',
+	'12A': 'Dbm', '12B': 'E',
+};
+
+/**
+ * Format any key for display as a musical note name.
+ * Converts Camelot ("9A" → "Em") and Open Key ("12m" → "Dm"), normalizes
+ * musical spellings to the canonical form, and returns the raw value unchanged
+ * when it can't be parsed (so nothing is ever lost).
+ */
+export function formatKey(key: string | null | undefined): string {
+	if (!key) return '';
+	const camelot = toCamelot(key);
+	if (camelot && CAMELOT_TO_MUSICAL[camelot]) return CAMELOT_TO_MUSICAL[camelot];
+	return key.trim();
 }
 
 export interface HarmonicRelationship {
