@@ -249,8 +249,11 @@ def genre_coherence(genre_a: str | None, genre_b: str | None) -> float:
     family_a = genre_to_family(genre_a)
     family_b = genre_to_family(genre_b)
 
+    # Same family scores as a full match: we weight the genre (e.g. Techno) over
+    # its sub-genres, so "Techno (Raw / Deep)" and "Techno (Peak Time)" count as the
+    # same genre rather than a near-miss.
     if family_a == family_b:
-        return 0.8
+        return 1.0
     if frozenset({family_a, family_b}) in COMPATIBLE_FAMILIES:
         return 0.5
     # Both are "other" — we can't tell, give neutral score
@@ -324,13 +327,15 @@ def track_quality(
     """
     score = 0.0
 
-    # Rating: 0-5 stars, normalize to 0-1 (unrated gets 0.3)
+    # Rating: 0-5 stars, normalize to 0-1 (unrated gets 0.3).
+    # Rating carries 50% of quality — your curation matters more than play history,
+    # so a great track you haven't played yet isn't penalized.
     if track.rating and track.rating > 0:
-        score += 0.4 * (track.rating / 5.0)
+        score += 0.5 * (track.rating / 5.0)
     else:
-        score += 0.4 * 0.3
+        score += 0.5 * 0.3
 
-    # Play familiarity (20% of track_quality)
+    # Play familiarity (10% of track_quality — deliberately light)
     combined_plays = min((track.play_count or 0) + (track.kiku_play_count or 0), 10)
     ratio = combined_plays / 10.0
     dd = discovery_density
@@ -342,7 +347,7 @@ def track_quality(
         play_signal = (1 - alpha) * ratio + alpha * (ratio ** 0.5)
     else:
         play_signal = ratio
-    score += 0.2 * play_signal
+    score += 0.1 * play_signal
 
     # Set density (10% of track_quality)
     density = min(set_appearance_count, 6) / 6.0
