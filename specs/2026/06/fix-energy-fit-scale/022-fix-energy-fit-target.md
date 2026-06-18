@@ -43,7 +43,35 @@ You are a senior engineer on Kiku. Honor the product principles — especially "
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+### Confirmed mechanism (file:line)
+- `_score_transitions` (set_analyzer.py:185-234): for each transition the energy target is `target_e = st_b.inferred_energy if st_b.inferred_energy is not None else 0.5` (line ~196), then `e = energy_fit(t_b, target_e)`.
+- `_infer_energy` (set_analyzer.py:138-177): computes `energies[i] = _get_track_energy(t)` for all tracks, but only WRITES `st.inferred_energy` for tracks where energy is missing (`if e is not None: continue`). So tracks WITH energy keep `inferred_energy = None` → target 0.5.
+- `_get_track_energy` (set_analyzer.py:128): returns `track.audio_features.energy` (raw Essentia) when present, else `zone_to_numeric(resolved_zone)`.
+- `energy_fit(track, target)` (scoring.py:295): `max(0, 1 - abs(track_energy - target) * 2)`, reading the SAME raw `audio_features.energy` first. So measured energy and `_get_track_energy` are on the same (raw) scale — the only inconsistency is the constant 0.5 target.
+- Result on the saved set "Excellent Techno 137-145": measured raw energy ≈ 0.9, target 0.5 → `energy_fit ≈ 0.2` on every transition; harmonic 1.0 / bpm 0.76-1.0 / genre 0.5-1.0 / quality 0.32 → totals ~0.59-0.74.
+
+### Fix design — neighbour-trend target (scale-consistent)
+- Replace the 0.5 fallback with a per-position target = the **energy trend of the track's neighbours**, drawn from the SAME source `_get_track_energy` already returns (raw), so target and measurement share a scale and the Essentia skew cancels out.
+- For position `i` (the incoming track `t_b` at set index `i+1`): target = mean of available neighbour energies among (index `i`, index `i+2`) — i.e. the track before and the track after the incoming track in the set. At the ends, use the single available neighbour. If both are missing, fall back to the track's own energy (so it isn't penalized) and ultimately 0.5 only when nothing is known.
+- Semantics: a track that sits smoothly between its neighbours scores ~1.0; a track that jumps away from its surroundings scores low. A sustained-flat set → every target ≈ 0.9 ≈ measured → `energy_fit ≈ 1.0`. A roller-coaster → real deviations → low. This is exactly "energy flow."
+- Deliberately do NOT pull the stored `energy_profile` into the analysis target: the profile is on the "intended 0-1" scale while measurement is raw/skewed, so mixing them reintroduces a scale mismatch for non-peak sets. Neighbour-trend keeps one consistent scale.
+- Localized: only `src/kiku/analysis/set_analyzer.py` changes. `energy_fit()` in scoring.py and the build planner are untouched (build derives its target from the energy profile and is out of scope here).
+
+### Implementation shape
+- `analyze_set` already calls `_infer_energy(db, set_tracks, tracks)` then `_score_transitions(tracks, set_tracks)`. Add a helper, e.g. `_energy_targets(set_tracks, tracks) -> list[float]`, that returns a per-index target via neighbour-trend over the resolved energies (reusing `_get_track_energy` + the already-populated `inferred_energy` for missing tracks). Pass the target list into `_score_transitions` (new param) and use `target_e = targets[i + 1]` instead of the `inferred_energy or 0.5` line. Keep `_infer_energy` writing `inferred_energy`/`inference_source` for missing tracks as today (used elsewhere / arc).
+
+### Tests
+- `tests/test_set_analysis.py`: existing energy expectations that relied on the 0.5 fallback must be updated. Add: a consistent-energy synthetic set → high `energy_fit` (~1.0) per transition; a jumpy set (e.g. 0.9,0.3,0.9,0.3) → low `energy_fit`; a track with missing energy still gets a sensible neighbour target. The synthetic tracks use the MagicMock pattern (`_mock_track`) with `audio_features.energy` set.
+- Validation: scripted before/after on set "Excellent Techno 137-145" reporting per-transition `energy_fit` + total; expect transitions to reach ≥0.8 (harmonic 1.0 + restored energy + bpm + genre + quality).
+- Full suite (`pytest tests/ -x -q`) stays green; svelte-check unaffected (no frontend change).
+
+### Strategy
+1. Add `_energy_targets()` helper to set_analyzer.py computing neighbour-trend targets over the set's resolved energies (handles ends + missing via existing inference).
+2. Thread the target list into `_score_transitions` and replace the `inferred_energy or 0.5` line with `targets[i + 1]`.
+3. Update/extend `tests/test_set_analysis.py` for the corrected energy semantics (flat→high, jumpy→low, missing→neighbour).
+4. Re-run pytest; script a before/after analyze on "Excellent Techno 137-145" and record numbers in the spec's Test Evidence.
+5. Commit `spec(022): IMPLEMENT - ...`; this branch (`fix-energy-fit-scale`) then merges to main.
 
 ## Plan
 <!-- Filled by /spec PLAN -->
