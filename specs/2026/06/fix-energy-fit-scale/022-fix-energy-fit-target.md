@@ -187,10 +187,47 @@ Script: `from kiku.db.models import get_session, Set` + `from kiku.analysis.set_
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+- T1 Add `_energy_targets()` + `_resolved_energy()` helper — Status: Done
+- T2 Thread `targets` into `_score_transitions`, replace 0.5 fallback — Status: Done
+- T3 Wire `_energy_targets` into `analyze_set` — Status: Done
+- T4 Unit tests (flat/jumpy/missing/ends + score_transitions) — Status: Done (7 new tests; 31 in file)
+- T5 Validation: py_compile + full pytest suite — Status: Done (373 passed)
+- T6 Before/after evidence on "Excellent Techno 137-145" — Status: Done (overall 0.861, energy_fit mean 0.961, 10/11 ≥0.8)
+- T7 Commit code+tests, append hash, commit spec — Status: Done
+
+Implementation commit: `8c0c544`
 
 ## Test Evidence & Outputs
-<!-- Filled by explicit testing after /spec IMPLEMENT -->
+
+### Unit tests
+`pytest tests/ -x -q` → **373 passed** (10 pre-existing deprecation warnings, unrelated). 7 new cases added to `tests/test_set_analysis.py` (31 in file). `py_compile` clean on both changed files. No frontend change → svelte-check unaffected.
+
+### Before/after — saved set "Excellent Techno 137-145" (id=24, 12 tracks, 11 transitions)
+Re-analyzed via `analyze_set(db, 24)`.
+
+**BEFORE (from Research, 0.5-target bug):** `energy_fit ≈ 0.2` on every transition; per-transition totals ~0.59-0.74.
+
+**AFTER (neighbour-trend target):**
+```
+pos | energy_fit | total
+  0 |   0.975    | 0.745
+  1 |   0.951    | 0.841
+  2 |   0.994    | 0.897
+  3 |   0.959    | 0.883
+  4 |   0.945    | 0.847
+  5 |   0.995    | 0.890
+  6 |   0.936    | 0.890
+  7 |   0.984    | 0.867
+  8 |   0.963    | 0.852
+  9 |   0.940    | 0.858
+ 10 |   0.925    | 0.897
+```
+- `energy_fit`: min 0.925 / max 0.995 / **mean 0.961** (was ~0.2).
+- `total`: min 0.745 / max 0.897 / mean 0.861. **overall_score = 0.861** ("excellent").
+- **10/11 transitions ≥ 0.8.** The one below (pos 0 = 0.745) is NOT capped by energy — its energy_fit is 0.975; it is held down by `genre_coherence 0.5`, `bpm_compat 0.759`, `track_quality 0.32`. That is honest scoring, not the energy bug, and acceptable per L12.
+
+Conclusion: the energy bug is fixed — consistent high-energy flow now reads near-perfect on energy, and the set scores excellent overall. Jumpy sets stay low (unit test `test_score_transitions_jumpy_low_energy_fit`, energy_fit < 0.5).
 
 ## Updated Doc
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
