@@ -74,7 +74,114 @@ Critical: AI can ONLY modify this section.
 5. Commit `spec(022): IMPLEMENT - ...`; this branch (`fix-energy-fit-scale`) then merges to main.
 
 ## Plan
-<!-- Filled by /spec PLAN -->
+
+### Files
+- `src/kiku/analysis/set_analyzer.py` — add `_energy_targets()` helper; thread targets into `_score_transitions`; wire in `analyze_set`. (only production file changed)
+- `tests/test_set_analysis.py` — update energy expectations, add flat/jumpy/missing cases for `_energy_targets` + `_score_transitions`.
+
+### Tasks
+
+**T1 — Add `_energy_targets()` helper (set_analyzer.py)**
+Insert after `_infer_energy` (before the Transition Scoring section). Per index `i`: mean of available neighbour energies (indices `i-1`, `i+1`); each neighbour energy from `_get_track_energy(t)` falling back to that set-track's `inferred_energy`; if no neighbour has energy, fall back to the track's own energy; else 0.5. Same source as `energy_fit` (raw first, then zone) so scales match.
+
+```diff
+@@ set_analyzer.py — after _infer_energy(), before "# ── Transition Scoring ──"
++def _resolved_energy(st: SetTrack, track: Track) -> float | None:
++    """Energy for a track on the same scale energy_fit uses, falling back to inferred."""
++    e = _get_track_energy(track)
++    if e is not None:
++        return e
++    return st.inferred_energy
++
++
++def _energy_targets(set_tracks: list[SetTrack], tracks: list[Track]) -> list[float]:
++    """Per-index energy target = the neighbour-trend of the set's own energies.
++
++    Scoring a track against the mean energy of its neighbours measures how smoothly
++    it sits in the flow. Falls back to the track's own energy when it has no neighbour
++    with energy, and to 0.5 only when nothing is known. Same scale as energy_fit().
++    """
++    energies = [_resolved_energy(st, t) for st, t in zip(set_tracks, tracks)]
++    n = len(tracks)
++    targets: list[float] = []
++    for i in range(n):
++        neighbours = []
++        if i > 0 and energies[i - 1] is not None:
++            neighbours.append(energies[i - 1])
++        if i < n - 1 and energies[i + 1] is not None:
++            neighbours.append(energies[i + 1])
++        if neighbours:
++            targets.append(sum(neighbours) / len(neighbours))
++        elif energies[i] is not None:
++            targets.append(energies[i])
++        else:
++            targets.append(0.5)
++    return targets
+```
+
+**T2 — Thread targets into `_score_transitions` (set_analyzer.py:185-196)**
+
+```diff
+-def _score_transitions(tracks: list[Track], set_tracks: list[SetTrack]) -> list[TransitionAnalysis]:
++def _score_transitions(
++    tracks: list[Track], set_tracks: list[SetTrack], targets: list[float]
++) -> list[TransitionAnalysis]:
+     """Score all adjacent transitions in the set."""
+     w = SCORING_WEIGHTS
+     results = []
+
+     for i in range(len(tracks) - 1):
+         t_a, t_b = tracks[i], tracks[i + 1]
+
+         h = harmonic_score(t_a.key, t_b.key)
+-        # Use inferred energy if available for target
+-        st_b = set_tracks[i + 1]
+-        target_e = st_b.inferred_energy if st_b.inferred_energy is not None else 0.5
++        # Target = neighbour-trend of the incoming track within the set's own arc
++        target_e = targets[i + 1]
+         e = energy_fit(t_b, target_e)
+```
+
+**T3 — Wire `_energy_targets` into `analyze_set` (set_analyzer.py:82-85)**
+
+```diff
+     # 1. Infer energy for untagged tracks
+     _infer_energy(db, set_tracks, tracks)
+
++    # 1b. Per-position energy targets from the set's own arc
++    targets = _energy_targets(set_tracks, tracks)
++
+     # 2. Score all transitions
+-    transitions = _score_transitions(tracks, set_tracks)
++    transitions = _score_transitions(tracks, set_tracks, targets)
+```
+
+**T4 — Unit tests (tests/test_set_analysis.py)**
+Add import of `_energy_targets`, `_score_transitions`. Add an energy-aware mock track helper (extends `_mock_track` pattern: `audio_features.energy`, `key`, `bpm`, `dir_genre`/`rb_genre`, `id`). Cases:
+- `test_energy_targets_flat` — energies all 0.9 → every target ≈ 0.9.
+- `test_energy_targets_jumpy` — 0.9,0.3,0.9,0.3 → middle targets pull toward neighbours (low fit at jumps).
+- `test_energy_targets_missing_neighbour` — middle track missing energy still gets neighbour-mean target (not 0.5).
+- `test_energy_targets_single_neighbour_ends` — end positions use the one available neighbour.
+- `test_score_transitions_flat_high_energy_fit` — flat 0.9 set → per-transition `energy_fit` ≈ 1.0.
+- `test_score_transitions_jumpy_low_energy_fit` — 0.9,0.3,0.9,0.3 → `energy_fit` low (< 0.5).
+
+**T5 — Validation (lint + suite)**
+`.venv/bin/python -m py_compile src/kiku/analysis/set_analyzer.py tests/test_set_analysis.py`; then `python -m pytest tests/ -x -q`.
+
+**T6 — Before/after evidence on "Excellent Techno 137-145"**
+Script: `from kiku.db.models import get_session, Set` + `from kiku.analysis.set_analyzer import analyze_set`, find the set by name, re-analyze, print per-transition `energy_fit` + `total` and overall. Record AFTER numbers in `## Test Evidence & Outputs`; state BEFORE from spec (totals ~0.59-0.74, energy_fit ~0.2). Note honestly any transition that stays <0.8 due to quality/genre caps.
+
+**T7 — Commit** code+tests `spec(022): IMPLEMENT - neighbour-trend energy target`, append hash to `## Implement`, then `commit_spec_changes` for the spec.
+
+### Validate
+- L5 / L8 (stop 0.5 fallback): T2 removes the `inferred_energy or 0.5` line → `target_e = targets[i+1]`.
+- L9 (per-position target from arc / neighbour interpolation for all positions): T1 `_energy_targets` neighbour-trend across every index.
+- L10 (flat→high, jumpy→low, not all 1.0): T4 `test_score_transitions_flat_high_energy_fit` + `test_score_transitions_jumpy_low_energy_fit`.
+- L11 (localized; no scoring.py/planner change): only set_analyzer.py + tests touched (Files).
+- L12 (before/after on real set ≥0.8; jumpy stays low): T6 + T4 jumpy case.
+- L13 (tests updated + new cases): T4.
+- L26/L58 (single consistent scale; do NOT pull energy_profile): T1 reuses `_get_track_energy` raw source only; no profile blend.
+- L30 (inferred_energy still written for missing): `_infer_energy` unchanged.
 
 ## Plan Review
 <!-- Filled if required to validate plan -->
