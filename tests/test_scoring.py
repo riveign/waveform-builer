@@ -33,8 +33,11 @@ def test_genre_same():
 
 
 def test_genre_family():
-    assert genre_coherence("Techno", "Hard Techno") == 0.8
-    assert genre_coherence("House", "Deep House") == 0.8
+    # Same family is a full match — we weight the genre over its sub-genres.
+    assert genre_coherence("Techno", "Hard Techno") == 1.0
+    assert genre_coherence("House", "Deep House") == 1.0
+    # Real Rekordbox sub-genre tags within the same family also count as a match.
+    assert genre_coherence("Techno (Raw / Deep / Hypnotic)", "Techno (Peak Time / Driving)") == 1.0
 
 
 def test_genre_compatible_families():
