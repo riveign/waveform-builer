@@ -142,6 +142,37 @@ export function formatKey(key: string | null | undefined): string {
 	return key.trim();
 }
 
+export interface CompatibleKey {
+	/** Camelot code, e.g. "9A". */
+	camelot: string;
+	/** Musical note name, e.g. "Em". */
+	name: string;
+	/** How it relates to the source key. */
+	relation: 'energy down' | 'energy up' | 'mood switch';
+}
+
+/**
+ * The harmonically compatible keys for mixing out of a given key — the
+ * neighbours on the Camelot wheel: one step down (drop a little energy), one
+ * step up (lift energy), and the relative major/minor (switch mood). Returns []
+ * if the key can't be parsed. The source key itself is omitted (you already have it).
+ */
+export function compatibleKeys(key: string | null | undefined): CompatibleKey[] {
+	const k = parseCamelot(key);
+	if (!k) return [];
+	const wrap = (n: number) => ((n - 1 + 12) % 12) + 1;
+	const other: 'A' | 'B' = k.letter === 'A' ? 'B' : 'A';
+	const make = (num: number, letter: 'A' | 'B', relation: CompatibleKey['relation']): CompatibleKey => {
+		const camelot = `${num}${letter}`;
+		return { camelot, name: formatKey(camelot), relation };
+	};
+	return [
+		make(wrap(k.number - 1), k.letter, 'energy down'),
+		make(wrap(k.number + 1), k.letter, 'energy up'),
+		make(k.number, other, 'mood switch'),
+	];
+}
+
 export interface HarmonicRelationship {
 	type: 'same' | 'adjacent' | 'modeSwitch' | 'adjacentMode' | 'twoAway' | 'clash' | 'unknown';
 	score: number;
