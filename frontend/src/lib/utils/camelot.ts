@@ -173,6 +173,29 @@ export function compatibleKeys(key: string | null | undefined): CompatibleKey[] 
 	];
 }
 
+/**
+ * Describe the move from one key to another in the same vocabulary as the
+ * Harmonic mixing card: "energy up/down" (Camelot ±1), "mood switch" (relative
+ * major/minor), "same key", or "distant keys" for anything outside the
+ * compatible set. Returns null if either key can't be parsed.
+ */
+export function keyMoveLabel(
+	fromKey: string | null | undefined,
+	toKey: string | null | undefined,
+): { label: string; score: number } | null {
+	const a = parseCamelot(fromKey);
+	const b = parseCamelot(toKey);
+	if (!a || !b) return null;
+	if (a.number === b.number && a.letter === b.letter) return { label: 'same key', score: 1.0 };
+	const wrap = (n: number) => ((n - 1 + 12) % 12) + 1;
+	if (a.letter === b.letter) {
+		if (b.number === wrap(a.number + 1)) return { label: 'energy up', score: 0.85 };
+		if (b.number === wrap(a.number - 1)) return { label: 'energy down', score: 0.85 };
+	}
+	if (a.number === b.number) return { label: 'mood switch', score: 0.8 };
+	return { label: 'distant keys', score: 0.3 };
+}
+
 export interface HarmonicRelationship {
 	type: 'same' | 'adjacent' | 'modeSwitch' | 'adjacentMode' | 'twoAway' | 'clash' | 'unknown';
 	score: number;
