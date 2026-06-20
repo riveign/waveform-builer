@@ -26,6 +26,8 @@
 
 	function handleTrackSelect(track: Track) {
 		ui.selectedTrack = track;
+		// Jump to Track View so clicking a song from any tab shows it.
+		ui.activeTab = 'track';
 	}
 
 	// Open the build dialog when something (e.g. the Build button in the set toolbar)
