@@ -33,6 +33,9 @@
 	{:else if store.tracks.length === 0}
 		<div class="status">Nothing matched those filters. Try loosening the search?</div>
 	{:else}
+		{#if store.fuzzy}
+			<div class="fuzzy-note">No exact match — showing similar names</div>
+		{/if}
 		<div class="track-count">{store.tracks.length} of {store.total} tracks</div>
 		<TrackTable tracks={store.tracks} {selectedId} onselect={handleSelect} />
 	{/if}
@@ -62,5 +65,12 @@
 		font-size: 11px;
 		color: var(--text-dim);
 		border-bottom: 1px solid var(--border);
+	}
+
+	.fuzzy-note {
+		padding: 5px 10px;
+		font-size: 11px;
+		color: var(--accent);
+		background: var(--bg-tertiary);
 	}
 </style>

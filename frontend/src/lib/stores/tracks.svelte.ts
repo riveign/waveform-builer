@@ -6,6 +6,7 @@ let total = $state(0);
 let loading = $state(false);
 let error = $state<string | null>(null);
 let lastParams = $state<SearchParams>({});
+let fuzzy = $state(false);
 
 async function search(params: SearchParams) {
 	loading = true;
@@ -15,10 +16,12 @@ async function search(params: SearchParams) {
 		const result = await searchTracks(params);
 		tracks = result.items;
 		total = result.total;
+		fuzzy = result.fuzzy ?? false;
 	} catch (e) {
 		error = e instanceof Error ? e.message : String(e);
 		tracks = [];
 		total = 0;
+		fuzzy = false;
 	} finally {
 		loading = false;
 	}
@@ -31,6 +34,7 @@ export function getTrackStore() {
 		get loading() { return loading; },
 		get error() { return error; },
 		get lastParams() { return lastParams; },
+		get fuzzy() { return fuzzy; },
 		search,
 	};
 }

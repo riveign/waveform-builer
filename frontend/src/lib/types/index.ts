@@ -389,6 +389,8 @@ export interface PaginatedTracks {
 	total: number;
 	offset: number;
 	limit: number;
+	/** True when these are fuzzy "did you mean" matches, not exact results. */
+	fuzzy?: boolean;
 }
 
 // ── Energy Tinder types ──
