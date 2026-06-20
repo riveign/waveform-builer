@@ -49,6 +49,9 @@ let ws = $state<WaveSurfer | null>(null);
  */
 let swapping = false;
 
+/** When set, seek to this fraction (0-1) once the freshly-loaded track is ready. */
+let pendingSeekFraction: number | null = null;
+
 /** Listen-time tracking for play count recording */
 let listenedSeconds = $state(0);
 let lastTimeUpdate = $state(0);
@@ -150,6 +153,13 @@ function registerPlayer(instance: WaveSurfer): () => void {
 		instance.setVolume(isMuted ? 0 : volume);
 		// Auto-play after load
 		if (status === 'loading') {
+			// If a start position was requested (e.g. clicking the Track View
+			// waveform before playback), seek there before playing.
+			if (pendingSeekFraction !== null) {
+				instance.seekTo(Math.max(0, Math.min(1, pendingSeekFraction)));
+				currentTime = pendingSeekFraction * duration;
+				pendingSeekFraction = null;
+			}
 			instance.play();
 		}
 	};
@@ -178,11 +188,12 @@ function registerPlayer(instance: WaveSurfer): () => void {
 /**
  * Play a single track. Stops any current playback first.
  */
-function play(track: Track) {
+function play(track: Track, startFraction: number | null = null) {
 	mode = 'single';
 	queue = [];
 	queueIndex = 0;
 	setId = null;
+	pendingSeekFraction = startFraction;
 	loadAndPlay(track);
 }
 
@@ -311,6 +322,7 @@ function stop() {
 	queueIndex = 0;
 	setId = null;
 	swapping = false;
+	pendingSeekFraction = null;
 }
 
 export function getPlayerStore() {

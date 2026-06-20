@@ -39,6 +39,18 @@
 		}
 	}
 
+	/** Click on the waveform: jump playback to that point in this track. */
+	function handleSeek(fraction: number) {
+		const dur = waveformData?.duration_sec ?? track.duration_sec ?? 0;
+		if (player.currentTrack?.id === track.id) {
+			// Already the active track — just move the playhead.
+			player.seek(fraction * dur);
+		} else {
+			// Not loaded yet — start this track from the clicked point.
+			player.play(track, fraction);
+		}
+	}
+
 	let waveformData = $state<WaveformDetailData | null>(null);
 	let features = $state<TrackFeatures | null>(null);
 	let loadingWaveform = $state(false);
@@ -301,6 +313,7 @@
 				spectral={false}
 				visualOnly={true}
 				externalProgress={globalProgress}
+				onseek={handleSeek}
 			/>
 		{:else if !track.has_waveform}
 			<div class="no-data">
