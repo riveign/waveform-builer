@@ -130,10 +130,14 @@
 	async function handleRatingChange(rating: number) {
 		const prev = localRating;
 		localRating = rating;
+		// Mutate the shared track object too so the library sidebar reflects the
+		// new rating (it's the same object reference selected from the store).
+		track.rating = rating;
 		try {
 			await updateTrackRating(track.id, rating);
 		} catch {
 			localRating = prev;
+			track.rating = prev;
 		}
 	}
 
