@@ -4,7 +4,7 @@
 	import { updateTrackRating } from '$lib/api/tracks';
 	import { submitDecision } from '$lib/api/tinder';
 	import { getWaveformDetail } from '$lib/api/waveforms';
-	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor, compatibleKeys } from '$lib/utils/camelot';
 	import { formatTime } from '$lib/utils/waveform';
 	import WavesurferPlayer from './WavesurferPlayer.svelte';
 	import TrackArtwork from './TrackArtwork.svelte';
@@ -30,6 +30,9 @@
 	let globalProgress = $derived(
 		isThisTrackActive ? player.progress : 0
 	);
+
+	/** Harmonically compatible keys to mix into (Camelot neighbours). */
+	let compatKeys = $derived(compatibleKeys(track.key));
 
 	function handlePlay() {
 		if (isThisTrackActive) {
@@ -238,6 +241,16 @@
 				</div>
 				{#if track.duration_sec}
 					<span class="meta-badge dim">{formatTime(track.duration_sec)}</span>
+				{/if}
+				{#if compatKeys.length}
+					<span class="mixes-label" title="Harmonically compatible keys (Camelot wheel)">Mixes with</span>
+					{#each compatKeys as ck (ck.camelot)}
+						<span
+							class="meta-badge compat-key"
+							style="color: {getCamelotColor(ck.camelot)}"
+							title="{ck.name} — {ck.relation}"
+						>{ck.name}</span>
+					{/each}
 				{/if}
 				<button
 					class="meta-badge meta-badge-interactive add-to-set-btn"
@@ -481,6 +494,19 @@
 
 	.meta-badge.dim {
 		color: var(--text-dim);
+	}
+
+	.mixes-label {
+		font-size: 11px;
+		color: var(--text-dim);
+		margin-left: 4px;
+		align-self: center;
+	}
+
+	.compat-key {
+		background: transparent;
+		border: 1px solid var(--border);
+		padding: 1px 7px;
 	}
 
 	.meta-badge-interactive {
