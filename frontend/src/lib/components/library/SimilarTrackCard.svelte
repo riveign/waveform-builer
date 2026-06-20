@@ -7,7 +7,7 @@
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
-	import { getCamelotColor, formatKey, harmonicRelationship } from '$lib/utils/camelot';
+	import { getCamelotColor, formatKey, keyMoveLabel } from '$lib/utils/camelot';
 
 	let {
 		item,
@@ -51,11 +51,11 @@
 		return diff;
 	});
 
-	// Harmonic relationship to the current track — helps spot the song to mix into.
+	// Harmonic move from the current track — same vocabulary as the Harmonic
+	// mixing card (energy up/down, mood switch, same key, distant keys).
 	const harmony = $derived.by(() => {
 		if (!track.key || !parentKey) return null;
-		const rel = harmonicRelationship(parentKey, track.key);
-		return rel.type === 'unknown' ? null : rel;
+		return keyMoveLabel(parentKey, track.key);
 	});
 	function harmonyColor(score: number): string {
 		if (score >= 0.8) return 'var(--energy-low, #66BB6A)';
@@ -232,7 +232,7 @@
 					<span
 						class="harmony-badge"
 						style="color: {harmonyColor(harmony.score)}; border-color: {harmonyColor(harmony.score)}"
-						title={harmony.description}
+						title="{formatKey(track.key)} — {harmony.label} from this track"
 					>{harmony.label}</span>
 				{/if}
 			{/if}
