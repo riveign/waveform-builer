@@ -7,17 +7,20 @@
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
+	import { getCamelotColor, formatKey, harmonicRelationship } from '$lib/utils/camelot';
 
 	let {
 		item,
 		parentTrackId,
 		parentBpm = null,
+		parentKey = null,
 		affinity = null,
 		onaffinitychange,
 	}: {
 		item: SuggestNextItem;
 		parentTrackId: number;
 		parentBpm?: number | null;
+		parentKey?: string | null;
 		affinity?: string | null;
 		onaffinitychange?: (trackId: number, newAffinity: string | null) => void;
 	} = $props();
@@ -47,6 +50,18 @@
 		const diff = Math.round(track.bpm) - Math.round(parentBpm);
 		return diff;
 	});
+
+	// Harmonic relationship to the current track — helps spot the song to mix into.
+	const harmony = $derived.by(() => {
+		if (!track.key || !parentKey) return null;
+		const rel = harmonicRelationship(parentKey, track.key);
+		return rel.type === 'unknown' ? null : rel;
+	});
+	function harmonyColor(score: number): string {
+		if (score >= 0.8) return 'var(--energy-low, #66BB6A)';
+		if (score >= 0.6) return 'var(--energy-mid, #FFA726)';
+		return 'var(--energy-high, #EF5350)';
+	}
 
 	// Phase pill colors: fill + text per zone
 	const PHASE_PILL_COLORS: Record<string, { bg: string; text: string }> = {
@@ -209,6 +224,16 @@
 						class:delta-down={bpmDelta < 0}
 						title="{Math.abs(bpmDelta)} BPM {bpmDelta > 0 ? 'faster' : 'slower'} than current track"
 					>{bpmDelta > 0 ? '+' : '\u2212'}{Math.abs(bpmDelta)}</span>
+				{/if}
+			{/if}
+			{#if track.key}
+				<span class="key-chip" style="color: {getCamelotColor(track.key)}" title="Key {formatKey(track.key)}">{formatKey(track.key)}</span>
+				{#if harmony}
+					<span
+						class="harmony-badge"
+						style="color: {harmonyColor(harmony.score)}; border-color: {harmonyColor(harmony.score)}"
+						title={harmony.description}
+					>{harmony.label}</span>
 				{/if}
 			{/if}
 		</div>
@@ -407,7 +432,25 @@
 	.meta-left {
 		display: flex;
 		align-items: baseline;
+		flex-wrap: wrap;
+		gap: 4px 0;
 		flex-shrink: 0;
+	}
+
+	.key-chip {
+		font-size: 12px;
+		font-weight: 700;
+		margin-left: 8px;
+	}
+
+	.harmony-badge {
+		font-size: 10px;
+		font-weight: 600;
+		padding: 1px 6px;
+		border: 1px solid;
+		border-radius: 99px;
+		margin-left: 6px;
+		white-space: nowrap;
 	}
 
 	.bpm-value {

@@ -98,6 +98,7 @@
 						{item}
 						parentTrackId={trackId}
 						{parentBpm}
+						parentKey={trackKey}
 						affinity={affinityMap[item.track.id] ?? null}
 						onaffinitychange={handleAffinityChange}
 					/>
