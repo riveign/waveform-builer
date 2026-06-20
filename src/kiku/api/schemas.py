@@ -334,6 +334,8 @@ class PaginatedTracksResponse(BaseModel):
     total: int
     offset: int
     limit: int
+    # True when these are fuzzy "did you mean" matches, not exact results.
+    fuzzy: bool = False
 
 
 # ── Energy Tinder models ──

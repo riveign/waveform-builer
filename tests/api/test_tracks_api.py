@@ -145,3 +145,29 @@ def test_suggest_next_with_discovery_density(client):
         for s in data["suggestions"]:
             assert "breakdown" in s
             assert "discovery_label" in s["breakdown"]
+
+
+def test_search_typo_returns_fuzzy_matches(client):
+    """A misspelled text search falls back to similar names."""
+    resp = client.get("/api/tracks/search?search=Trakc 7")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["fuzzy"] is True
+    assert len(data["items"]) > 0
+    assert any("Track" in (it["title"] or "") for it in data["items"])
+
+
+def test_search_exact_is_not_fuzzy(client):
+    """An exact match is returned normally, not flagged fuzzy."""
+    resp = client.get("/api/tracks/search?search=Track 1")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["fuzzy"] is False
+    assert len(data["items"]) > 0
+
+
+def test_search_typo_with_filter_does_not_fuzzy(client):
+    """Fuzzy fallback only kicks in for a pure text search, not with filters."""
+    resp = client.get("/api/tracks/search?search=Trakc 7&genre=techno")
+    assert resp.status_code == 200
+    assert resp.json()["fuzzy"] is False

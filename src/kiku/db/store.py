@@ -11,6 +11,44 @@ from sqlalchemy.orm import Session
 from kiku.db.models import AudioFeatures, Track, TransitionCue
 
 
+def fuzzy_search_tracks(
+    session: Session, query: str, limit: int = 50, threshold: int = 60
+) -> tuple[list[Track], int]:
+    """Find tracks whose title or artist is *similar* to the query.
+
+    Used as a fallback for typos when an exact text search finds nothing — e.g.
+    "Bicpe" surfaces "Bicep". Scores every track's title and artist against the
+    query with thefuzz and returns the best matches above ``threshold`` (0-100),
+    ordered by score. Returns (tracks, count).
+    """
+    q = (query or "").strip()
+    if not q:
+        return [], 0
+
+    from thefuzz import fuzz
+
+    rows = session.query(Track.id, Track.title, Track.artist).all()
+    scored: list[tuple[int, int]] = []  # (score, track_id)
+    for tid, title, artist in rows:
+        score = 0
+        if title:
+            score = fuzz.WRatio(q, title)
+        if artist:
+            score = max(score, fuzz.WRatio(q, artist))
+        if score >= threshold:
+            scored.append((score, tid))
+
+    scored.sort(key=lambda s: s[0], reverse=True)
+    top_ids = [tid for _, tid in scored[:limit]]
+    if not top_ids:
+        return [], 0
+
+    tracks = session.query(Track).filter(Track.id.in_(top_ids)).all()
+    order = {tid: i for i, tid in enumerate(top_ids)}
+    tracks.sort(key=lambda t: order[t.id])
+    return tracks, len(top_ids)
+
+
 def get_track_by_title(session: Session, title: str) -> Optional[Track]:
     """Find a track by title (case-insensitive partial match)."""
     return (

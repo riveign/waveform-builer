@@ -123,11 +123,26 @@ def track_search(
         limit=limit,
         offset=offset,
     )
+
+    # Typo fallback: if a plain text search found nothing, surface similar names
+    # (e.g. "Bicpe" -> "Bicep"). Only when text is the sole filter, so we never
+    # override active filters.
+    fuzzy = False
+    other_filters = any(
+        f is not None for f in (title, artist, genre, key, label, bpm_min, bpm_max,
+                                energy, energy_zone, rating_min, plays_min, plays_max)
+    )
+    if search and total == 0 and not other_filters:
+        from kiku.db.store import fuzzy_search_tracks
+        tracks, total = fuzzy_search_tracks(db, search, limit=limit)
+        fuzzy = bool(tracks)
+
     return PaginatedTracksResponse(
         items=[_track_to_response(t) for t in tracks],
         total=total,
         offset=offset,
         limit=limit,
+        fuzzy=fuzzy,
     )
 
 
