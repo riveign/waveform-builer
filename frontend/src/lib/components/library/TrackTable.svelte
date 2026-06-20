@@ -162,6 +162,9 @@
 
 	.track-table {
 		width: 100%;
+		/* Fixed layout so the table always fits the panel — long titles ellipsis
+		   instead of pushing the Rating column off the right edge. */
+		table-layout: fixed;
 		border-collapse: collapse;
 		font-size: 12px;
 	}
@@ -174,7 +177,7 @@
 
 	th {
 		background: var(--bg-tertiary);
-		padding: 6px 8px;
+		padding: 6px 5px;
 		text-align: left;
 		font-weight: 600;
 		color: var(--text-secondary);
@@ -185,7 +188,7 @@
 	}
 
 	td {
-		padding: 5px 8px;
+		padding: 5px 5px;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -218,14 +221,15 @@
 		color: var(--accent);
 	}
 
-	.col-play { width: 28px; text-align: center; padding: 0 2px; }
-	.col-title { max-width: 140px; }
-	.col-artist { max-width: 100px; color: var(--text-secondary); }
-	.col-key { width: 40px; text-align: center; }
-	.col-bpm { width: 40px; text-align: right; }
-	.col-energy { width: 60px; }
-	.col-plays { width: 36px; text-align: right; }
-	.col-rating { width: 60px; }
+	/* Title + artist have no fixed width — under table-layout:fixed they share the
+	   remaining space and ellipsis, so the fixed columns (incl. Rating) always show. */
+	.col-play { width: 26px; text-align: center; padding: 0 2px; }
+	.col-artist { color: var(--text-secondary); }
+	.col-key { width: 34px; text-align: center; }
+	.col-bpm { width: 36px; text-align: right; }
+	.col-energy { width: 52px; }
+	.col-plays { width: 30px; text-align: right; }
+	.col-rating { width: 62px; }
 
 	.play-btn {
 		width: 22px;
