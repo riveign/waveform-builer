@@ -29,6 +29,8 @@
 		externalProgress = 0,
 		onfinish,
 		onready,
+		/** Fired when the user clicks the waveform in visualOnly mode (fraction 0-1). */
+		onseek,
 	}: {
 		trackId: number;
 		peaks: string;
@@ -46,6 +48,7 @@
 		externalProgress?: number;
 		onfinish?: () => void;
 		onready?: (ws: WaveSurfer) => void;
+		onseek?: (fraction: number) => void;
 	} = $props();
 
 	let container: HTMLDivElement;
@@ -182,6 +185,10 @@
 				ws.on('play', () => { isPlaying = true; });
 				ws.on('pause', () => { isPlaying = false; });
 				ws.on('finish', () => { onfinish?.(); });
+			} else {
+				// Visual-only: clicks can't seek local audio (there is none), so
+				// forward the clicked position to the owner (the global player).
+				ws.on('click', (relativeX: number) => { onseek?.(relativeX); });
 			}
 
 			onready?.(ws);
@@ -252,6 +259,8 @@
 			ws.on('play', () => { isPlaying = true; });
 			ws.on('pause', () => { isPlaying = false; });
 			ws.on('finish', () => { onfinish?.(); });
+		} else {
+			ws.on('click', (relativeX: number) => { onseek?.(relativeX); });
 		}
 
 		onready?.(ws);
