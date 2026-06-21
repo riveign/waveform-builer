@@ -4,7 +4,7 @@
 	import { updateTrackRating } from '$lib/api/tracks';
 	import { submitDecision } from '$lib/api/tinder';
 	import { getWaveformDetail } from '$lib/api/waveforms';
-	import { formatKey, getCamelotColor, compatibleKeys } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor, compatibleKeys, harmonyColor } from '$lib/utils/camelot';
 	import { formatTime } from '$lib/utils/waveform';
 	import WavesurferPlayer from './WavesurferPlayer.svelte';
 	import TrackArtwork from './TrackArtwork.svelte';
@@ -355,7 +355,7 @@
 								class="hk-note"
 								style="color: {getCamelotColor(ck.camelot)}; border-color: {getCamelotColor(ck.camelot)}"
 							>{ck.name}</span>
-							<span class="hk-rel">{ck.relation}</span>
+							<span class="hk-rel" style="color: {harmonyColor(ck.score)}">{ck.relation}</span>
 						</div>
 					{/each}
 				</div>

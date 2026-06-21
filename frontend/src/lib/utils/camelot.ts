@@ -149,6 +149,18 @@ export interface CompatibleKey {
 	name: string;
 	/** How it relates to the source key. */
 	relation: 'energy down' | 'energy up' | 'mood switch';
+	/** Harmonic quality (0-1), for color coding consistent with the Sounds-like cards. */
+	score: number;
+}
+
+/**
+ * Color for a harmonic-quality score, shared by the Harmonic mixing card and the
+ * Sounds-like recommendation badges so the two surfaces always match.
+ */
+export function harmonyColor(score: number): string {
+	if (score >= 0.8) return 'var(--energy-low, #66BB6A)';
+	if (score >= 0.6) return 'var(--energy-mid, #FFA726)';
+	return 'var(--energy-high, #EF5350)';
 }
 
 /**
@@ -162,14 +174,14 @@ export function compatibleKeys(key: string | null | undefined): CompatibleKey[] 
 	if (!k) return [];
 	const wrap = (n: number) => ((n - 1 + 12) % 12) + 1;
 	const other: 'A' | 'B' = k.letter === 'A' ? 'B' : 'A';
-	const make = (num: number, letter: 'A' | 'B', relation: CompatibleKey['relation']): CompatibleKey => {
+	const make = (num: number, letter: 'A' | 'B', relation: CompatibleKey['relation'], score: number): CompatibleKey => {
 		const camelot = `${num}${letter}`;
-		return { camelot, name: formatKey(camelot), relation };
+		return { camelot, name: formatKey(camelot), relation, score };
 	};
 	return [
-		make(wrap(k.number - 1), k.letter, 'energy down'),
-		make(wrap(k.number + 1), k.letter, 'energy up'),
-		make(k.number, other, 'mood switch'),
+		make(wrap(k.number - 1), k.letter, 'energy down', 0.85),
+		make(wrap(k.number + 1), k.letter, 'energy up', 0.85),
+		make(k.number, other, 'mood switch', 0.8),
 	];
 }
 
