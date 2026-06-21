@@ -326,14 +326,14 @@
 	/* ── Zone 1: Header ── */
 	.zone-header {
 		display: flex;
-		gap: 10px;
+		gap: 8px;
 		align-items: flex-start;
-		padding: 14px 14px 10px;
+		padding: 10px 10px 7px;
 	}
 
 	.artwork-wrap {
-		width: 48px;
-		height: 48px;
+		width: 38px;
+		height: 38px;
 		flex-shrink: 0;
 		border-radius: 6px;
 		overflow: hidden;
@@ -370,9 +370,9 @@
 	}
 
 	.track-title {
-		font-size: 13px;
+		font-size: 12px;
 		font-weight: 500;
-		line-height: 1.35;
+		line-height: 1.3;
 		color: var(--text-primary);
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
@@ -381,9 +381,9 @@
 	}
 
 	.track-artist {
-		font-size: 12px;
+		font-size: 11px;
 		color: var(--text-secondary);
-		margin-top: 2px;
+		margin-top: 1px;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -426,8 +426,8 @@
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
-		padding: 8px 14px;
-		gap: 6px;
+		padding: 6px 10px;
+		gap: 5px;
 	}
 
 	.meta-left {
@@ -516,7 +516,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 8px 14px 14px;
+		padding: 6px 10px 10px;
 	}
 
 	.score-display {
@@ -525,7 +525,7 @@
 	}
 
 	.score-number {
-		font-size: 22px;
+		font-size: 18px;
 		font-weight: 500;
 		color: var(--text-primary);
 		font-variant-numeric: tabular-nums;
