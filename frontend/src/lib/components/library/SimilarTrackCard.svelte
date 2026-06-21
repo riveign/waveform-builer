@@ -7,7 +7,7 @@
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
-	import { getCamelotColor, formatKey, keyMoveLabel } from '$lib/utils/camelot';
+	import { getCamelotColor, formatKey, keyMoveLabel, harmonyColor } from '$lib/utils/camelot';
 
 	let {
 		item,
@@ -57,11 +57,6 @@
 		if (!track.key || !parentKey) return null;
 		return keyMoveLabel(parentKey, track.key);
 	});
-	function harmonyColor(score: number): string {
-		if (score >= 0.8) return 'var(--energy-low, #66BB6A)';
-		if (score >= 0.6) return 'var(--energy-mid, #FFA726)';
-		return 'var(--energy-high, #EF5350)';
-	}
 
 	// Phase pill colors: fill + text per zone
 	const PHASE_PILL_COLORS: Record<string, { bg: string; text: string }> = {
