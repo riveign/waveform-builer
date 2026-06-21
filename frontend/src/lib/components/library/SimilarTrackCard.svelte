@@ -239,7 +239,7 @@
 		</div>
 		<div class="meta-right">
 			{#if genreLabel}
-				<span class="pill pill-genre">{genreLabel}</span>
+				<span class="pill pill-genre" title={genreLabel}>{genreLabel}</span>
 			{/if}
 			{#if energyZone}
 				{@const colors = PHASE_PILL_COLORS[energyZone]}
@@ -423,10 +423,10 @@
 	/* ── Zone 2: Metadata ── */
 	.zone-metadata {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
+		flex-direction: column;
+		align-items: stretch;
 		padding: 8px 14px;
-		gap: 8px;
+		gap: 6px;
 	}
 
 	.meta-left {
@@ -487,6 +487,7 @@
 
 	.meta-right {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 5px;
 		min-width: 0;
 	}
@@ -504,6 +505,7 @@
 	.pill-genre {
 		background: var(--bg-tertiary);
 		color: var(--text-secondary);
+		max-width: 100%;
 	}
 
 	/* pill-phase colors set inline via style attribute */
