@@ -139,6 +139,7 @@
 	.cards-grid {
 		display: grid;
 		grid-template-columns: repeat(6, minmax(0, 1fr));
+		grid-auto-rows: 1fr; /* every row the same height → all cards equal */
 		gap: 12px;
 	}
 
@@ -162,6 +163,7 @@
 
 	.card-slot {
 		position: relative;
+		display: flex; /* let the card stretch to fill the equal-height cell */
 		transition: opacity 0.3s, transform 0.3s;
 	}
 
