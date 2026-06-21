@@ -298,8 +298,14 @@
 		transition: border-color 0.15s;
 		display: flex;
 		flex-direction: column;
+		flex: 1; /* fill the equal-height grid cell */
 		min-width: 0;
 		overflow: hidden;
+	}
+
+	/* Push the score/action row to the bottom so it lines up across all cards. */
+	.zone-metadata + .zone-divider {
+		margin-top: auto;
 	}
 
 	.similar-card:hover {
