@@ -3,7 +3,11 @@
 	import Stack from '$lib/components/primitives/Stack.svelte';
 	import Grid from '$lib/components/primitives/Grid.svelte';
 	import SimilarTrackCard from '$lib/components/library/SimilarTrackCard.svelte';
+	import StarRating from '$lib/components/library/StarRating.svelte';
 	import type { SuggestNextItem, Track } from '$lib/types';
+
+	// Interactive rating demo — clicking a star updates this local value live.
+	let demoRating = $state(3);
 
 	// Cerceta palette: five source colors mapped to UI roles. Each ratio is the
 	// WCAG 2.1 contrast figure measured against the app background (#0D0D0D).
@@ -380,7 +384,43 @@
 		</div>
 	</section>
 
-	<!-- 9. RELATED TRACKS CARD -->
+	<!-- 9. RATING -->
+	<section class="ds__section">
+		<h2>Rating</h2>
+		<p class="ds__note">
+			The five-star rating carries your curation signal — it feeds the track-quality dimension when
+			Kiku scores a transition. The filled color comes from the <code>--star-fill</code> token. Each
+			star is a keyboard-reachable control with its own focus ring; clicking a filled star again
+			clears the rating. Read-only ratings drop the cursor and interaction.
+		</p>
+		<div class="rating-grid">
+			<div class="rating-cell">
+				<span class="rating-cell__label">Empty</span>
+				<StarRating rating={0} readonly />
+			</div>
+			<div class="rating-cell">
+				<span class="rating-cell__label">Partial</span>
+				<StarRating rating={3} readonly />
+			</div>
+			<div class="rating-cell">
+				<span class="rating-cell__label">Full</span>
+				<StarRating rating={5} readonly />
+			</div>
+			<div class="rating-cell">
+				<span class="rating-cell__label">Interactive</span>
+				<StarRating rating={demoRating} showScore onchange={(r) => (demoRating = r)} />
+			</div>
+			<div class="rating-cell">
+				<span class="rating-cell__label">Small / large</span>
+				<div class="cluster cluster--md">
+					<StarRating rating={4} readonly size="sm" />
+					<StarRating rating={4} readonly size="lg" />
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- 10. RELATED TRACKS CARD -->
 	<section class="ds__section">
 		<h2>Related tracks card</h2>
 		<p class="ds__note">
@@ -407,7 +447,7 @@
 		</div>
 	</section>
 
-	<!-- 10. REFERENCES -->
+	<!-- 11. REFERENCES -->
 	<section class="ds__section">
 		<h2>References</h2>
 		<p class="ds__note">
@@ -428,6 +468,9 @@
 		--accent-11: var(--teal-500);  /* #44AAA2 text-on-dark, 6.96:1 */
 		--accent-contrast: #FFFFFF;    /* on-fill label, 4.23:1 on teal-600 — passes large/UI */
 		--accent-pressed: var(--teal-700);
+		/* Rating star re-points to the magenta highlight step under cerceta — the
+		 * palette's "accent / highlight" role. Amber stays the live-app default. */
+		--star-fill: var(--magenta-400);
 	}
 
 	/* One centered document. Every section — header, titles, descriptions and the
@@ -660,6 +703,26 @@
 	.btn-row__label {
 		font-size: var(--text-xs); color: var(--text-3);
 		width: 80px; flex-shrink: 0; text-transform: capitalize;
+	}
+
+	/* rating — each state sits in a captioned cell, mirroring the related-tracks
+	 * grid. Cells wrap responsively rather than locking to a fixed column count. */
+	.rating-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+		gap: var(--space-lg);
+	}
+	.rating-cell {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-sm);
+		min-width: 0;
+	}
+	.rating-cell__label {
+		font-size: var(--text-2xs);
+		color: var(--text-3);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
 	}
 
 	/* related tracks card — four states on the same equal-height grid the live

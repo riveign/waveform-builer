@@ -60,29 +60,39 @@
 	.star-rating {
 		display: flex;
 		align-items: center;
-		gap: 2px;
+		gap: var(--space-2xs);
 	}
 	.star {
 		background: none;
 		border: none;
 		cursor: pointer;
-		color: var(--text-dim);
-		font-size: 16px;
-		padding: 0 1px;
+		color: var(--text-4);
+		font-size: var(--text-lg);
+		/* Vertical padding keeps the interactive hit area ≥32px tall on the
+		 * default size, even though the glyph itself is smaller. */
+		padding: var(--space-md) var(--space-2xs);
 		line-height: 1;
-		transition: color 0.1s;
+		border-radius: var(--radius-xs);
+		transition: color var(--dur-fast) var(--ease-standard);
 	}
 	.star:disabled {
 		cursor: default;
 	}
 	.star.filled {
-		color: #ffc107;
+		color: var(--star-fill);
 	}
-	.star-rating-sm .star { font-size: 11px; }
-	.star-rating-lg .star { font-size: 20px; }
+	.star:not(:disabled):hover {
+		color: var(--star-fill);
+	}
+	.star:focus-visible {
+		outline: var(--focus-ring-width) solid var(--focus-ring);
+		outline-offset: var(--focus-ring-offset);
+	}
+	.star-rating-sm .star { font-size: var(--text-xs); padding: var(--space-sm) var(--space-2xs); }
+	.star-rating-lg .star { font-size: var(--text-xl); }
 	.score-hint {
-		font-size: 11px;
-		color: var(--text-muted, var(--text-secondary));
-		margin-left: 6px;
+		font-size: var(--text-xs);
+		color: var(--text-3);
+		margin-left: var(--space-sm);
 	}
 </style>

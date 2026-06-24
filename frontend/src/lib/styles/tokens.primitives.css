@@ -95,4 +95,5 @@
 	--orange-500: #FF9800; /* energy-mid */
 	--red-500:    #F44336; /* energy-high */
 	--coral-500:  #FF6B6B; /* destructive */
+	--amber-500:  #FFC107; /* star / rating fill (live app star color) */
 }

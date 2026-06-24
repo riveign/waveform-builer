@@ -45,6 +45,10 @@
 	--energy-high: var(--red-500);
 	--destructive: var(--coral-500);
 
+	/* rating — filled star color. Defaults to amber so the live app is unchanged;
+	 * the /design-system showcase re-points it under [data-theme="cerceta"]. */
+	--star-fill: var(--amber-500);
+
 	/* --- Focus ring (Research §5; systemic a11y fix) --- */
 	--focus-ring: #5FD0A8;        /* light teal-green; 10.25:1 vs bg — ring sits in the offset gap against the page bg */
 	--focus-ring-width: 2px;
