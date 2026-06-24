@@ -280,9 +280,9 @@
 	}
 
 	/* One centered document. Every section — header, titles, descriptions and the
-	 * card grids — shares this container's left + right edges. --ds-measure keeps
-	 * paragraphs at a readable line length while still aligning to that left edge,
-	 * so the right side never reads as broken empty space. */
+	 * card grids — shares this container's left + right edges. The lede and section
+	 * notes run the full container width, reaching the same right edge as the grids
+	 * below them. --ds-measure caps only the boxed on-accent proof. */
 	.ds {
 		--ds-measure: 70ch;
 		max-width: 1120px;
@@ -317,7 +317,6 @@
 		font-size: var(--text-lg);
 		line-height: var(--lh-lg);
 		color: var(--text-2);
-		max-width: var(--ds-measure);
 	}
 
 	/* Each section is a stack: title → description → content with uniform rhythm.
@@ -338,7 +337,6 @@
 		font-size: var(--text-sm);
 		line-height: var(--lh-sm);
 		color: var(--text-3);
-		max-width: var(--ds-measure);
 	}
 
 	/* color */
