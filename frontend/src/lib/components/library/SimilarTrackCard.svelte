@@ -7,6 +7,7 @@
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { getCamelotColor, formatKey, keyMoveLabel, harmonyColor } from '$lib/utils/camelot';
+	import HarmonyIcon, { toHarmonyRelation, HARMONY_RELATION_LABEL } from '$lib/components/primitives/HarmonyIcon.svelte';
 
 	let {
 		item,
@@ -57,14 +58,9 @@
 		return keyMoveLabel(parentKey, track.key);
 	});
 
-	// Compact icon per harmonic move (replaces the long label on the card).
-	const HARMONY_ICON: Record<string, string> = {
-		'same key': '=',
-		'energy up': '▲',
-		'energy down': '▼',
-		'mood switch': '⇄',
-		'distant keys': '✕',
-	};
+	// Compact icon per harmonic move — the standardized HarmonyIcon glyph
+	// (replaces the long label on the card). null when the move can't be classified.
+	const harmonyRelation = $derived(harmony ? toHarmonyRelation(harmony.label) : null);
 
 	// Phase pill colors: fill + text per zone
 	const PHASE_PILL_COLORS: Record<string, { bg: string; text: string }> = {
@@ -235,9 +231,18 @@
 					<span
 						class="harmony-badge"
 						style="color: {harmonyColor(harmony.score)}; border-color: {harmonyColor(harmony.score)}"
-						title="{formatKey(track.key)} — {harmony.label} from this track"
-						aria-label={harmony.label}
-					>{HARMONY_ICON[harmony.label] ?? harmony.label}</span>
+					>
+						{#if harmonyRelation}
+							<HarmonyIcon
+								relation={harmonyRelation}
+								size="sm"
+								label={HARMONY_RELATION_LABEL[harmonyRelation]}
+								title="{formatKey(track.key)} — {harmony.label} from this track"
+							/>
+						{:else}
+							<span class="harmony-fallback" title="{formatKey(track.key)} — {harmony.label} from this track">{harmony.label}</span>
+						{/if}
+					</span>
 				{/if}
 			{/if}
 		</div>
@@ -466,6 +471,15 @@
 		border-radius: var(--radius-full);
 		margin-left: var(--space-sm);
 		flex-shrink: 0;
+	}
+	/* the standardized SVG glyph sits inside the colored circle; shrink it a step
+	 * so it reads as a glyph within the ring (icon inherits the badge color). */
+	.harmony-badge :global(.harmony-icon--sm) {
+		width: 12px;
+		height: 12px;
+	}
+	.harmony-fallback {
+		font-size: var(--text-2xs);
 	}
 
 	.bpm-value {

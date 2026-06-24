@@ -5,7 +5,20 @@
 	import SimilarTrackCard from '$lib/components/library/SimilarTrackCard.svelte';
 	import StarRating from '$lib/components/library/StarRating.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
+	import HarmonyIcon, {
+		HARMONY_RELATION_LABEL,
+		type HarmonyRelation,
+	} from '$lib/components/primitives/HarmonyIcon.svelte';
 	import { getCamelotColor } from '$lib/utils/camelot';
+
+	// The five harmonic-move relations, in teaching order, for the Icons section.
+	const harmonyRelations: { relation: HarmonyRelation; color: string }[] = [
+		{ relation: 'same', color: 'var(--score-excellent)' },
+		{ relation: 'up', color: 'var(--score-excellent)' },
+		{ relation: 'down', color: 'var(--score-good)' },
+		{ relation: 'swap', color: 'var(--score-good)' },
+		{ relation: 'clash', color: 'var(--score-poor)' },
+	];
 	import type { SuggestNextItem, Track } from '$lib/types';
 
 	// Interactive rating demo — clicking a star updates this local value live.
@@ -499,13 +512,13 @@
 				<span class="chip-cell__label">Harmony move</span>
 				<div class="cluster cluster--sm">
 					<Chip variant="harmony" value="Energy up" color="var(--score-excellent)" title="Energy up — one step on the Camelot wheel">
-						{#snippet icon()}▲{/snippet}
+						{#snippet icon()}<HarmonyIcon relation="up" size="sm" />{/snippet}
 					</Chip>
 					<Chip variant="harmony" value="Mood switch" color="var(--score-good)" title="Mood switch — relative major/minor">
-						{#snippet icon()}⇄{/snippet}
+						{#snippet icon()}<HarmonyIcon relation="swap" size="sm" />{/snippet}
 					</Chip>
 					<Chip variant="harmony" value="Clash" color="var(--score-poor)" title="Distant keys — clashing">
-						{#snippet icon()}✕{/snippet}
+						{#snippet icon()}<HarmonyIcon relation="clash" size="sm" />{/snippet}
 					</Chip>
 				</div>
 			</div>
@@ -578,7 +591,48 @@
 		</div>
 	</section>
 
-	<!-- 11. RELATED TRACKS CARD -->
+	<!-- 11. ICONS -->
+	<section class="ds__section">
+		<h2>Icons</h2>
+		<p class="ds__note">
+			Meaning-bearing icons are inline SVG drawn with <code>currentColor</code>, so they inherit the
+			chip or theme color rather than hardcoding hex. The harmony-move set is the first standardized
+			family: each of the five relations has a distinct <em>shape</em>, so the signal survives
+			colorblindness — color is never the only cue. Every icon carries a sentence-case accessible
+			label (used as its <code>aria-label</code> and tooltip) and means the same thing everywhere.
+			Icons size off one shared scale (<code>--icon-size-sm / -md / -lg</code>) with one stroke weight.
+		</p>
+
+		<h3 class="ds__subhead">Harmony moves</h3>
+		<div class="icon-grid">
+			{#each harmonyRelations as { relation, color } (relation)}
+				<div class="icon-cell">
+					<span class="icon-cell__glyph" style:color>
+						<HarmonyIcon {relation} size="lg" />
+					</span>
+					<span class="icon-cell__label">{HARMONY_RELATION_LABEL[relation]}</span>
+				</div>
+			{/each}
+		</div>
+
+		<h3 class="ds__subhead">Size scale</h3>
+		<div class="icon-sizes">
+			<div class="icon-cell">
+				<span class="icon-cell__glyph"><HarmonyIcon relation="swap" size="sm" /></span>
+				<span class="icon-cell__label">Small — 16px</span>
+			</div>
+			<div class="icon-cell">
+				<span class="icon-cell__glyph"><HarmonyIcon relation="swap" size="md" /></span>
+				<span class="icon-cell__label">Medium — 20px</span>
+			</div>
+			<div class="icon-cell">
+				<span class="icon-cell__glyph"><HarmonyIcon relation="swap" size="lg" /></span>
+				<span class="icon-cell__label">Large — 24px</span>
+			</div>
+		</div>
+	</section>
+
+	<!-- 12. RELATED TRACKS CARD -->
 	<section class="ds__section">
 		<h2>Related tracks card</h2>
 		<p class="ds__note">
@@ -932,6 +986,44 @@
 		width: var(--space-md);
 		height: var(--space-md);
 		border-radius: var(--radius-full);
+	}
+
+	/* icons — labeled cards on the same uniform spacing as the chip grid. */
+	.icon-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+		gap: var(--space-lg);
+	}
+	.icon-sizes {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2xl);
+		margin-top: var(--space-lg);
+	}
+	.icon-cell {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: var(--space-sm);
+		padding: var(--space-lg);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+		background: var(--surface-2);
+		min-width: 0;
+	}
+	.icon-sizes .icon-cell {
+		min-width: 100px;
+	}
+	.icon-cell__glyph {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text-1);
+	}
+	.icon-cell__label {
+		font-size: var(--text-2xs);
+		color: var(--text-3);
+		text-align: center;
 	}
 
 	/* related tracks card — four states on the same equal-height grid the live

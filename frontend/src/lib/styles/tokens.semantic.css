@@ -156,6 +156,16 @@
 	--star-size-sm: 14px;
 	--star-size-md: 16px;
 	--star-size-lg: 24px;
+
+	/* --- Tier 3 — Component (Icon) --- one size scale for inline-SVG icons
+	 * (content-conventions §6: one size step, one stroke weight). Meaning-bearing
+	 * glyphs (the harmony moves) size off these; sm is the dense in-card size, md
+	 * the default inline size, lg the showcase/standalone size. Icons draw with
+	 * `currentColor`, so they inherit the chip/theme color rather than owning hex. */
+	--icon-size-sm: 16px;
+	--icon-size-md: 20px;
+	--icon-size-lg: 24px;
+	--icon-stroke: 2;  /* shared stroke weight for line glyphs */
 }
 
 /* Global systemic focus ring — specificity 0 so components can still override.
