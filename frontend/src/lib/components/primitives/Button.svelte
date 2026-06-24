@@ -40,6 +40,11 @@
 		align-items: center;
 		justify-content: center;
 		gap: var(--space-sm);
+		/* Single fixed control height for all sizes; centered content + border-box
+		   means font-size/horizontal padding can't change the box height. */
+		height: var(--btn-height);
+		box-sizing: border-box;
+		line-height: 1;
 		font-family: inherit;
 		font-weight: var(--font-weight-medium);
 		border: 1px solid transparent;
@@ -49,10 +54,11 @@
 		            border-color var(--dur-fast) var(--ease-standard),
 		            color var(--dur-fast) var(--ease-standard);
 	}
-	/* sizes */
-	.btn--sm { padding: var(--space-xs) var(--space-md);  font-size: var(--text-xs);  }
-	.btn--md { padding: var(--space-sm) var(--space-lg);  font-size: var(--text-sm);  }
-	.btn--lg { padding: var(--space-md) var(--space-xl);  font-size: var(--text-base);}
+	/* sizes — vertical padding is 0; the fixed height + centering owns the box.
+	   Sizes differ only by horizontal padding and font-size. */
+	.btn--sm { padding: 0 var(--space-md);  font-size: var(--text-xs);  }
+	.btn--md { padding: 0 var(--space-lg);  font-size: var(--text-sm);  }
+	.btn--lg { padding: 0 var(--space-xl);  font-size: var(--text-base);}
 	/* variants */
 	.btn--primary {
 		background: var(--accent);
