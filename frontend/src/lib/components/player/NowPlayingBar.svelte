@@ -9,6 +9,21 @@
 
 	const player = getPlayerStore();
 
+	/** Flatten a theme token (which chains through several var() indirections) to a
+	 * concrete color for the WaveSurfer canvas. A probe element lets the browser
+	 * resolve the full var() chain to a used color, so the waveform follows the
+	 * app accent without a hardcoded hex. */
+	function resolveColor(expr: string, fallback: string): string {
+		if (typeof window === 'undefined') return fallback;
+		const probe = document.createElement('span');
+		probe.style.color = expr;
+		probe.style.display = 'none';
+		document.body.appendChild(probe);
+		const used = getComputedStyle(probe).color;
+		probe.remove();
+		return used || fallback;
+	}
+
 	// ── WaveSurfer (owned by this component, registered with store) ──
 	let waveformContainer = $state<HTMLDivElement>(null!);
 	let ws: WaveSurfer | null = null;
@@ -103,8 +118,8 @@
 		ws = WaveSurfer.create({
 			container: waveformContainer,
 			height: 40,
-			waveColor: '#00CED1',
-			progressColor: '#00A8AB',
+			waveColor: resolveColor('var(--accent)', '#00CED1'),
+			progressColor: resolveColor('var(--accent-hover)', '#00A8AB'),
 			cursorColor: 'rgba(255,255,255,0.5)',
 			cursorWidth: 1,
 			barWidth: 2,

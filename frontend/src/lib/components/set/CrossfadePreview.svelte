@@ -340,7 +340,7 @@
 	}
 
 	.gain-fill.a {
-		background: #00CED1;
+		background: var(--accent);
 	}
 
 	.gain-fill.b {

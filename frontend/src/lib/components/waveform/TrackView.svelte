@@ -575,7 +575,7 @@
 	.teaching-moment {
 		font-size: 13px;
 		color: var(--accent);
-		background: rgba(0, 206, 209, 0.08);
+		background: color-mix(in srgb, var(--accent) 8%, transparent);
 		padding: 8px 12px;
 		border-radius: 6px;
 		border-left: 3px solid var(--accent);

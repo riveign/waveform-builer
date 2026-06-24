@@ -4,19 +4,20 @@
  * =========================================================================== */
 :root {
 	/* --- THE FLIP LEVER (Research §3) -------------------------------------
-	 * The accent source points at the CYAN ramp in :root, so the live app
-	 * stays cyan. The /design-system showcase re-points ONLY these 4 vars
-	 * inside [data-theme="cerceta"] to the new teal book palette. The future
-	 * deliberate flip edits these 4 lines here once. */
-	--accent-9:        var(--cyan-500); /* solid brand / action fill */
-	--accent-10:       var(--cyan-600); /* solid hover */
-	--accent-11:       var(--cyan-500); /* accent text on dark (cyan is light enough) */
-	--accent-contrast: #000000;         /* legible foreground ON accent-9 (cyan+black = 10.75:1) */
+	 * FLIPPED to CERCETA (teal book palette). The app default is now cerceta.
+	 * The cyan ramp survives as an inert primitive (available for revert/demo);
+	 * the /design-system showcase keeps its [data-theme="cerceta"] block as an
+	 * explicit mirror. To revert the whole app to cyan, repoint these 4 lines
+	 * back at the --cyan-* ramp (and restore --accent-contrast: #000000). */
+	--accent-9:        var(--teal-600);  /* #008A84 solid brand / action fill */
+	--accent-10:       var(--teal-400);  /* #00B1B8 bright hover lift */
+	--accent-11:       var(--teal-500);  /* #44AAA2 accent text on dark (6.96:1) */
+	--accent-contrast: #FFFFFF;          /* legible foreground ON accent-9 (white on teal-600) */
 
 	/* role aliases components actually use */
 	--accent:          var(--accent-9);
 	--accent-hover:    var(--accent-10);
-	--accent-pressed:  var(--accent-9);  /* cyan has no decided press; reuse fill (cerceta overrides) */
+	--accent-pressed:  var(--teal-700);  /* cerceta pressed step */
 	--accent-text:     var(--accent-11);
 	--on-accent:       var(--accent-contrast);
 
@@ -39,32 +40,37 @@
 	--border-default: var(--gray-600);
 	--border-strong: var(--gray-500);
 
-	/* status */
-	--energy-low:  var(--green-500);
-	--energy-mid:  var(--orange-500);
-	--energy-high: var(--red-500);
-	--destructive: var(--coral-500);
+	/* status — re-tinted onto the cerceta cool→hot ramp (navy→lilac→magenta) so
+	 * the energy scale reads in-palette rather than as off-book green/orange/red.
+	 * All three steps clear AA body contrast vs the app bg. --destructive moves to
+	 * the magenta accent step (AA text-safe) so error states sit in the book. */
+	--energy-low:  var(--navy-400);    /* cool — low energy (7.78:1) */
+	--energy-mid:  var(--lilac-400);   /* mid — lifting (7.43:1) */
+	--energy-high: var(--magenta-400); /* hot — peak (7.01:1) */
+	--destructive: var(--magenta-500); /* error / danger, in-palette (5.19:1) */
 
-	/* rating — filled star color. Defaults to amber so the live app is unchanged;
-	 * the /design-system showcase re-points it under [data-theme="cerceta"]. */
-	--star-fill: var(--amber-500);
+	/* rating — filled star color. Cerceta uses the magenta highlight step (the
+	 * palette's accent/highlight role). To revert, point back at --amber-500. */
+	--star-fill: var(--magenta-400);
 
 	/* energy zones — one source for the 6-zone journey, consumed by the Chip
-	 * `energy` variant and the zone-dot/zone-badge sites. Defaults to the live
-	 * ZONE_COLORS hexes so the app is unchanged. */
-	--zone-intro:  var(--zone-intro-500);
-	--zone-warmup: var(--zone-warmup-500);
-	--zone-build:  var(--zone-build-500);
-	--zone-drive:  var(--zone-drive-500);
-	--zone-peak:   var(--zone-peak-500);
-	--zone-close:  var(--zone-close-500);
+	 * `energy` variant and the zone-dot/zone-badge sites. Re-pointed onto the
+	 * cerceta book palette (navy→teal→lilac→magenta journey). To revert, point
+	 * each back at its --zone-*-500 primitive. */
+	--zone-intro:  var(--navy-400);    /* cool blue — doors-open lull */
+	--zone-warmup: var(--teal-400);    /* teal — easing in */
+	--zone-build:  var(--lilac-400);   /* soft lilac — lifting */
+	--zone-drive:  var(--magenta-400); /* magenta — floor moving */
+	--zone-peak:   var(--magenta-300); /* bright highlight — the apex */
+	--zone-close:  var(--lilac-500);   /* dusk violet — comedown */
 
 	/* score quality — one ramp by meaning (excellent/good/fair/poor) for
-	 * transition, bpm and harmony verdicts. */
-	--score-excellent: var(--score-excellent-500);
-	--score-good:      var(--score-good-500);
-	--score-fair:      var(--score-fair-500);
-	--score-poor:      var(--score-poor-500);
+	 * transition, bpm and harmony verdicts. Re-pointed onto the cerceta book
+	 * palette. To revert, point each back at its --score-*-500 primitive. */
+	--score-excellent: var(--teal-400);
+	--score-good:      var(--lilac-400);
+	--score-fair:      var(--magenta-400);
+	--score-poor:      var(--magenta-300);
 
 	/* bpm delta — tension coloring from content-conventions §3. Within ±6% of the
 	 * source BPM the transition is seamless (neutral); beyond that it warns. */

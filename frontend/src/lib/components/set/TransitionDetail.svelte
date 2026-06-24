@@ -81,8 +81,6 @@
 						peaks={transition.waveform_a_overview}
 						duration={a.duration_sec}
 						height={56}
-						waveColor="#00CED1"
-						progressColor="#00A8AB"
 						onready={(ws) => { wsA = ws; }}
 					/>
 					{#if wsA}

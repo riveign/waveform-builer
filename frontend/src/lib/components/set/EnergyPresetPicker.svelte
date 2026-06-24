@@ -136,7 +136,7 @@
 	.preset-card.selected {
 		border-color: var(--accent);
 		background: var(--bg-active);
-		box-shadow: 0 0 8px rgba(0, 206, 209, 0.15);
+		box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 15%, transparent);
 	}
 
 	.sparkline {

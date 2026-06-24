@@ -167,7 +167,7 @@
 		text-transform: lowercase;
 		letter-spacing: 0;
 		color: var(--accent);
-		background: rgba(0, 206, 209, 0.1);
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
 		padding: 1px 5px;
 		border-radius: 3px;
 	}

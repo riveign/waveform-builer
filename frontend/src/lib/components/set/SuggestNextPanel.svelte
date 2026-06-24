@@ -46,10 +46,10 @@
 	}
 
 	function scoreColor(score: number): string {
-		if (score >= 0.8) return 'var(--energy-low, #4ecdc4)';
-		if (score >= 0.6) return 'var(--accent, #00CED1)';
-		if (score >= 0.4) return 'var(--text-secondary, #999)';
-		return 'var(--energy-high, #ff6b6b)';
+		if (score >= 0.8) return 'var(--score-excellent)';
+		if (score >= 0.6) return 'var(--score-good)';
+		if (score >= 0.4) return 'var(--score-fair)';
+		return 'var(--score-poor)';
 	}
 
 	// Load on mount

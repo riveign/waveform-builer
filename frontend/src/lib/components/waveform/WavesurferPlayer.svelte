@@ -5,6 +5,24 @@
 	import { getWaveformBands } from '$lib/api/waveforms';
 	import { API_BASE } from '$lib/api/client';
 
+	/**
+	 * Resolve a theme token to a concrete color at runtime. WaveSurfer paints to a
+	 * canvas and needs a literal color, not a `var()` — and tokens chain through
+	 * several `var()` indirections (--accent → --accent-9 → --teal-600). A probe
+	 * element with `color: var(...)` lets the browser flatten the whole chain to a
+	 * used rgb() value, so the waveform follows the app accent with no hardcoded hex.
+	 */
+	function resolveColor(expr: string, fallback: string): string {
+		if (typeof window === 'undefined') return fallback;
+		const probe = document.createElement('span');
+		probe.style.color = expr;
+		probe.style.display = 'none';
+		document.body.appendChild(probe);
+		const used = getComputedStyle(probe).color;
+		probe.remove();
+		return used || fallback;
+	}
+
 	// Band colors: unplayed / played (darker)
 	const BAND_COLORS = [
 		{ unplayed: '#e74c3c', played: '#c0392b' }, // bass — red
@@ -19,8 +37,8 @@
 		duration,
 		beats = null,
 		height = 128,
-		waveColor = '#00CED1',
-		progressColor = '#00A8AB',
+		waveColor,
+		progressColor,
 		spectral = true,
 		autoplay = false,
 		/** When true, render waveform without loading audio — visual display only. */
@@ -37,7 +55,9 @@
 		duration: number;
 		beats?: string | null;
 		height?: number;
+		/** Wave color. Defaults to the app accent token resolved at runtime. */
 		waveColor?: string;
+		/** Progress (played) color. Defaults to the accent hover token. */
 		progressColor?: string;
 		/** When true, fetch band data and render spectral (multi-color) waveform if available. */
 		spectral?: boolean;
@@ -131,6 +151,11 @@
 		};
 	}
 
+	// Concrete colors for the canvas: caller-supplied literal, else the resolved
+	// app accent tokens (so the waveform follows the theme flip).
+	const waveColorResolved = $derived(waveColor ?? resolveColor('var(--accent)', '#00CED1'));
+	const progressColorResolved = $derived(progressColor ?? resolveColor('var(--accent-hover)', '#00A8AB'));
+
 	onMount(() => {
 		const peakData = decodeFloat32(peaks);
 
@@ -161,8 +186,8 @@
 			ws = WaveSurfer.create({
 				container,
 				height,
-				waveColor: spectralActive ? 'transparent' : waveColor,
-				progressColor: spectralActive ? 'rgba(255,255,255,0.2)' : progressColor,
+				waveColor: spectralActive ? 'transparent' : waveColorResolved,
+				progressColor: spectralActive ? 'rgba(255,255,255,0.2)' : progressColorResolved,
 				cursorColor: '#fff',
 				cursorWidth: 1,
 				barWidth: 2,
@@ -239,8 +264,8 @@
 		ws = WaveSurfer.create({
 			container,
 			height,
-			waveColor: spectralActive ? 'transparent' : waveColor,
-			progressColor: spectralActive ? 'rgba(255,255,255,0.2)' : progressColor,
+			waveColor: spectralActive ? 'transparent' : waveColorResolved,
+			progressColor: spectralActive ? 'rgba(255,255,255,0.2)' : progressColorResolved,
 			cursorColor: '#fff',
 			cursorWidth: 1,
 			barWidth: 2,
@@ -325,7 +350,7 @@
 		height: 32px;
 		border-radius: 50%;
 		background: var(--accent);
-		color: #000;
+		color: var(--on-accent);
 		font-size: 14px;
 		display: flex;
 		align-items: center;
@@ -363,13 +388,13 @@
 	}
 
 	.spectral-toggle:hover {
-		border-color: var(--accent, #00CED1);
+		border-color: var(--accent);
 		color: var(--text, #fff);
 	}
 
 	.spectral-toggle.active {
-		border-color: var(--accent, #00CED1);
-		color: var(--accent, #00CED1);
+		border-color: var(--accent);
+		color: var(--accent-text);
 	}
 
 	.spectral-icon {
@@ -389,5 +414,5 @@
 	.band-midlow  { background: #e67e22; height: 9px; }
 	.band-midhigh { background: #2ecc71; height: 7px; }
 	.band-high    { background: #3498db; height: 5px; }
-	.band-classic { background: #00CED1; height: 10px; }
+	.band-classic { background: var(--accent); height: 10px; }
 </style>
