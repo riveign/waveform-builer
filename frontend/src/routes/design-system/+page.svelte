@@ -180,7 +180,7 @@
 			item: mockItem(
 				mockTrack({
 					id: 9002, title: 'Off Axis', artist: 'Corner Theory',
-					bpm: 122, key: '3B', rating: 3, genre_family: 'House',
+					bpm: 138, key: '3B', rating: 3, genre_family: 'House',
 					resolved_energy: 'build',
 				}),
 				0.41,
@@ -192,7 +192,7 @@
 			item: mockItem(
 				mockTrack({
 					id: 9003, title: 'Untagged Bootleg With A Very Long Title That Clamps',
-					artist: 'Unknown Pressing', bpm: 131, key: '9A', rating: 0,
+					artist: 'Unknown Pressing', bpm: 150, key: '9A', rating: 0,
 					genre_family: 'Groove', resolved_energy: 'drive',
 				}),
 				0.78,
@@ -483,8 +483,9 @@
 			<code>color</code> prop, keeping the chip presentational. Sentence case throughout, keys in
 			Camelot notation, and a muted <code>—</code> for missing values. The <code>bpm</code> variant
 			leads with a <strong>metronome icon</strong> instead of a literal "BPM" text label (saving width
-			in dense rows); the integer tempo and signed delta follow, and the chip's <code>title</code>
-			carries "Beats per minute" for screen readers. The <code>genre</code> variant gets its own
+			in dense rows); the integer tempo and a <strong>signed delta colored green / orange / red by
+			magnitude</strong> (seamless ≤6% · moderate ~6–12% · tension &gt;12%) follow, and the chip's
+			<code>title</code> carries "Beats per minute" for screen readers. The <code>genre</code> variant gets its own
 			visible tinted treatment so genre reads as clearly as the colored key and energy chips.
 		</p>
 
@@ -508,16 +509,27 @@
 			</div>
 
 			<div class="chip-cell">
-				<span class="chip-cell__label">BPM (metronome)</span>
+				<span class="chip-cell__label">BPM delta — green / orange / red by magnitude</span>
 				<div class="cluster cluster--sm">
-					<Chip variant="bpm" title="Tempo 128 BPM, +1 from this track">
-						<span class="bpm-num">128</span><span class="bpm-delta">+1</span>
+					<!-- seamless (≈ within ±6%) → green -->
+					<Chip variant="bpm" title="128 BPM — +1, seamless (within ±6%)">
+						<span class="bpm-num">128</span><span class="bpm-delta" style="color: var(--score-excellent)">+1</span>
 					</Chip>
-					<Chip variant="bpm" tone="warn" title="Tempo 146 BPM, +18 from this track">
-						<span class="bpm-num">146</span><span class="bpm-delta">+18</span>
+					<!-- moderate (~6–12%) → orange -->
+					<Chip variant="bpm" title="138 BPM — +10, moderate shift (~6–12%)">
+						<span class="bpm-num">138</span><span class="bpm-delta" style="color: var(--score-good)">+10</span>
 					</Chip>
-					<Chip variant="bpm" value="−6" title="Within ±6% — seamless" />
+					<!-- tension (> ~12%) → red -->
+					<Chip variant="bpm" title="146 BPM — +18, big jump (> ±12%)">
+						<span class="bpm-num">146</span><span class="bpm-delta" style="color: var(--score-poor)">+18</span>
+					</Chip>
 				</div>
+				<span class="chip-cell__note">
+					Within ±6% reads <span style="color: var(--score-excellent)">seamless</span>,
+					~6–12% <span style="color: var(--score-good)">moderate</span>,
+					beyond ±12% <span style="color: var(--score-poor)">tension</span> — the color is
+					always paired with the signed number, never the only cue.
+				</span>
 			</div>
 
 			<div class="chip-cell">
@@ -737,25 +749,31 @@
 			the genre is rendered as <strong>genre-family-colored text</strong> (no box), the color carrying
 			the signal, while the artist stays muted plain text and ellipsizes first); the
 			<strong>attribute chips</strong> in priority order key → BPM → energy, the key chip carrying its
-			harmony-move icon; and the <strong>Track signals</strong> block — <strong>three balanced columns</strong>
-			(each an equal third) of the match score <code>NN/100</code> (lead, left), the DJ's rating as a
-			compact <code>N★</code> (left), and affinity rendered as a labelled qualitative strength bar
-			(Strong / Likely / Weak match, right) rather than a second raw number.
+			harmony-move icon and the BPM chip carrying its metronome glyph + a <strong>signed delta colored
+			green / orange / red by magnitude</strong> (seamless / moderate / tension); and the
+			<strong>Track signals</strong> block — <strong>three balanced columns</strong> (each an equal third)
+			reading left → center → right: the match score <code>NN/100</code> (lead, <strong>left</strong>),
+			the DJ's rating as a compact <code>N★</code> (<strong>center</strong>), and affinity rendered as a
+			labelled qualitative strength bar (Great / Likely / Weak, <strong>right</strong>) rather than a
+			second raw number.
 		</p>
 		<p class="ds__note">
 			The card is a <strong>size container</strong>: it renders across grid densities (4-up, 6-up, the
 			expanded "Show more" grid) and adapts to its real column width through three container-query
 			tiers rather than one shrinking design. <strong>Regular (≥240px)</strong> shows everything:
 			identity with artist + genre-colored text, chips key → BPM → energy, and the three-balanced-column
-			signals grid (NN/100 · N★ · match). <strong>Intermediate (200–240px)</strong> tightens — smaller
-			artwork and the energy chip drops (surfacing a muted <code>+1</code>), chips become key + BPM, but
-			the lightweight genre text and the three-column signals both stay. <strong>Compact (&lt;200px)</strong>
-			becomes a dense <strong>pill</strong> (rounder, badge-like): artwork + title (+ ⋮), then a single row
-			of <strong>color-coded icons only</strong> — harmony glyph · metronome · match-strength bars · N★ —
-			where icon shape + color + the star count carry the signal. The numeric score, key text, BPM number,
-			genre and energy all drop there; every icon keeps its real value in its <code>title</code>/aria-label.
-			Chips never clip mid-word at any width. The visible match verdict is a single terse word
-			(<strong>Great / Likely / Weak / Not for me</strong>), with the fuller phrasing on hover.
+			signals grid (NN/100 left · N★ center · match right). <strong>Intermediate (200–240px)</strong>
+			tightens only — smaller artwork and reduced padding — but <strong>all three chips (key + BPM +
+			energy) stay</strong> (the compact metronome glyph makes the BPM chip short enough that no chip
+			drops and no <code>+1</code> overflow is needed), and the genre text and three-column signals both
+			stay too. <strong>Compact (&lt;200px)</strong> becomes a dense <strong>pill</strong> (rounder,
+			badge-like): artwork + title (+ ⋮), then a single row of <strong>color-coded icons only</strong>,
+			<strong>evenly distributed</strong> across the pill — harmony glyph · metronome · match-strength
+			bars · N★ — where icon shape + color + the star count carry the signal. The numeric score, key
+			text, BPM number, genre and energy all drop there; every icon keeps its real value in its
+			<code>title</code>/aria-label. Chips never clip mid-word at any width. The visible match verdict is
+			a single terse word (<strong>Great / Likely / Weak / Not for me</strong>), with the fuller phrasing
+			on hover.
 		</p>
 
 		<p class="related-density-label">Regular — ~250px columns (everything visible; genre as colored text)</p>
@@ -775,7 +793,7 @@
 			{/each}
 		</div>
 
-		<p class="related-density-label">Intermediate — ~220px columns (genre kept; energy drops → +1)</p>
+		<p class="related-density-label">Intermediate — ~220px columns (tighter, but all three chips key + BPM + energy stay; no +1)</p>
 		<div class="related-grid related-grid--intermediate">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">
@@ -791,7 +809,7 @@
 			{/each}
 		</div>
 
-		<p class="related-density-label">Compact — ~190px columns (dense pill: artwork + title / color-coded icons only — harmony · metronome · match bars · N★)</p>
+		<p class="related-density-label">Compact — ~190px columns (dense pill: artwork + title / evenly-distributed color-coded icons only — harmony · metronome · match bars · N★)</p>
 		<div class="related-grid related-grid--compact">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">
@@ -1137,6 +1155,11 @@
 	}
 	.chip-cell__empty {
 		font-size: var(--text-xs);
+		color: var(--text-3);
+	}
+	.chip-cell__note {
+		font-size: var(--text-xs);
+		line-height: var(--lh-sm);
 		color: var(--text-3);
 	}
 	.vibe-dot {

@@ -37,13 +37,13 @@ flowchart TB
         subgraph T2["Tier 2 — Attribute chips (the why)"]
             direction LR
             KEY["Key 8A + harmony move<br/>= ▲ ▼ ⇄ ✕"]
-            BPM["[metronome] 128 + delta +4"]
-            EN["Energy zone (Peak)<br/>drops → +1 when narrow"]
+            BPM["[metronome] 128 + delta<br/>(green/orange/red by size)"]
+            EN["Energy zone (Peak)"]
         end
         D2["── divider ──"]
-        subgraph T3["Tier 3 — Track signals (3 balanced cols)"]
+        subgraph T3["Tier 3 — Track signals (3 balanced cols, L·C·R)"]
             direction LR
-            SIG["score NN/100 | N★ rating | match strength"]
+            SIG["score NN/100 (left) | N★ rating (center) | match strength (right)"]
         end
         T1 --> D1 --> T2 --> D2 --> T3
     end
@@ -106,8 +106,9 @@ Tier 2 renders a row of chips in a fixed **priority order**:
    "why." Transition-critical; always shown.
 2. **BPM** (metronome + integer + signed delta) — tempo compatibility.
    Transition-critical; always shown.
-3. **Energy** (zone) — where it sits in the journey. Lowest priority; **drops first**
-   when the card is narrow.
+3. **Energy** (zone) — where it sits in the journey. Lowest priority; it is the
+   first chip to **drop at the compact tier** (it stays at regular **and**
+   intermediate — the compact metronome glyph keeps all three chips fitting).
 
 Genre is **not a Tier-2 chip** — it lives in the identity tier as genre-family-colored
 text (see [Title, artist & genre](#title-artist--genre)).
@@ -124,6 +125,21 @@ to "BPM") carry the tempo meaning for screen readers — so color/text is never 
 signal (§4). This is a **system-wide** bpm-chip change (the metronome auto-renders for
 the `bpm` variant), so every migrated bpm chip is consistent.
 
+**BPM delta color scale (green / orange / red).** The signed delta is **colored by
+magnitude** per Kiku's tempo rules, so the DJ reads "how far is this tempo?" at a glance:
+
+| Delta magnitude | Meaning | Color token |
+|-----------------|---------|-------------|
+| ≈ within **±6%** | **Seamless** | `--score-excellent` (green) |
+| ~**6–12%** | **Moderate** shift | `--score-good` (orange) |
+| > ~**12%** | **Tension** (big jump) | `--score-poor` (red) |
+
+The color is applied to the delta number on the card via `bpmDeltaColor` (a tokenized
+value, no hardcoded hex) and is **always paired with the signed number** (and the chip's
+`title`, e.g. "+18 BPM faster — big jump"), so color is never the only cue (§4). The same
+three-state strength drives the compact-tier metronome icon color. The `/design-system`
+showcase shows the three states side by side (seamless / moderate / tension).
+
 **Responsive tiers**
 - The card is a **size container** (`container-type: inline-size`, `container-name:
   relcard`), so it adapts to the card's **real laid-out width** — whatever grid density
@@ -132,8 +148,8 @@ the `bpm` variant), so every migrated bpm chip is consistent.
   any width. Whole chips are hidden by priority instead. See
   [Responsive tiers](#responsive-tiers) for the full breakdown.
 - Chip colors come from **semantic tokens by meaning** (the `--zone-*` set for
-  energy, `--score-*` for the harmony band, `--bpm-delta-*` via the chip's `tone`
-  for the ±6% tension rule) — never hardcoded pastel hex. Genre (now identity text,
+  energy, `--score-*` for the harmony band **and the BPM delta's green/orange/red
+  magnitude scale**) — never hardcoded pastel hex. Genre (now identity text,
   not a chip) uses `--chip-genre-fg`.
 - Each color-coded chip pairs color with text/glyph (zone name, harmony glyph,
   signed delta, metronome glyph), per §4.
@@ -148,9 +164,9 @@ expanded). Nothing is ever clipped mid-word; tiers hide whole elements or restru
 
 | Tier | Container width | Shows | Hides / changes |
 |------|-----------------|-------|-----------------|
-| **Regular** | ≥ 240px | Everything: identity (artist · **genre-colored text**), chips **key → BPM → energy**, three-balanced-column signals (`NN/100` · `N★` · match). | — |
-| **Intermediate** | 200–240px | Identity (artist · **genre-colored text — KEPT**), chips **key + BPM**, three-column signals. | **Energy chip drops** → muted `+1`; smaller artwork, tighter padding/gaps. (Genre stays — it's lightweight colored text, costs almost no width.) |
-| **Compact** | < 200px | **Dense PILL** (rounder, badge-like). **Top**: small artwork + 1-line title (+ `⋮` if it fits). **Below**: a single row of **color-coded ICONS only** — harmony glyph · metronome · match-strength bars · `N★`. | The numeric **score**, **key text**, **BPM number**, **genre**, **energy**, the `+` action, both dividers and the whole chip + signals rows all hidden. Icon **shape + color + star count** carry the signal; each icon's real value lives in its `title`/aria-label. |
+| **Regular** | ≥ 240px | Everything: identity (artist · **genre-colored text**), chips **key → BPM → energy**, three-balanced-column signals (`NN/100` left · `N★` center · match right). | — |
+| **Intermediate** | 200–240px | Identity (artist · **genre-colored text — KEPT**), **all three chips key + BPM + energy — KEPT**, three-column signals (L · C · R). | **Tighten only**: smaller artwork, tighter padding/gaps. **No chip drops, no `+1`** — the compact metronome glyph keeps the BPM chip short enough that key + BPM + energy all fit. |
+| **Compact** | < 200px | **Dense PILL** (rounder, badge-like). **Top**: small artwork + 1-line title (+ `⋮` if it fits). **Below**: a single row of **color-coded ICONS only**, **evenly distributed** across the pill (`justify-content: space-between`) — harmony glyph · metronome · match-strength bars · `N★`. | The numeric **score**, **key text**, **BPM number**, **genre**, **energy**, the `+` action, both dividers and the whole chip + signals rows all hidden. Icon **shape + color + star count** carry the signal; each icon's real value lives in its `title`/aria-label. |
 
 - The container queries are placed **last** in the stylesheet so they win over the base
   (regular) rules by source order (container queries add no specificity).
@@ -160,6 +176,10 @@ expanded). Nothing is ever clipped mid-word; tiers hide whole elements or restru
   is irrelevant there; the value is in its `title`/aria-label. The icon row is legible with
   no overlap down to ≈180px. The compact card is rounder (`--radius-full`) so the dense
   variant reads as visually distinct from the regular card.
+- The compact icons are **evenly distributed** across the pill (`justify-content:
+  space-between`) — harmony · metronome · match-bars · `N★` each own a balanced slot, rather
+  than bunching left with the star flung to the far edge (the stars no longer use
+  `margin-left: auto`).
 
 ---
 
@@ -182,15 +202,17 @@ your call* — in a single glance.
 `display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center;
 gap: var(--space-sm)`, with the same `--space-sm var(--space-md)` padding as the other
 tiers. Each signal gets an **equal third** so cards in a row read as **aligned columns**
-with no bunch-left + dead-gap-right; the per-column content alignment reads like a table:
+with no bunch-left + dead-gap-right; the per-column content alignment reads
+**left → center → right** like a table:
 
-1. **Score `NN/100` (column 1 — lead anchor, heaviest; aligned START/left)** — `NN` at
+1. **Score `NN/100` (column 1 — lead anchor, heaviest; aligned START/LEFT)** — `NN` at
    `--text-lg`, `--font-weight-semibold`, `--text-1`; suffix `/100` at `--text-xs`,
    `--text-3`. It is the headline verdict, so it carries the most weight.
-2. **Rating (column 2 — aligned START/left)** — `<StarRating display="compact" size="sm" />`
-   → `N★` when `rating > 0` (the DJ's curation signal beside the tool's verdict); when
-   unrated, the canonical muted `—` (content-conventions §3), never a blank gap.
-3. **Match strength (column 3 — aligned END/right)** — a small 3-segment **strength bar +
+2. **Rating (column 2 — aligned CENTER)** — `<StarRating display="compact" size="sm" />`
+   → `N★` when `rating > 0` (the DJ's curation signal beside the tool's verdict), centered
+   in its middle third so the row balances; when unrated, the canonical muted `—`
+   (content-conventions §3), never a blank gap.
+3. **Match strength (column 3 — aligned END/RIGHT)** — a small 3-segment **strength bar +
    TERSE word** (`justify-content: flex-end`), mapping the match score onto a qualitative
    band so the row never shows a second raw number competing with `NN/100` (§3) and never
    relies on color alone (§4). The visible word is a single short token —
@@ -274,8 +296,9 @@ exclusively. No px/hex literals.
 | Elevation | `--elev-3` (add-to-set popover) |
 
 **Outstanding debt**: the hardcoded `PHASE_PILL_COLORS` / delta-badge pastel hex
-are **gone** — chips now derive color from the `--zone-*`, `--score-*`, `--bpm-delta-*`
-and `--chip-genre-*` token sets via `<Chip>`. The remaining non-token literals are the
+are **gone** — chips now derive color from the `--zone-*`, `--score-*` (incl. the BPM
+delta's green/orange/red magnitude scale) and `--chip-genre-*` token sets via `<Chip>`.
+The remaining non-token literals are the
 artwork's `38px` (and the responsive `30px`/`28px` artwork steps), the popover's
 `220px min-width`, and the two **container-query tier breakpoints** (`240px`
 intermediate, `200px` compact) — intentional raw layout thresholds that encode measured
@@ -296,13 +319,15 @@ Resolved (spec 023, step 5):
    tier as **genre-family-colored text** (regular + intermediate; hidden at compact); the
    chip row is key → BPM(metronome) → energy. The card uses **three container-query tiers**
    (regular ≥240px / intermediate 200–240px / compact <200px — see
-   [Responsive tiers](#responsive-tiers)) rather than one shrinking design: energy drops at
-   intermediate, and at compact the card becomes a dense **pill** with a single row of
-   **color-coded icons only** (harmony · metronome · match-bars · `N★`; numbers/text/genre/
+   [Responsive tiers](#responsive-tiers)) rather than one shrinking design: at intermediate
+   it only tightens (all three chips stay, no `+1`), energy drops only at compact, and at
+   compact the card becomes a dense **pill** with a single row of **evenly-distributed
+   color-coded icons only** (harmony · metronome · match-bars · `N★`; numbers/text/genre/
    energy gone). Never clipped mid-word. Demonstrated at all three widths in the
    `/design-system` showcase.
-5. ~~**Zone/status color tokens**~~ — **RESOLVED**: chips consume `--zone-*`,
-   `--score-*`, and `--bpm-delta-*` tokens; no hardcoded hex remains on this card.
+5. ~~**Zone/status color tokens**~~ — **RESOLVED**: chips consume `--zone-*` and
+   `--score-*` tokens (the latter also drives the BPM delta's green/orange/red magnitude
+   scale); no hardcoded hex remains on this card.
 
 Still open (needs user confirmation):
 

@@ -90,16 +90,31 @@
 	const titleText = $derived(track.title ?? 'Unknown');
 	const artistText = $derived(track.artist ?? 'Unknown');
 
-	// BPM integer + signed colored delta. Tone follows the ±6% tension rule
-	// (content-conventions §3): within 6% reads neutral, beyond reads warn.
+	// BPM integer + signed colored delta. Color follows the Kiku tempo rule by
+	// MAGNITUDE (content-conventions §3): within ±6% = seamless (green),
+	// ~6–12% = moderate (orange), beyond ±12% = tension (red). The color is
+	// always paired with the signed number, so it is never the only cue.
 	const bpmDelta = $derived.by(() => {
 		if (!track.bpm || !parentBpm) return null;
 		return Math.round(track.bpm) - Math.round(parentBpm);
 	});
-	const bpmDeltaTone = $derived.by<'default' | 'warn'>(() => {
-		if (bpmDelta === null || !parentBpm) return 'default';
-		return Math.abs(bpmDelta) / parentBpm > 0.06 ? 'warn' : 'default';
+	// Three-state delta strength: 'seamless' | 'moderate' | 'tension'. Drives a
+	// tokenized color (green/orange/red) on the delta span + the compact icon.
+	const bpmDeltaStrength = $derived.by<'seamless' | 'moderate' | 'tension'>(() => {
+		if (bpmDelta === null || !parentBpm) return 'seamless';
+		const pct = Math.abs(bpmDelta) / parentBpm;
+		if (pct <= 0.06) return 'seamless';
+		if (pct <= 0.12) return 'moderate';
+		return 'tension';
 	});
+	// Tokenized color for the signed delta — green/orange/red, no hardcoded hex.
+	const bpmDeltaColor = $derived(
+		bpmDeltaStrength === 'tension'
+			? 'var(--score-poor)'
+			: bpmDeltaStrength === 'moderate'
+				? 'var(--score-good)'
+				: 'var(--score-excellent)',
+	);
 
 	// Harmonic move from the current track — same vocabulary as the Harmonic
 	// mixing card (energy up/down, mood switch, same key, distant keys).
@@ -318,26 +333,28 @@
 			<!-- bpm chip leads with the metronome glyph (auto-rendered by the bpm
 			     variant) instead of a literal "BPM" text label — saves width; the
 			     glyph + the chip's a11y title carry the meaning. -->
-			<Chip variant="bpm" tone={bpmDeltaTone} title="Tempo {Math.round(track.bpm)} BPM">
+			<Chip variant="bpm" title="Tempo {Math.round(track.bpm)} BPM">
 				<span class="bpm-num">{Math.round(track.bpm)}</span>
 				{#if bpmDelta !== null && bpmDelta !== 0}
+					<!-- Signed delta colored green/orange/red by magnitude (seamless /
+					     moderate / tension). Color is tokenized and always paired with
+					     the number, so it is never the only cue. -->
 					<span
 						class="bpm-delta"
-						title="{Math.abs(bpmDelta)} BPM {bpmDelta > 0 ? 'faster' : 'slower'} than this track"
+						style:color={bpmDeltaColor}
+						title="{Math.abs(bpmDelta)} BPM {bpmDelta > 0 ? 'faster' : 'slower'} than this track — {bpmDeltaStrength === 'seamless' ? 'seamless' : bpmDeltaStrength === 'moderate' ? 'moderate shift' : 'big jump'}"
 					>{bpmDelta > 0 ? '+' : '−'}{Math.abs(bpmDelta)}</span>
 				{/if}
 			</Chip>
 		{/if}
 		{#if energyZone}
-			<!-- Energy chip: stays in the DOM so its hover title always resolves;
-			     a container query hides the whole chip when the card is narrow. -->
+			<!-- Energy chip: stays at the regular AND intermediate tiers (key + BPM +
+			     energy all fit now the bpm chip uses the compact metronome glyph). It
+			     only drops at the compact tier, where the whole chip row is replaced
+			     by the color-coded icon row. -->
 			<div class="energy-chip" title="Energy zone: {capFirst(energyZone)}">
 				<Chip variant="energy" color={zoneColor} value={capFirst(energyZone)} title="Energy zone: {capFirst(energyZone)}" />
 			</div>
-			<!-- Discoverability for the dropped chip: a subtle "+1" that only shows
-			     (via the same container query) when energy is hidden, revealing the
-			     full value on hover. Never clips a chip. -->
-			<span class="chips-more" title="Energy zone: {capFirst(energyZone)}">+1</span>
 		{/if}
 	</div>
 
@@ -364,7 +381,7 @@
 		{#if track.bpm}
 			<span
 				class="cicon"
-				style="color: {bpmDeltaTone === 'warn' ? 'var(--bpm-delta-warn)' : 'var(--text-2)'}"
+				style:color={bpmDelta !== null && bpmDelta !== 0 ? bpmDeltaColor : 'var(--text-2)'}
 				title="{Math.round(track.bpm)} BPM{bpmDelta !== null && bpmDelta !== 0 ? ` (${bpmDelta > 0 ? '+' : '−'}${Math.abs(bpmDelta)} vs this track)` : ''}"
 			>
 				<MetronomeIcon
@@ -646,29 +663,21 @@
 		min-width: 0;
 	}
 
-	/* "+1" affordance for the dropped energy chip — hidden by default (energy is
-	 * visible at wide widths); revealed by the intermediate/compact tiers below.
-	 * Tiny, muted, full value on hover, never clips. */
-	.chips-more {
-		display: none;
-		flex-shrink: 0;
-		font-size: var(--text-2xs);
-		font-weight: var(--font-weight-medium);
-		color: var(--text-4);
-		padding: 0 var(--space-2xs);
-		cursor: default;
-	}
-
 	/* ── Compact-tier icon row ── color-coded ICONS ONLY (no text/numbers/chips).
 	 * Hidden at regular + intermediate; revealed at the compact tier (below) where
 	 * the card becomes a dense pill. Each icon's color carries the signal; the
 	 * distinct SHAPES (harmony glyph, metronome, strength bars, stars) keep color
 	 * from being the only cue, and per-icon title/aria-label preserve the real
 	 * value. */
+	/* Compact icon row — icons are EVENLY DISTRIBUTED across the full width
+	 * (space-between), not bunched-left with the star flung to the far edge. Each
+	 * icon owns an equal slot so harmony · metronome · match-bars · stars read as
+	 * a balanced row. */
 	.compact-icons {
 		display: none;
 		align-items: center;
-		gap: var(--space-md);
+		justify-content: space-between;
+		gap: var(--space-sm);
 		padding: 0 var(--space-md) var(--space-md);
 		margin-top: auto;
 	}
@@ -690,10 +699,8 @@
 		width: var(--icon-size-sm);
 		height: var(--icon-size-sm);
 	}
-	/* stars sit at the trailing edge of the icon row. */
-	.cicon-stars {
-		margin-left: auto;
-	}
+	/* stars are one of the evenly-distributed slots — no margin-left:auto (that
+	 * would fling them to the far edge and bunch the rest left). */
 
 	/* BPM chip internals — the metronome glyph (auto-rendered by the bpm variant)
 	 * leads, then the number, then the signed delta. No literal "BPM" text. */
@@ -717,8 +724,8 @@
 	 * `repeat(3, minmax(0,1fr))` gives each signal an equal third, so they read as
 	 * aligned columns down a row of cards (no bunch-left + dead-gap-right). Column
 	 * content alignment reads like a table:
-	 *   1) score NN/100 — start (left), the lead/anchor,
-	 *   2) rating N★ / — — start (left),
+	 *   1) score NN/100 — START (left), the lead/anchor,
+	 *   2) rating N★ / — — CENTER, balances the row's middle third,
 	 *   3) match — END (right), so the verdict sits at the card's trailing edge.
 	 * min-width:0 (via minmax) lets the match column ellipsize within its third
 	 * instead of forcing the row wider than the narrow card. */
@@ -749,8 +756,13 @@
 		margin-left: var(--space-2xs);
 	}
 
+	/* Rating sits in the CENTER of its middle third (L/C/R balance across the
+	 * three signal columns). */
 	.signal-rating {
-		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 0;
 	}
 	.signal-empty {
 		color: var(--text-4);
@@ -820,13 +832,15 @@
 	 * width, not the viewport, so it works at any grid density. Three tiers:
 	 *
 	 *   • Regular   (≥ 240px) — the full card (the base rules above): identity with
-	 *                 artist + genre chip · chips key→BPM→energy · 3-col signals.
-	 *   • Intermediate (200–240px) — tighten: smaller artwork, reduced padding/gaps;
-	 *                 genre chip drops (artist only); energy chip drops (→ "+1");
-	 *                 chips = key(+harmony) + BPM; signals stay the 3-col grid.
-	 *   • Compact   (< 200px) — RESTRUCTURED into a dense 2-line layout: Row 1 small
-	 *                 artwork + title + ⋮; Row 2 NN/100 · key · BPM · match. Stars,
-	 *                 energy, genre and the + action are hidden. */
+	 *                 artist + genre colored text · chips key→BPM→energy · 3-col
+	 *                 signals (score L · rating C · match R).
+	 *   • Intermediate (200–240px) — tighten only: smaller artwork, reduced
+	 *                 padding/gaps. Genre colored text STAYS; all THREE chips
+	 *                 (key + BPM + energy) STAY (no "+1"); signals stay 3-col.
+	 *   • Compact   (< 200px) — RESTRUCTURED into a dense PILL: Row 1 small artwork +
+	 *                 title + ⋮; Row 2 a single row of evenly-distributed COLOR-CODED
+	 *                 ICONS (harmony · metronome · match bars · N★). Numbers, key/BPM
+	 *                 text, genre, energy and the + action are hidden. */
 
 	/* ── Intermediate (≤ 240px) ── */
 	@container relcard (max-width: 240px) {
@@ -840,14 +854,11 @@
 		}
 		/* Genre STAYS at the intermediate tier — it is now lightweight colored text,
 		 * not a chip, so it costs almost no width. Only the compact tier hides it. */
-		/* energy chip drops as a whole unit; "+1" surfaces in its place. */
-		.energy-chip {
-			display: none;
-		}
-		.chips-more {
-			display: inline-flex;
-			align-items: center;
-		}
+		/* All THREE chips (key + BPM + energy) STAY at the intermediate tier: with
+		 * the metronome glyph replacing the literal "BPM" text the bpm chip is short
+		 * enough that key + BPM + energy fit, so the energy chip no longer drops and
+		 * the "+1" overflow affordance is not needed here. (The +1 only surfaces if
+		 * chips genuinely overflow — they don't at this width.) */
 		.zone-chips {
 			gap: var(--space-2xs);
 			padding: var(--space-xs) var(--space-sm);
@@ -880,8 +891,9 @@
 		.add-btn {
 			display: none;
 		}
-		/* Genre, energy and stars (in identity/chips) drop — the icon row carries the
-		 * signal instead. (energy chip already drops via the ≤240px intermediate query.) */
+		/* Genre and the artist·genre dot drop — the icon row carries the signal
+		 * instead. (The energy chip drops here too, as part of the whole .zone-chips
+		 * row being hidden above.) */
 		.track-genre,
 		.meta-dot {
 			display: none;
@@ -893,11 +905,12 @@
 			width: 28px;
 			height: 28px;
 		}
-		/* the icon row becomes the bottom row, pushed down so cards align. */
+		/* the icon row becomes the bottom row, pushed down so cards align. Icons
+		 * stay EVENLY DISTRIBUTED (space-between from the base rule) across the
+		 * pill's width — not bunched left. */
 		.compact-icons {
 			display: flex;
-			gap: var(--space-lg);
-			padding: var(--space-2xs) var(--space-md) var(--space-sm) var(--space-sm);
+			padding: var(--space-2xs) var(--space-md) var(--space-sm) var(--space-md);
 		}
 	}
 </style>
