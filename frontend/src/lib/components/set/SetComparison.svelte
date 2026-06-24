@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SetComparison, TrackDeviation } from '$lib/types';
+	import Chip from '$lib/components/primitives/Chip.svelte';
 
 	let {
 		comparison,
@@ -51,9 +52,9 @@
 	</div>
 
 	<div class="arc-row">
-		<span class="arc-chip">arc: {comparison.arc.planned_shape} &rarr; {comparison.arc.played_shape}</span>
-		<span class="arc-chip">keys: {comparison.arc.planned_key_style} &rarr; {comparison.arc.played_key_style}</span>
-		<span class="arc-chip">bpm: {comparison.arc.planned_bpm_style} &rarr; {comparison.arc.played_bpm_style}</span>
+		<Chip variant="neutral" size="sm">arc: {comparison.arc.planned_shape} &rarr; {comparison.arc.played_shape}</Chip>
+		<Chip variant="neutral" size="sm">keys: {comparison.arc.planned_key_style} &rarr; {comparison.arc.played_key_style}</Chip>
+		<Chip variant="neutral" size="sm">bpm: {comparison.arc.planned_bpm_style} &rarr; {comparison.arc.played_bpm_style}</Chip>
 	</div>
 
 	<div class="two-col">
@@ -144,14 +145,6 @@
 		gap: 8px;
 		flex-wrap: wrap;
 		margin-bottom: 12px;
-	}
-
-	.arc-chip {
-		font-size: 11px;
-		color: var(--text-secondary);
-		padding: 2px 8px;
-		background: var(--bg-tertiary);
-		border-radius: 10px;
 	}
 
 	.two-col {

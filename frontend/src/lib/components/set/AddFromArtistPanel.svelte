@@ -3,6 +3,7 @@
 	import { getArtistPicks, addTrackToSet } from '$lib/api/sets';
 	import { autocompleteArtists } from '$lib/api/tracks';
 	import Typeahead from '$lib/components/library/Typeahead.svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
 
 	let {
 		setId,
@@ -122,10 +123,10 @@
 								<div class="pick-reason">{pick.reason}</div>
 								{#if pick.breakdown}
 									<div class="pick-breakdown">
-										<span class="chip">key {Math.round(pick.breakdown.harmonic * 100)}</span>
-										<span class="chip">energy {Math.round(pick.breakdown.energy_fit * 100)}</span>
-										<span class="chip">bpm {Math.round(pick.breakdown.bpm_compat * 100)}</span>
-										<span class="chip">genre {Math.round(pick.breakdown.genre_coherence * 100)}</span>
+										<Chip variant="neutral" size="sm" value="key {Math.round(pick.breakdown.harmonic * 100)}" />
+										<Chip variant="neutral" size="sm" value="energy {Math.round(pick.breakdown.energy_fit * 100)}" />
+										<Chip variant="neutral" size="sm" value="bpm {Math.round(pick.breakdown.bpm_compat * 100)}" />
+										<Chip variant="neutral" size="sm" value="genre {Math.round(pick.breakdown.genre_coherence * 100)}" />
 									</div>
 								{/if}
 							</div>
@@ -310,14 +311,6 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 5px;
-	}
-
-	.chip {
-		font-size: 10px;
-		padding: 2px 6px;
-		border-radius: 4px;
-		background: var(--bg-tertiary);
-		color: var(--text-dim);
 	}
 
 	.pick-side {

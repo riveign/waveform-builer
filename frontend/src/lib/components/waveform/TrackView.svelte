@@ -16,6 +16,7 @@
 	import EnergyZonePicker from '../library/EnergyZonePicker.svelte';
 	import { ZONE_COLORS } from '../library/EnergyZonePicker.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
+	import Chip from '../primitives/Chip.svelte';
 
 	let { track }: { track: Track } = $props();
 
@@ -300,7 +301,7 @@
 			{#if track.playlist_tags.length > 0}
 				<div class="tag-chips">
 					{#each track.playlist_tags as tag}
-						<span class="chip">{tag}</span>
+						<Chip variant="neutral" size="sm" value={tag} title={tag} />
 					{/each}
 				</div>
 			{/if}
@@ -617,14 +618,6 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
-	}
-
-	.chip {
-		font-size: 11px;
-		padding: 2px 8px;
-		background: var(--bg-tertiary);
-		border-radius: 10px;
-		color: var(--text-secondary);
 	}
 
 	.track-comment {
