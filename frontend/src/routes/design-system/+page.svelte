@@ -279,16 +279,26 @@
 		--accent-pressed: var(--teal-700);
 	}
 
+	/* One centered document. Every section — header, titles, descriptions and the
+	 * card grids — shares this container's left + right edges. --ds-measure keeps
+	 * paragraphs at a readable line length while still aligning to that left edge,
+	 * so the right side never reads as broken empty space. */
 	.ds {
-		max-width: 960px;
+		--ds-measure: 70ch;
+		max-width: 1120px;
 		margin: 0 auto;
-		padding: var(--space-5xl) var(--space-4xl) var(--space-6xl);
+		padding: var(--space-5xl) var(--space-5xl) var(--space-6xl);
 		height: 100%;
 		overflow-y: auto;
 		color: var(--text-1);
 	}
 
-	.ds__head { margin-bottom: var(--space-6xl); }
+	.ds__head {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-lg);
+		margin-bottom: var(--space-6xl);
+	}
 	.ds__kicker {
 		font-size: var(--text-xs);
 		font-weight: var(--font-weight-semibold);
@@ -296,38 +306,39 @@
 		letter-spacing: 0.08em;
 		text-transform: uppercase;
 		color: var(--accent-text);
-		margin-bottom: var(--space-lg);
 	}
 	.ds h1 {
 		font-size: var(--text-2xl);
 		line-height: var(--lh-2xl);
 		font-weight: var(--font-weight-semibold);
 		color: var(--text-1);
-		margin-bottom: var(--space-lg);
 	}
 	.ds__lede {
 		font-size: var(--text-lg);
 		line-height: var(--lh-lg);
 		color: var(--text-2);
-		max-width: 60ch;
+		max-width: var(--ds-measure);
 	}
 
+	/* Each section is a stack: title → description → content with uniform rhythm.
+	 * gap handles the title→description→content spacing; no per-element margins. */
 	.ds__section {
-		padding: var(--space-5xl) 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-lg);
+		padding: var(--space-6xl) 0;
 		border-top: 1px solid var(--border-subtle);
 	}
 	.ds h2 {
 		font-size: var(--text-xl);
 		line-height: var(--lh-xl);
 		font-weight: var(--font-weight-semibold);
-		margin-bottom: var(--space-md);
 	}
 	.ds__note {
 		font-size: var(--text-sm);
 		line-height: var(--lh-sm);
 		color: var(--text-3);
-		margin-bottom: var(--space-2xl);
-		max-width: 60ch;
+		max-width: var(--ds-measure);
 	}
 
 	/* color */
@@ -360,14 +371,12 @@
 		font-size: var(--text-lg);
 		line-height: var(--lh-lg);
 		font-weight: var(--font-weight-semibold);
-		margin-top: var(--space-4xl);
-		margin-bottom: var(--space-md);
+		margin-top: var(--space-3xl); /* extra break above a sub-block within a section */
 	}
 	.palette-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
 		gap: var(--space-lg);
-		margin-bottom: var(--space-2xl);
 	}
 	.palette-card {
 		display: flex;
@@ -409,11 +418,12 @@
 
 	.on-accent-proof {
 		display: flex; align-items: center; gap: var(--space-lg);
-		margin-top: var(--space-xl);
+		margin-top: var(--space-md); /* small lift above the proof block */
 		padding: var(--space-lg);
 		background: var(--surface-2);
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-md);
+		max-width: var(--ds-measure);
 	}
 	.on-accent-proof__chip {
 		background: var(--teal-600); color: #FFFFFF;
