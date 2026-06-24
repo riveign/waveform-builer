@@ -2,6 +2,8 @@
 	import Button from '$lib/components/primitives/Button.svelte';
 	import Stack from '$lib/components/primitives/Stack.svelte';
 	import Grid from '$lib/components/primitives/Grid.svelte';
+	import SimilarTrackCard from '$lib/components/library/SimilarTrackCard.svelte';
+	import type { SuggestNextItem, Track } from '$lib/types';
 
 	// Cerceta palette: five source colors mapped to UI roles. Each ratio is the
 	// WCAG 2.1 contrast figure measured against the app background (#0D0D0D).
@@ -81,6 +83,98 @@
 	const elevations = ['0', '1', '2', '3'];
 	const variants = ['primary', 'secondary', 'ghost', 'danger'] as const;
 	const sizes = ['sm', 'md', 'lg'] as const;
+
+	// Related tracks card — showcase mock data. The card consumes only module-level
+	// singleton stores (player, ui) and pure helpers, so it renders safely on this
+	// route with no provider. Artwork URLs intentionally 404 here, exercising the
+	// music-note fallback; one state below also forces the no-artwork variant.
+	// Callbacks are no-ops so the card is inert in the showcase.
+	function mockTrack(overrides: Partial<Track>): Track {
+		return {
+			id: 0, title: null, artist: null, album: null, label: null,
+			bpm: null, key: null, rating: null, genre: null, energy: null,
+			duration_sec: null, play_count: null, kiku_play_count: null,
+			has_waveform: false, has_features: false, resolved_energy: null,
+			energy_source: null, energy_confidence: null, energy_value: null,
+			energy_label: null, energy_conflict: null, date_added: null,
+			release_year: null, track_number: null, disc_number: null,
+			comment: null, playlist_tags: [], genre_family: null,
+			...overrides,
+		};
+	}
+
+	function mockItem(track: Track, score: number): SuggestNextItem {
+		return {
+			track,
+			score,
+			breakdown: {
+				harmonic: score, energy_fit: score, bpm_compat: score,
+				genre_coherence: score, track_quality: score, total: score,
+			},
+		};
+	}
+
+	// The parent track context every card scores against (128 BPM, 8A).
+	const parentBpm = 128;
+	const parentKey = '8A';
+
+	// Four meaningful states shown side by side.
+	const relatedStates: {
+		label: string;
+		item: SuggestNextItem;
+		affinity: string | null;
+	}[] = [
+		{
+			label: 'Strong match',
+			affinity: 'good',
+			item: mockItem(
+				mockTrack({
+					id: 9001, title: 'Midnight Drive', artist: 'Lena Vox',
+					bpm: 128, key: '8A', rating: 5, genre_family: 'Techno',
+					resolved_energy: 'peak',
+				}),
+				0.94,
+			),
+		},
+		{
+			label: 'Key / BPM clash',
+			affinity: null,
+			item: mockItem(
+				mockTrack({
+					id: 9002, title: 'Off Axis', artist: 'Corner Theory',
+					bpm: 122, key: '3B', rating: 3, genre_family: 'House',
+					resolved_energy: 'build',
+				}),
+				0.41,
+			),
+		},
+		{
+			label: 'No artwork (fallback)',
+			affinity: null,
+			item: mockItem(
+				mockTrack({
+					id: 9003, title: 'Untagged Bootleg With A Very Long Title That Clamps',
+					artist: 'Unknown Pressing', bpm: 131, key: '9A', rating: 0,
+					genre_family: 'Groove', resolved_energy: 'drive',
+				}),
+				0.78,
+			),
+		},
+		{
+			label: 'Marked: not for me',
+			affinity: 'bad',
+			item: mockItem(
+				mockTrack({
+					id: 9004, title: 'Warm Up Tool', artist: 'Slow Hands',
+					bpm: 124, key: '7A', rating: 4, genre_family: 'Trance',
+					resolved_energy: 'warmup',
+				}),
+				0.66,
+			),
+		},
+	];
+
+	const noop = () => {};
 </script>
 
 <div class="ds" data-theme="cerceta">
@@ -286,7 +380,34 @@
 		</div>
 	</section>
 
-	<!-- 9. REFERENCES -->
+	<!-- 9. RELATED TRACKS CARD -->
+	<section class="ds__section">
+		<h2>Related tracks card</h2>
+		<p class="ds__note">
+			The card shown under the "Related tracks" header on the track view — each entry is a candidate
+			to mix into next. It surfaces title and artist, the BPM with a signed delta from the current
+			track, the Camelot key chip and a harmony-move icon, genre and energy-phase pills, the match
+			score out of 100, a read-only rating, and an affinity dot. Below are four representative
+			states; artwork falls back to the music-note mark when none is available.
+		</p>
+		<div class="related-grid">
+			{#each relatedStates as s (s.item.track.id)}
+				<div class="related-cell">
+					<span class="related-cell__label">{s.label}</span>
+					<SimilarTrackCard
+						item={s.item}
+						parentTrackId={1}
+						parentBpm={parentBpm}
+						parentKey={parentKey}
+						affinity={s.affinity}
+						onaffinitychange={noop}
+					/>
+				</div>
+			{/each}
+		</div>
+	</section>
+
+	<!-- 10. REFERENCES -->
 	<section class="ds__section">
 		<h2>References</h2>
 		<p class="ds__note">
@@ -539,5 +660,31 @@
 	.btn-row__label {
 		font-size: var(--text-xs); color: var(--text-3);
 		width: 80px; flex-shrink: 0; text-transform: capitalize;
+	}
+
+	/* related tracks card — four states on the same equal-height grid the live
+	 * track view uses, so the showcase matches reality. Each cell carries a small
+	 * caption above the real card. */
+	.related-grid {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-auto-rows: 1fr;
+		gap: var(--space-lg);
+	}
+	.related-cell {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-sm);
+		min-width: 0;
+	}
+	.related-cell__label {
+		font-size: var(--text-2xs);
+		color: var(--text-3);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	@media (max-width: 720px) {
+		.related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	}
 </style>
