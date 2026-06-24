@@ -46,6 +46,7 @@
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { getCamelotColor, formatKey, keyMoveLabel } from '$lib/utils/camelot';
 	import HarmonyIcon, { toHarmonyRelation, HARMONY_RELATION_LABEL } from '$lib/components/primitives/HarmonyIcon.svelte';
+	import MetronomeIcon from '$lib/components/primitives/MetronomeIcon.svelte';
 
 	let {
 		item,
@@ -123,8 +124,23 @@
 		energyZone && ZONES.includes(energyZone) ? `var(--zone-${energyZone})` : 'var(--text-2)',
 	);
 
+	// Full opinion phrasing — kept for the hover title / aria so it reads naturally.
 	const affinityLabel = $derived(
 		affinity === 'good' ? 'Great together' : affinity === 'bad' ? 'Not for me' : null,
+	);
+	// TERSE visible match word (the signals row was too wide with "Great together" /
+	// "Likely match"). Single short words only — same scoreStrength() thresholds, only
+	// the displayed text changes. A 'bad' opinion reads "Not for me"; otherwise the
+	// strength label maps Strong→"Great", Likely→"Likely", Weak→"Weak". The fuller
+	// phrasing lives in the title/aria-label.
+	const matchWord = $derived.by(() => {
+		if (affinity === 'bad') return 'Not for me';
+		if (affinity === 'good') return 'Great';
+		return strength.label === 'Strong' ? 'Great' : strength.label;
+	});
+	// Natural-language hover/aria text for the match verdict.
+	const matchTitle = $derived(
+		affinityLabel ? `${affinityLabel} · ${strength.label} match` : `${strength.label} match`,
 	);
 
 	function handleCardClick() {
@@ -228,16 +244,17 @@
 		<div class="text-col">
 			<span class="track-title" title={titleText}>{capFirst(titleText)}</span>
 			<!-- Identity subtitle: artist (plain muted text, ellipsizes FIRST under
-			     width pressure) + a visible genre CHIP. Genre is a small genre-colored
-			     Chip rather than muted text so it reads as clearly as the key/energy
-			     chips. The genre chip is HIDDEN at the compact tier (space too tight).
-			     Genre stays OUT of the Tier-2 chip row (that caused the prior overflow). -->
+			     width pressure) · genre as genre-family-COLORED TEXT (no box/border).
+			     Genre is lightweight colored text — the color carries the signal, so it
+			     reads without the visual weight of a chip on the dense identity line.
+			     Artist `flex-shrink:1` yields space first so the artist ellipsizes BEFORE
+			     the genre word. Genre shows at the regular + intermediate tiers and is
+			     hidden ONLY at the compact tier (Row 2 is essentials-only there). -->
 			<span class="track-meta">
 				<span class="track-artist" title={artistText}>{capFirst(artistText)}</span>
 				{#if genreLabel}
-					<span class="track-genre" title="Genre: {genreLabel}">
-						<Chip variant="genre" size="sm" value={capFirst(genreLabel)} title="Genre: {genreLabel}" />
-					</span>
+					<span class="meta-dot" aria-hidden="true">·</span>
+					<span class="track-genre" title="Genre: {genreLabel}">{capFirst(genreLabel)}</span>
 				{/if}
 			</span>
 		</div>
@@ -279,12 +296,6 @@
 	     lives in Tier 1 (identity), not here. overflow:hidden is a final safety
 	     net only. -->
 	<div class="zone-chips">
-		<!-- Compact-tier score: at <200px the signals row is dropped and the score
-		     moves up onto this line (NN/100 · key · BPM · match). Hidden at the
-		     regular + intermediate tiers, where the score lives in the signals row. -->
-		<span class="chips-score" title="Match score {scoreDisplay} out of 100">
-			<span class="score-number">{scoreDisplay}</span><span class="score-suffix">/100</span>
-		</span>
 		{#if track.key}
 			<Chip
 				variant="key"
@@ -328,19 +339,58 @@
 			     full value on hover. Never clips a chip. -->
 			<span class="chips-more" title="Energy zone: {capFirst(energyZone)}">+1</span>
 		{/if}
-		<!-- Compact-tier match: bar + word, pushed right onto Row 2. Hidden at the
-		     regular + intermediate tiers (match lives in the signals row there). -->
+	</div>
+
+	<!-- Compact-tier ONLY: a single row of COLOR-CODED ICONS (no text, no numbers,
+	     no chips). At <200px the card becomes a dense pill; the chip row + signals
+	     row are hidden and the signal is carried purely by icon SHAPE + COLOR + the
+	     star count. Every icon keeps its real value in aria-label/title so nothing
+	     is lost (a11y), and the distinct shapes mean color is never the only cue. -->
+	<div class="compact-icons">
+		{#if track.key && harmonyRelation}
+			<span
+				class="cicon"
+				style="color: {keyColor}"
+				title={harmony ? `${formatKey(track.key)} — ${harmony.label} from this track` : `Key ${formatKey(track.key)}`}
+			>
+				<HarmonyIcon
+					relation={harmonyRelation}
+					size="sm"
+					label={harmony ? `${formatKey(track.key)}, ${harmony.label}` : `Key ${formatKey(track.key)}`}
+					title={harmony ? `${formatKey(track.key)} — ${harmony.label} from this track` : `Key ${formatKey(track.key)}`}
+				/>
+			</span>
+		{/if}
+		{#if track.bpm}
+			<span
+				class="cicon"
+				style="color: {bpmDeltaTone === 'warn' ? 'var(--bpm-delta-warn)' : 'var(--text-2)'}"
+				title="{Math.round(track.bpm)} BPM{bpmDelta !== null && bpmDelta !== 0 ? ` (${bpmDelta > 0 ? '+' : '−'}${Math.abs(bpmDelta)} vs this track)` : ''}"
+			>
+				<MetronomeIcon
+					size="sm"
+					label="{Math.round(track.bpm)} BPM"
+					title="{Math.round(track.bpm)} BPM{bpmDelta !== null && bpmDelta !== 0 ? ` (${bpmDelta > 0 ? '+' : '−'}${Math.abs(bpmDelta)} vs this track)` : ''}"
+				/>
+			</span>
+		{/if}
 		<span
-			class="chips-match affinity-{strength.tone}"
-			title={affinityLabel ? `${affinityLabel} · ${strength.label} match` : `${strength.label} match`}
+			class="cicon affinity-{strength.tone}"
+			role="img"
+			aria-label={matchTitle}
+			title={matchTitle}
 		>
 			<span class="affinity-bars" aria-hidden="true">
 				<span class="bar" class:on={strength.level >= 1}></span>
 				<span class="bar" class:on={strength.level >= 2}></span>
 				<span class="bar" class:on={strength.level >= 3}></span>
 			</span>
-			<span class="affinity-text">{affinityLabel ?? `${strength.label} match`}</span>
 		</span>
+		{#if track.rating && track.rating > 0}
+			<span class="cicon cicon-stars" title="Your rating: {track.rating} of 5">
+				<StarRating rating={track.rating} display="compact" size="sm" />
+			</span>
+		{/if}
 	</div>
 
 	<!-- Divider -->
@@ -360,14 +410,14 @@
 		</div>
 		<div
 			class="signal-affinity affinity-{strength.tone}"
-			title={affinityLabel ? `${affinityLabel} · ${strength.label} match` : `${strength.label} match`}
+			title={matchTitle}
 		>
 			<span class="affinity-bars" aria-hidden="true">
 				<span class="bar" class:on={strength.level >= 1}></span>
 				<span class="bar" class:on={strength.level >= 2}></span>
 				<span class="bar" class:on={strength.level >= 3}></span>
 			</span>
-			<span class="affinity-text">{affinityLabel ?? `${strength.label} match`}</span>
+			<span class="affinity-text">{matchWord}</span>
 		</div>
 	</div>
 </div>
@@ -420,8 +470,10 @@
 		overflow: hidden;
 	}
 
-	/* Push the signals row to the bottom so it lines up across all cards. */
-	.zone-chips + .zone-divider {
+	/* Push the signals row to the bottom so it lines up across all cards. The
+	 * divider sits between the (hidden-at-regular) compact-icons row and the signals
+	 * row, so the margin goes on the divider that precedes the signals. */
+	.compact-icons + .zone-divider {
 		margin-top: auto;
 	}
 
@@ -501,11 +553,12 @@
 	/* Artist + genre on one identity subtitle line. Genre is descriptive identity
 	 * metadata (not a transition signal), so it lives here in Tier 1 — not in the
 	 * chip row. The artist is plain muted text and ellipsizes FIRST under width
-	 * pressure; the genre CHIP stays fixed and visible so genre reads as clearly as
-	 * the key/energy chips. Full artist value on hover via title (§2). */
+	 * pressure; the genre is genre-family-COLORED TEXT (no box) — the color is the
+	 * signal, so it stays legible while staying lightweight. Full artist/genre value
+	 * on hover via title (§2). */
 	.track-meta {
 		display: flex;
-		align-items: center;
+		align-items: baseline;
 		gap: var(--space-xs);
 		min-width: 0;
 		font-size: var(--text-xs);
@@ -518,16 +571,29 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		min-width: 0;
-		/* Artist yields space first so the genre chip stays visible. */
+		/* Artist yields space first so the genre word stays visible. */
 		flex-shrink: 1;
 	}
 
-	/* The genre chip wrapper holds its intrinsic width — it does not shrink, so the
-	 * genre stays legible while the artist text ellipsizes around it. */
+	/* Separator between artist and genre — muted, never shrinks. */
+	.meta-dot {
+		flex-shrink: 0;
+		color: var(--text-4);
+	}
+
+	/* Genre as genre-family-COLORED TEXT (NO background/border): the color is the
+	 * only signal. Uses the tokenized genre color (--chip-genre-fg, cerceta-aware)
+	 * so it never hardcodes hex and re-themes automatically. Holds its intrinsic
+	 * width (does not shrink) so the artist ellipsizes first, then 1-line ellipsis +
+	 * `title` hover if the genre itself overflows. */
 	.track-genre {
 		flex-shrink: 0;
 		min-width: 0;
-		display: inline-flex;
+		color: var(--chip-genre-fg);
+		font-weight: var(--font-weight-medium);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.menu-area {
@@ -593,32 +659,40 @@
 		cursor: default;
 	}
 
-	/* Compact-tier-only elements — hidden at the regular + intermediate tiers,
-	 * where the score + match live in the dedicated signals row. At the compact
-	 * tier the signals row is dropped and these move onto the chip line. */
-	.chips-score {
+	/* ── Compact-tier icon row ── color-coded ICONS ONLY (no text/numbers/chips).
+	 * Hidden at regular + intermediate; revealed at the compact tier (below) where
+	 * the card becomes a dense pill. Each icon's color carries the signal; the
+	 * distinct SHAPES (harmony glyph, metronome, strength bars, stars) keep color
+	 * from being the only cue, and per-icon title/aria-label preserve the real
+	 * value. */
+	.compact-icons {
 		display: none;
-		flex-shrink: 0;
-		align-items: baseline;
-	}
-	.chips-match {
-		display: none;
-		flex-shrink: 0;
 		align-items: center;
-		gap: var(--space-xs);
-		margin-left: auto;
-		--strength-color: var(--text-3);
+		gap: var(--space-md);
+		padding: 0 var(--space-md) var(--space-md);
+		margin-top: auto;
 	}
-	.chips-match.affinity-success { --strength-color: var(--score-excellent); }
-	.chips-match.affinity-warn { --strength-color: var(--score-good); }
-	.chips-match.affinity-danger { --strength-color: var(--score-poor); }
-	.chips-match .affinity-text {
-		font-size: var(--text-2xs);
-		font-weight: var(--font-weight-medium);
-		color: var(--strength-color);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+	.cicon {
+		display: inline-flex;
+		align-items: center;
+		flex-shrink: 0;
+		line-height: 0;
+	}
+	/* the match-bars icon colors by affinity strength via the shared mapping. */
+	.cicon.affinity-success { --strength-color: var(--score-excellent); }
+	.cicon.affinity-warn { --strength-color: var(--score-good); }
+	.cicon.affinity-danger { --strength-color: var(--score-poor); }
+	.cicon.affinity-success,
+	.cicon.affinity-warn,
+	.cicon.affinity-danger { color: var(--strength-color); }
+	.compact-icons :global(.harmony-icon--sm),
+	.compact-icons :global(.metronome-icon--sm) {
+		width: var(--icon-size-sm);
+		height: var(--icon-size-sm);
+	}
+	/* stars sit at the trailing edge of the icon row. */
+	.cicon-stars {
+		margin-left: auto;
 	}
 
 	/* BPM chip internals — the metronome glyph (auto-rendered by the bpm variant)
@@ -639,18 +713,20 @@
 		height: var(--icon-size-sm);
 	}
 
-	/* ── Tier 3: Track signals — 3-column grid: score · rating · match ──
-	 * Three explicit columns so cards in a row read as aligned columns:
-	 *   1) score NN/100 — sized to its content (the lead/anchor),
-	 *   2) rating N★ / — — sized to its content,
-	 *   3) match — takes the remaining space (1fr), right-aligned.
-	 * min-width:0 on the cells lets the match column ellipsize instead of
-	 * forcing the row wider than the narrow card. */
+	/* ── Tier 3: Track signals — THREE BALANCED columns: score · rating · match ──
+	 * `repeat(3, minmax(0,1fr))` gives each signal an equal third, so they read as
+	 * aligned columns down a row of cards (no bunch-left + dead-gap-right). Column
+	 * content alignment reads like a table:
+	 *   1) score NN/100 — start (left), the lead/anchor,
+	 *   2) rating N★ / — — start (left),
+	 *   3) match — END (right), so the verdict sits at the card's trailing edge.
+	 * min-width:0 (via minmax) lets the match column ellipsize within its third
+	 * instead of forcing the row wider than the narrow card. */
 	.zone-signals {
 		display: grid;
-		grid-template-columns: auto auto minmax(0, 1fr);
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		align-items: center;
-		gap: var(--space-md);
+		gap: var(--space-sm);
 		padding: var(--space-sm) var(--space-md) var(--space-md);
 	}
 
@@ -682,12 +758,14 @@
 	}
 
 	/* Affinity as a labelled qualitative strength — bar + word, never a raw
-	 * number and never color alone (content-conventions §3, §4). Pushed right. */
+	 * number and never color alone (content-conventions §3, §4). Sits at the END of
+	 * its 1fr column (trailing edge), so it reads as the right-most aligned column
+	 * across a row of cards. */
 	.signal-affinity {
 		display: flex;
 		align-items: center;
+		justify-content: flex-end;
 		gap: var(--space-xs);
-		margin-left: auto;
 		min-width: 0;
 		--strength-color: var(--text-3);
 	}
@@ -760,10 +838,8 @@
 			width: 30px;
 			height: 30px;
 		}
-		/* genre chip drops — artist alone on the subtitle line. */
-		.track-genre {
-			display: none;
-		}
+		/* Genre STAYS at the intermediate tier — it is now lightweight colored text,
+		 * not a chip, so it costs almost no width. Only the compact tier hides it. */
 		/* energy chip drops as a whole unit; "+1" surfaces in its place. */
 		.energy-chip {
 			display: none;
@@ -782,42 +858,46 @@
 		}
 	}
 
-	/* ── Compact (≤ 200px) — restructured 2-line layout ── */
+	/* ── Compact (< 200px) — DENSE PILL, color-coded icons only ──
+	 * The card is space-starved here, so it becomes a minimal, badge-like PILL:
+	 * rounder corners, no chips, no numbers, no text values. Top: small artwork +
+	 * 1-line title (+ ⋮ only if it fits). Below: a single row of COLOR-CODED ICONS —
+	 * harmony glyph · metronome · match-strength bars · N★ — where icon SHAPE + COLOR
+	 * + the star count carry the whole signal. Everything else is hidden: the numeric
+	 * score, key text, BPM number, genre, energy, the + action, both dividers and the
+	 * whole chip + signals rows. Per-icon title/aria-label keep the real values, so
+	 * nothing is lost and color is never the only cue. Legible/no-overlap to ~180px. */
 	@container relcard (max-width: 200px) {
-		/* Row 1: artwork + title + ⋮ only. The + action and the dividers go away;
-		 * the signals row is dropped entirely and its data moves onto Row 2. */
+		/* pill treatment — rounder so the dense variant reads as distinct. */
+		.similar-card {
+			border-radius: var(--radius-full);
+		}
+		/* Top: artwork + title (+ ⋮). The + action, both dividers, the full chip row
+		 * and the signals row are all hidden; the icon row replaces them. */
 		.zone-divider,
 		.zone-signals,
+		.zone-chips,
 		.add-btn {
 			display: none;
 		}
+		/* Genre, energy and stars (in identity/chips) drop — the icon row carries the
+		 * signal instead. (energy chip already drops via the ≤240px intermediate query.) */
+		.track-genre,
+		.meta-dot {
+			display: none;
+		}
 		.zone-header {
-			padding: var(--space-sm) var(--space-sm) var(--space-2xs);
+			padding: var(--space-sm) var(--space-md) var(--space-2xs) var(--space-sm);
 		}
 		.artwork-wrap {
 			width: 28px;
 			height: 28px;
 		}
-		/* Row 2: NN/100 · key(+harmony) · BPM · match. Score + match move up here;
-		 * stars, energy and genre stay hidden (inherited from intermediate). */
-		.chips-score {
-			display: inline-flex;
-		}
-		.chips-match {
-			display: inline-flex;
-		}
-		/* "+1" is redundant in the compact row (energy is intentionally dropped). */
-		.chips-more {
-			display: none;
-		}
-		.zone-chips {
-			gap: var(--space-2xs);
-			padding: 0 var(--space-sm) var(--space-sm);
-			/* let the chip line use the full width; match is pushed right. */
-			margin-top: auto;
-		}
-		.chips-score .score-number {
-			font-size: var(--text-base);
+		/* the icon row becomes the bottom row, pushed down so cards align. */
+		.compact-icons {
+			display: flex;
+			gap: var(--space-lg);
+			padding: var(--space-2xs) var(--space-md) var(--space-sm) var(--space-sm);
 		}
 	}
 </style>

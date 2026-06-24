@@ -733,27 +733,32 @@
 			The card shown under the "Related tracks" header on the track view — each entry is a candidate
 			to mix into next, built entirely from the design-system primitives (<code>Chip</code>,
 			<code>StarRating</code>, <code>HarmonyIcon</code>, <code>Menu</code>). It stacks three tiers:
-			<strong>identity</strong> (first-letter-capped title, with artist · genre on a muted subtitle
-			line — genre is descriptive identity metadata, so it lives here, not in the chip row); the
+			<strong>identity</strong> (first-letter-capped title, with artist · genre on a subtitle line —
+			the genre is rendered as <strong>genre-family-colored text</strong> (no box), the color carrying
+			the signal, while the artist stays muted plain text and ellipsizes first); the
 			<strong>attribute chips</strong> in priority order key → BPM → energy, the key chip carrying its
-			harmony-move icon; and the <strong>Track signals</strong> block — a 3-column grid of the match
-			score <code>NN/100</code> (lead), the DJ's rating as a compact <code>N★</code>, and affinity
-			rendered as a labelled qualitative strength bar (Strong / Likely / Weak match) rather than a
-			second raw number.
+			harmony-move icon; and the <strong>Track signals</strong> block — <strong>three balanced columns</strong>
+			(each an equal third) of the match score <code>NN/100</code> (lead, left), the DJ's rating as a
+			compact <code>N★</code> (left), and affinity rendered as a labelled qualitative strength bar
+			(Strong / Likely / Weak match, right) rather than a second raw number.
 		</p>
 		<p class="ds__note">
 			The card is a <strong>size container</strong>: it renders across grid densities (4-up, 6-up, the
 			expanded "Show more" grid) and adapts to its real column width through three container-query
 			tiers rather than one shrinking design. <strong>Regular (≥240px)</strong> shows everything:
-			identity with artist + a visible genre chip, chips key → BPM → energy, and the 3-column signals
-			grid (NN/100 · N★ · match). <strong>Intermediate (200–240px)</strong> tightens — smaller artwork,
-			the genre chip and the energy chip drop (energy surfaces a muted <code>+1</code>), chips become
-			key + BPM, signals stay the 3-column grid. <strong>Compact (&lt;200px)</strong> is restructured
-			into a dense two-line layout — Row 1: artwork + title + ⋮; Row 2: NN/100 · key · BPM · match.
-			Stars, energy and genre are hidden there. Chips never clip mid-word at any width.
+			identity with artist + genre-colored text, chips key → BPM → energy, and the three-balanced-column
+			signals grid (NN/100 · N★ · match). <strong>Intermediate (200–240px)</strong> tightens — smaller
+			artwork and the energy chip drops (surfacing a muted <code>+1</code>), chips become key + BPM, but
+			the lightweight genre text and the three-column signals both stay. <strong>Compact (&lt;200px)</strong>
+			becomes a dense <strong>pill</strong> (rounder, badge-like): artwork + title (+ ⋮), then a single row
+			of <strong>color-coded icons only</strong> — harmony glyph · metronome · match-strength bars · N★ —
+			where icon shape + color + the star count carry the signal. The numeric score, key text, BPM number,
+			genre and energy all drop there; every icon keeps its real value in its <code>title</code>/aria-label.
+			Chips never clip mid-word at any width. The visible match verdict is a single terse word
+			(<strong>Great / Likely / Weak / Not for me</strong>), with the fuller phrasing on hover.
 		</p>
 
-		<p class="related-density-label">Regular — ~250px columns (everything visible)</p>
+		<p class="related-density-label">Regular — ~250px columns (everything visible; genre as colored text)</p>
 		<div class="related-grid related-grid--regular">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">
@@ -770,7 +775,7 @@
 			{/each}
 		</div>
 
-		<p class="related-density-label">Intermediate — ~220px columns (genre + energy drop, energy → +1)</p>
+		<p class="related-density-label">Intermediate — ~220px columns (genre kept; energy drops → +1)</p>
 		<div class="related-grid related-grid--intermediate">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">
@@ -786,7 +791,7 @@
 			{/each}
 		</div>
 
-		<p class="related-density-label">Compact — ~190px columns (restructured 2-line: title + ⋮ / NN/100 · key · BPM · match)</p>
+		<p class="related-density-label">Compact — ~190px columns (dense pill: artwork + title / color-coded icons only — harmony · metronome · match bars · N★)</p>
 		<div class="related-grid related-grid--compact">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">

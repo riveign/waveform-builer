@@ -29,7 +29,7 @@ flowchart TB
         subgraph T1["Tier 1 — Identity"]
             direction LR
             ART["Artwork 38×38<br/>(music-note fallback)"]
-            TXT["Title (1 line, ellipsis)<br/>Artist + [Genre chip]"]
+            TXT["Title (1 line, ellipsis)<br/>Artist · *genre-colored text*"]
             ACT["+ add · ⋮ menu"]
             ART --> TXT --> ACT
         end
@@ -41,7 +41,7 @@ flowchart TB
             EN["Energy zone (Peak)<br/>drops → +1 when narrow"]
         end
         D2["── divider ──"]
-        subgraph T3["Tier 3 — Track signals (3-col grid)"]
+        subgraph T3["Tier 3 — Track signals (3 balanced cols)"]
             direction LR
             SIG["score NN/100 | N★ rating | match strength"]
         end
@@ -49,13 +49,13 @@ flowchart TB
     end
 ```
 
-- **Tier 1 — Identity**: artwork → title → **artist + genre chip** subtitle. Who is this
-  track? Plus the per-card actions (`+` add to set, `⋮` `<Menu>`). Title is one line,
+- **Tier 1 — Identity**: artwork → title → **artist · genre-colored text** subtitle. Who is
+  this track? Plus the per-card actions (`+` add to set, `⋮` `<Menu>`). Title is one line,
   first-letter-capped, full value on hover. **Genre lives here**, not in the chip row:
   it is descriptive identity metadata, not a transition signal, so it belongs with the
-  artist on the subtitle line. Genre is rendered as a small **genre `<Chip>`** (not muted
-  text) so it reads as clearly as the colored key/energy chips; the artist is plain muted
-  text that ellipsizes first under width pressure.
+  artist on the subtitle line. Genre is rendered as **genre-family-colored text** (no box /
+  background / border) — the color *is* the signal, keeping it lightweight on the dense
+  line. The artist is plain muted text that ellipsizes first under width pressure.
 - **Tier 2 — Attribute chips / the "why"**: the harmonic and energetic reasons it
   fits, as `<Chip>`s in priority order key → BPM → energy — Camelot key +
   harmony-move icon, a **metronome glyph + integer BPM + signed delta** (no literal
@@ -71,20 +71,23 @@ flowchart TB
 
 - **Title** is one line, ellipsis on overflow, **no wrap**. (This replaced the old
   2-line `-webkit-line-clamp: 2`.)
-- **Artist and genre share one identity subtitle line.** The artist is plain muted text;
-  **genre is a small `<Chip variant="genre" size="sm">`**, placed after the artist (e.g.
-  `Lena Vox  [Techno]`). Genre was moved out of the chip row into the identity tier
-  because it is descriptive metadata, not a transition signal — it belongs with *who the
-  track is*, beside the artist. The artist takes priority and **ellipsizes first** under
-  width pressure (`flex-shrink: 1`); the **genre chip stays fixed and visible**
-  (`flex-shrink: 0`) so it reads as clearly as the colored key/energy chips. When genre
-  is missing, only the artist shows. The genre chip is **hidden** at the intermediate and
-  compact tiers (space too tight — see [Responsive tiers](#responsive-tiers)).
-- The genre chip's visibility comes from the `genre` `<Chip>` variant's own tinted
-  treatment (a soft accent-tinted surface + accent-strength text + matching border,
-  all from `--chip-genre-*` tokens) — a **system-wide** contrast bump so every genre
-  chip reads clearly, not just on this card.
-- Full value exposed on hover/focus via `title` on the artist span and the genre chip
+- **Artist and genre share one identity subtitle line**, separated by a muted `·`. The
+  artist is plain muted text; **genre is genre-family-colored TEXT** (no box / background /
+  border), placed after the artist (e.g. `Lena Vox · Techno`, the word "Techno" colored).
+  Genre was kept out of the chip row because it is descriptive metadata, not a transition
+  signal — it belongs with *who the track is*, beside the artist. An earlier pass tried a
+  genre **chip** here, but the box read too heavy on this dense line and a plain muted-grey
+  fallback was invisible; **colored text** is the resolution — visible without weight, the
+  color carrying the meaning. The artist takes priority and **ellipsizes first** under
+  width pressure (`flex-shrink: 1`); the **genre word holds its width** (`flex-shrink: 0`)
+  then 1-line ellipsis + `title` if it overflows on its own. When genre is missing, only
+  the artist shows. Genre stays at **regular + intermediate** tiers and is hidden **only at
+  compact** (see [Responsive tiers](#responsive-tiers)).
+- The genre text color comes from the tokenized `--chip-genre-fg` (the genre color from the
+  system-wide genre treatment, derived from `--accent-text`) — so it is **cerceta-aware**
+  automatically and never hardcodes hex. The card has no per-family token set; this one
+  genre color token is the single source.
+- Full value exposed on hover/focus via `title` on the artist span and the genre span
   (per [content-conventions §2](./content-conventions.md#2-overflow--wrapping)).
 - Title and artist are **first-letter-capped** via the shared `capFirst()` helper —
   the first visible character is forced to a capital, the rest of the string is left
@@ -106,8 +109,8 @@ Tier 2 renders a row of chips in a fixed **priority order**:
 3. **Energy** (zone) — where it sits in the journey. Lowest priority; **drops first**
    when the card is narrow.
 
-Genre is **no longer a Tier-2 chip** — it moved to the identity tier as a genre chip
-(see [Title, artist & genre](#title-artist--genre)).
+Genre is **not a Tier-2 chip** — it lives in the identity tier as genre-family-colored
+text (see [Title, artist & genre](#title-artist--genre)).
 
 All are the shared `<Chip>` primitive (`variant="key|bpm|energy"`) — no bespoke pills.
 The key chip carries a `<HarmonyIcon>` glyph for the move.
@@ -130,7 +133,8 @@ the `bpm` variant), so every migrated bpm chip is consistent.
   [Responsive tiers](#responsive-tiers) for the full breakdown.
 - Chip colors come from **semantic tokens by meaning** (the `--zone-*` set for
   energy, `--score-*` for the harmony band, `--bpm-delta-*` via the chip's `tone`
-  for the ±6% tension rule, `--chip-genre-*` for genre) — never hardcoded pastel hex.
+  for the ±6% tension rule) — never hardcoded pastel hex. Genre (now identity text,
+  not a chip) uses `--chip-genre-fg`.
 - Each color-coded chip pairs color with text/glyph (zone name, harmony glyph,
   signed delta, metronome glyph), per §4.
 
@@ -144,17 +148,18 @@ expanded). Nothing is ever clipped mid-word; tiers hide whole elements or restru
 
 | Tier | Container width | Shows | Hides / changes |
 |------|-----------------|-------|-----------------|
-| **Regular** | ≥ 240px | Everything: identity (artist + **genre chip**), chips **key → BPM → energy**, 3-col signals (`NN/100` · `N★` · match). | — |
-| **Intermediate** | 200–240px | Identity (artist only), chips **key + BPM**, 3-col signals. | **Genre chip drops**; **energy chip drops** → muted `+1`; smaller artwork, tighter padding/gaps. |
-| **Compact** | < 200px | **Restructured 2-line** layout. **Row 1**: small artwork + 1-line title + `⋮`. **Row 2**: `NN/100` · key(+harmony) · BPM(metronome) · match (bar + word). | Stars (`N★`), energy, genre, the `+` action, and the dividers + signals row are all hidden; the score + match move up onto Row 2. |
+| **Regular** | ≥ 240px | Everything: identity (artist · **genre-colored text**), chips **key → BPM → energy**, three-balanced-column signals (`NN/100` · `N★` · match). | — |
+| **Intermediate** | 200–240px | Identity (artist · **genre-colored text — KEPT**), chips **key + BPM**, three-column signals. | **Energy chip drops** → muted `+1`; smaller artwork, tighter padding/gaps. (Genre stays — it's lightweight colored text, costs almost no width.) |
+| **Compact** | < 200px | **Dense PILL** (rounder, badge-like). **Top**: small artwork + 1-line title (+ `⋮` if it fits). **Below**: a single row of **color-coded ICONS only** — harmony glyph · metronome · match-strength bars · `N★`. | The numeric **score**, **key text**, **BPM number**, **genre**, **energy**, the `+` action, both dividers and the whole chip + signals rows all hidden. Icon **shape + color + star count** carry the signal; each icon's real value lives in its `title`/aria-label. |
 
 - The container queries are placed **last** in the stylesheet so they win over the base
   (regular) rules by source order (container queries add no specificity).
 - The chip row is still **no-wrap** with `overflow: hidden` as a **final safety net
   only** — the tiers are what actually prevent clipping.
-- At compact, the match word ellipsizes at the right edge if the column is very tight
-  (`minmax`/`text-overflow: ellipsis`); it is never clipped mid-glyph, and key + BPM
-  + score stay fully legible down to ≈180–190px.
+- At compact the match is an **icon** (the colored strength bars), not text — so the wording
+  is irrelevant there; the value is in its `title`/aria-label. The icon row is legible with
+  no overlap down to ≈180px. The compact card is rounder (`--radius-full`) so the dense
+  variant reads as visually distinct from the regular card.
 
 ---
 
@@ -173,45 +178,54 @@ your call* — in a single glance.
 - **Rating** — the DJ's own rating as a compact `N★` (`StarRating display="compact"`).
 - **Affinity strength** — a labelled qualitative strength, NOT a raw number.
 
-**Layout** (token-based, no literals) — a **3-column CSS grid**,
-`display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items:
-center; gap: var(--space-md)`, with the same `--space-sm var(--space-md)` padding as
-the other tiers. The three explicit columns mean cards in a row read as **aligned
-columns**, left → right:
+**Layout** (token-based, no literals) — **three BALANCED columns**,
+`display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center;
+gap: var(--space-sm)`, with the same `--space-sm var(--space-md)` padding as the other
+tiers. Each signal gets an **equal third** so cards in a row read as **aligned columns**
+with no bunch-left + dead-gap-right; the per-column content alignment reads like a table:
 
-1. **Score `NN/100` (column 1 — lead anchor, heaviest)** — `auto` width. `NN` at
+1. **Score `NN/100` (column 1 — lead anchor, heaviest; aligned START/left)** — `NN` at
    `--text-lg`, `--font-weight-semibold`, `--text-1`; suffix `/100` at `--text-xs`,
    `--text-3`. It is the headline verdict, so it carries the most weight.
-2. **Rating (column 2)** — `auto` width. `<StarRating display="compact" size="sm" />`
+2. **Rating (column 2 — aligned START/left)** — `<StarRating display="compact" size="sm" />`
    → `N★` when `rating > 0` (the DJ's curation signal beside the tool's verdict); when
    unrated, the canonical muted `—` (content-conventions §3), never a blank gap.
-3. **Match strength (column 3 — `minmax(0, 1fr)`, takes the remaining space)** — a
-   small 3-segment **strength bar + word**, mapping the match score onto a qualitative
-   band so the row never shows a second raw number competing with `NN/100` (§3) and
-   never relies on color alone (§4). When the DJ has set an explicit opinion the word
-   becomes that opinion ("Great together" / "Not for me"); otherwise it reads the
-   strength label. The full opinion + strength is in the `title` tooltip.
+3. **Match strength (column 3 — aligned END/right)** — a small 3-segment **strength bar +
+   TERSE word** (`justify-content: flex-end`), mapping the match score onto a qualitative
+   band so the row never shows a second raw number competing with `NN/100` (§3) and never
+   relies on color alone (§4). The visible word is a single short token —
+   **Great** (Strong tier or a `good` opinion) / **Likely** / **Weak** / **Not for me**
+   (a `bad` opinion) — deliberately terse so the column fits cleanly at both regular and
+   intermediate; the fuller phrasing ("Great together · Strong match") is in the `title`
+   tooltip. Sitting at the trailing edge of its third eliminates the old awkward gap (the
+   previous `auto auto minmax(0,1fr)` flung match far right of bunched score+stars).
 
-**Responsiveness**: because column 3 is `minmax(0, 1fr)` and the affinity bar is
-`flex-shrink: 0`, at narrow card widths (≈210px / 6-up) the **word ellipsizes** while
-the bar stays intact — the three columns never overlap and never force the row wider
-than the card. The narrow `@container` query also trims the inter-column gap.
+**Responsiveness**: because every column is `minmax(0, 1fr)` and the affinity bar is
+`flex-shrink: 0`, at narrow card widths (≈210px / 6-up) the match **word ellipsizes**
+within its third while the bar stays intact — the three columns never overlap and never
+force the row wider than the card. The narrow `@container` query also trims the gap.
 
 **Affinity-strength thresholds** (`scoreStrength()` in `SimilarTrackCard.svelte`),
 derived from the match score (0–1):
 
-| Score | Label | Bars | Color token |
-|-------|-------|------|-------------|
-| ≥ 0.80 | **Strong match** | ███ (3) | `--score-excellent` |
-| ≥ 0.55 | **Likely match** | ██ (2) | `--score-good` |
-| < 0.55 | **Weak match** | █ (1) | `--score-poor` |
+| Score | Strength (`scoreStrength`) | Visible terse word | Bars | Color token |
+|-------|---------------------------|--------------------|------|-------------|
+| ≥ 0.80 | Strong | **Great** | ███ (3) | `--score-excellent` |
+| ≥ 0.55 | Likely | **Likely** | ██ (2) | `--score-good` |
+| < 0.55 | Weak | **Weak** | █ (1) | `--score-poor` |
+
+A DJ-set opinion overrides the word: `good` → **Great**, `bad` → **Not for me** (the bars
+still reflect the score). The thresholds/mapping are unchanged — only the displayed word is
+terse.
 
 **Degradation**
 - No score → `—` in the score slot (never blank).
 - No rating → muted `—` in the rating slot.
-- Explicit affinity set → the word shows the opinion; the bar still reflects score.
-- Space-constrained → keep score (the headline); the match **word ellipsizes** in its
-  `1fr` column while the bar stays intact. Score and rating columns hold their content.
+- Explicit affinity set → the word shows the terse opinion (**Great** / **Not for me**);
+  the bar still reflects score.
+- Space-constrained → keep score (the headline); the terse match word stays whole in its
+  `1fr` column while the bar stays intact. At compact the match becomes an icon (the bars),
+  so wording is irrelevant.
 
 **Why**: grouping the tool's score next to the DJ's own rating and a plain-language
 strength read reinforces "Opinions You Can See Through" — the DJ sees *why* and can
@@ -231,13 +245,14 @@ behavior:
 | **Focus-visible** | Keyboard ring from the global `--focus-ring` rule (card is `role="button"`, `tabindex="0"`). |
 | **Selected** | `border: var(--space-2xs) solid var(--accent)`. NOTE: `isSelected` is declared but never set true — wire it or drop the rule (see Open items). |
 | **No-artwork fallback** | Inline music-note SVG in `--text-4` on `--surface-1`. |
-| **Affinity set/unset** | Set → the Tier-3 strength word reads the opinion ("Great together" / "Not for me") with the full opinion + strength in `title`; unset → the strength word reads the score band ("Strong / Likely / Weak match"). |
+| **Affinity set/unset** | Set → the Tier-3 strength word reads the terse opinion (**Great** / **Not for me**) with the full opinion + strength in `title`; unset → the terse word reads the score band (**Great** / **Likely** / **Weak**). At compact this verdict is the colored match-bars icon, value in its `title`/aria-label. |
 | **Loading** | Owned by the wrapper: `<Spinner label="Finding what mixes..." />`. |
 | **Empty** | Owned by the wrapper: muted "Nothing in your library mixes cleanly from here yet". |
 
 **Keyboard reachability**: the `+` and `⋮` actions live in Tier 1 and must remain
 Tab-reachable and show on focus (content-conventions §5) — they are not
-hover-only.
+hover-only. (At the compact pill the `+` action drops; the `⋮` menu stays, so
+every action still has a reachable home — the full-size card.)
 
 ---
 
@@ -251,7 +266,7 @@ exclusively. No px/hex literals.
 | Surfaces | `--surface-1`, `--surface-2`, `--surface-3`, `--surface-hover` |
 | Text | `--text-1`, `--text-2`, `--text-3`, `--text-4` |
 | Borders | `--border-subtle`, `--border-strong` |
-| Accent / status | `--accent` (selected/primary action), `--destructive` (bad affinity), zone/status ramp for energy chips, `--chip-genre-*` (genre chip surface/text/border, derived from `--accent-text`), `--icon-size-*` + `--icon-stroke` (harmony + metronome glyphs) |
+| Accent / status | `--accent` (selected/primary action), `--destructive` (bad affinity), zone/status ramp for energy chips, `--chip-genre-fg` (genre-colored identity text, derived from `--accent-text`), `--icon-size-*` + `--icon-stroke` (harmony + metronome glyphs) |
 | Spacing | `--space-2xs`, `--space-xs`, `--space-sm`, `--space-md`, `--space-lg`, `--space-xl` |
 | Type | `--text-2xs` … `--text-lg`, `--lh-*`, `--font-weight-medium/semibold` |
 | Radius | `--radius-md` (artwork), `--radius-sm` (buttons), `--radius-full` (chips/dots), `--radius-xl` (card) |
@@ -277,12 +292,14 @@ Resolved (spec 023, step 5):
 2. ~~**"Track signals" block**~~ — **RESOLVED**: built as the locked
    [Track signals block](#track-signals-block); the Tier-1 affinity dot was removed
    and affinity moved to Tier 3 as a labelled strength.
-4. ~~**Chip drop order / responsiveness**~~ — **RESOLVED**: genre moved to the identity
-   tier (now a visible genre chip); the chip row is key → BPM(metronome) → energy. The
-   card uses **three container-query tiers** (regular ≥240px / intermediate 200–240px /
-   compact <200px — see [Responsive tiers](#responsive-tiers)) rather than one shrinking
-   design: energy drops then genre drops, and at compact the card restructures into a
-   dense 2-line layout. Never clipped mid-word. Demonstrated at all three widths in the
+4. ~~**Chip drop order / responsiveness**~~ — **RESOLVED**: genre lives in the identity
+   tier as **genre-family-colored text** (regular + intermediate; hidden at compact); the
+   chip row is key → BPM(metronome) → energy. The card uses **three container-query tiers**
+   (regular ≥240px / intermediate 200–240px / compact <200px — see
+   [Responsive tiers](#responsive-tiers)) rather than one shrinking design: energy drops at
+   intermediate, and at compact the card becomes a dense **pill** with a single row of
+   **color-coded icons only** (harmony · metronome · match-bars · `N★`; numbers/text/genre/
+   energy gone). Never clipped mid-word. Demonstrated at all three widths in the
    `/design-system` showcase.
 5. ~~**Zone/status color tokens**~~ — **RESOLVED**: chips consume `--zone-*`,
    `--score-*`, and `--bpm-delta-*` tokens; no hardcoded hex remains on this card.
