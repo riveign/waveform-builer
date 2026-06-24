@@ -47,11 +47,13 @@
 
 <div class="ds" data-theme="pine">
 	<header class="ds__head">
-		<h1>Kiku design system</h1>
+		<p class="ds__kicker">Kiku 聴く — the visual language</p>
+		<h1>How Kiku looks when it listens</h1>
 		<p class="ds__lede">
-			One source of visual truth — the tokens, layout helpers, and primitives your sets are
-			built on. Pine renders here, in isolation, so you can read the system before the rest of
-			the app adopts it. Tab through anything to see its focus ring.
+			The shared vocabulary every screen is built from — the tokens, the rhythm, the primitives.
+			Read it the way you'd read a track before you mix it: notice the spacing, the contrast, the
+			restraint. Pine renders here in isolation, so you can learn the system before the rest of the
+			app speaks it. Tab through anything to hear its focus ring.
 		</p>
 	</header>
 
@@ -103,7 +105,7 @@
 	<!-- 3. TYPE -->
 	<section class="ds__section">
 		<h2>Type scale</h2>
-		<p class="ds__note">Anchored at 12px body. Each line is set at its own token size and line-height.</p>
+		<p class="ds__note">Anchored at a 12px body — the size most of your library reads at. Each line is set at its own token size and line-height.</p>
 		<Stack gap="var(--space-md)">
 			{#each typeScale as t (t.name)}
 				<div class="type-row">
@@ -219,25 +221,47 @@
 		color: var(--text-1);
 	}
 
-	.ds__head { margin-bottom: var(--space-5xl); }
+	.ds__head { margin-bottom: var(--space-6xl); }
+	.ds__kicker {
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
+		line-height: var(--lh-xs);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--accent-text);
+		margin-bottom: var(--space-lg);
+	}
 	.ds h1 {
 		font-size: var(--text-2xl);
+		line-height: var(--lh-2xl);
 		font-weight: var(--font-weight-semibold);
-		color: var(--accent-text);
-		margin-bottom: var(--space-md);
+		color: var(--text-1);
+		margin-bottom: var(--space-lg);
 	}
-	.ds__lede { font-size: var(--text-md); line-height: var(--lh-md); color: var(--text-2); max-width: 60ch; }
+	.ds__lede {
+		font-size: var(--text-lg);
+		line-height: var(--lh-lg);
+		color: var(--text-2);
+		max-width: 60ch;
+	}
 
 	.ds__section {
-		padding: var(--space-4xl) 0;
+		padding: var(--space-5xl) 0;
 		border-top: 1px solid var(--border-subtle);
 	}
 	.ds h2 {
 		font-size: var(--text-xl);
+		line-height: var(--lh-xl);
 		font-weight: var(--font-weight-semibold);
-		margin-bottom: var(--space-sm);
+		margin-bottom: var(--space-md);
 	}
-	.ds__note { font-size: var(--text-sm); color: var(--text-3); margin-bottom: var(--space-xl); max-width: 60ch; }
+	.ds__note {
+		font-size: var(--text-sm);
+		line-height: var(--lh-sm);
+		color: var(--text-3);
+		margin-bottom: var(--space-2xl);
+		max-width: 60ch;
+	}
 
 	/* color */
 	.swatch-grid {
