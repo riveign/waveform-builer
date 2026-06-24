@@ -1,0 +1,43 @@
+/* ===========================================================================
+ * Tier 1 — PRIMITIVES (raw palette). Components NEVER reference these directly;
+ * only tokens.semantic.css does. Defining pine here costs nothing visually until
+ * the accent source re-points (Research §3 flip strategy).
+ * =========================================================================== */
+:root {
+	/* --- Pine ramp (OKLCH-even, hue ~165°; Research §4) --- */
+	--pine-50:  #E8F8F0;
+	--pine-100: #D3F0E2;
+	--pine-200: #B5E2CD;
+	--pine-300: #8ACDAF;
+	--pine-400: #3FB489; /* decided: light tint / text-on-dark (7.50:1 on #0D0D0D) */
+	--pine-500: #25855E; /* decided: hover fill */
+	--pine-600: #1F6F54; /* decided: PRIMARY action fill */
+	--pine-700: #185C45; /* decided: press / dim */
+	--pine-800: #164735;
+	--pine-900: #123226;
+	--pine-950: #0C2018;
+
+	/* --- Cyan ramp (current accent; kept so the flip stays reversible) --- */
+	--cyan-500: #00CED1; /* current --accent */
+	--cyan-600: #00A8AB; /* current --accent-dim */
+
+	/* --- Gray ramp (formalized from existing --bg-*/--text-*) --- */
+	--gray-950: #0D0D0D; /* current --bg-primary */
+	--gray-900: #12121A; /* current --waveform-bg */
+	--gray-850: #1A1B23; /* current --bg-secondary */
+	--gray-800: #242631; /* current --bg-tertiary */
+	--gray-750: #2E3040; /* current --bg-hover */
+	--gray-700: #383A4A; /* current --bg-active */
+	--gray-600: #3F414A; /* current --border */
+	--gray-500: #555555; /* current --border-focus */
+	--gray-400: #666666; /* current --text-dim */
+	--gray-300: #7A7B82; /* current --text-tertiary */
+	--gray-200: #A0A1A7; /* current --text-secondary */
+	--gray-50:  #F5F5F0; /* current --text-primary */
+
+	/* --- Status primitives --- */
+	--green-500:  #4CAF50; /* energy-low */
+	--orange-500: #FF9800; /* energy-mid */
+	--red-500:    #F44336; /* energy-high */
+	--coral-500:  #FF6B6B; /* destructive */
+}

@@ -1,0 +1,133 @@
+/* ===========================================================================
+ * Tier 2 — SEMANTIC (intent). This is what components SHOULD consume.
+ * Tier 3 (--btn-*), the global :focus-visible rule, and motion live here too.
+ * =========================================================================== */
+:root {
+	/* --- THE FLIP LEVER (Research §3) -------------------------------------
+	 * The accent source points at the CYAN ramp in :root, so the live app
+	 * stays cyan. The /design-system showcase re-points ONLY these 4 vars
+	 * inside [data-theme="pine"]. The future deliberate flip edits these 4
+	 * lines here once. */
+	--accent-9:        var(--cyan-500); /* solid brand / action fill */
+	--accent-10:       var(--cyan-600); /* solid hover */
+	--accent-11:       var(--cyan-500); /* accent text on dark (cyan is light enough) */
+	--accent-contrast: #000000;         /* legible foreground ON accent-9 (cyan+black = 10.75:1) */
+
+	/* role aliases components actually use */
+	--accent:          var(--accent-9);
+	--accent-hover:    var(--accent-10);
+	--accent-pressed:  var(--accent-9);  /* cyan has no decided press; reuse fill (pine overrides) */
+	--accent-text:     var(--accent-11);
+	--on-accent:       var(--accent-contrast);
+
+	/* surfaces (Carbon layer ladder) */
+	--surface-1: var(--gray-950);  /* app bg */
+	--surface-2: var(--gray-850);  /* panel */
+	--surface-3: var(--gray-800);  /* raised / input bg */
+	--surface-hover:    var(--gray-750);
+	--surface-active:   var(--gray-700);
+	--surface-waveform: var(--gray-900);
+
+	/* foreground (shadcn/M3 on- pairing) */
+	--text-1: var(--gray-50);   /* primary */
+	--text-2: var(--gray-200);  /* secondary */
+	--text-3: var(--gray-300);  /* tertiary */
+	--text-4: var(--gray-400);  /* dim */
+
+	/* borders (Radix 6/7/8) — solid color tokens for border-color usage */
+	--border-subtle: var(--gray-600);
+	--border-default: var(--gray-600);
+	--border-strong: var(--gray-500);
+
+	/* status */
+	--energy-low:  var(--green-500);
+	--energy-mid:  var(--orange-500);
+	--energy-high: var(--red-500);
+	--destructive: var(--coral-500);
+
+	/* --- Focus ring (Research §5; systemic a11y fix) --- */
+	--focus-ring: #5FD0A8;        /* 10.25:1 vs bg, 3.20:1 vs pine-600 fill — clears 3:1 both sides */
+	--focus-ring-width: 2px;
+	--focus-ring-offset: 2px;
+
+	/* --- Spacing (Research §6; 4px hybrid + 2px mini-unit) --- */
+	--space-0: 0;
+	--space-px: 1px;
+	--space-2xs: 2px;
+	--space-xs: 4px;
+	--space-sm: 6px;
+	--space-md: 8px;
+	--space-lg: 12px;
+	--space-xl: 16px;
+	--space-2xl: 20px;
+	--space-3xl: 24px;
+	--space-4xl: 32px;
+	--space-5xl: 48px;
+	--space-6xl: 64px;
+
+	/* --- Type scale (Research §6; 12px body anchor, 9→10 promoted) --- */
+	--text-2xs: 10px;  --lh-2xs: 1.45;
+	--text-xs:  11px;  --lh-xs:  1.45;
+	--text-sm:  12px;  --lh-sm:  1.4;
+	--text-base:13px;  --lh-base:1.4;
+	--text-md:  14px;  --lh-md:  1.4;
+	--text-lg:  16px;  --lh-lg:  1.3;
+	--text-xl:  20px;  --lh-xl:  1.2;
+	--text-2xl: 24px;  --lh-2xl: 1.2;
+	--font-weight-regular: 400;
+	--font-weight-medium:  500;
+	--font-weight-semibold:600;
+
+	/* --- Radius (Research §6) --- */
+	--radius-xs:   2px;
+	--radius-sm:   4px;
+	--radius-md:   6px;
+	--radius-lg:   8px;
+	--radius-xl:   12px;
+	--radius-full: 9999px;
+
+	/* --- Elevation (Research §6; border-first on dark) --- */
+	--elev-0: none;
+	--elev-1: 0 1px 2px rgba(0,0,0,0.4);
+	--elev-2: 0 2px 8px rgba(0,0,0,0.5);
+	--elev-3: 0 8px 24px rgba(0,0,0,0.6);
+
+	/* --- Motion (Research §6) --- */
+	--dur-fast: 120ms;
+	--dur-base: 200ms;
+	--dur-slow: 320ms;
+	--ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+	--ease-decelerate: cubic-bezier(0, 0, 0, 1);
+	--ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+
+	/* --- Tier 3 — Component (Button only) --- */
+	--btn-bg:       var(--accent);
+	--btn-bg-hover: var(--accent-hover);
+	--btn-fg:       var(--on-accent);
+	--btn-radius:   var(--radius-sm);
+	--btn-focus:    var(--focus-ring);
+}
+
+/* Global systemic focus ring — specificity 0 so components can still override.
+ * :focus-visible = keyboard/AT only (not mouse). outline+offset keeps the ring in
+ * the gap against the page bg (Research §5). */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+	outline: var(--focus-ring-width) solid var(--focus-ring);
+	outline-offset: var(--focus-ring-offset);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* Reduced motion — collapse token durations so no component touches a literal. */
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--dur-fast: 0.01ms;
+		--dur-base: 0.01ms;
+		--dur-slow: 0.01ms;
+	}
+	*, *::before, *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
