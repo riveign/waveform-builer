@@ -14,6 +14,7 @@
 
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import MetronomeIcon from './MetronomeIcon.svelte';
 
 	let {
 		variant = 'neutral',
@@ -55,6 +56,13 @@
 		value === undefined || value === null || value === '' ? '—' : String(value),
 	);
 	const isEmpty = $derived(value === undefined || value === null || value === '');
+
+	// The bpm variant always leads with the metronome glyph instead of a literal
+	// "BPM" text label (saves space; the glyph + a11y label carry the meaning).
+	// A caller-supplied `icon` snippet wins; otherwise the bpm chip auto-renders
+	// the metronome. The chip's title still carries the tempo meaning for AT.
+	const showMetronome = $derived(variant === 'bpm' && !icon);
+	const bpmTitle = $derived(variant === 'bpm' ? (title ?? 'Beats per minute') : title);
 </script>
 
 <span
@@ -62,10 +70,12 @@
 	class:chip--colored={Boolean(color)}
 	class:chip--empty={isEmpty && !children}
 	style:--chip-color={color ?? null}
-	{title}
+	title={bpmTitle}
 >
 	{#if icon}
 		<span class="chip__icon" aria-hidden="true">{@render icon()}</span>
+	{:else if showMetronome}
+		<span class="chip__icon"><MetronomeIcon size="sm" /></span>
 	{/if}
 	<span class="chip__label">
 		{#if children}{@render children()}{:else}{display}{/if}
@@ -154,6 +164,18 @@
 	.chip--vibe {
 		border-color: var(--border-subtle);
 		color: var(--text-1);
+	}
+
+	/* genre — descriptive identity metadata. Gets its own visible tinted treatment
+	 * so it reads as clearly as the colored key/energy chips instead of fading into
+	 * the surface. Fully tokenized (cerceta re-points --accent-text). */
+	.chip--genre {
+		background: var(--chip-genre-bg);
+		color: var(--chip-genre-fg);
+		border-color: var(--chip-genre-border);
+	}
+	.chip--genre:hover {
+		background: var(--chip-genre-bg);
 	}
 
 	/* --- bpm delta — signed value, colored by the ±6% tension rule.

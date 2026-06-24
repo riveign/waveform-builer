@@ -430,15 +430,15 @@
 			count plus a single glyph (3★).
 		</p>
 		<div class="rating-grid">
-			<div class="rating-cell">
+			<div class="rating-cell rating-cell--center">
 				<span class="rating-cell__label">Empty</span>
 				<StarRating rating={0} readonly />
 			</div>
-			<div class="rating-cell">
+			<div class="rating-cell rating-cell--center">
 				<span class="rating-cell__label">Partial</span>
 				<StarRating rating={3} readonly />
 			</div>
-			<div class="rating-cell">
+			<div class="rating-cell rating-cell--center">
 				<span class="rating-cell__label">Full</span>
 				<StarRating rating={5} readonly />
 			</div>
@@ -463,7 +463,7 @@
 					<StarRating rating={5} display="compact" />
 				</div>
 			</div>
-			<div class="rating-cell">
+			<div class="rating-cell rating-cell--center">
 				<span class="rating-cell__label">Small / large</span>
 				<div class="cluster cluster--md">
 					<StarRating rating={4} readonly size="sm" />
@@ -480,8 +480,12 @@
 			One primitive for every labelled value — genre, Camelot key, BPM delta, energy zone, harmony
 			move, vibe and level. Color always derives from a token by meaning and is paired with a word or
 			glyph, so it's never the only signal. Dynamic colors (key, zone, vibe) flow in through a
-			<code>color</code> prop, keeping the chip presentational. Sentence case throughout, BPM as a
-			signed integer delta, keys in Camelot notation, and a muted <code>—</code> for missing values.
+			<code>color</code> prop, keeping the chip presentational. Sentence case throughout, keys in
+			Camelot notation, and a muted <code>—</code> for missing values. The <code>bpm</code> variant
+			leads with a <strong>metronome icon</strong> instead of a literal "BPM" text label (saving width
+			in dense rows); the integer tempo and signed delta follow, and the chip's <code>title</code>
+			carries "Beats per minute" for screen readers. The <code>genre</code> variant gets its own
+			visible tinted treatment so genre reads as clearly as the colored key and energy chips.
 		</p>
 
 		<div class="chip-grid">
@@ -504,11 +508,15 @@
 			</div>
 
 			<div class="chip-cell">
-				<span class="chip-cell__label">BPM delta</span>
+				<span class="chip-cell__label">BPM (metronome)</span>
 				<div class="cluster cluster--sm">
-					<Chip variant="bpm" value="+4" title="Within ±6% — seamless" />
+					<Chip variant="bpm" title="Tempo 128 BPM, +1 from this track">
+						<span class="bpm-num">128</span><span class="bpm-delta">+1</span>
+					</Chip>
+					<Chip variant="bpm" tone="warn" title="Tempo 146 BPM, +18 from this track">
+						<span class="bpm-num">146</span><span class="bpm-delta">+18</span>
+					</Chip>
 					<Chip variant="bpm" value="−6" title="Within ±6% — seamless" />
-					<Chip variant="bpm" value="+18" tone="warn" title="Beyond ±6% — getting harder" />
 				</div>
 			</div>
 
@@ -735,15 +743,18 @@
 		</p>
 		<p class="ds__note">
 			The card is a <strong>size container</strong>: it renders across grid densities (4-up, 6-up, the
-			expanded "Show more" grid) and adapts to its real column width. Chips drop by priority — never
-			clipped mid-word — as the card narrows: key (+ harmony glyph) and BPM are transition-critical
-			and always show; <strong>energy drops first</strong> when tight, surfacing a muted <code>+1</code>
-			(full value on hover). The two rows below show the same four states at <strong>4-up (~250px,
-			energy visible)</strong> and <strong>6-up (~210px, energy folded into +1)</strong>.
+			expanded "Show more" grid) and adapts to its real column width through three container-query
+			tiers rather than one shrinking design. <strong>Regular (≥240px)</strong> shows everything:
+			identity with artist + a visible genre chip, chips key → BPM → energy, and the 3-column signals
+			grid (NN/100 · N★ · match). <strong>Intermediate (200–240px)</strong> tightens — smaller artwork,
+			the genre chip and the energy chip drop (energy surfaces a muted <code>+1</code>), chips become
+			key + BPM, signals stay the 3-column grid. <strong>Compact (&lt;200px)</strong> is restructured
+			into a dense two-line layout — Row 1: artwork + title + ⋮; Row 2: NN/100 · key · BPM · match.
+			Stars, energy and genre are hidden there. Chips never clip mid-word at any width.
 		</p>
 
-		<p class="related-density-label">4-up — ~250px columns (energy chip visible)</p>
-		<div class="related-grid related-grid--4up">
+		<p class="related-density-label">Regular — ~250px columns (everything visible)</p>
+		<div class="related-grid related-grid--regular">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">
 					<span class="related-cell__label">{s.label}</span>
@@ -759,8 +770,24 @@
 			{/each}
 		</div>
 
-		<p class="related-density-label">6-up — ~210px columns (energy folds into +1, key + BPM stay)</p>
-		<div class="related-grid related-grid--6up">
+		<p class="related-density-label">Intermediate — ~220px columns (genre + energy drop, energy → +1)</p>
+		<div class="related-grid related-grid--intermediate">
+			{#each relatedStates as s (s.item.track.id)}
+				<div class="related-cell">
+					<SimilarTrackCard
+						item={s.item}
+						parentTrackId={1}
+						parentBpm={parentBpm}
+						parentKey={parentKey}
+						affinity={s.affinity}
+						onaffinitychange={noop}
+					/>
+				</div>
+			{/each}
+		</div>
+
+		<p class="related-density-label">Compact — ~190px columns (restructured 2-line: title + ⋮ / NN/100 · key · BPM · match)</p>
+		<div class="related-grid related-grid--compact">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">
 					<SimilarTrackCard
@@ -1068,6 +1095,15 @@
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
+	/* Static star-display cells (Empty / Partial / Full / Small-large) center the
+	 * stars within the card so a row of cards reads balanced — the label stays at
+	 * the top-left, only the star row centers. The Interactive cell is untouched. */
+	.rating-cell--center {
+		align-items: center;
+	}
+	.rating-cell--center .rating-cell__label {
+		align-self: flex-start;
+	}
 	/* the interactive cell's resolved value/explanation sits on its own row
 	 * beneath the stars (via Stack), not crammed onto the control's line. */
 	.rating-cell__caption {
@@ -1103,6 +1139,18 @@
 		width: var(--space-md);
 		height: var(--space-md);
 		border-radius: var(--radius-full);
+	}
+	/* bpm chip internals in the showcase — number leads (after the metronome glyph),
+	 * signed delta follows. No literal "BPM" text. */
+	.bpm-num {
+		font-weight: var(--font-weight-semibold);
+		font-variant-numeric: tabular-nums;
+		color: var(--text-1);
+	}
+	.bpm-delta {
+		font-variant-numeric: tabular-nums;
+		font-weight: var(--font-weight-medium);
+		margin-left: var(--space-2xs);
 	}
 
 	/* icons — labeled cards on the same uniform spacing as the chip grid. */
@@ -1188,14 +1236,23 @@
 		grid-auto-rows: 1fr;
 		gap: var(--space-lg);
 	}
-	/* 4-up — ~250px columns: energy chip is visible. */
-	.related-grid--4up {
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+	/* Each demo grid uses FIXED-width columns so each row reliably lands in its
+	 * intended container-query tier regardless of the viewport — the card adapts
+	 * to its real column width, which is what we want to demonstrate. */
+	/* Regular — 250px columns (≥240px tier): the full card, everything visible. */
+	.related-grid--regular {
+		grid-template-columns: repeat(auto-fill, 250px);
 	}
-	/* 6-up — ~210px columns: the energy chip folds into "+1"; key + BPM stay.
-	 * Tighter gap so columns land near the real narrow density. */
-	.related-grid--6up {
-		grid-template-columns: repeat(6, minmax(0, 1fr));
+	/* Intermediate — 220px columns (200–240px tier): genre + energy chips drop,
+	 * energy folds to "+1"; signals stay the 3-col grid. */
+	.related-grid--intermediate {
+		grid-template-columns: repeat(auto-fill, 220px);
+		gap: var(--space-md);
+		margin-bottom: var(--space-lg);
+	}
+	/* Compact — 190px columns (<200px tier): the restructured 2-line layout. */
+	.related-grid--compact {
+		grid-template-columns: repeat(auto-fill, 190px);
 		gap: var(--space-md);
 		margin-bottom: var(--space-lg);
 	}
@@ -1218,7 +1275,8 @@
 	}
 
 	@media (max-width: 720px) {
-		.related-grid--4up { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-		.related-grid--6up { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+		.related-grid--regular { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+		.related-grid--intermediate { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+		.related-grid--compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 	}
 </style>

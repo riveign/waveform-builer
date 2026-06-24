@@ -227,18 +227,24 @@
 
 		<div class="text-col">
 			<span class="track-title" title={titleText}>{capFirst(titleText)}</span>
+			<!-- Identity subtitle: artist (plain muted text, ellipsizes FIRST under
+			     width pressure) + a visible genre CHIP. Genre is a small genre-colored
+			     Chip rather than muted text so it reads as clearly as the key/energy
+			     chips. The genre chip is HIDDEN at the compact tier (space too tight).
+			     Genre stays OUT of the Tier-2 chip row (that caused the prior overflow). -->
 			<span class="track-meta">
 				<span class="track-artist" title={artistText}>{capFirst(artistText)}</span>
 				{#if genreLabel}
-					<span class="meta-dot" aria-hidden="true">·</span>
-					<span class="track-genre" title="Genre: {genreLabel}">{capFirst(genreLabel)}</span>
+					<span class="track-genre" title="Genre: {genreLabel}">
+						<Chip variant="genre" size="sm" value={capFirst(genreLabel)} title="Genre: {genreLabel}" />
+					</span>
 				{/if}
 			</span>
 		</div>
 
 		<div class="menu-area">
 			<button
-				class="menu-btn"
+				class="menu-btn add-btn"
 				onclick={handleAddToSet}
 				aria-label="Add to set"
 				title="Add to set"
@@ -273,6 +279,12 @@
 	     lives in Tier 1 (identity), not here. overflow:hidden is a final safety
 	     net only. -->
 	<div class="zone-chips">
+		<!-- Compact-tier score: at <200px the signals row is dropped and the score
+		     moves up onto this line (NN/100 · key · BPM · match). Hidden at the
+		     regular + intermediate tiers, where the score lives in the signals row. -->
+		<span class="chips-score" title="Match score {scoreDisplay} out of 100">
+			<span class="score-number">{scoreDisplay}</span><span class="score-suffix">/100</span>
+		</span>
 		{#if track.key}
 			<Chip
 				variant="key"
@@ -292,9 +304,11 @@
 			</Chip>
 		{/if}
 		{#if track.bpm}
+			<!-- bpm chip leads with the metronome glyph (auto-rendered by the bpm
+			     variant) instead of a literal "BPM" text label — saves width; the
+			     glyph + the chip's a11y title carry the meaning. -->
 			<Chip variant="bpm" tone={bpmDeltaTone} title="Tempo {Math.round(track.bpm)} BPM">
 				<span class="bpm-num">{Math.round(track.bpm)}</span>
-				<span class="bpm-unit">BPM</span>
 				{#if bpmDelta !== null && bpmDelta !== 0}
 					<span
 						class="bpm-delta"
@@ -314,6 +328,19 @@
 			     full value on hover. Never clips a chip. -->
 			<span class="chips-more" title="Energy zone: {capFirst(energyZone)}">+1</span>
 		{/if}
+		<!-- Compact-tier match: bar + word, pushed right onto Row 2. Hidden at the
+		     regular + intermediate tiers (match lives in the signals row there). -->
+		<span
+			class="chips-match affinity-{strength.tone}"
+			title={affinityLabel ? `${affinityLabel} · ${strength.label} match` : `${strength.label} match`}
+		>
+			<span class="affinity-bars" aria-hidden="true">
+				<span class="bar" class:on={strength.level >= 1}></span>
+				<span class="bar" class:on={strength.level >= 2}></span>
+				<span class="bar" class:on={strength.level >= 3}></span>
+			</span>
+			<span class="affinity-text">{affinityLabel ?? `${strength.label} match`}</span>
+		</span>
 	</div>
 
 	<!-- Divider -->
@@ -471,14 +498,15 @@
 		text-overflow: ellipsis;
 	}
 
-	/* Artist + genre on one muted subtitle line. Genre is descriptive identity
+	/* Artist + genre on one identity subtitle line. Genre is descriptive identity
 	 * metadata (not a transition signal), so it lives here in Tier 1 — not in the
-	 * chip row. Artist takes priority and ellipsizes first; genre is capped so the
-	 * line never wraps. Full values on hover via per-span title (§2). */
+	 * chip row. The artist is plain muted text and ellipsizes FIRST under width
+	 * pressure; the genre CHIP stays fixed and visible so genre reads as clearly as
+	 * the key/energy chips. Full artist value on hover via title (§2). */
 	.track-meta {
 		display: flex;
-		align-items: baseline;
-		gap: var(--space-2xs);
+		align-items: center;
+		gap: var(--space-xs);
 		min-width: 0;
 		font-size: var(--text-xs);
 		line-height: var(--lh-sm);
@@ -490,22 +518,16 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		min-width: 0;
+		/* Artist yields space first so the genre chip stays visible. */
 		flex-shrink: 1;
 	}
 
-	.meta-dot {
-		color: var(--text-4);
-		flex-shrink: 0;
-	}
-
+	/* The genre chip wrapper holds its intrinsic width — it does not shrink, so the
+	 * genre stays legible while the artist text ellipsizes around it. */
 	.track-genre {
-		color: var(--text-3);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		flex-shrink: 0;
 		min-width: 0;
-		/* Genre yields space to the artist but keeps a readable minimum. */
-		flex-shrink: 2;
+		display: inline-flex;
 	}
 
 	.menu-area {
@@ -536,8 +558,8 @@
 
 	/* ── Tier 2: Attribute chips ── */
 	/* Whole-chip priority: chips never shrink, so they are never clipped mid-word.
-	 * The energy chip is hidden as a whole unit (JS-measured) when it would not
-	 * fit; key + BPM always show. overflow:hidden is a final safety net only. */
+	 * The energy chip is hidden as a whole unit (container query, below) when it
+	 * would not fit; key + BPM always show. overflow:hidden is a final safety net. */
 	.zone-chips {
 		display: flex;
 		align-items: center;
@@ -559,8 +581,8 @@
 	}
 
 	/* "+1" affordance for the dropped energy chip — hidden by default (energy is
-	 * visible at wide widths); revealed by the container query below. Tiny, muted,
-	 * full value on hover, never clips. */
+	 * visible at wide widths); revealed by the intermediate/compact tiers below.
+	 * Tiny, muted, full value on hover, never clips. */
 	.chips-more {
 		display: none;
 		flex-shrink: 0;
@@ -571,36 +593,48 @@
 		cursor: default;
 	}
 
-	/* Whole-chip priority hide: when the CARD itself is narrow (6-up ~210px and
-	 * tighter), drop the energy chip as a whole unit and surface the "+1" instead.
-	 * Key (+ harmony glyph) and BPM stay visible down to the narrowest density.
-	 * Threshold keyed off the card's inline size, so it adapts to any grid column
-	 * width rather than the viewport. */
-	@container relcard (max-width: 232px) {
-		.energy-chip {
-			display: none;
-		}
-		.chips-more {
-			display: inline-flex;
-			align-items: center;
-		}
+	/* Compact-tier-only elements — hidden at the regular + intermediate tiers,
+	 * where the score + match live in the dedicated signals row. At the compact
+	 * tier the signals row is dropped and these move onto the chip line. */
+	.chips-score {
+		display: none;
+		flex-shrink: 0;
+		align-items: baseline;
 	}
-	/* BPM chip internals — number leads, unit + signed delta follow. */
+	.chips-match {
+		display: none;
+		flex-shrink: 0;
+		align-items: center;
+		gap: var(--space-xs);
+		margin-left: auto;
+		--strength-color: var(--text-3);
+	}
+	.chips-match.affinity-success { --strength-color: var(--score-excellent); }
+	.chips-match.affinity-warn { --strength-color: var(--score-good); }
+	.chips-match.affinity-danger { --strength-color: var(--score-poor); }
+	.chips-match .affinity-text {
+		font-size: var(--text-2xs);
+		font-weight: var(--font-weight-medium);
+		color: var(--strength-color);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	/* BPM chip internals — the metronome glyph (auto-rendered by the bpm variant)
+	 * leads, then the number, then the signed delta. No literal "BPM" text. */
 	.bpm-num {
 		font-weight: var(--font-weight-semibold);
 		font-variant-numeric: tabular-nums;
 		color: var(--text-1);
 	}
-	.bpm-unit {
-		font-size: var(--text-2xs);
-		color: var(--text-4);
-	}
 	.bpm-delta {
 		font-variant-numeric: tabular-nums;
 		font-weight: var(--font-weight-medium);
 	}
-	/* the harmony glyph rides inside the key chip at the shared icon size. */
-	.zone-chips :global(.harmony-icon--sm) {
+	/* the harmony + metronome glyphs ride inside their chips at the shared icon size. */
+	.zone-chips :global(.harmony-icon--sm),
+	.zone-chips :global(.metronome-icon--sm) {
 		width: var(--icon-size-sm);
 		height: var(--icon-size-sm);
 	}
@@ -702,16 +736,88 @@
 		min-width: 220px;
 	}
 
-	/* ── Narrow-card tightening (6-up ~210px and below) ──
-	 * Trim the inter-column gaps so the three signals stay on one row without
-	 * overlap; the match column already ellipsizes via minmax(0,1fr). The chip
-	 * row gap shrinks too so key + BPM keep breathing room. */
-	@container relcard (max-width: 232px) {
-		.zone-signals {
+	/* ── Responsive tiers (container queries on the card's inline size) ──
+	 * Placed LAST so they win over the base rules above by source order (container
+	 * queries add no specificity). The card adapts to its real laid-out column
+	 * width, not the viewport, so it works at any grid density. Three tiers:
+	 *
+	 *   • Regular   (≥ 240px) — the full card (the base rules above): identity with
+	 *                 artist + genre chip · chips key→BPM→energy · 3-col signals.
+	 *   • Intermediate (200–240px) — tighten: smaller artwork, reduced padding/gaps;
+	 *                 genre chip drops (artist only); energy chip drops (→ "+1");
+	 *                 chips = key(+harmony) + BPM; signals stay the 3-col grid.
+	 *   • Compact   (< 200px) — RESTRUCTURED into a dense 2-line layout: Row 1 small
+	 *                 artwork + title + ⋮; Row 2 NN/100 · key · BPM · match. Stars,
+	 *                 energy, genre and the + action are hidden. */
+
+	/* ── Intermediate (≤ 240px) ── */
+	@container relcard (max-width: 240px) {
+		.zone-header {
 			gap: var(--space-sm);
+			padding: var(--space-sm) var(--space-sm) var(--space-2xs);
+		}
+		.artwork-wrap {
+			width: 30px;
+			height: 30px;
+		}
+		/* genre chip drops — artist alone on the subtitle line. */
+		.track-genre {
+			display: none;
+		}
+		/* energy chip drops as a whole unit; "+1" surfaces in its place. */
+		.energy-chip {
+			display: none;
+		}
+		.chips-more {
+			display: inline-flex;
+			align-items: center;
 		}
 		.zone-chips {
 			gap: var(--space-2xs);
+			padding: var(--space-xs) var(--space-sm);
+		}
+		.zone-signals {
+			gap: var(--space-sm);
+			padding: var(--space-2xs) var(--space-sm) var(--space-sm);
+		}
+	}
+
+	/* ── Compact (≤ 200px) — restructured 2-line layout ── */
+	@container relcard (max-width: 200px) {
+		/* Row 1: artwork + title + ⋮ only. The + action and the dividers go away;
+		 * the signals row is dropped entirely and its data moves onto Row 2. */
+		.zone-divider,
+		.zone-signals,
+		.add-btn {
+			display: none;
+		}
+		.zone-header {
+			padding: var(--space-sm) var(--space-sm) var(--space-2xs);
+		}
+		.artwork-wrap {
+			width: 28px;
+			height: 28px;
+		}
+		/* Row 2: NN/100 · key(+harmony) · BPM · match. Score + match move up here;
+		 * stars, energy and genre stay hidden (inherited from intermediate). */
+		.chips-score {
+			display: inline-flex;
+		}
+		.chips-match {
+			display: inline-flex;
+		}
+		/* "+1" is redundant in the compact row (energy is intentionally dropped). */
+		.chips-more {
+			display: none;
+		}
+		.zone-chips {
+			gap: var(--space-2xs);
+			padding: 0 var(--space-sm) var(--space-sm);
+			/* let the chip line use the full width; match is pushed right. */
+			margin-top: auto;
+		}
+		.chips-score .score-number {
+			font-size: var(--text-base);
 		}
 	}
 </style>

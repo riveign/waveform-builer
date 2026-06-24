@@ -148,6 +148,14 @@
 	--chip-font-sm:   var(--text-xs);
 	--chip-font-md:   var(--text-sm);
 	--chip-gap:       var(--space-xs);
+	/* Genre is descriptive identity metadata, but a bare-surface label read too
+	 * faint next to the colored key/energy chips. The genre chip gets a visible,
+	 * tinted treatment of its own: a soft accent-tinted surface + accent-strength
+	 * text + a matching border, so it reads as clearly as the other variants
+	 * while staying neutral in meaning. Tokenized so cerceta re-points it. */
+	--chip-genre-bg:     color-mix(in srgb, var(--accent-text) 14%, var(--surface-3));
+	--chip-genre-fg:     var(--accent-text);
+	--chip-genre-border: color-mix(in srgb, var(--accent-text) 34%, transparent);
 
 	/* --- Tier 3 — Component (Rating / StarRating) --- dedicated glyph sizes so
 	 * the star scale is decoupled from the text scale (text tokens read too
