@@ -2,6 +2,7 @@
 	import type { DJSet } from '$lib/types';
 	import { listSets, deleteSet, getDeletedSets, restoreSet } from '$lib/api/sets';
 	import { onMount } from 'svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
 
 	let {
 		onselect,
@@ -170,7 +171,7 @@
 							{s.track_count} tracks{#if s.duration_min}, {s.duration_min}min{/if}
 						</span>
 						<span class="card-foot">
-							{#if sourceLabel(s.source)}<span class="tag">{sourceLabel(s.source)}</span>{/if}
+							{#if sourceLabel(s.source)}<Chip variant="neutral" value={sourceLabel(s.source)} size="sm" />{/if}
 							{#if shortDate(s.created_at)}<span class="date">{shortDate(s.created_at)}</span>{/if}
 						</span>
 					</div>
@@ -374,16 +375,6 @@
 		justify-content: space-between;
 		gap: 8px;
 		margin-top: 2px;
-	}
-
-	.tag {
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		padding: 2px 6px;
-		border-radius: 4px;
-		background: var(--bg-tertiary);
-		color: var(--text-dim);
 	}
 
 	.date {

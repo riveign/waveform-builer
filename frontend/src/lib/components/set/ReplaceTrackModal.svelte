@@ -5,6 +5,7 @@
 	import { API_BASE } from '$lib/api/client';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
 
 	const playback = getPlaybackStore();
 	const ui = getUiStore();
@@ -198,7 +199,7 @@
 							<div class="title-row">
 								<span class="track-title">{cand.track.title ?? 'Untitled'}</span>
 								{#if cand.track.genre}
-									<span class="genre-badge">{cand.track.genre}</span>
+									<Chip variant="genre" value={cand.track.genre} size="sm" title={cand.track.genre} />
 								{/if}
 							</div>
 							<span class="track-artist">{cand.track.artist ?? 'Unknown'}</span>
@@ -517,17 +518,6 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-	}
-
-	.genre-badge {
-		flex-shrink: 0;
-		font-size: 9px;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		padding: 1px 5px;
-		border-radius: 3px;
-		background: var(--bg-tertiary);
-		color: var(--text-secondary);
 	}
 
 	/* ── Meta ── */
