@@ -723,10 +723,15 @@
 		<h2>Related tracks card</h2>
 		<p class="ds__note">
 			The card shown under the "Related tracks" header on the track view — each entry is a candidate
-			to mix into next. It surfaces title and artist, the BPM with a signed delta from the current
-			track, the Camelot key chip and a harmony-move icon, genre and energy-phase pills, the match
-			score out of 100, a read-only rating, and an affinity dot. Below are four representative
-			states; artwork falls back to the music-note mark when none is available.
+			to mix into next, built entirely from the design-system primitives (<code>Chip</code>,
+			<code>StarRating</code>, <code>HarmonyIcon</code>, <code>Menu</code>). It stacks three tiers:
+			<strong>identity</strong> (first-letter-capped title + artist, one line each with the full value
+			on hover); <strong>attribute chips</strong> in priority order key → BPM → energy → genre, the key
+			chip carrying its harmony-move icon; and the <strong>Track signals</strong> block — the match
+			score <code>NN/100</code> as the lead verdict, the DJ's rating as a compact <code>N★</code>, and
+			affinity rendered as a labelled qualitative strength bar (Strong / Likely / Weak match) rather
+			than a second raw number. Below are four representative states; artwork falls back to the
+			music-note mark when none is available.
 		</p>
 		<div class="related-grid">
 			{#each relatedStates as s (s.item.track.id)}

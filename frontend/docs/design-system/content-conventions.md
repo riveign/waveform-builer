@@ -24,7 +24,7 @@ scannability in dense card grids.
 |------|------|---------|
 | First-letter-capitalized | Single-word labels | `Peak`, `Techno`, `Warmup` |
 | Sentence case | Multi-word labels, sentences | `Mix in key`, `Add to set`, `Related tracks` |
-| Preserve source casing | Track titles, artist names | `LOUDER` (if that's the real title), `deadmau5` |
+| First-letter-capitalized | Track titles, artist names | `Midnight drive`, `LOUDER`→`LOUDER` (already capped), `deadmau5`→`Deadmau5` |
 
 **Do**
 - `Peak` (energy zone chip)
@@ -34,11 +34,16 @@ scannability in dense card grids.
 **Don't**
 - `PEAK`, `MIX IN KEY` (no ALL-CAPS)
 - `mix in key` (capitalize the first letter)
-- Rewriting `deadmau5` → `Deadmau5` — track/artist text is the DJ's library, not ours to restyle.
 
-**Exception**: Track titles and artist names render with their **original source
-casing** — they belong to the DJ's collection. Genre chips, zone labels, and our
-own action text normalize to sentence case.
+**Track titles & artist names — first-letter-capped (USER DECISION, spec 023)**:
+titles and artist names render with their **first letter forced to a capital**,
+overriding the previous "preserve source casing" default. This only changes the
+**first visible character**; the rest of the string is left byte-for-byte intact,
+so stylized casing past the first glyph is preserved (`deadmau5` → `Deadmau5`,
+but `MEDUZA` and `LOUDER` stay as they are). The underlying library value is never
+mutated — it's a presentational cap only, and the full original is always exposed
+on hover via `title` (§2). Implemented by the shared `capFirst()` helper in
+`SimilarTrackCard.svelte`.
 
 ---
 

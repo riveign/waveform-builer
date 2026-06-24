@@ -1,14 +1,50 @@
+<script lang="ts" module>
+	/** First-letter capitalization for library text (title / artist).
+	 *
+	 *  USER DECISION (spec 023): the Related tracks card forces a capital first
+	 *  letter on the track title and artist, overriding the previous
+	 *  "preserve source casing" default. This is purely presentational — it
+	 *  only upper-cases the FIRST visible character and leaves the rest of the
+	 *  string byte-for-byte intact, so stylized casing the DJ relies on
+	 *  (`deadmau5`, `LOUDER`, `MEDUZA`) is preserved past the first glyph and no
+	 *  value is ever lost. Safe because it never mutates the underlying data —
+	 *  the full original is still exposed via the `title` attribute on hover. */
+	export function capFirst(value: string | null | undefined): string {
+		if (!value) return '';
+		return value.charAt(0).toUpperCase() + value.slice(1);
+	}
+
+	/** Map a match score (0–1) onto a qualitative strength label + a 0–3 bar
+	 *  level. Keeps the affinity row from showing a second raw number next to
+	 *  the headline `NN/100` (content-conventions §3) while still pairing the
+	 *  color with a word (§4). Thresholds:
+	 *    ≥ 0.80 → Strong  (3 bars) — confidently mixes
+	 *    ≥ 0.55 → Likely  (2 bars) — workable with intent
+	 *    <  0.55 → Weak    (1 bar)  — a stretch */
+	export function scoreStrength(score: number): {
+		label: 'Strong' | 'Likely' | 'Weak';
+		level: 1 | 2 | 3;
+		tone: 'success' | 'warn' | 'danger';
+	} {
+		if (score >= 0.8) return { label: 'Strong', level: 3, tone: 'success' };
+		if (score >= 0.55) return { label: 'Likely', level: 2, tone: 'warn' };
+		return { label: 'Weak', level: 1, tone: 'danger' };
+	}
+</script>
+
 <script lang="ts">
-	import type { Track, SuggestNextItem } from '$lib/types';
+	import type { SuggestNextItem } from '$lib/types';
 	import { getTrackArtworkUrl, setTrackAffinity, removeTrackAffinity } from '$lib/api/tracks';
 	import StarRating from './StarRating.svelte';
+	import Chip from '../primitives/Chip.svelte';
+	import Stack from '../primitives/Stack.svelte';
 	import Menu from '../primitives/Menu.svelte';
 	import MenuItem from '../primitives/MenuItem.svelte';
 	import MenuSeparator from '../primitives/MenuSeparator.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
-	import { getCamelotColor, formatKey, keyMoveLabel, harmonyColor } from '$lib/utils/camelot';
+	import { getCamelotColor, formatKey, keyMoveLabel } from '$lib/utils/camelot';
 	import HarmonyIcon, { toHarmonyRelation, HARMONY_RELATION_LABEL } from '$lib/components/primitives/HarmonyIcon.svelte';
 
 	let {
@@ -47,10 +83,21 @@
 	const energyZone = $derived(track.resolved_energy ?? null);
 	const genreLabel = $derived(track.genre_family ?? track.genre ?? null);
 	const scoreDisplay = $derived(Math.round(item.score * 100));
+	const strength = $derived(scoreStrength(item.score));
+
+	// First-letter-capped, full value preserved past the first glyph (capFirst).
+	const titleText = $derived(track.title ?? 'Unknown');
+	const artistText = $derived(track.artist ?? 'Unknown');
+
+	// BPM integer + signed colored delta. Tone follows the ±6% tension rule
+	// (content-conventions §3): within 6% reads neutral, beyond reads warn.
 	const bpmDelta = $derived.by(() => {
 		if (!track.bpm || !parentBpm) return null;
-		const diff = Math.round(track.bpm) - Math.round(parentBpm);
-		return diff;
+		return Math.round(track.bpm) - Math.round(parentBpm);
+	});
+	const bpmDeltaTone = $derived.by<'default' | 'warn'>(() => {
+		if (bpmDelta === null || !parentBpm) return 'default';
+		return Math.abs(bpmDelta) / parentBpm > 0.06 ? 'warn' : 'default';
 	});
 
 	// Harmonic move from the current track — same vocabulary as the Harmonic
@@ -59,21 +106,26 @@
 		if (!track.key || !parentKey) return null;
 		return keyMoveLabel(parentKey, track.key);
 	});
-
-	// Compact icon per harmonic move — the standardized HarmonyIcon glyph
-	// (replaces the long label on the card). null when the move can't be classified.
+	// Compact icon per harmonic move — the standardized HarmonyIcon glyph.
 	const harmonyRelation = $derived(harmony ? toHarmonyRelation(harmony.label) : null);
+	// Key chip color comes from the harmony quality (meaning), pairing the
+	// Camelot text with the move glyph so color is never the only cue (§4).
+	const keyColor = $derived.by(() => {
+		if (!harmony) return getCamelotColor(track.key);
+		if (harmony.score >= 0.8) return 'var(--score-excellent)';
+		if (harmony.score >= 0.55) return 'var(--score-good)';
+		return 'var(--score-poor)';
+	});
 
-	// Phase pill colors: fill + text per zone
-	const PHASE_PILL_COLORS: Record<string, { bg: string; text: string }> = {
-		intro:   { bg: '#E6F1FB', text: '#185FA5' },
-		warmup:  { bg: '#E1F5EE', text: '#0F6E56' },
-		build:   { bg: '#FAEEDA', text: '#854F0B' },
-		drive:   { bg: '#FAEEDA', text: '#854F0B' },
-		peak:    { bg: '#FAECE7', text: '#993C1D' },
-		close:   { bg: '#E1F5EE', text: '#085041' },
-		cooldown:{ bg: '#E1F5EE', text: '#085041' },
-	};
+	// Energy zone color from the shared --zone-* token set (single source).
+	const ZONES = ['intro', 'warmup', 'build', 'drive', 'peak', 'close'];
+	const zoneColor = $derived(
+		energyZone && ZONES.includes(energyZone) ? `var(--zone-${energyZone})` : 'var(--text-2)',
+	);
+
+	const affinityLabel = $derived(
+		affinity === 'good' ? 'Great together' : affinity === 'bad' ? 'Not for me' : null,
+	);
 
 	function handleCardClick() {
 		ui.selectedTrack = track;
@@ -152,7 +204,7 @@
 	ondragstart={handleDragStart}
 	onkeydown={(e) => { if (e.key === 'Enter') handleCardClick(); }}
 >
-	<!-- Zone 1: Header Row — artwork + title/artist + menu -->
+	<!-- Tier 1: Identity — artwork + title/artist + actions -->
 	<div class="zone-header">
 		<div class="artwork-wrap">
 			{#if artworkFailed}
@@ -174,18 +226,11 @@
 		</div>
 
 		<div class="text-col">
-			<span class="track-title">{track.title ?? 'Unknown'}</span>
-			<span class="track-artist">{track.artist ?? 'Unknown'}</span>
+			<span class="track-title" title={titleText}>{capFirst(titleText)}</span>
+			<span class="track-artist" title={artistText}>{capFirst(artistText)}</span>
 		</div>
 
 		<div class="menu-area">
-			{#if affinity}
-				<span
-					class="affinity-dot"
-					style="background: {affinity === 'good' ? 'var(--accent)' : 'var(--energy-high)'}"
-					title="{affinity === 'good' ? 'Marked: great together' : 'Marked: not for me'}"
-				></span>
-			{/if}
 			<button
 				class="menu-btn"
 				onclick={handleAddToSet}
@@ -196,6 +241,7 @@
 				class="menu-btn"
 				onclick={handleMenuClick}
 				aria-label="Track options"
+				title="Track options"
 			>&#8942;</button>
 			{#if showAddPicker}
 				<div class="add-picker-popover">
@@ -212,68 +258,73 @@
 	<!-- Divider -->
 	<div class="zone-divider"></div>
 
-	<!-- Zone 2: Track Metadata Row — BPM + delta | genre + phase pills -->
-	<div class="zone-metadata">
-		<div class="meta-left">
-			{#if track.bpm}
-				<span class="bpm-value">{Math.round(track.bpm)}</span>
+	<!-- Tier 2: Attribute chips — priority key → BPM → energy → genre.
+	     No-wrap; lowest-priority chips drop first when space is tight. -->
+	<div class="zone-chips">
+		{#if track.key}
+			<Chip
+				variant="key"
+				color={keyColor}
+				value={formatKey(track.key)}
+				title={harmony ? `${formatKey(track.key)} — ${harmony.label} from this track` : `Key ${formatKey(track.key)}`}
+			>
+				{#snippet icon()}
+					{#if harmonyRelation}
+						<HarmonyIcon
+							relation={harmonyRelation}
+							size="sm"
+							label={HARMONY_RELATION_LABEL[harmonyRelation]}
+						/>
+					{/if}
+				{/snippet}
+			</Chip>
+		{/if}
+		{#if track.bpm}
+			<Chip variant="bpm" tone={bpmDeltaTone} title="Tempo {Math.round(track.bpm)} BPM">
+				<span class="bpm-num">{Math.round(track.bpm)}</span>
 				<span class="bpm-unit">BPM</span>
 				{#if bpmDelta !== null && bpmDelta !== 0}
 					<span
-						class="bpm-delta-badge"
-						class:delta-up={bpmDelta > 0}
-						class:delta-down={bpmDelta < 0}
-						title="{Math.abs(bpmDelta)} BPM {bpmDelta > 0 ? 'faster' : 'slower'} than current track"
-					>{bpmDelta > 0 ? '+' : '\u2212'}{Math.abs(bpmDelta)}</span>
+						class="bpm-delta"
+						title="{Math.abs(bpmDelta)} BPM {bpmDelta > 0 ? 'faster' : 'slower'} than this track"
+					>{bpmDelta > 0 ? '+' : '−'}{Math.abs(bpmDelta)}</span>
 				{/if}
-			{/if}
-			{#if track.key}
-				<span class="key-chip" style="color: {getCamelotColor(track.key)}" title="Key {formatKey(track.key)}">{formatKey(track.key)}</span>
-				{#if harmony}
-					<span
-						class="harmony-badge"
-						style="color: {harmonyColor(harmony.score)}; border-color: {harmonyColor(harmony.score)}"
-					>
-						{#if harmonyRelation}
-							<HarmonyIcon
-								relation={harmonyRelation}
-								size="sm"
-								label={HARMONY_RELATION_LABEL[harmonyRelation]}
-								title="{formatKey(track.key)} — {harmony.label} from this track"
-							/>
-						{:else}
-							<span class="harmony-fallback" title="{formatKey(track.key)} — {harmony.label} from this track">{harmony.label}</span>
-						{/if}
-					</span>
-				{/if}
-			{/if}
-		</div>
-		<div class="meta-right">
-			{#if genreLabel}
-				<span class="pill pill-genre" title={genreLabel}>{genreLabel}</span>
-			{/if}
-			{#if energyZone}
-				{@const colors = PHASE_PILL_COLORS[energyZone]}
-				<span
-					class="pill pill-phase"
-					style="background: {colors?.bg ?? 'var(--surface-3)'}; color: {colors?.text ?? 'var(--text-2)'}"
-				>{energyZone}</span>
-			{/if}
-		</div>
+			</Chip>
+		{/if}
+		{#if energyZone}
+			<Chip variant="energy" color={zoneColor} value={capFirst(energyZone)} title="Energy zone: {capFirst(energyZone)}" />
+		{/if}
+		{#if genreLabel}
+			<Chip variant="genre" value={capFirst(genreLabel)} title={genreLabel} />
+		{/if}
 	</div>
 
 	<!-- Divider -->
 	<div class="zone-divider"></div>
 
-	<!-- Zone 3: Score + Actions Row -->
-	<div class="zone-score">
-		<div class="score-display">
-			<span class="score-number">{scoreDisplay}</span>
-			<span class="score-suffix">/ 100</span>
+	<!-- Tier 3: Track signals — score (lead) · rating · affinity strength -->
+	<div class="zone-signals">
+		<div class="signal-score" title="Match score {scoreDisplay} out of 100">
+			<span class="score-number">{scoreDisplay}</span><span class="score-suffix">/100</span>
 		</div>
-		{#if track.rating && track.rating > 0}
-			<StarRating rating={track.rating} readonly size="sm" />
-		{/if}
+		<div class="signal-rating" title={track.rating && track.rating > 0 ? `Your rating: ${track.rating} of 5` : 'Unrated'}>
+			{#if track.rating && track.rating > 0}
+				<StarRating rating={track.rating} display="compact" size="sm" />
+			{:else}
+				<span class="signal-empty">—</span>
+			{/if}
+		</div>
+		<div
+			class="signal-affinity affinity-{strength.tone}"
+			title={affinityLabel ? `${affinityLabel} · ${strength.label} match` : `${strength.label} match`}
+		>
+			<span class="affinity-bars" aria-hidden="true">
+				<span class="bar" class:on={strength.level >= 1}></span>
+				<span class="bar" class:on={strength.level >= 2}></span>
+				<span class="bar" class:on={strength.level >= 3}></span>
+			</span>
+			<span class="affinity-text">{affinityLabel ?? `${strength.label} match`}</span>
+		</div>
 	</div>
 </div>
 
@@ -284,7 +335,7 @@
 		Great together
 	</MenuItem>
 	<MenuItem onselect={() => handleAffinity('bad')}>
-		{#snippet icon()}<span style="color: var(--energy-high)">&#9679;</span>{/snippet}
+		{#snippet icon()}<span style="color: var(--destructive)">&#9679;</span>{/snippet}
 		Not for me
 	</MenuItem>
 	{#if affinity}
@@ -319,8 +370,8 @@
 		overflow: hidden;
 	}
 
-	/* Push the score/action row to the bottom so it lines up across all cards. */
-	.zone-metadata + .zone-divider {
+	/* Push the signals row to the bottom so it lines up across all cards. */
+	.zone-chips + .zone-divider {
 		margin-top: auto;
 	}
 
@@ -339,7 +390,7 @@
 		opacity: 0.08;
 	}
 
-	/* ── Zone 1: Header ── */
+	/* ── Tier 1: Identity ── */
 	.zone-header {
 		display: flex;
 		gap: var(--space-md);
@@ -385,21 +436,21 @@
 		gap: var(--space-2xs);
 	}
 
+	/* Title + artist: one line each, ellipsis on overflow, full value on hover
+	 * (content-conventions §2). No -webkit-line-clamp wrap. */
 	.track-title {
 		font-size: var(--text-sm);
 		font-weight: var(--font-weight-medium);
 		line-height: var(--lh-sm);
 		color: var(--text-1);
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
+		white-space: nowrap;
 		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.track-artist {
 		font-size: var(--text-xs);
 		color: var(--text-2);
-		margin-top: var(--space-px);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -413,20 +464,14 @@
 		position: relative;
 	}
 
-	.affinity-dot {
-		width: var(--space-sm);
-		height: var(--space-sm);
-		border-radius: var(--radius-full);
-		flex-shrink: 0;
-	}
-
 	.menu-btn {
 		background: none;
 		border: none;
 		color: var(--text-4);
 		cursor: pointer;
 		font-size: var(--text-lg);
-		padding: var(--space-2xs) var(--space-xs);
+		/* padding keeps the hit target ≈32px even with a small glyph (§5). */
+		padding: var(--space-xs) var(--space-sm);
 		border-radius: var(--radius-sm);
 		line-height: 1;
 		transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
@@ -437,138 +482,110 @@
 		color: var(--text-1);
 	}
 
-	/* ── Zone 2: Metadata ── */
-	.zone-metadata {
+	/* ── Tier 2: Attribute chips ── */
+	.zone-chips {
 		display: flex;
-		flex-direction: column;
-		align-items: stretch;
-		padding: var(--space-sm) var(--space-md);
-		gap: var(--space-xs);
-	}
-
-	.meta-left {
-		display: flex;
-		align-items: baseline;
-		flex-wrap: wrap;
-		gap: var(--space-xs) 0;
-		flex-shrink: 0;
-	}
-
-	.key-chip {
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-semibold);
-		margin-left: var(--space-md);
-	}
-
-	.harmony-badge {
-		display: inline-flex;
 		align-items: center;
-		justify-content: center;
-		width: 17px;
-		height: 17px;
-		font-size: var(--text-2xs);
+		flex-wrap: nowrap;
+		gap: var(--space-xs);
+		padding: var(--space-sm) var(--space-md);
+		overflow: hidden;
+	}
+	/* BPM chip internals — number leads, unit + signed delta follow. */
+	.bpm-num {
 		font-weight: var(--font-weight-semibold);
-		line-height: 1;
-		border: var(--space-px) solid;
-		border-radius: var(--radius-full);
-		margin-left: var(--space-sm);
-		flex-shrink: 0;
-	}
-	/* the standardized SVG glyph sits inside the colored circle; shrink it a step
-	 * so it reads as a glyph within the ring (icon inherits the badge color). */
-	.harmony-badge :global(.harmony-icon--sm) {
-		width: 12px;
-		height: 12px;
-	}
-	.harmony-fallback {
-		font-size: var(--text-2xs);
-	}
-
-	.bpm-value {
-		font-size: var(--text-base);
-		font-weight: var(--font-weight-medium);
 		font-variant-numeric: tabular-nums;
 		color: var(--text-1);
 	}
-
 	.bpm-unit {
-		font-size: var(--text-xs);
-		color: var(--text-3);
-		margin-left: var(--space-2xs);
+		font-size: var(--text-2xs);
+		color: var(--text-4);
 	}
-
-	.bpm-delta-badge {
-		font-size: var(--text-xs);
-		font-weight: var(--font-weight-medium);
-		padding: var(--space-px) var(--space-sm);
-		border-radius: var(--radius-full);
-		margin-left: var(--space-sm);
+	.bpm-delta {
 		font-variant-numeric: tabular-nums;
-	}
-
-	.bpm-delta-badge.delta-up {
-		background: #FAEEDA;
-		color: #854F0B;
-	}
-
-	.bpm-delta-badge.delta-down {
-		background: #E6F1FB;
-		color: #185FA5;
-	}
-
-	.meta-right {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-xs);
-		min-width: 0;
-	}
-
-	.pill {
-		font-size: var(--text-xs);
 		font-weight: var(--font-weight-medium);
-		padding: var(--space-2xs) var(--space-md);
-		border-radius: var(--radius-full);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
+	}
+	/* the harmony glyph rides inside the key chip at the shared icon size. */
+	.zone-chips :global(.harmony-icon--sm) {
+		width: var(--icon-size-sm);
+		height: var(--icon-size-sm);
 	}
 
-	.pill-genre {
-		background: var(--surface-3);
-		color: var(--text-2);
-		max-width: 100%;
-	}
-
-	/* pill-phase colors set inline via style attribute */
-
-	/* ── Zone 3: Score + Stars ── */
-	.zone-score {
+	/* ── Tier 3: Track signals — score · rating · affinity strength ── */
+	.zone-signals {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		gap: var(--space-md);
 		padding: var(--space-sm) var(--space-md) var(--space-md);
 	}
 
-	.score-display {
+	/* Score is the headline verdict — visually heaviest, sits left. */
+	.signal-score {
 		display: flex;
 		align-items: baseline;
+		flex-shrink: 0;
 	}
-
 	.score-number {
 		font-size: var(--text-lg);
-		font-weight: var(--font-weight-medium);
+		font-weight: var(--font-weight-semibold);
 		color: var(--text-1);
 		font-variant-numeric: tabular-nums;
 		line-height: 1;
 	}
-
 	.score-suffix {
 		font-size: var(--text-xs);
 		color: var(--text-3);
 		margin-left: var(--space-2xs);
 	}
 
-	/* Context-menu rows now come from the <Menu>/<MenuItem> primitives. */
+	.signal-rating {
+		flex-shrink: 0;
+	}
+	.signal-empty {
+		color: var(--text-4);
+		font-size: var(--text-sm);
+	}
+
+	/* Affinity as a labelled qualitative strength — bar + word, never a raw
+	 * number and never color alone (content-conventions §3, §4). Pushed right. */
+	.signal-affinity {
+		display: flex;
+		align-items: center;
+		gap: var(--space-xs);
+		margin-left: auto;
+		min-width: 0;
+		--strength-color: var(--text-3);
+	}
+	.affinity-success { --strength-color: var(--score-excellent); }
+	.affinity-warn { --strength-color: var(--score-good); }
+	.affinity-danger { --strength-color: var(--score-poor); }
+
+	.affinity-bars {
+		display: inline-flex;
+		align-items: flex-end;
+		gap: var(--space-px);
+		flex-shrink: 0;
+	}
+	.affinity-bars .bar {
+		width: var(--space-2xs);
+		height: var(--space-sm);
+		border-radius: var(--radius-xs);
+		background: var(--surface-3);
+	}
+	.affinity-bars .bar.on {
+		background: var(--strength-color);
+	}
+
+	.affinity-text {
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-medium);
+		color: var(--strength-color);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	/* Context-menu rows come from the <Menu>/<MenuItem> primitives. */
 
 	/* ── Add to Set Popover ── */
 	.add-picker-popover {
