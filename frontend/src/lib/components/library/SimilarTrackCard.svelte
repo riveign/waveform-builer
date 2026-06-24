@@ -227,7 +227,13 @@
 
 		<div class="text-col">
 			<span class="track-title" title={titleText}>{capFirst(titleText)}</span>
-			<span class="track-artist" title={artistText}>{capFirst(artistText)}</span>
+			<span class="track-meta">
+				<span class="track-artist" title={artistText}>{capFirst(artistText)}</span>
+				{#if genreLabel}
+					<span class="meta-dot" aria-hidden="true">·</span>
+					<span class="track-genre" title="Genre: {genreLabel}">{capFirst(genreLabel)}</span>
+				{/if}
+			</span>
 		</div>
 
 		<div class="menu-area">
@@ -258,8 +264,14 @@
 	<!-- Divider -->
 	<div class="zone-divider"></div>
 
-	<!-- Tier 2: Attribute chips — priority key → BPM → energy → genre.
-	     No-wrap; lowest-priority chips drop first when space is tight. -->
+	<!-- Tier 2: Attribute chips — priority key → BPM → energy.
+	     Whole-chip priority hiding via a CSS container query on the card: key +
+	     BPM are transition-critical and ALWAYS show; the energy chip drops as a
+	     WHOLE unit when the card is too narrow (never clipped mid-word). This
+	     responds to the card's real laid-out width, so it adapts to whatever grid
+	     density (4-up ~250px, 6-up ~210px, expanded) the card lands in. Genre
+	     lives in Tier 1 (identity), not here. overflow:hidden is a final safety
+	     net only. -->
 	<div class="zone-chips">
 		{#if track.key}
 			<Chip
@@ -292,10 +304,15 @@
 			</Chip>
 		{/if}
 		{#if energyZone}
-			<Chip variant="energy" color={zoneColor} value={capFirst(energyZone)} title="Energy zone: {capFirst(energyZone)}" />
-		{/if}
-		{#if genreLabel}
-			<Chip variant="genre" value={capFirst(genreLabel)} title={genreLabel} />
+			<!-- Energy chip: stays in the DOM so its hover title always resolves;
+			     a container query hides the whole chip when the card is narrow. -->
+			<div class="energy-chip" title="Energy zone: {capFirst(energyZone)}">
+				<Chip variant="energy" color={zoneColor} value={capFirst(energyZone)} title="Energy zone: {capFirst(energyZone)}" />
+			</div>
+			<!-- Discoverability for the dropped chip: a subtle "+1" that only shows
+			     (via the same container query) when energy is hidden, revealing the
+			     full value on hover. Never clips a chip. -->
+			<span class="chips-more" title="Energy zone: {capFirst(energyZone)}">+1</span>
 		{/if}
 	</div>
 
@@ -357,7 +374,13 @@
 
 <style>
 	/* ── Card Container ── */
+	/* The card is a size container, so its inner tiers can adapt to the card's
+	 * real laid-out width (whatever grid density it lands in) rather than the
+	 * viewport. The Tier-2 chip priority and Tier-3 signal compaction both key
+	 * off @container width below — no JS measurement needed. */
 	.similar-card {
+		container-type: inline-size;
+		container-name: relcard;
 		background: var(--surface-2);
 		border: var(--space-px) solid var(--border-subtle);
 		border-radius: var(--radius-xl);
@@ -448,12 +471,41 @@
 		text-overflow: ellipsis;
 	}
 
-	.track-artist {
+	/* Artist + genre on one muted subtitle line. Genre is descriptive identity
+	 * metadata (not a transition signal), so it lives here in Tier 1 — not in the
+	 * chip row. Artist takes priority and ellipsizes first; genre is capped so the
+	 * line never wraps. Full values on hover via per-span title (§2). */
+	.track-meta {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-2xs);
+		min-width: 0;
 		font-size: var(--text-xs);
+		line-height: var(--lh-sm);
+	}
+
+	.track-artist {
 		color: var(--text-2);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		min-width: 0;
+		flex-shrink: 1;
+	}
+
+	.meta-dot {
+		color: var(--text-4);
+		flex-shrink: 0;
+	}
+
+	.track-genre {
+		color: var(--text-3);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		min-width: 0;
+		/* Genre yields space to the artist but keeps a readable minimum. */
+		flex-shrink: 2;
 	}
 
 	.menu-area {
@@ -483,6 +535,9 @@
 	}
 
 	/* ── Tier 2: Attribute chips ── */
+	/* Whole-chip priority: chips never shrink, so they are never clipped mid-word.
+	 * The energy chip is hidden as a whole unit (JS-measured) when it would not
+	 * fit; key + BPM always show. overflow:hidden is a final safety net only. */
 	.zone-chips {
 		display: flex;
 		align-items: center;
@@ -490,6 +545,45 @@
 		gap: var(--space-xs);
 		padding: var(--space-sm) var(--space-md);
 		overflow: hidden;
+	}
+	/* Chips never shrink, so a chip is never clipped mid-word; a whole chip is
+	 * hidden instead (energy, below). */
+	.zone-chips :global(.chip) {
+		flex-shrink: 0;
+	}
+
+	.energy-chip {
+		display: inline-flex;
+		flex-shrink: 0;
+		min-width: 0;
+	}
+
+	/* "+1" affordance for the dropped energy chip — hidden by default (energy is
+	 * visible at wide widths); revealed by the container query below. Tiny, muted,
+	 * full value on hover, never clips. */
+	.chips-more {
+		display: none;
+		flex-shrink: 0;
+		font-size: var(--text-2xs);
+		font-weight: var(--font-weight-medium);
+		color: var(--text-4);
+		padding: 0 var(--space-2xs);
+		cursor: default;
+	}
+
+	/* Whole-chip priority hide: when the CARD itself is narrow (6-up ~210px and
+	 * tighter), drop the energy chip as a whole unit and surface the "+1" instead.
+	 * Key (+ harmony glyph) and BPM stay visible down to the narrowest density.
+	 * Threshold keyed off the card's inline size, so it adapts to any grid column
+	 * width rather than the viewport. */
+	@container relcard (max-width: 232px) {
+		.energy-chip {
+			display: none;
+		}
+		.chips-more {
+			display: inline-flex;
+			align-items: center;
+		}
 	}
 	/* BPM chip internals — number leads, unit + signed delta follow. */
 	.bpm-num {
@@ -511,19 +605,26 @@
 		height: var(--icon-size-sm);
 	}
 
-	/* ── Tier 3: Track signals — score · rating · affinity strength ── */
+	/* ── Tier 3: Track signals — 3-column grid: score · rating · match ──
+	 * Three explicit columns so cards in a row read as aligned columns:
+	 *   1) score NN/100 — sized to its content (the lead/anchor),
+	 *   2) rating N★ / — — sized to its content,
+	 *   3) match — takes the remaining space (1fr), right-aligned.
+	 * min-width:0 on the cells lets the match column ellipsize instead of
+	 * forcing the row wider than the narrow card. */
 	.zone-signals {
-		display: flex;
+		display: grid;
+		grid-template-columns: auto auto minmax(0, 1fr);
 		align-items: center;
 		gap: var(--space-md);
 		padding: var(--space-sm) var(--space-md) var(--space-md);
 	}
 
-	/* Score is the headline verdict — visually heaviest, sits left. */
+	/* Score is the headline verdict — visually heaviest, sits in column 1. */
 	.signal-score {
 		display: flex;
 		align-items: baseline;
-		flex-shrink: 0;
+		min-width: 0;
 	}
 	.score-number {
 		font-size: var(--text-lg);
@@ -599,5 +700,18 @@
 		box-shadow: var(--elev-3);
 		z-index: 10;
 		min-width: 220px;
+	}
+
+	/* ── Narrow-card tightening (6-up ~210px and below) ──
+	 * Trim the inter-column gaps so the three signals stay on one row without
+	 * overlap; the match column already ellipsizes via minmax(0,1fr). The chip
+	 * row gap shrinks too so key + BPM keep breathing room. */
+	@container relcard (max-width: 232px) {
+		.zone-signals {
+			gap: var(--space-sm);
+		}
+		.zone-chips {
+			gap: var(--space-2xs);
+		}
 	}
 </style>

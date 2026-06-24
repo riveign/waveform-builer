@@ -27,8 +27,8 @@ flowchart TB
         subgraph T1["Tier 1 — Identity"]
             direction LR
             ART["Artwork 38×38<br/>(music-note fallback)"]
-            TXT["Title (1 line, ellipsis)<br/>Artist (1 line, ellipsis)"]
-            ACT["+ add · ⋮ menu<br/>affinity dot"]
+            TXT["Title (1 line, ellipsis)<br/>Artist · Genre (1 line, ellipsis)"]
+            ACT["+ add · ⋮ menu"]
             ART --> TXT --> ACT
         end
         D1["── divider ──"]
@@ -36,24 +36,26 @@ flowchart TB
             direction LR
             KEY["Key 8A + harmony move<br/>= ▲ ▼ ⇄ ✕"]
             BPM["BPM 128 + delta +4"]
-            EN["Energy zone (Peak)"]
-            GEN["Genre (Techno)"]
+            EN["Energy zone (Peak)<br/>drops → +1 when narrow"]
         end
         D2["── divider ──"]
-        subgraph T3["Tier 3 — Track signals"]
+        subgraph T3["Tier 3 — Track signals (3-col grid)"]
             direction LR
-            SIG["score NN/100 (lead) · N★ rating · affinity strength bar"]
+            SIG["score NN/100 | N★ rating | match strength"]
         end
         T1 --> D1 --> T2 --> D2 --> T3
     end
 ```
 
-- **Tier 1 — Identity**: artwork → title → artist. Who is this track? Plus the
-  per-card actions (`+` add to set, `⋮` `<Menu>`). One line each, first-letter-capped,
-  full value on hover.
+- **Tier 1 — Identity**: artwork → title → **artist · genre** subtitle. Who is this
+  track? Plus the per-card actions (`+` add to set, `⋮` `<Menu>`). One line each,
+  first-letter-capped, full value on hover. **Genre lives here**, not in the chip row:
+  it is descriptive identity metadata, not a transition signal, so it belongs with the
+  artist on the subtitle line (artist takes priority and ellipsizes first; genre yields
+  space but keeps a readable minimum).
 - **Tier 2 — Attribute chips / the "why"**: the harmonic and energetic reasons it
-  fits, as `<Chip>`s in priority order key → BPM → energy → genre — Camelot key +
-  harmony-move icon, BPM + signed delta, energy zone, genre. This tier is the card's
+  fits, as `<Chip>`s in priority order key → BPM → energy — Camelot key +
+  harmony-move icon, BPM + signed delta, energy zone. This tier is the card's
   reason to exist; it's "Show the Why" made visible. See [Chips](#chips).
 - **Tier 3 — Track signals**: the quality verdict (match score), the DJ's own
   rating (compact `N★`), and affinity-as-strength — see
@@ -61,13 +63,19 @@ flowchart TB
 
 ---
 
-## Title & artist
+## Title, artist & genre
 
-- **One line each**, ellipsis on overflow, **no wrap**. (This replaced the old
-  2-line `-webkit-line-clamp: 2` on the title.)
-- Full value exposed on hover/focus via `title` (per
+- **Title** is one line, ellipsis on overflow, **no wrap**. (This replaced the old
+  2-line `-webkit-line-clamp: 2`.)
+- **Artist and genre share one muted subtitle line** as `artist · genre`. Genre was
+  moved out of the chip row into the identity tier because it is descriptive metadata,
+  not a transition signal — it belongs with *who the track is*, beside the artist.
+  Artist takes priority and ellipsizes first; genre yields space (`flex-shrink: 2`) but
+  keeps a readable minimum so the line never wraps. When genre is missing, only the
+  artist shows (no dangling `·`).
+- Full value exposed on hover/focus via `title` on each span (per
   [content-conventions §2](./content-conventions.md#2-overflow--wrapping)).
-- Title and artist are **first-letter-capped** via the shared `capFirst()` helper —
+- Title, artist, and genre are **first-letter-capped** via the shared `capFirst()` helper —
   the first visible character is forced to a capital, the rest of the string is left
   intact (so `deadmau5` → `Deadmau5` but `MEDUZA` stays `MEDUZA`). This is a USER
   DECISION (spec 023) that overrides the previous "preserve source casing" default;
@@ -81,19 +89,31 @@ flowchart TB
 Tier 2 renders a row of chips in a fixed **priority order**:
 
 1. **Key** (Camelot + harmony move) — the harmonic relationship is the strongest
-   "why."
-2. **BPM** (+ signed delta) — tempo compatibility.
-3. **Energy** (zone) — where it sits in the journey.
-4. **Genre** — coarsest signal, lowest priority.
+   "why." Transition-critical; always shown.
+2. **BPM** (+ signed delta) — tempo compatibility. Transition-critical; always shown.
+3. **Energy** (zone) — where it sits in the journey. Lowest priority; **drops first**
+   when the card is narrow.
 
-All four are the shared `<Chip>` primitive (`variant="key|bpm|energy|genre"`) —
+Genre is **no longer a chip** — it moved to the identity tier (see
+[Title, artist & genre](#title-artist--genre)).
+
+All three are the shared `<Chip>` primitive (`variant="key|bpm|energy"`) —
 no bespoke pills. The key chip carries a `<HarmonyIcon>` glyph for the move.
 
-**Rules**
-- The chip row is **no-wrap** (`flex-wrap: nowrap; overflow: hidden`) — chips do
-  not flow to a second line (that would break card height; see §2).
-- When space-constrained, the row clips from the end, so the **lowest-priority
-  chips (genre, then energy) are the first to go**, preserving key + BPM.
+**Responsive, whole-chip priority hiding**
+- The card is a **size container** (`container-type: inline-size`, `container-name:
+  relcard`), so the chip row adapts to the card's **real laid-out width** — whatever
+  grid density it lands in (4-up ≈250px, 6-up ≈210px, the expanded "Show more" grid).
+- Chips **never shrink** (`flex-shrink: 0`), so a chip is **never clipped mid-word** at
+  any width. Instead, whole chips are hidden by priority.
+- A `@container relcard (max-width: 232px)` query hides the **whole energy chip** when
+  the card is narrow (≈6-up and tighter) and surfaces a muted **`+1`** in its place
+  (full value on hover). **Key (+ harmony glyph) and BPM stay visible down to the
+  narrowest density.** The same query trims the chip-row and signal-row gaps so the
+  remaining chips keep breathing room.
+- The chip row is still **no-wrap** with `overflow: hidden` as a **final safety net
+  only** — the container query is what actually prevents clipping; nothing reaches the
+  safety net under normal densities.
 - Chip colors come from **semantic tokens by meaning** (the `--zone-*` set for
   energy, `--score-*` for the harmony band, `--bpm-delta-*` via the chip's `tone`
   for the ±6% tension rule) — never hardcoded pastel hex.
@@ -117,22 +137,29 @@ your call* — in a single glance.
 - **Rating** — the DJ's own rating as a compact `N★` (`StarRating display="compact"`).
 - **Affinity strength** — a labelled qualitative strength, NOT a raw number.
 
-**Layout** (token-based, no literals) — a single horizontal row,
-`display: flex; align-items: center; gap: var(--space-md)`, with the same
-`--space-sm var(--space-md)` padding as the other tiers:
+**Layout** (token-based, no literals) — a **3-column CSS grid**,
+`display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items:
+center; gap: var(--space-md)`, with the same `--space-sm var(--space-md)` padding as
+the other tiers. The three explicit columns mean cards in a row read as **aligned
+columns**, left → right:
 
-1. **Score `NN/100` (lead anchor, leftmost, heaviest)** — `NN` at `--text-lg`,
-   `--font-weight-semibold`, `--text-1`; suffix `/100` at `--text-xs`, `--text-3`.
-   It is the headline verdict, so it carries the most weight.
-2. **Rating** — `<StarRating display="compact" size="sm" />` → `N★` when
-   `rating > 0` (the DJ's curation signal beside the tool's verdict); when unrated,
-   the canonical muted `—` (content-conventions §3), never a blank gap.
-3. **Affinity strength (pushed right, `margin-left: auto`)** — a small 3-segment
-   **strength bar + word**, mapping the match score onto a qualitative band so the
-   row never shows a second raw number competing with `NN/100` (§3) and never
-   relies on color alone (§4). When the DJ has set an explicit opinion the word
+1. **Score `NN/100` (column 1 — lead anchor, heaviest)** — `auto` width. `NN` at
+   `--text-lg`, `--font-weight-semibold`, `--text-1`; suffix `/100` at `--text-xs`,
+   `--text-3`. It is the headline verdict, so it carries the most weight.
+2. **Rating (column 2)** — `auto` width. `<StarRating display="compact" size="sm" />`
+   → `N★` when `rating > 0` (the DJ's curation signal beside the tool's verdict); when
+   unrated, the canonical muted `—` (content-conventions §3), never a blank gap.
+3. **Match strength (column 3 — `minmax(0, 1fr)`, takes the remaining space)** — a
+   small 3-segment **strength bar + word**, mapping the match score onto a qualitative
+   band so the row never shows a second raw number competing with `NN/100` (§3) and
+   never relies on color alone (§4). When the DJ has set an explicit opinion the word
    becomes that opinion ("Great together" / "Not for me"); otherwise it reads the
    strength label. The full opinion + strength is in the `title` tooltip.
+
+**Responsiveness**: because column 3 is `minmax(0, 1fr)` and the affinity bar is
+`flex-shrink: 0`, at narrow card widths (≈210px / 6-up) the **word ellipsizes** while
+the bar stays intact — the three columns never overlap and never force the row wider
+than the card. The narrow `@container` query also trims the inter-column gap.
 
 **Affinity-strength thresholds** (`scoreStrength()` in `SimilarTrackCard.svelte`),
 derived from the match score (0–1):
@@ -147,8 +174,8 @@ derived from the match score (0–1):
 - No score → `—` in the score slot (never blank).
 - No rating → muted `—` in the rating slot.
 - Explicit affinity set → the word shows the opinion; the bar still reflects score.
-- Space-constrained → keep score (the headline) and the strength word; the bar and
-  rating are the first to compress.
+- Space-constrained → keep score (the headline); the match **word ellipsizes** in its
+  `1fr` column while the bar stays intact. Score and rating columns hold their content.
 
 **Why**: grouping the tool's score next to the DJ's own rating and a plain-language
 strength read reinforces "Opinions You Can See Through" — the DJ sees *why* and can
@@ -198,7 +225,9 @@ exclusively. No px/hex literals.
 **Outstanding debt**: the hardcoded `PHASE_PILL_COLORS` / delta-badge pastel hex
 are **gone** — chips now derive color from the `--zone-*`, `--score-*`, and
 `--bpm-delta-*` token sets via `<Chip>`. The remaining non-token literals are the
-artwork's `38px` and the popover's `220px min-width`.
+artwork's `38px`, the popover's `220px min-width`, and the chip-priority container
+query breakpoint (`232px` — a layout threshold, intentionally a raw value since it
+encodes a measured fit-width rather than a design-token step).
 
 ---
 
@@ -211,8 +240,11 @@ Resolved (spec 023, step 5):
 2. ~~**"Track signals" block**~~ — **RESOLVED**: built as the locked
    [Track signals block](#track-signals-block); the Tier-1 affinity dot was removed
    and affinity moved to Tier 3 as a labelled strength.
-4. ~~**Chip drop order**~~ — **RESOLVED**: the chip row is `nowrap` + `overflow:
-   hidden`, so it clips from the end (genre → energy first), preserving key + BPM.
+4. ~~**Chip drop order**~~ — **RESOLVED**: genre moved to the identity tier; the chip
+   row is now key → BPM → energy. A `@container` query on the card hides the **whole**
+   energy chip (never clipped mid-word) at narrow densities and surfaces a `+1`, while
+   key + BPM always show. Responsive across 4-up (~250px), 6-up (~210px), and the
+   expanded grid — demonstrated at two widths in the `/design-system` showcase.
 5. ~~**Zone/status color tokens**~~ — **RESOLVED**: chips consume `--zone-*`,
    `--score-*`, and `--bpm-delta-*` tokens; no hardcoded hex remains on this card.
 

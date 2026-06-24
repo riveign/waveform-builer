@@ -725,18 +725,44 @@
 			The card shown under the "Related tracks" header on the track view — each entry is a candidate
 			to mix into next, built entirely from the design-system primitives (<code>Chip</code>,
 			<code>StarRating</code>, <code>HarmonyIcon</code>, <code>Menu</code>). It stacks three tiers:
-			<strong>identity</strong> (first-letter-capped title + artist, one line each with the full value
-			on hover); <strong>attribute chips</strong> in priority order key → BPM → energy → genre, the key
-			chip carrying its harmony-move icon; and the <strong>Track signals</strong> block — the match
-			score <code>NN/100</code> as the lead verdict, the DJ's rating as a compact <code>N★</code>, and
-			affinity rendered as a labelled qualitative strength bar (Strong / Likely / Weak match) rather
-			than a second raw number. Below are four representative states; artwork falls back to the
-			music-note mark when none is available.
+			<strong>identity</strong> (first-letter-capped title, with artist · genre on a muted subtitle
+			line — genre is descriptive identity metadata, so it lives here, not in the chip row); the
+			<strong>attribute chips</strong> in priority order key → BPM → energy, the key chip carrying its
+			harmony-move icon; and the <strong>Track signals</strong> block — a 3-column grid of the match
+			score <code>NN/100</code> (lead), the DJ's rating as a compact <code>N★</code>, and affinity
+			rendered as a labelled qualitative strength bar (Strong / Likely / Weak match) rather than a
+			second raw number.
 		</p>
-		<div class="related-grid">
+		<p class="ds__note">
+			The card is a <strong>size container</strong>: it renders across grid densities (4-up, 6-up, the
+			expanded "Show more" grid) and adapts to its real column width. Chips drop by priority — never
+			clipped mid-word — as the card narrows: key (+ harmony glyph) and BPM are transition-critical
+			and always show; <strong>energy drops first</strong> when tight, surfacing a muted <code>+1</code>
+			(full value on hover). The two rows below show the same four states at <strong>4-up (~250px,
+			energy visible)</strong> and <strong>6-up (~210px, energy folded into +1)</strong>.
+		</p>
+
+		<p class="related-density-label">4-up — ~250px columns (energy chip visible)</p>
+		<div class="related-grid related-grid--4up">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">
 					<span class="related-cell__label">{s.label}</span>
+					<SimilarTrackCard
+						item={s.item}
+						parentTrackId={1}
+						parentBpm={parentBpm}
+						parentKey={parentKey}
+						affinity={s.affinity}
+						onaffinitychange={noop}
+					/>
+				</div>
+			{/each}
+		</div>
+
+		<p class="related-density-label">6-up — ~210px columns (energy folds into +1, key + BPM stay)</p>
+		<div class="related-grid related-grid--6up">
+			{#each relatedStates as s (s.item.track.id)}
+				<div class="related-cell">
 					<SimilarTrackCard
 						item={s.item}
 						parentTrackId={1}
@@ -1159,9 +1185,24 @@
 	 * caption above the real card. */
 	.related-grid {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
 		grid-auto-rows: 1fr;
 		gap: var(--space-lg);
+	}
+	/* 4-up — ~250px columns: energy chip is visible. */
+	.related-grid--4up {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+	/* 6-up — ~210px columns: the energy chip folds into "+1"; key + BPM stay.
+	 * Tighter gap so columns land near the real narrow density. */
+	.related-grid--6up {
+		grid-template-columns: repeat(6, minmax(0, 1fr));
+		gap: var(--space-md);
+		margin-bottom: var(--space-lg);
+	}
+	.related-density-label {
+		font-size: var(--text-xs);
+		color: var(--text-3);
+		margin: var(--space-md) 0 var(--space-sm);
 	}
 	.related-cell {
 		display: flex;
@@ -1177,6 +1218,7 @@
 	}
 
 	@media (max-width: 720px) {
-		.related-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+		.related-grid--4up { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+		.related-grid--6up { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 	}
 </style>
