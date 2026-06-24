@@ -143,6 +143,7 @@ class Set(Base):
     analysis_cache = Column(Text)  # JSON blob for cached analysis (Phase 2)
     planned_set_id = Column(Integer, ForeignKey("sets.id"), nullable=True)  # Played set -> the plan it came from
     comparison_cache = Column(Text)  # JSON blob for cached played-vs-planned comparison
+    deleted_at = Column(String, nullable=True)  # Soft delete: NULL = active, ISO timestamp = in trash
 
     tracks = relationship("SetTrack", back_populates="set_", cascade="all, delete-orphan")
 

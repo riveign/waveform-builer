@@ -114,6 +114,7 @@ class SetResponse(BaseModel):
     duration_min: int | None = None
     track_count: int = 0
     source: str | None = None
+    deleted_at: str | None = None  # ISO timestamp when soft-deleted, else None
 
     model_config = {"from_attributes": True}
 

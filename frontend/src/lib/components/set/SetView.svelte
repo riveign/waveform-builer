@@ -556,7 +556,7 @@
 			<div class="status">An empty set — your story starts here</div>
 		{/if}
 	{:else}
-		<SetGrid onselect={handleSetSelect} refreshSignal={pickerRefresh} ondelete={() => pickerRefresh++} />
+		<SetGrid onselect={handleSetSelect} refreshSignal={pickerRefresh} onchange={() => pickerRefresh++} />
 	{/if}
 
 	{#if showAssist && selectedSet}
