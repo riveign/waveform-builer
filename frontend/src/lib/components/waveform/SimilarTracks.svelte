@@ -6,6 +6,17 @@
 
 	let { trackId, trackKey = null, parentBpm = null }: { trackId: number; trackKey?: string | null; parentBpm?: number | null } = $props();
 
+	// These are mix suggestions, so weight what actually makes a mix work — key and
+	// tempo lead, energy/genre/quality support. (Overrides the default balance that
+	// let clashing-key tracks rank high.)
+	const MIX_WEIGHTS = {
+		harmonic: 0.4,
+		bpm_compat: 0.25,
+		energy_fit: 0.15,
+		genre_coherence: 0.1,
+		track_quality: 0.1,
+	};
+
 	let pool = $state<SuggestNextItem[]>([]);
 	let rejectedIds = $state<Set<number>>(new Set());
 	let loading = $state(false);
@@ -36,7 +47,7 @@
 		dismissing = new Set();
 
 		Promise.all([
-			suggestNext(id, FETCH_COUNT),
+			suggestNext(id, FETCH_COUNT, undefined, MIX_WEIGHTS),
 			getTrackAffinities(id).catch(() => [] as TrackAffinity[]),
 		])
 			.then(([res, affinities]) => {
@@ -84,12 +95,12 @@
 </script>
 
 <div class="similar-section">
-	<h3 class="section-title">Sounds like</h3>
+	<h3 class="section-title">Mix next</h3>
 
 	{#if loading}
-		<Spinner label="Listening to your library..." />
+		<Spinner label="Finding what mixes..." />
 	{:else if available.length === 0}
-		<p class="muted">No similar tracks found</p>
+		<p class="muted">Nothing in your library mixes cleanly from here yet</p>
 	{:else}
 		<div class="cards-grid">
 			{#each visibleSuggestions as item (item.track.id)}
