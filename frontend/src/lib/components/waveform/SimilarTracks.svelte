@@ -95,7 +95,7 @@
 </script>
 
 <div class="similar-section">
-	<h3 class="section-title">Mix next</h3>
+	<h3 class="section-title">Related tracks</h3>
 
 	{#if loading}
 		<Spinner label="Finding what mixes..." />

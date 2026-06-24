@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Track, SuggestNextItem } from '$lib/types';
 	import { getTrackArtworkUrl, setTrackAffinity, removeTrackAffinity } from '$lib/api/tracks';
-	import { ZONE_COLORS } from './EnergyZonePicker.svelte';
 	import StarRating from './StarRating.svelte';
 	import ContextMenu from '../ContextMenu.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
@@ -185,7 +184,7 @@
 			{#if affinity}
 				<span
 					class="affinity-dot"
-					style="background: {affinity === 'good' ? 'var(--accent, #4ecdc4)' : 'var(--energy-high, #e74c3c)'}"
+					style="background: {affinity === 'good' ? 'var(--accent)' : 'var(--energy-high)'}"
 					title="{affinity === 'good' ? 'Marked: great together' : 'Marked: not for me'}"
 				></span>
 			{/if}
@@ -250,7 +249,7 @@
 				{@const colors = PHASE_PILL_COLORS[energyZone]}
 				<span
 					class="pill pill-phase"
-					style="background: {colors?.bg ?? 'var(--bg-tertiary)'}; color: {colors?.text ?? 'var(--text-secondary)'}"
+					style="background: {colors?.bg ?? 'var(--surface-3)'}; color: {colors?.text ?? 'var(--text-2)'}"
 				>{energyZone}</span>
 			{/if}
 		</div>
@@ -274,11 +273,11 @@
 <!-- Context menu -->
 <ContextMenu bind:open={menuOpen} x={menuX} y={menuY}>
 	<button class="ctx-item" onclick={() => handleAffinity('good')}>
-		<span class="ctx-icon" style="color: var(--accent, #4ecdc4)">&#9679;</span>
+		<span class="ctx-icon" style="color: var(--accent)">&#9679;</span>
 		Great together
 	</button>
 	<button class="ctx-item" onclick={() => handleAffinity('bad')}>
-		<span class="ctx-icon" style="color: var(--energy-high, #e74c3c)">&#9679;</span>
+		<span class="ctx-icon" style="color: var(--energy-high)">&#9679;</span>
 		Not for me
 	</button>
 	{#if affinity}
@@ -301,11 +300,11 @@
 <style>
 	/* ── Card Container ── */
 	.similar-card {
-		background: var(--bg-secondary);
-		border: 0.5px solid var(--border);
-		border-radius: 12px;
+		background: var(--surface-2);
+		border: var(--space-px) solid var(--border-subtle);
+		border-radius: var(--radius-xl);
 		cursor: pointer;
-		transition: border-color 0.15s;
+		transition: border-color var(--dur-fast) var(--ease-standard);
 		display: flex;
 		flex-direction: column;
 		flex: 1; /* fill the equal-height grid cell */
@@ -319,16 +318,16 @@
 	}
 
 	.similar-card:hover {
-		border-color: var(--border-focus);
+		border-color: var(--border-strong);
 	}
 
 	.similar-card.selected {
-		border: 2px solid var(--accent);
+		border: var(--space-2xs) solid var(--accent);
 	}
 
 	/* ── Zone Divider ── */
 	.zone-divider {
-		height: 1px;
+		height: var(--space-px);
 		background: currentColor;
 		opacity: 0.08;
 	}
@@ -336,18 +335,18 @@
 	/* ── Zone 1: Header ── */
 	.zone-header {
 		display: flex;
-		gap: 8px;
+		gap: var(--space-md);
 		align-items: flex-start;
-		padding: 10px 10px 7px;
+		padding: var(--space-md) var(--space-md) var(--space-sm);
 	}
 
 	.artwork-wrap {
 		width: 38px;
 		height: 38px;
 		flex-shrink: 0;
-		border-radius: 6px;
+		border-radius: var(--radius-md);
 		overflow: hidden;
-		background: #1a1a1a;
+		background: var(--surface-1);
 	}
 
 	.artwork-img {
@@ -363,12 +362,12 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: var(--text-dim);
+		color: var(--text-4);
 	}
 
 	.artwork-fallback svg {
-		width: 24px;
-		height: 24px;
+		width: var(--space-3xl);
+		height: var(--space-3xl);
 	}
 
 	.text-col {
@@ -376,14 +375,14 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
+		gap: var(--space-2xs);
 	}
 
 	.track-title {
-		font-size: 12px;
-		font-weight: 500;
-		line-height: 1.3;
-		color: var(--text-primary);
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-medium);
+		line-height: var(--lh-sm);
+		color: var(--text-1);
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
 		-webkit-box-orient: vertical;
@@ -391,9 +390,9 @@
 	}
 
 	.track-artist {
-		font-size: 11px;
-		color: var(--text-secondary);
-		margin-top: 1px;
+		font-size: var(--text-xs);
+		color: var(--text-2);
+		margin-top: var(--space-px);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -403,32 +402,32 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: var(--space-xs);
 		position: relative;
 	}
 
 	.affinity-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
+		width: var(--space-sm);
+		height: var(--space-sm);
+		border-radius: var(--radius-full);
 		flex-shrink: 0;
 	}
 
 	.menu-btn {
 		background: none;
 		border: none;
-		color: var(--text-dim);
+		color: var(--text-4);
 		cursor: pointer;
-		font-size: 16px;
-		padding: 2px 4px;
-		border-radius: 4px;
+		font-size: var(--text-lg);
+		padding: var(--space-2xs) var(--space-xs);
+		border-radius: var(--radius-sm);
 		line-height: 1;
-		transition: background 0.1s, color 0.1s;
+		transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
 	}
 
 	.menu-btn:hover {
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
+		background: var(--surface-3);
+		color: var(--text-1);
 	}
 
 	/* ── Zone 2: Metadata ── */
@@ -436,22 +435,22 @@
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
-		padding: 6px 10px;
-		gap: 5px;
+		padding: var(--space-sm) var(--space-md);
+		gap: var(--space-xs);
 	}
 
 	.meta-left {
 		display: flex;
 		align-items: baseline;
 		flex-wrap: wrap;
-		gap: 4px 0;
+		gap: var(--space-xs) 0;
 		flex-shrink: 0;
 	}
 
 	.key-chip {
-		font-size: 12px;
-		font-weight: 700;
-		margin-left: 8px;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		margin-left: var(--space-md);
 	}
 
 	.harmony-badge {
@@ -460,34 +459,34 @@
 		justify-content: center;
 		width: 17px;
 		height: 17px;
-		font-size: 10px;
-		font-weight: 700;
+		font-size: var(--text-2xs);
+		font-weight: var(--font-weight-semibold);
 		line-height: 1;
-		border: 1px solid;
-		border-radius: 50%;
-		margin-left: 6px;
+		border: var(--space-px) solid;
+		border-radius: var(--radius-full);
+		margin-left: var(--space-sm);
 		flex-shrink: 0;
 	}
 
 	.bpm-value {
-		font-size: 13px;
-		font-weight: 500;
+		font-size: var(--text-base);
+		font-weight: var(--font-weight-medium);
 		font-variant-numeric: tabular-nums;
-		color: var(--text-primary);
+		color: var(--text-1);
 	}
 
 	.bpm-unit {
-		font-size: 11px;
-		color: var(--text-tertiary);
-		margin-left: 3px;
+		font-size: var(--text-xs);
+		color: var(--text-3);
+		margin-left: var(--space-2xs);
 	}
 
 	.bpm-delta-badge {
-		font-size: 11px;
-		font-weight: 500;
-		padding: 1px 6px;
-		border-radius: 99px;
-		margin-left: 6px;
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-medium);
+		padding: var(--space-px) var(--space-sm);
+		border-radius: var(--radius-full);
+		margin-left: var(--space-sm);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -504,23 +503,23 @@
 	.meta-right {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 5px;
+		gap: var(--space-xs);
 		min-width: 0;
 	}
 
 	.pill {
-		font-size: 11px;
-		font-weight: 500;
-		padding: 2px 8px;
-		border-radius: 99px;
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-medium);
+		padding: var(--space-2xs) var(--space-md);
+		border-radius: var(--radius-full);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
 
 	.pill-genre {
-		background: var(--bg-tertiary);
-		color: var(--text-secondary);
+		background: var(--surface-3);
+		color: var(--text-2);
 		max-width: 100%;
 	}
 
@@ -531,7 +530,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 6px 10px 10px;
+		padding: var(--space-sm) var(--space-md) var(--space-md);
 	}
 
 	.score-display {
@@ -540,50 +539,50 @@
 	}
 
 	.score-number {
-		font-size: 18px;
-		font-weight: 500;
-		color: var(--text-primary);
+		font-size: var(--text-lg);
+		font-weight: var(--font-weight-medium);
+		color: var(--text-1);
 		font-variant-numeric: tabular-nums;
 		line-height: 1;
 	}
 
 	.score-suffix {
-		font-size: 11px;
-		color: var(--text-tertiary);
-		margin-left: 3px;
+		font-size: var(--text-xs);
+		color: var(--text-3);
+		margin-left: var(--space-2xs);
 	}
 
 	/* ── Context menu items ── */
 	.ctx-item {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: var(--space-md);
 		width: 100%;
-		padding: 6px 10px;
+		padding: var(--space-sm) var(--space-md);
 		background: none;
 		border: none;
-		border-radius: 4px;
-		color: var(--text-primary);
-		font-size: 13px;
+		border-radius: var(--radius-sm);
+		color: var(--text-1);
+		font-size: var(--text-base);
 		cursor: pointer;
 		text-align: left;
 	}
 
 	.ctx-item:hover {
-		background: var(--bg-secondary);
+		background: var(--surface-2);
 	}
 
 	.ctx-icon {
-		width: 16px;
+		width: var(--space-xl);
 		text-align: center;
-		font-size: 12px;
+		font-size: var(--text-sm);
 		flex-shrink: 0;
 	}
 
 	.ctx-divider {
-		height: 1px;
-		background: var(--border);
-		margin: 2px 0;
+		height: var(--space-px);
+		background: var(--border-subtle);
+		margin: var(--space-2xs) 0;
 	}
 
 	/* ── Add to Set Popover ── */
@@ -591,11 +590,11 @@
 		position: absolute;
 		top: 100%;
 		right: 0;
-		margin-top: 4px;
-		background: var(--bg-primary);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+		margin-top: var(--space-xs);
+		background: var(--surface-1);
+		border: var(--space-px) solid var(--border-subtle);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--elev-3);
 		z-index: 10;
 		min-width: 220px;
 	}
