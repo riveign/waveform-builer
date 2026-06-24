@@ -4,7 +4,7 @@
 	import { updateTrackRating } from '$lib/api/tracks';
 	import { submitDecision } from '$lib/api/tinder';
 	import { getWaveformDetail } from '$lib/api/waveforms';
-	import { formatKey, getCamelotColor, compatibleKeys, harmonyColor } from '$lib/utils/camelot';
+	import { formatKey, getCamelotColor, compatibleKeys } from '$lib/utils/camelot';
 	import { formatTime } from '$lib/utils/waveform';
 	import WavesurferPlayer from './WavesurferPlayer.svelte';
 	import TrackArtwork from './TrackArtwork.svelte';
@@ -335,34 +335,6 @@
 		{/if}
 	</div>
 
-	<!-- ── Harmonic mixing (needs only the key) ── -->
-	{#if compatKeys.length}
-		<div class="harmonic-section">
-			<h3 class="section-title">Harmonic mixing</h3>
-			<div class="harmonic-card">
-				<div class="hk-cell">
-					<span
-						class="hk-note current"
-						style="color: {getCamelotColor(track.key)}; border-color: {getCamelotColor(track.key)}"
-					>{formatKey(track.key)}</span>
-					<span class="hk-rel">this track</span>
-				</div>
-				<span class="hk-arrow" aria-hidden="true">→</span>
-				<div class="hk-compat-row">
-					{#each compatKeys as ck (ck.camelot)}
-						<div class="hk-cell">
-							<span
-								class="hk-note"
-								style="color: {getCamelotColor(ck.camelot)}; border-color: {getCamelotColor(ck.camelot)}"
-							>{ck.name}</span>
-							<span class="hk-rel" style="color: {harmonyColor(ck.score)}">{ck.relation}</span>
-						</div>
-					{/each}
-				</div>
-			</div>
-		</div>
-	{/if}
-
 	<!-- ── What Kiku Hears (always visible) ── -->
 	{#if features}
 		<div class="kiku-hears">
@@ -537,58 +509,6 @@
 		padding: 1px 7px;
 	}
 
-	.harmonic-section {
-		margin-top: 20px;
-	}
-
-	.harmonic-card {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: 16px;
-		padding: 16px 18px;
-		background: var(--bg-secondary);
-		border-radius: 10px;
-		border: 1px solid var(--border);
-	}
-
-	.hk-compat-row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 14px;
-	}
-
-	.hk-cell {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 5px;
-	}
-
-	.hk-note {
-		font-size: 16px;
-		font-weight: 700;
-		padding: 4px 12px;
-		border: 1.5px solid;
-		border-radius: 6px;
-		background: transparent;
-	}
-
-	.hk-note.current {
-		font-size: 18px;
-	}
-
-	.hk-rel {
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: var(--text-dim);
-	}
-
-	.hk-arrow {
-		color: var(--text-dim);
-		font-size: 18px;
-	}
 
 	.meta-badge-interactive {
 		cursor: pointer;

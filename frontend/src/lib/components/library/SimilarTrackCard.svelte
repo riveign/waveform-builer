@@ -58,6 +58,15 @@
 		return keyMoveLabel(parentKey, track.key);
 	});
 
+	// Compact icon per harmonic move (replaces the long label on the card).
+	const HARMONY_ICON: Record<string, string> = {
+		'same key': '=',
+		'energy up': '▲',
+		'energy down': '▼',
+		'mood switch': '⇄',
+		'distant keys': '✕',
+	};
+
 	// Phase pill colors: fill + text per zone
 	const PHASE_PILL_COLORS: Record<string, { bg: string; text: string }> = {
 		intro:   { bg: '#E6F1FB', text: '#185FA5' },
@@ -228,7 +237,8 @@
 						class="harmony-badge"
 						style="color: {harmonyColor(harmony.score)}; border-color: {harmonyColor(harmony.score)}"
 						title="{formatKey(track.key)} — {harmony.label} from this track"
-					>{harmony.label}</span>
+						aria-label={harmony.label}
+					>{HARMONY_ICON[harmony.label] ?? harmony.label}</span>
 				{/if}
 			{/if}
 		</div>
@@ -445,13 +455,18 @@
 	}
 
 	.harmony-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 17px;
+		height: 17px;
 		font-size: 10px;
-		font-weight: 600;
-		padding: 1px 6px;
+		font-weight: 700;
+		line-height: 1;
 		border: 1px solid;
-		border-radius: 99px;
+		border-radius: 50%;
 		margin-left: 6px;
-		white-space: nowrap;
+		flex-shrink: 0;
 	}
 
 	.bpm-value {
