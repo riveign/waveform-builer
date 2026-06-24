@@ -32,7 +32,7 @@ the rest of the app.
 
 ### Current State
 - Frontend: SvelteKit + Svelte 5 runes, TypeScript, adapter-static, SSR off.
-- Styling: pure scoped Svelte `<style>` blocks + 16 CSS variables in `src/app.css`. No
+- Styling: pure scoped Svelte `<style>` blocks + 20 CSS variables in `src/app.css`. No
   Tailwind, no PostCSS, no CSS framework.
 - Current palette is a **dark** theme with cyan accent `--accent: #00CED1`.
 - 76 components under `src/lib/components/`, grouped by domain (set/, hunt/, dna/,
