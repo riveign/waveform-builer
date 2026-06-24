@@ -297,7 +297,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-lg);
-		margin-bottom: var(--space-6xl);
+		margin-bottom: var(--space-4xl);
 	}
 	.ds__kicker {
 		font-size: var(--text-xs);
@@ -320,12 +320,14 @@
 	}
 
 	/* Each section is a stack: title → description → content with uniform rhythm.
-	 * gap handles the title→description→content spacing; no per-element margins. */
+	 * gap handles the title→description→content spacing; no per-element margins.
+	 * Top-only padding gives a single 32px break above each border so stacked
+	 * sections never compound to 64px — the rhythm stays even, intentional. */
 	.ds__section {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-lg);
-		padding: var(--space-6xl) 0;
+		padding: var(--space-4xl) 0 0;
 		border-top: 1px solid var(--border-subtle);
 	}
 	.ds h2 {
