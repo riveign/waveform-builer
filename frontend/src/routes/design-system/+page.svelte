@@ -7,10 +7,17 @@
 	// WCAG 2.1 contrast figure measured against the app background (#0D0D0D).
 	// Fill and text-safe steps are listed separately per color.
 	type Verdict = 'text' | 'large' | 'nontext';
-	const verdictLabel: Record<Verdict, string> = {
-		text: 'Body text AA (≥4.5:1)',
-		large: 'Large / UI only (≥3:1)',
-		nontext: 'Non-text only',
+	// Compact uppercase role chip for the ramp cards, mirroring the palette card's
+	// role chip. Short label + the WCAG threshold that step clears.
+	const verdictChip: Record<Verdict, string> = {
+		text: 'Body text · AA',
+		large: 'Large · UI',
+		nontext: 'Non-text',
+	};
+	const verdictTitle: Record<Verdict, string> = {
+		text: 'Passes WCAG AA body text (≥4.5:1)',
+		large: 'Passes large text / UI only (≥3:1)',
+		nontext: 'Non-text only (fails 3:1)',
 	};
 
 	// The five source colors with their role, fill step, and text-safe step.
@@ -131,14 +138,27 @@
 		<div class="swatch-grid">
 			{#each tealRamp as s (s.step)}
 				<div class="swatch">
-					<div class="swatch__chip" style="background: var(--teal-{s.step});"></div>
-					<div class="swatch__meta">
-						<code>--teal-{s.step}</code>
-						<span class="swatch__hex">{s.hex}</span>
-						<span class="swatch__ratio">{s.ratio}</span>
-						<span class="swatch__verdict swatch__verdict--{s.verdict}">{verdictLabel[s.verdict]}</span>
-						{#if s.note}<span class="swatch__hint">{s.note}</span>{/if}
+					<div class="swatch__head">
+						<div class="swatch__chip" style="background: var(--teal-{s.step});"></div>
+						<div class="swatch__id">
+							<code>--teal-{s.step}</code>
+							<span
+								class="swatch__chiplabel swatch__verdict--{s.verdict}"
+								title={verdictTitle[s.verdict]}
+							>{verdictChip[s.verdict]}</span>
+						</div>
 					</div>
+					<div class="swatch__rows">
+						<div class="swatch__row">
+							<span class="swatch__label">Hex</span>
+							<span class="swatch__hex">{s.hex}</span>
+						</div>
+						<div class="swatch__row">
+							<span class="swatch__label">On #0D0D0D</span>
+							<span class="swatch__ratio swatch__verdict--{s.verdict}">{s.ratio}</span>
+						</div>
+					</div>
+					{#if s.note}<span class="swatch__hint">{s.note}</span>{/if}
 				</div>
 			{/each}
 		</div>
@@ -358,30 +378,56 @@
 		color: var(--text-3);
 	}
 
-	/* color */
+	/* color — ramp cards mirror the palette card's labeled mini-table. Three
+	 * columns give each card room for its label column without awkward wraps;
+	 * it drops to two on narrower widths. */
 	.swatch-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+		grid-template-columns: repeat(3, 1fr);
 		gap: var(--space-lg);
 	}
 	.swatch {
 		display: flex;
+		flex-direction: column;
 		gap: var(--space-md);
 		background: var(--surface-2);
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-md);
-		padding: var(--space-md);
+		padding: var(--space-lg);
 	}
-	.swatch__chip { width: 48px; height: 48px; border-radius: var(--radius-sm); flex-shrink: 0; }
-	.swatch__meta { display: flex; flex-direction: column; gap: var(--space-2xs); min-width: 0; }
-	.swatch__meta code { font-size: var(--text-xs); color: var(--text-1); }
-	.swatch__hex { font-size: var(--text-2xs); color: var(--text-3); text-transform: uppercase; }
+	.swatch__head { display: flex; align-items: center; gap: var(--space-md); }
+	.swatch__chip { width: 40px; height: 40px; border-radius: var(--radius-sm); flex-shrink: 0; }
+	.swatch__id { display: flex; flex-direction: column; gap: var(--space-2xs); min-width: 0; }
+	.swatch__id code { font-size: var(--text-md); color: var(--text-1); }
+	.swatch__chiplabel {
+		font-size: var(--text-2xs);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		font-weight: var(--font-weight-semibold);
+	}
+	.swatch__rows { display: flex; flex-direction: column; gap: var(--space-sm); }
+	.swatch__row {
+		display: grid;
+		grid-template-columns: 88px 1fr;
+		align-items: center;
+		gap: var(--space-sm);
+	}
+	.swatch__label {
+		font-size: var(--text-2xs);
+		color: var(--text-3);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+	.swatch__hex { font-size: var(--text-xs); color: var(--text-1); text-transform: uppercase; }
 	.swatch__ratio { font-size: var(--text-sm); font-weight: var(--font-weight-semibold); }
-	.swatch__verdict { font-size: var(--text-2xs); }
 	.swatch__verdict--text { color: var(--energy-low); }
 	.swatch__verdict--large { color: var(--energy-mid); }
 	.swatch__verdict--nontext { color: var(--text-4); }
 	.swatch__hint { font-size: var(--text-2xs); color: var(--text-3); }
+
+	@media (max-width: 720px) {
+		.swatch-grid { grid-template-columns: repeat(2, 1fr); }
+	}
 
 	/* palette role cards (the five source colors) */
 	.ds__subhead {
