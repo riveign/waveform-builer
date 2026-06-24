@@ -4,10 +4,18 @@
 	import Grid from '$lib/components/primitives/Grid.svelte';
 	import SimilarTrackCard from '$lib/components/library/SimilarTrackCard.svelte';
 	import StarRating from '$lib/components/library/StarRating.svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
+	import { getCamelotColor } from '$lib/utils/camelot';
 	import type { SuggestNextItem, Track } from '$lib/types';
 
 	// Interactive rating demo — clicking a star updates this local value live.
 	let demoRating = $state(3);
+
+	// Removable-filter demo for the chip section — the × actually drops the chip.
+	let filterChips = $state(['Techno', 'deadmau5', 'Anjunadeep']);
+	function dropChip(label: string) {
+		filterChips = filterChips.filter((c) => c !== label);
+	}
 
 	// Cerceta palette: five source colors mapped to UI roles. Each ratio is the
 	// WCAG 2.1 contrast figure measured against the app background (#0D0D0D).
@@ -420,7 +428,138 @@
 		</div>
 	</section>
 
-	<!-- 10. RELATED TRACKS CARD -->
+	<!-- 10. CHIP -->
+	<section class="ds__section">
+		<h2>Chip</h2>
+		<p class="ds__note">
+			One primitive for every labelled value — genre, Camelot key, BPM delta, energy zone, harmony
+			move, vibe and level. Color always derives from a token by meaning and is paired with a word or
+			glyph, so it's never the only signal. Dynamic colors (key, zone, vibe) flow in through a
+			<code>color</code> prop, keeping the chip presentational. Sentence case throughout, BPM as a
+			signed integer delta, keys in Camelot notation, and a muted <code>—</code> for missing values.
+		</p>
+
+		<div class="chip-grid">
+			<div class="chip-cell">
+				<span class="chip-cell__label">Genre</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="genre" value="Techno" />
+					<Chip variant="genre" value="Tech house" />
+					<Chip variant="genre" value="Melodic house" />
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">Camelot key</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="key" value="8A" color={getCamelotColor('8A')} />
+					<Chip variant="key" value="12B" color={getCamelotColor('12B')} />
+					<Chip variant="key" value="5A" color={getCamelotColor('5A')} />
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">BPM delta</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="bpm" value="+4" title="Within ±6% — seamless" />
+					<Chip variant="bpm" value="−6" title="Within ±6% — seamless" />
+					<Chip variant="bpm" value="+18" tone="warn" title="Beyond ±6% — getting harder" />
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">Energy zone</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="energy" value="Warmup" color="var(--zone-warmup)" />
+					<Chip variant="energy" value="Drive" color="var(--zone-drive)" />
+					<Chip variant="energy" value="Peak" color="var(--zone-peak)" />
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">Harmony move</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="harmony" value="Energy up" color="var(--score-excellent)" title="Energy up — one step on the Camelot wheel">
+						{#snippet icon()}▲{/snippet}
+					</Chip>
+					<Chip variant="harmony" value="Mood switch" color="var(--score-good)" title="Mood switch — relative major/minor">
+						{#snippet icon()}⇄{/snippet}
+					</Chip>
+					<Chip variant="harmony" value="Clash" color="var(--score-poor)" title="Distant keys — clashing">
+						{#snippet icon()}✕{/snippet}
+					</Chip>
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">Vibe</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="vibe" value="Bright &amp; dense" color="hsl(48 90% 60%)">
+						{#snippet icon()}<span class="vibe-dot" style:background="hsl(48 90% 60%)"></span>{/snippet}
+					</Chip>
+					<Chip variant="vibe" value="Dark &amp; sparse" color="hsl(265 50% 55%)">
+						{#snippet icon()}<span class="vibe-dot" style:background="hsl(265 50% 55%)"></span>{/snippet}
+					</Chip>
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">Level (belt)</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="level" value="Green belt" tone="success" />
+					<Chip variant="level" value="Brown belt" tone="warn" />
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">Neutral &amp; tones</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="neutral" value="Tag" />
+					<Chip variant="neutral" value="Owned" tone="success" />
+					<Chip variant="neutral" value="Gap" tone="warn" />
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">Sizes</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="genre" value="Small" size="sm" />
+					<Chip variant="genre" value="Medium" size="md" />
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">Missing value</span>
+				<div class="cluster cluster--sm">
+					<Chip variant="genre" />
+					<Chip variant="key" />
+				</div>
+			</div>
+
+			<div class="chip-cell">
+				<span class="chip-cell__label">Removable filters</span>
+				<div class="cluster cluster--sm">
+					{#each filterChips as label (label)}
+						<Chip
+							variant="neutral"
+							value={label}
+							removable
+							removeLabel={`Remove ${label} filter`}
+							onremove={() => dropChip(label)}
+						/>
+					{/each}
+					{#if filterChips.length === 0}
+						<span class="chip-cell__empty">All filters cleared — click reset to bring them back.</span>
+						<Button size="sm" variant="ghost" onclick={() => (filterChips = ['Techno', 'deadmau5', 'Anjunadeep'])}>
+							Reset
+						</Button>
+					{/if}
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- 11. RELATED TRACKS CARD -->
 	<section class="ds__section">
 		<h2>Related tracks card</h2>
 		<p class="ds__note">
@@ -447,7 +586,7 @@
 		</div>
 	</section>
 
-	<!-- 11. REFERENCES -->
+	<!-- 12. REFERENCES -->
 	<section class="ds__section">
 		<h2>References</h2>
 		<p class="ds__note">
@@ -471,6 +610,21 @@
 		/* Rating star re-points to the magenta highlight step under cerceta — the
 		 * palette's "accent / highlight" role. Amber stays the live-app default. */
 		--star-fill: var(--magenta-400);
+
+		/* Chip ramps under cerceta — the energy journey and the score-quality
+		 * ramp re-point onto the teal-book palette steps (all text-safe). The
+		 * live app keeps the original ZONE_COLORS / score hexes. */
+		--zone-intro:  var(--navy-400);   /* cool blue — doors-open lull */
+		--zone-warmup: var(--teal-400);   /* teal — easing in */
+		--zone-build:  var(--lilac-400);  /* soft lilac — lifting */
+		--zone-drive:  var(--magenta-400);/* magenta — floor moving */
+		--zone-peak:   var(--magenta-300);/* bright highlight — the apex */
+		--zone-close:  var(--lilac-500);  /* dusk violet — comedown */
+
+		--score-excellent: var(--teal-400);
+		--score-good:      var(--lilac-400);
+		--score-fair:      var(--magenta-400);
+		--score-poor:      var(--magenta-300);
 	}
 
 	/* One centered document. Every section — header, titles, descriptions and the
@@ -723,6 +877,36 @@
 		color: var(--text-3);
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
+	}
+
+	/* chip — each variant sits in a captioned cell, mirroring the rating grid.
+	 * Cells wrap responsively; the chips inside cluster with the shared utility. */
+	.chip-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		gap: var(--space-lg);
+	}
+	.chip-cell {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-sm);
+		min-width: 0;
+	}
+	.chip-cell__label {
+		font-size: var(--text-2xs);
+		color: var(--text-3);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.chip-cell__empty {
+		font-size: var(--text-xs);
+		color: var(--text-3);
+	}
+	.vibe-dot {
+		display: inline-block;
+		width: var(--space-md);
+		height: var(--space-md);
+		border-radius: var(--radius-full);
 	}
 
 	/* related tracks card — four states on the same equal-height grid the live

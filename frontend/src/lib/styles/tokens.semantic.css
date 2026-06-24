@@ -49,6 +49,28 @@
 	 * the /design-system showcase re-points it under [data-theme="cerceta"]. */
 	--star-fill: var(--amber-500);
 
+	/* energy zones — one source for the 6-zone journey, consumed by the Chip
+	 * `energy` variant and the zone-dot/zone-badge sites. Defaults to the live
+	 * ZONE_COLORS hexes so the app is unchanged. */
+	--zone-intro:  var(--zone-intro-500);
+	--zone-warmup: var(--zone-warmup-500);
+	--zone-build:  var(--zone-build-500);
+	--zone-drive:  var(--zone-drive-500);
+	--zone-peak:   var(--zone-peak-500);
+	--zone-close:  var(--zone-close-500);
+
+	/* score quality — one ramp by meaning (excellent/good/fair/poor) for
+	 * transition, bpm and harmony verdicts. */
+	--score-excellent: var(--score-excellent-500);
+	--score-good:      var(--score-good-500);
+	--score-fair:      var(--score-fair-500);
+	--score-poor:      var(--score-poor-500);
+
+	/* bpm delta — tension coloring from content-conventions §3. Within ±6% of the
+	 * source BPM the transition is seamless (neutral); beyond that it warns. */
+	--bpm-delta-neutral: var(--text-2);
+	--bpm-delta-warn:    var(--score-fair);
+
 	/* --- Focus ring (Research §5; systemic a11y fix) --- */
 	--focus-ring: #5FD0A8;        /* light teal-green; 10.25:1 vs bg — ring sits in the offset gap against the page bg */
 	--focus-ring-width: 2px;
@@ -104,13 +126,28 @@
 	--ease-decelerate: cubic-bezier(0, 0, 0, 1);
 	--ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
 
-	/* --- Tier 3 — Component (Button only) --- */
+	/* --- Tier 3 — Component (Button) --- */
 	--btn-bg:       var(--accent);
 	--btn-bg-hover: var(--accent-hover);
 	--btn-fg:       var(--on-accent);
 	--btn-radius:   var(--radius-sm);
 	--btn-focus:    var(--focus-ring);
 	--btn-height:   36px;  /* single control height; sizes differ by padding/font only */
+
+	/* --- Tier 3 — Component (Chip) --- mirrors the --btn-* pattern. One radius,
+	 * two heights, two padding/font steps. The default chip is a neutral surface
+	 * label; variants tint via the zone/score/key color flowing in. */
+	--chip-radius:    var(--radius-sm);
+	--chip-bg:        var(--surface-3);
+	--chip-fg:        var(--text-2);
+	--chip-border:    var(--border-subtle);
+	--chip-height-sm: 24px;
+	--chip-height-md: 32px;  /* meets the ≈32px target (content-conventions §5) */
+	--chip-pad-x-sm:  var(--space-sm);
+	--chip-pad-x-md:  var(--space-md);
+	--chip-font-sm:   var(--text-xs);
+	--chip-font-md:   var(--text-sm);
+	--chip-gap:       var(--space-xs);
 }
 
 /* Global systemic focus ring — specificity 0 so components can still override.

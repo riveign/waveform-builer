@@ -96,4 +96,21 @@
 	--red-500:    #F44336; /* energy-high */
 	--coral-500:  #FF6B6B; /* destructive */
 	--amber-500:  #FFC107; /* star / rating fill (live app star color) */
+
+	/* --- Energy-zone primitives (the live ZONE_COLORS map, promoted) ---
+	 * Single source for the 6 energy zones. Replaces the de-facto ZONE_COLORS
+	 * map + SimilarTrackCard PHASE_PILL_COLORS + EnergyConflictBadge inline dict. */
+	--zone-intro-500:  #6388B4; /* cool blue — the doors-open lull */
+	--zone-warmup-500: #4ECDC4; /* teal — easing the room in */
+	--zone-build-500:  #FFE66D; /* warm yellow — lifting */
+	--zone-drive-500:  #F39C12; /* amber — the floor moving */
+	--zone-peak-500:   #FF6B6B; /* coral-red — the apex */
+	--zone-close-500:  #9B59B6; /* violet — the comedown */
+
+	/* --- Score-quality primitives (one ramp; folds the duplicated thresholds
+	 * in TransitionIndicator / BpmBadge / HarmonicBadge) --- */
+	--score-excellent-500: #66BB6A; /* ≥0.8 */
+	--score-good-500:      #FFB74D; /* ≥0.6 */
+	--score-fair-500:      #FF9800; /* ≥0.4 */
+	--score-poor-500:      #FF6B6B; /* below */
 }
