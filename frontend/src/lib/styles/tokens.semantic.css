@@ -166,6 +166,22 @@
 	--icon-size-md: 20px;
 	--icon-size-lg: 24px;
 	--icon-stroke: 2;  /* shared stroke weight for line glyphs */
+
+	/* --- Tier 3 — Component (Menu) --- the floating menu surface + its rows.
+	 * One surface (bg/border/radius/shadow), one item geometry. Items meet the
+	 * ≈32px target (content-conventions §5). Inherits the theme via tokens — no
+	 * hardcoded hex, so the cerceta showcase recolors it like everything else. */
+	--menu-bg:           var(--surface-2);
+	--menu-border:       var(--border-default);
+	--menu-radius:       var(--radius-lg);
+	--menu-shadow:       var(--elev-3);
+	--menu-pad:          var(--space-xs);   /* panel inner padding */
+	--menu-item-gap:     var(--space-px);   /* gap between rows */
+	--menu-item-height:  32px;              /* min target — ≈32px (§5) */
+	--menu-item-pad-x:   var(--space-md);
+	--menu-item-radius:  var(--radius-sm);
+	--menu-item-hover:   var(--surface-hover);
+	--menu-item-active:  var(--surface-active);
 }
 
 /* Global systemic focus ring — specificity 0 so components can still override.

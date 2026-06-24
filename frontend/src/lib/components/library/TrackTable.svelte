@@ -7,7 +7,7 @@
 	import { preloadOnHover } from '$lib/utils/audio-preload';
 	import { prefetchPeaks } from '$lib/api/waveforms';
 	import { updateTrackRating } from '$lib/api/tracks';
-	import ContextMenu from '../ContextMenu.svelte';
+	import Menu from '../primitives/Menu.svelte';
 	import TrackContextMenu from './TrackContextMenu.svelte';
 	import StarRating from './StarRating.svelte';
 
@@ -143,7 +143,7 @@
 </div>
 
 {#if contextMenuTrack}
-	<ContextMenu bind:open={contextMenuOpen} x={contextMenuX} y={contextMenuY}>
+	<Menu bind:open={contextMenuOpen} x={contextMenuX} y={contextMenuY} label="Track actions">
 		<TrackContextMenu
 			track={contextMenuTrack}
 			onclose={() => contextMenuOpen = false}
@@ -151,7 +151,7 @@
 				if (contextMenuTrack) Object.assign(contextMenuTrack, updates);
 			}}
 		/>
-	</ContextMenu>
+	</Menu>
 {/if}
 
 <style>

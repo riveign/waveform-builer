@@ -9,6 +9,9 @@
 		HARMONY_RELATION_LABEL,
 		type HarmonyRelation,
 	} from '$lib/components/primitives/HarmonyIcon.svelte';
+	import Menu from '$lib/components/primitives/Menu.svelte';
+	import MenuItem from '$lib/components/primitives/MenuItem.svelte';
+	import MenuSeparator from '$lib/components/primitives/MenuSeparator.svelte';
 	import { getCamelotColor } from '$lib/utils/camelot';
 
 	// The five harmonic-move relations, in teaching order, for the Icons section.
@@ -29,6 +32,16 @@
 	function dropChip(label: string) {
 		filterChips = filterChips.filter((c) => c !== label);
 	}
+
+	// Menu demos — each trigger opens an anchored, keyboard-driven panel.
+	let basicMenuOpen = $state(false);
+	let richMenuOpen = $state(false);
+	let pickerMenuOpen = $state(false);
+	// Picker-style menu: the selected zone is the one with the trailing check.
+	const sortZones = ['Warmup', 'Build', 'Drive', 'Peak'];
+	let selectedZone = $state('Build');
+	// Last action picked, so the inert demos still show they fired.
+	let lastMenuAction = $state<string | null>(null);
 
 	// Cerceta palette: five source colors mapped to UI roles. Each ratio is the
 	// WCAG 2.1 contrast figure measured against the app background (#0D0D0D).
@@ -632,7 +645,80 @@
 		</div>
 	</section>
 
-	<!-- 12. RELATED TRACKS CARD -->
+	<!-- 12. MENU -->
+	<section class="ds__section">
+		<h2>Menu</h2>
+		<p class="ds__note">
+			One floating menu mechanism for the right-click track actions and anchored pickers. The panel
+			is fully keyboard-driven: <kbd>Enter</kbd> or <kbd>Space</kbd> opens it and lands focus on the
+			first item, <kbd>↑</kbd>/<kbd>↓</kbd> move between items, <kbd>Home</kbd>/<kbd>End</kbd> jump to
+			the ends, <kbd>Enter</kbd>/<kbd>Space</kbd> activate, and <kbd>Esc</kbd> closes it and returns
+			focus to the trigger. Focus is trapped while open and a click outside dismisses it. The trigger
+			carries <code>aria-haspopup</code> + <code>aria-expanded</code>; rows are real
+			<code>menuitem</code>s. The surface and rows are fully tokenized, so the cerceta theme recolors
+			them like everything else.
+		</p>
+
+		<div class="menu-grid">
+			<div class="menu-cell">
+				<span class="menu-cell__label">Basic menu</span>
+				<Menu bind:open={basicMenuOpen} label="Set actions">
+					{#snippet trigger({ open, props })}
+						<span {...props}><Button variant="secondary" size="sm" onclick={open}>Set actions</Button></span>
+					{/snippet}
+					<MenuItem onselect={() => (lastMenuAction = 'Rename set')}>Rename set</MenuItem>
+					<MenuItem onselect={() => (lastMenuAction = 'Duplicate set')}>Duplicate set</MenuItem>
+					<MenuItem onselect={() => (lastMenuAction = 'Export set')}>Export set</MenuItem>
+				</Menu>
+			</div>
+
+			<div class="menu-cell">
+				<span class="menu-cell__label">Icons, separator, destructive</span>
+				<Menu bind:open={richMenuOpen} label="Track actions">
+					{#snippet trigger({ open, props })}
+						<span {...props}><Button variant="secondary" size="sm" onclick={open}>Track actions</Button></span>
+					{/snippet}
+					<MenuItem onselect={() => (lastMenuAction = 'Play')}>
+						{#snippet icon()}&#9654;{/snippet}
+						Play
+					</MenuItem>
+					<MenuItem onselect={() => (lastMenuAction = 'Add to set')}>
+						{#snippet icon()}+{/snippet}
+						Add to set
+					</MenuItem>
+					<MenuItem disabled>
+						{#snippet icon()}<HarmonyIcon relation="swap" size="sm" />{/snippet}
+						Find a transition
+					</MenuItem>
+					<MenuSeparator />
+					<MenuItem danger onselect={() => (lastMenuAction = 'Remove from set')}>
+						{#snippet icon()}&#10005;{/snippet}
+						Remove from set
+					</MenuItem>
+				</Menu>
+			</div>
+
+			<div class="menu-cell">
+				<span class="menu-cell__label">Picker (selected item)</span>
+				<Menu bind:open={pickerMenuOpen} label="Sort by energy zone">
+					{#snippet trigger({ open, props })}
+						<span {...props}><Button variant="secondary" size="sm" onclick={open}>Sort: {selectedZone}</Button></span>
+					{/snippet}
+					{#each sortZones as zone (zone)}
+						<MenuItem selected={selectedZone === zone} onselect={() => (selectedZone = zone)}>
+							{zone}
+						</MenuItem>
+					{/each}
+				</Menu>
+			</div>
+		</div>
+
+		<p class="ds__note ds__note--quiet" aria-live="polite">
+			{#if lastMenuAction}Last action: {lastMenuAction}.{:else}Pick an item to see it register here.{/if}
+		</p>
+	</section>
+
+	<!-- 13. RELATED TRACKS CARD -->
 	<section class="ds__section">
 		<h2>Related tracks card</h2>
 		<p class="ds__note">
@@ -659,7 +745,7 @@
 		</div>
 	</section>
 
-	<!-- 12. REFERENCES -->
+	<!-- 14. REFERENCES -->
 	<section class="ds__section">
 		<h2>References</h2>
 		<p class="ds__note">
@@ -1024,6 +1110,43 @@
 		font-size: var(--text-2xs);
 		color: var(--text-3);
 		text-align: center;
+	}
+
+	/* menu — labeled trigger cards on the same uniform spacing as the icon grid.
+	 * The panels float above on open; the cards just host the triggers. */
+	.menu-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+		gap: var(--space-lg);
+	}
+	.menu-cell {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-sm);
+		padding: var(--space-lg);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+		background: var(--surface-2);
+		min-width: 0;
+	}
+	.menu-cell__label {
+		font-size: var(--text-2xs);
+		color: var(--text-3);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+	.ds__note--quiet {
+		color: var(--text-3);
+	}
+	kbd {
+		font-family: inherit;
+		font-size: var(--text-2xs);
+		padding: var(--space-2xs) var(--space-xs);
+		border: 1px solid var(--border-default);
+		border-radius: var(--radius-sm);
+		background: var(--surface-3);
+		color: var(--text-2);
 	}
 
 	/* related tracks card — four states on the same equal-height grid the live

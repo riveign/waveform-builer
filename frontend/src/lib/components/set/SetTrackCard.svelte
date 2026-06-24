@@ -6,7 +6,7 @@
 	import { getTrack } from '$lib/api/tracks';
 	import EnergyConflictBadge from './EnergyConflictBadge.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
-	import ContextMenu from '../ContextMenu.svelte';
+	import Menu from '../primitives/Menu.svelte';
 	import TrackContextMenu from '../library/TrackContextMenu.svelte';
 
 	let {
@@ -148,16 +148,16 @@
 </div>
 
 {#if contextMenuOpen}
-	<ContextMenu bind:open={contextMenuOpen} x={contextMenuX} y={contextMenuY}>
+	<Menu bind:open={contextMenuOpen} x={contextMenuX} y={contextMenuY} label="Track actions">
 		{#if loadingContextTrack}
-			<div style="padding: 12px; font-size: 13px; color: var(--text-secondary);">Loading...</div>
+			<div style="padding: 12px; font-size: 13px; color: var(--text-secondary);">Reading the track...</div>
 		{:else if contextMenuFullTrack}
 			<TrackContextMenu
 				track={contextMenuFullTrack}
 				onclose={() => contextMenuOpen = false}
 			/>
 		{/if}
-	</ContextMenu>
+	</Menu>
 {/if}
 
 <style>

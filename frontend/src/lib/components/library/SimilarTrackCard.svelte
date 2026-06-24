@@ -2,7 +2,9 @@
 	import type { Track, SuggestNextItem } from '$lib/types';
 	import { getTrackArtworkUrl, setTrackAffinity, removeTrackAffinity } from '$lib/api/tracks';
 	import StarRating from './StarRating.svelte';
-	import ContextMenu from '../ContextMenu.svelte';
+	import Menu from '../primitives/Menu.svelte';
+	import MenuItem from '../primitives/MenuItem.svelte';
+	import MenuSeparator from '../primitives/MenuSeparator.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
@@ -276,31 +278,31 @@
 </div>
 
 <!-- Context menu -->
-<ContextMenu bind:open={menuOpen} x={menuX} y={menuY}>
-	<button class="ctx-item" onclick={() => handleAffinity('good')}>
-		<span class="ctx-icon" style="color: var(--accent)">&#9679;</span>
+<Menu bind:open={menuOpen} x={menuX} y={menuY} label="Related track actions">
+	<MenuItem onselect={() => handleAffinity('good')}>
+		{#snippet icon()}<span style="color: var(--accent)">&#9679;</span>{/snippet}
 		Great together
-	</button>
-	<button class="ctx-item" onclick={() => handleAffinity('bad')}>
-		<span class="ctx-icon" style="color: var(--energy-high)">&#9679;</span>
+	</MenuItem>
+	<MenuItem onselect={() => handleAffinity('bad')}>
+		{#snippet icon()}<span style="color: var(--energy-high)">&#9679;</span>{/snippet}
 		Not for me
-	</button>
+	</MenuItem>
 	{#if affinity}
-		<button class="ctx-item" onclick={handleRemoveAffinity}>
-			<span class="ctx-icon">&#10005;</span>
+		<MenuItem onselect={handleRemoveAffinity}>
+			{#snippet icon()}&#10005;{/snippet}
 			Remove opinion
-		</button>
+		</MenuItem>
 	{/if}
-	<div class="ctx-divider"></div>
-	<button class="ctx-item" onclick={handlePlay}>
-		<span class="ctx-icon">&#9654;</span>
+	<MenuSeparator />
+	<MenuItem onselect={handlePlay}>
+		{#snippet icon()}&#9654;{/snippet}
 		Play
-	</button>
-	<button class="ctx-item" onclick={handleOpenTrack}>
-		<span class="ctx-icon">&#8599;</span>
+	</MenuItem>
+	<MenuItem onselect={handleOpenTrack}>
+		{#snippet icon()}&#8599;{/snippet}
 		Open track
-	</button>
-</ContextMenu>
+	</MenuItem>
+</Menu>
 
 <style>
 	/* ── Card Container ── */
@@ -566,38 +568,7 @@
 		margin-left: var(--space-2xs);
 	}
 
-	/* ── Context menu items ── */
-	.ctx-item {
-		display: flex;
-		align-items: center;
-		gap: var(--space-md);
-		width: 100%;
-		padding: var(--space-sm) var(--space-md);
-		background: none;
-		border: none;
-		border-radius: var(--radius-sm);
-		color: var(--text-1);
-		font-size: var(--text-base);
-		cursor: pointer;
-		text-align: left;
-	}
-
-	.ctx-item:hover {
-		background: var(--surface-2);
-	}
-
-	.ctx-icon {
-		width: var(--space-xl);
-		text-align: center;
-		font-size: var(--text-sm);
-		flex-shrink: 0;
-	}
-
-	.ctx-divider {
-		height: var(--space-px);
-		background: var(--border-subtle);
-		margin: var(--space-2xs) 0;
-	}
+	/* Context-menu rows now come from the <Menu>/<MenuItem> primitives. */
 
 	/* ── Add to Set Popover ── */
 	.add-picker-popover {
