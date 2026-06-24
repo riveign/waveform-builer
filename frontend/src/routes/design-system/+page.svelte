@@ -3,9 +3,9 @@
 	import Stack from '$lib/components/primitives/Stack.svelte';
 	import Grid from '$lib/components/primitives/Grid.svelte';
 
-	// CERCETA book palette — Sara Caldas's 5 source colors, mapped to roles.
-	// Every ratio is the honest WCAG 2.x figure vs the page bg (#0D0D0D) — the
-	// showcase never lies. text-safe vs fill steps are called out per color.
+	// Cerceta palette: five source colors mapped to UI roles. Each ratio is the
+	// WCAG 2.1 contrast figure measured against the app background (#0D0D0D).
+	// Fill and text-safe steps are listed separately per color.
 	type Verdict = 'text' | 'large' | 'nontext';
 	const verdictLabel: Record<Verdict, string> = {
 		text: 'Body text AA (≥4.5:1)',
@@ -78,23 +78,21 @@
 
 <div class="ds" data-theme="cerceta">
 	<header class="ds__head">
-		<p class="ds__kicker">Kiku 聴く — the visual language</p>
-		<h1>How Kiku looks when it listens</h1>
+		<p class="ds__kicker">KIKU 聴く · DESIGN SYSTEM</p>
+		<h1>Design System</h1>
 		<p class="ds__lede">
-			The shared vocabulary every screen is built from — the tokens, the rhythm, the primitives.
-			Read it the way you'd read a track before you mix it: notice the spacing, the contrast, the
-			restraint. The cerceta palette renders here in isolation, so you can learn the system before
-			the rest of the app speaks it. Tab through anything to hear its focus ring.
+			The shared foundation behind every Kiku screen — design tokens, color, typography, spacing,
+			and the core component primitives. Use this page as the reference when building or reviewing
+			the interface.
 		</p>
 	</header>
 
 	<!-- 1. COLOR & PALETTE -->
 	<section class="ds__section">
-		<h2>The cerceta palette</h2>
+		<h2>Color palette</h2>
 		<p class="ds__note">
-			Five colors from Sara Caldas's book, each with a job. Cerceta leads; lilac echoes; navy holds
-			structure; magenta is the rare pop. The ratio decides the role — fill steps fill, text steps
-			read. Every figure is real contrast against the page (#0D0D0D).
+			Five core colors, each with a defined role. Every swatch shows its fill token, its text-safe
+			token, the source hex, and the WCAG contrast ratio against the app background (#0D0D0D).
 		</p>
 		<div class="palette-grid">
 			{#each palette as c (c.name)}
@@ -127,7 +125,8 @@
 
 		<h3 class="ds__subhead">Cerceta ramp · 50 → 950</h3>
 		<p class="ds__note">
-			The primary teal, stepped. The ratio against the page decides what each step is allowed to do.
+			The cerceta ramp from 50 to 950. Lighter steps carry text on dark; mid steps are solid fills;
+			darker steps are borders and subtle backgrounds.
 		</p>
 		<div class="swatch-grid">
 			{#each tealRamp as s (s.step)}
@@ -147,8 +146,9 @@
 		<div class="on-accent-proof">
 			<div class="on-accent-proof__chip">Aa label</div>
 			<p>
-				Button labels are <strong>white on teal-600</strong> = <strong>4.23:1</strong> (passes AA
-				large / 3:1). So <code>--on-accent</code> stays white on the cerceta fill.
+				Button labels are <strong>white on teal-600</strong> at <strong>4.23:1</strong>, which
+				passes WCAG AA for large text and UI (≥3:1). <code>--on-accent</code> is therefore white on
+				the cerceta fill.
 			</p>
 		</div>
 	</section>
@@ -156,7 +156,7 @@
 	<!-- 2. SPACING -->
 	<section class="ds__section">
 		<h2>Spacing scale</h2>
-		<p class="ds__note">A 4px rhythm with a 2px mini-unit for dense rows. Every bar is its real width.</p>
+		<p class="ds__note">A 4px base rhythm with a 2px mini-unit for dense rows. Each bar is rendered at its token width.</p>
 		<Stack gap="var(--space-sm)">
 			{#each spacing as sp (sp.name)}
 				<div class="scale-row">
@@ -171,13 +171,13 @@
 	<!-- 3. TYPE -->
 	<section class="ds__section">
 		<h2>Type scale</h2>
-		<p class="ds__note">Anchored at a 12px body — the size most of your library reads at. Each line is set at its own token size and line-height.</p>
+		<p class="ds__note">Anchored at a 12px body size. Each row is set at its own token size and line-height.</p>
 		<Stack gap="var(--space-md)">
 			{#each typeScale as t (t.name)}
 				<div class="type-row">
 					<code class="type-row__name">--text-{t.name}</code>
 					<span class="type-row__sample" style="font-size: var(--text-{t.name}); line-height: var(--lh-{t.name});">
-						The set breathes through energy — {t.px}
+						The quick brown fox jumps over the lazy dog — {t.px}
 					</span>
 				</div>
 			{/each}
@@ -187,7 +187,7 @@
 	<!-- 4. RADIUS -->
 	<section class="ds__section">
 		<h2>Radius</h2>
-		<p class="ds__note">Five steps plus full. Replaces the old 2/3/4/6/8/10/12 sprawl.</p>
+		<p class="ds__note">Five corner-radius steps plus a full pill. These tokens replace the previous ad-hoc radius values.</p>
 		<div class="cluster cluster--lg">
 			{#each radii as r (r)}
 				<div class="radius-demo">
@@ -201,7 +201,7 @@
 	<!-- 5. ELEVATION -->
 	<section class="ds__section">
 		<h2>Elevation</h2>
-		<p class="ds__note">Border-first on dark — shadows read poorly on #0D0D0D, so they're reserved for floating layers.</p>
+		<p class="ds__note">Borders define depth on the dark background. Shadows read poorly on #0D0D0D, so they are reserved for floating layers.</p>
 		<div class="cluster cluster--lg">
 			{#each elevations as e (e)}
 				<div class="elev-demo" style="box-shadow: var(--elev-{e});">
@@ -214,7 +214,7 @@
 	<!-- 6. 12-COL GRID -->
 	<section class="ds__section">
 		<h2>12-column grid</h2>
-		<p class="ds__note">Opt-in for content. The app shell and the fixed two-pane layout stay flex.</p>
+		<p class="ds__note">An opt-in grid for content areas. The app shell and the fixed two-pane layout remain flex-based.</p>
 		<Stack gap="var(--space-lg)">
 			<Grid>
 				<div class="grid-cell col-span-6">6</div>
@@ -237,7 +237,7 @@
 	<!-- 7. BUTTON MATRIX -->
 	<section class="ds__section">
 		<h2>Buttons</h2>
-		<p class="ds__note">One primitive, every variant × size, plus disabled and loading. Cerceta fill, white label.</p>
+		<p class="ds__note">The Button primitive across every variant and size, including disabled and loading states. Primary uses the cerceta fill with a white label.</p>
 		<Stack gap="var(--space-lg)">
 			{#each variants as v (v)}
 				<div class="btn-row">
@@ -257,13 +257,23 @@
 	<!-- 8. FOCUS RING -->
 	<section class="ds__section">
 		<h2>Focus ring</h2>
-		<p class="ds__note">Tab through these to see the ring. It only shows for keyboard, never the mouse.</p>
+		<p class="ds__note">The focus ring appears on keyboard navigation only, not on mouse interaction. It is shown here on buttons and an input field.</p>
 		<div class="cluster cluster--md">
 			<Button variant="primary">First</Button>
 			<Button variant="secondary">Second</Button>
 			<input type="text" placeholder="and a field" />
 			<Button variant="ghost">Last</Button>
 		</div>
+	</section>
+
+	<!-- 9. REFERENCES -->
+	<section class="ds__section">
+		<h2>References</h2>
+		<p class="ds__note">
+			Color palette inspired by Sara Caldas — La paleta perfecta para diseño gráfico e ilustración
+			(Hoaki, ISBN 978-84-17412-93-7).
+		</p>
+		<p class="ds__note">Contrast ratios follow WCAG 2.1 AA.</p>
 	</section>
 </div>
 
