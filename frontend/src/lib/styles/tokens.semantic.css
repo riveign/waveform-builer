@@ -6,8 +6,8 @@
 	/* --- THE FLIP LEVER (Research §3) -------------------------------------
 	 * The accent source points at the CYAN ramp in :root, so the live app
 	 * stays cyan. The /design-system showcase re-points ONLY these 4 vars
-	 * inside [data-theme="pine"]. The future deliberate flip edits these 4
-	 * lines here once. */
+	 * inside [data-theme="cerceta"] to the new teal book palette. The future
+	 * deliberate flip edits these 4 lines here once. */
 	--accent-9:        var(--cyan-500); /* solid brand / action fill */
 	--accent-10:       var(--cyan-600); /* solid hover */
 	--accent-11:       var(--cyan-500); /* accent text on dark (cyan is light enough) */
@@ -16,7 +16,7 @@
 	/* role aliases components actually use */
 	--accent:          var(--accent-9);
 	--accent-hover:    var(--accent-10);
-	--accent-pressed:  var(--accent-9);  /* cyan has no decided press; reuse fill (pine overrides) */
+	--accent-pressed:  var(--accent-9);  /* cyan has no decided press; reuse fill (cerceta overrides) */
 	--accent-text:     var(--accent-11);
 	--on-accent:       var(--accent-contrast);
 
@@ -46,7 +46,7 @@
 	--destructive: var(--coral-500);
 
 	/* --- Focus ring (Research §5; systemic a11y fix) --- */
-	--focus-ring: #5FD0A8;        /* 10.25:1 vs bg, 3.20:1 vs pine-600 fill — clears 3:1 both sides */
+	--focus-ring: #5FD0A8;        /* light teal-green; 10.25:1 vs bg — ring sits in the offset gap against the page bg */
 	--focus-ring-width: 2px;
 	--focus-ring-offset: 2px;
 
