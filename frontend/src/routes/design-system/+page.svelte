@@ -399,7 +399,9 @@
 			The five-star rating carries your curation signal — it feeds the track-quality dimension when
 			Kiku scores a transition. The filled color comes from the <code>--star-fill</code> token. Each
 			star is a keyboard-reachable control with its own focus ring; clicking a filled star again
-			clears the rating. Read-only ratings drop the cursor and interaction.
+			clears the rating. Read-only ratings drop the cursor and interaction. For tight inline spots
+			like the related-tracks card, the <code>display="compact"</code> mode collapses the rating to a
+			count plus a single glyph (3★).
 		</p>
 		<div class="rating-grid">
 			<div class="rating-cell">
@@ -416,7 +418,24 @@
 			</div>
 			<div class="rating-cell">
 				<span class="rating-cell__label">Interactive</span>
-				<StarRating rating={demoRating} showScore onchange={(r) => (demoRating = r)} />
+				<Stack gap="var(--space-sm)">
+					<StarRating rating={demoRating} onchange={(r) => (demoRating = r)} />
+					<span class="rating-cell__caption" aria-live="polite">
+						{#if demoRating === 0}
+							Unrated — neutral weight in transitions
+						{:else}
+							{demoRating}★ — {Math.round((demoRating / 5) * 40)}% of curation score
+						{/if}
+					</span>
+				</Stack>
+			</div>
+			<div class="rating-cell">
+				<span class="rating-cell__label">Compact</span>
+				<div class="cluster cluster--md">
+					<StarRating rating={0} display="compact" />
+					<StarRating rating={3} display="compact" />
+					<StarRating rating={5} display="compact" />
+				</div>
 			</div>
 			<div class="rating-cell">
 				<span class="rating-cell__label">Small / large</span>
@@ -877,6 +896,12 @@
 		color: var(--text-3);
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
+	}
+	/* the interactive cell's resolved value/explanation sits on its own row
+	 * beneath the stars (via Stack), not crammed onto the control's line. */
+	.rating-cell__caption {
+		font-size: var(--text-xs);
+		color: var(--text-3);
 	}
 
 	/* chip — each variant sits in a captioned cell, mirroring the rating grid.

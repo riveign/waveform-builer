@@ -148,6 +148,14 @@
 	--chip-font-sm:   var(--text-xs);
 	--chip-font-md:   var(--text-sm);
 	--chip-gap:       var(--space-xs);
+
+	/* --- Tier 3 — Component (Rating / StarRating) --- dedicated glyph sizes so
+	 * the star scale is decoupled from the text scale (text tokens read too
+	 * small at the ends). sm reads clearly at a glance; lg is a touch-friendly
+	 * showcase/peak size; md is the default inline size. */
+	--star-size-sm: 14px;
+	--star-size-md: 16px;
+	--star-size-lg: 24px;
 }
 
 /* Global systemic focus ring — specificity 0 so components can still override.

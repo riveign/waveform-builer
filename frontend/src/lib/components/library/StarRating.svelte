@@ -5,12 +5,17 @@
 		onchange,
 		showScore = false,
 		size = 'md',
+		display = 'stars',
 	}: {
 		rating: number;
 		readonly?: boolean;
 		onchange?: (rating: number) => void;
 		showScore?: boolean;
 		size?: 'sm' | 'md' | 'lg';
+		/* 'stars' = five interactive glyphs (default). 'compact' = a single
+		 * static glyph prefixed by the count (e.g. 3★), for tight inline use
+		 * such as the related-tracks card. Compact is always read-only. */
+		display?: 'stars' | 'compact';
 	} = $props();
 
 	let hovered = $state<number | null>(null);
@@ -22,6 +27,21 @@
 		return `${r}★ — ${pct}% of curation score`;
 	}
 </script>
+
+{#if display === 'compact'}
+	<span
+		class="star-compact"
+		class:star-compact-sm={size === 'sm'}
+		class:star-compact-lg={size === 'lg'}
+		aria-label={rating === 0 ? 'Unrated' : `Rated ${rating} out of 5`}
+	>
+		<span class="star-compact__count">{rating}</span><span
+			class="star-compact__glyph"
+			class:unrated={rating === 0}
+			aria-hidden="true">★</span
+		>
+	</span>
+{:else}
 
 <div
 	class="star-rating"
@@ -55,6 +75,7 @@
 		</span>
 	{/if}
 </div>
+{/if}
 
 <style>
 	.star-rating {
@@ -67,7 +88,7 @@
 		border: none;
 		cursor: pointer;
 		color: var(--text-4);
-		font-size: var(--text-lg);
+		font-size: var(--star-size-md);
 		/* Vertical padding keeps the interactive hit area ≥32px tall on the
 		 * default size, even though the glyph itself is smaller. */
 		padding: var(--space-md) var(--space-2xs);
@@ -88,11 +109,34 @@
 		outline: var(--focus-ring-width) solid var(--focus-ring);
 		outline-offset: var(--focus-ring-offset);
 	}
-	.star-rating-sm .star { font-size: var(--text-xs); padding: var(--space-sm) var(--space-2xs); }
-	.star-rating-lg .star { font-size: var(--text-xl); }
+	.star-rating-sm .star { font-size: var(--star-size-sm); padding: var(--space-sm) var(--space-2xs); }
+	.star-rating-lg .star { font-size: var(--star-size-lg); }
 	.score-hint {
 		font-size: var(--text-xs);
 		color: var(--text-3);
 		margin-left: var(--space-sm);
 	}
+
+	/* compact — count + a single glyph, tight enough to sit inline next to a
+	 * score or affinity readout (related-tracks card). Static, never interactive. */
+	.star-compact {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2xs);
+		font-size: var(--star-size-md);
+		line-height: 1;
+		white-space: nowrap;
+	}
+	.star-compact__count {
+		color: var(--text-2);
+		font-variant-numeric: tabular-nums;
+	}
+	.star-compact__glyph {
+		color: var(--star-fill);
+	}
+	.star-compact__glyph.unrated {
+		color: var(--text-4);
+	}
+	.star-compact-sm { font-size: var(--star-size-sm); }
+	.star-compact-lg { font-size: var(--star-size-lg); }
 </style>
