@@ -769,7 +769,7 @@
 			stay too. <strong>Compact (&lt;200px)</strong> becomes a dense <strong>pill</strong> (rounder,
 			badge-like): artwork + title (+ ⋮), then a single row of <strong>color-coded icons only</strong>,
 			<strong>evenly distributed</strong> across the pill — harmony glyph · metronome · match-strength
-			bars · N★ — where icon shape + color + the star count carry the signal. The numeric score, key
+			bars · a <strong>larger, bold</strong> N★ — where icon shape + color + the star count carry the signal. The numeric score, key
 			text, BPM number, genre and energy all drop there; every icon keeps its real value in its
 			<code>title</code>/aria-label. Chips never clip mid-word at any width. The visible match verdict is
 			a single terse word (<strong>Great / Likely / Weak / Not for me</strong>), with the fuller phrasing
@@ -809,7 +809,7 @@
 			{/each}
 		</div>
 
-		<p class="related-density-label">Compact — ~190px columns (dense pill: artwork + title / evenly-distributed color-coded icons only — harmony · metronome · match bars · N★)</p>
+		<p class="related-density-label">Compact — ~190px columns (dense pill: artwork + title / evenly-distributed color-coded icons only — harmony · metronome · match bars · larger bold N★)</p>
 		<div class="related-grid related-grid--compact">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">

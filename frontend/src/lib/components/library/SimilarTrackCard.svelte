@@ -405,7 +405,7 @@
 		</span>
 		{#if track.rating && track.rating > 0}
 			<span class="cicon cicon-stars" title="Your rating: {track.rating} of 5">
-				<StarRating rating={track.rating} display="compact" size="sm" />
+				<StarRating rating={track.rating} display="compact" size="md" />
 			</span>
 		{/if}
 	</div>
@@ -701,6 +701,17 @@
 	}
 	/* stars are one of the evenly-distributed slots — no margin-left:auto (that
 	 * would fling them to the far edge and bunch the rest left). */
+
+	/* Bold the compact N★ COUNT wherever it appears in the card (the compact-pill
+	 * icon row and the regular-tier rating column), matching the semibold weight
+	 * the score/rating numbers use elsewhere. Card-scoped :global() so StarRating
+	 * stays untouched and other compact-star sites are unaffected. The star glyph
+	 * itself keeps its normal weight. */
+	.cicon-stars :global(.star-compact__count),
+	.signal-rating :global(.star-compact__count) {
+		font-weight: var(--font-weight-semibold);
+		color: var(--text-1);
+	}
 
 	/* BPM chip internals — the metronome glyph (auto-rendered by the bpm variant)
 	 * leads, then the number, then the signed delta. No literal "BPM" text. */

@@ -166,7 +166,7 @@ expanded). Nothing is ever clipped mid-word; tiers hide whole elements or restru
 |------|-----------------|-------|-----------------|
 | **Regular** | ≥ 240px | Everything: identity (artist · **genre-colored text**), chips **key → BPM → energy**, three-balanced-column signals (`NN/100` left · `N★` center · match right). | — |
 | **Intermediate** | 200–240px | Identity (artist · **genre-colored text — KEPT**), **all three chips key + BPM + energy — KEPT**, three-column signals (L · C · R). | **Tighten only**: smaller artwork, tighter padding/gaps. **No chip drops, no `+1`** — the compact metronome glyph keeps the BPM chip short enough that key + BPM + energy all fit. |
-| **Compact** | < 200px | **Dense PILL** (rounder, badge-like). **Top**: small artwork + 1-line title (+ `⋮` if it fits). **Below**: a single row of **color-coded ICONS only**, **evenly distributed** across the pill (`justify-content: space-between`) — harmony glyph · metronome · match-strength bars · `N★`. | The numeric **score**, **key text**, **BPM number**, **genre**, **energy**, the `+` action, both dividers and the whole chip + signals rows all hidden. Icon **shape + color + star count** carry the signal; each icon's real value lives in its `title`/aria-label. |
+| **Compact** | < 200px | **Dense PILL** (rounder, badge-like). **Top**: small artwork + 1-line title (+ `⋮` if it fits). **Below**: a single row of **color-coded ICONS only**, **evenly distributed** across the pill (`justify-content: space-between`) — harmony glyph · metronome · match-strength bars · a **larger, bold `N★`** (`size="md"`). | The numeric **score**, **key text**, **BPM number**, **genre**, **energy**, the `+` action, both dividers and the whole chip + signals rows all hidden. Icon **shape + color + star count** carry the signal; each icon's real value lives in its `title`/aria-label. |
 
 - The container queries are placed **last** in the stylesheet so they win over the base
   (regular) rules by source order (container queries add no specificity).
@@ -180,6 +180,12 @@ expanded). Nothing is ever clipped mid-word; tiers hide whole elements or restru
   space-between`) — harmony · metronome · match-bars · `N★` each own a balanced slot, rather
   than bunching left with the star flung to the far edge (the stars no longer use
   `margin-left: auto`).
+- The compact `N★` is rendered **larger** (`<StarRating display="compact" size="md">`, up
+  from `sm`) so it holds its own against the icon row, and its **count number is bold**
+  (`--font-weight-semibold`, `--text-1`) — matching the weight of the score/rating numbers
+  in the regular card. The bold-count rule is **card-scoped** (`:global(.star-compact__count)`
+  under `.cicon-stars` and `.signal-rating`), so `StarRating.svelte` is untouched and other
+  compact-star sites keep their normal weight. The star glyph itself stays normal weight.
 
 ---
 
@@ -211,7 +217,9 @@ with no bunch-left + dead-gap-right; the per-column content alignment reads
 2. **Rating (column 2 — aligned CENTER)** — `<StarRating display="compact" size="sm" />`
    → `N★` when `rating > 0` (the DJ's curation signal beside the tool's verdict), centered
    in its middle third so the row balances; when unrated, the canonical muted `—`
-   (content-conventions §3), never a blank gap.
+   (content-conventions §3), never a blank gap. The **count number is bold**
+   (`--font-weight-semibold`, `--text-1`) here too, consistent with the larger compact-pill
+   `N★` (card-scoped CSS; `StarRating.svelte` untouched).
 3. **Match strength (column 3 — aligned END/RIGHT)** — a small 3-segment **strength bar +
    TERSE word** (`justify-content: flex-end`), mapping the match score onto a qualitative
    band so the row never shows a second raw number competing with `NN/100` (§3) and never
