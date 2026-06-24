@@ -21,7 +21,7 @@
 	--cyan-500: #00CED1; /* current --accent */
 	--cyan-600: #00A8AB; /* current --accent-dim */
 
-	/* --- Gray ramp (formalized from existing --bg-*/--text-*) --- */
+	/* --- Gray ramp (formalized from existing --bg-* and --text-*) --- */
 	--gray-950: #0D0D0D; /* current --bg-primary */
 	--gray-900: #12121A; /* current --waveform-bg */
 	--gray-850: #1A1B23; /* current --bg-secondary */
