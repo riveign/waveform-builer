@@ -283,6 +283,10 @@
 	 * card grids — shares this container's left + right edges. The lede and section
 	 * notes run the full container width, reaching the same right edge as the grids
 	 * below them. --ds-measure caps only the boxed on-accent proof. */
+	/* The page is ONE flex column. A single gap token (--space-4xl = 32px) sets the
+	 * vertical break between EVERY adjacent block — header→first section and every
+	 * section→section pair alike. No block carries its own top/bottom margin, so
+	 * nothing compounds (never 32 + 32 = 64). The rhythm is uniform by construction. */
 	.ds {
 		--ds-measure: 70ch;
 		max-width: 1120px;
@@ -291,13 +295,15 @@
 		height: 100%;
 		overflow-y: auto;
 		color: var(--text-1);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4xl);
 	}
 
 	.ds__head {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-lg);
-		margin-bottom: var(--space-4xl);
 	}
 	.ds__kicker {
 		font-size: var(--text-xs);
@@ -319,16 +325,17 @@
 		color: var(--text-2);
 	}
 
-	/* Each section is a stack: title → description → content with uniform rhythm.
-	 * gap handles the title→description→content spacing; no per-element margins.
-	 * Top-only padding gives a single 32px break above each border so stacked
-	 * sections never compound to 64px — the rhythm stays even, intentional. */
+	/* Each section is a stack: title → description → content. gap handles the
+	 * internal title→description→content spacing; the inter-section 32px break is
+	 * owned solely by the parent .ds flex gap, so sections carry no vertical
+	 * padding or margin of their own. The border-top is a flush divider only —
+	 * it adds no spacing, so the rhythm above every section stays an even 32px. */
 	.ds__section {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-lg);
-		padding: var(--space-4xl) 0 0;
 		border-top: 1px solid var(--border-subtle);
+		padding-top: var(--space-lg);
 	}
 	.ds h2 {
 		font-size: var(--text-xl);
