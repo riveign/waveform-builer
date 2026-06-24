@@ -1,13 +1,40 @@
 <script lang="ts">
 	import type { DJSet } from '$lib/types';
-	import { listSets } from '$lib/api/sets';
+	import { listSets, deleteSet } from '$lib/api/sets';
 	import { onMount } from 'svelte';
 
-	let { onselect, refreshSignal = 0 }: { onselect: (set: DJSet) => void; refreshSignal?: number } = $props();
+	let {
+		onselect,
+		refreshSignal = 0,
+		ondelete,
+	}: { onselect: (set: DJSet) => void; refreshSignal?: number; ondelete?: () => void } = $props();
 
 	let sets = $state<DJSet[]>([]);
 	let loading = $state(true);
 	let search = $state('');
+	let confirmDeleteId = $state<number | null>(null);
+	let deletingId = $state<number | null>(null);
+
+	async function handleDelete(e: MouseEvent, s: DJSet) {
+		e.stopPropagation();
+		// Two-click confirm: first click arms, second within 3s deletes.
+		if (confirmDeleteId !== s.id) {
+			confirmDeleteId = s.id;
+			setTimeout(() => { if (confirmDeleteId === s.id) confirmDeleteId = null; }, 3000);
+			return;
+		}
+		deletingId = s.id;
+		try {
+			await deleteSet(s.id);
+			sets = sets.filter((x) => x.id !== s.id);
+			ondelete?.();
+		} catch {
+			// Leave the set in place if the delete didn't go through.
+		} finally {
+			deletingId = null;
+			confirmDeleteId = null;
+		}
+	}
 
 	async function refresh() {
 		loading = true;
@@ -71,7 +98,21 @@
 	{:else}
 		<div class="grid">
 			{#each filtered as s (s.id)}
-				<button class="set-card" onclick={() => onselect(s)}>
+				<div
+					class="set-card"
+					role="button"
+					tabindex="0"
+					onclick={() => onselect(s)}
+					onkeydown={(e) => { if (e.key === 'Enter') onselect(s); }}
+				>
+					<button
+						class="card-delete"
+						class:confirm={confirmDeleteId === s.id}
+						title={confirmDeleteId === s.id ? 'Click again to delete' : 'Delete set'}
+						aria-label="Delete set {s.name ?? ''}"
+						disabled={deletingId === s.id}
+						onclick={(e) => handleDelete(e, s)}
+					>{confirmDeleteId === s.id ? 'Delete?' : '×'}</button>
 					<span class="card-name">{s.name ?? 'Untitled set'}</span>
 					<span class="card-meta">
 						{s.track_count} tracks{#if s.duration_min}, {s.duration_min}min{/if}
@@ -80,7 +121,7 @@
 						{#if sourceLabel(s.source)}<span class="tag">{sourceLabel(s.source)}</span>{/if}
 						{#if shortDate(s.created_at)}<span class="date">{shortDate(s.created_at)}</span>{/if}
 					</span>
-				</button>
+				</div>
 			{/each}
 		</div>
 	{/if}
@@ -124,6 +165,7 @@
 	}
 
 	.set-card {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
@@ -140,6 +182,46 @@
 	.set-card:hover {
 		border-color: var(--accent);
 		background: var(--bg-tertiary);
+	}
+
+	.card-delete {
+		position: absolute;
+		top: 6px;
+		right: 6px;
+		min-width: 20px;
+		height: 20px;
+		padding: 0 6px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 13px;
+		line-height: 1;
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		background: var(--bg-primary);
+		color: var(--text-dim);
+		cursor: pointer;
+		opacity: 0;
+		transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+	}
+
+	.set-card:hover .card-delete,
+	.card-delete:focus-visible {
+		opacity: 1;
+	}
+
+	.card-delete:hover {
+		color: var(--energy-high, #EF5350);
+		border-color: var(--energy-high, #EF5350);
+	}
+
+	.card-delete.confirm {
+		opacity: 1;
+		font-size: 11px;
+		font-weight: 600;
+		color: #fff;
+		background: var(--energy-high, #EF5350);
+		border-color: var(--energy-high, #EF5350);
 	}
 
 	.card-name {
