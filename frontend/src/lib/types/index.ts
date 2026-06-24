@@ -92,6 +92,7 @@ export interface DJSet {
 	duration_min: number | null;
 	track_count: number;
 	source: string | null;
+	deleted_at?: string | null;
 }
 
 export interface SetDetail {

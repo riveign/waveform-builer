@@ -6,6 +6,7 @@ import base64
 import json
 import logging
 import time
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import StreamingResponse
@@ -492,15 +493,54 @@ def update_set(set_id: int, body: SetUpdateRequest, db: Session = Depends(get_db
     )
 
 
+# How long a soft-deleted set stays recoverable before it's purged for good.
+SOFT_DELETE_DAYS = 3
+
+
+def _purge_expired_sets(db: Session) -> None:
+    """Hard-delete sets that have been in the trash longer than SOFT_DELETE_DAYS.
+
+    ISO timestamps sort chronologically as strings, so a string comparison is safe.
+    """
+    cutoff = (datetime.now() - timedelta(days=SOFT_DELETE_DAYS)).isoformat()
+    expired = (
+        db.query(Set)
+        .filter(Set.deleted_at.isnot(None), Set.deleted_at < cutoff)
+        .all()
+    )
+    if expired:
+        for s in expired:
+            db.delete(s)
+        db.commit()
+
+
 @router.delete("/{set_id}", status_code=204)
 def delete_set(set_id: int, db: Session = Depends(get_db)):
-    """Delete a set and its tracks/cues (cascade)."""
+    """Soft-delete a set — move it to the trash, recoverable for SOFT_DELETE_DAYS days."""
     set_ = db.get(Set, set_id)
     if not set_:
         raise HTTPException(status_code=404, detail="Set not found")
-    db.delete(set_)
+    set_.deleted_at = datetime.now().isoformat()
     db.commit()
     return Response(status_code=204)
+
+
+@router.post("/{set_id}/restore", response_model=SetResponse)
+def restore_set(set_id: int, db: Session = Depends(get_db)):
+    """Recover a soft-deleted set from the trash."""
+    set_ = db.get(Set, set_id)
+    if not set_:
+        raise HTTPException(status_code=404, detail="Set not found")
+    set_.deleted_at = None
+    db.commit()
+    return SetResponse(
+        id=set_.id,
+        name=set_.name,
+        created_at=set_.created_at,
+        duration_min=set_.duration_min,
+        track_count=len(set_.tracks),
+        source=set_.source,
+    )
 
 
 @router.post("/{set_id}/tracks", response_model=list[SetTrackResponse])
@@ -755,7 +795,8 @@ def list_sets(
     limit: int = 20,
     db: Session = Depends(get_db),
 ):
-    q = db.query(Set)
+    _purge_expired_sets(db)
+    q = db.query(Set).filter(Set.deleted_at.is_(None))
     if search:
         q = q.filter(Set.name.ilike(f"%{search}%"))
     q = q.order_by(Set.created_at.desc()).limit(limit)
@@ -768,6 +809,30 @@ def list_sets(
             duration_min=s.duration_min,
             track_count=len(s.tracks),
             source=s.source,
+        )
+        for s in sets
+    ]
+
+
+@router.get("/deleted", response_model=list[SetResponse])
+def list_deleted_sets(db: Session = Depends(get_db)):
+    """List soft-deleted sets (the trash), most recently deleted first."""
+    _purge_expired_sets(db)
+    sets = (
+        db.query(Set)
+        .filter(Set.deleted_at.isnot(None))
+        .order_by(Set.deleted_at.desc())
+        .all()
+    )
+    return [
+        SetResponse(
+            id=s.id,
+            name=s.name,
+            created_at=s.created_at,
+            duration_min=s.duration_min,
+            track_count=len(s.tracks),
+            source=s.source,
+            deleted_at=s.deleted_at,
         )
         for s in sets
     ]

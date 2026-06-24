@@ -65,9 +65,9 @@ def test_delete_set(client):
     resp = client.delete(f"/api/sets/{set_id}")
     assert resp.status_code == 204
 
-    # Confirm it's gone
-    resp = client.get(f"/api/sets/{set_id}")
-    assert resp.status_code == 404
+    # Soft-deleted: gone from the active list (but still recoverable from trash)
+    active = client.get("/api/sets").json()
+    assert all(s["id"] != set_id for s in active)
 
 
 def test_delete_set_not_found(client):
@@ -202,3 +202,49 @@ def test_reorder_set_tracks(client):
     tracks = resp.json()
     result_ids = [t["track_id"] for t in sorted(tracks, key=lambda t: t["position"])]
     assert result_ids == new_order
+
+
+# ── Soft delete / trash / restore ──
+
+
+def test_soft_delete_moves_to_trash(client):
+    """DELETE soft-deletes: gone from the active list, present in /deleted."""
+    assert client.delete("/api/sets/1").status_code == 204
+    # Not in the active list
+    active = client.get("/api/sets").json()
+    assert all(s["id"] != 1 for s in active)
+    # In the trash, with a deleted_at timestamp
+    trash = client.get("/api/sets/deleted").json()
+    assert any(s["id"] == 1 for s in trash)
+    assert next(s for s in trash if s["id"] == 1)["deleted_at"] is not None
+    # The set still exists (recoverable), not hard-deleted
+    assert client.get("/api/sets/1").status_code == 200
+
+
+def test_restore_set(client):
+    """A soft-deleted set can be recovered back to the active list."""
+    client.delete("/api/sets/1")
+    resp = client.post("/api/sets/1/restore")
+    assert resp.status_code == 200
+    assert resp.json()["deleted_at"] is None
+    assert any(s["id"] == 1 for s in client.get("/api/sets").json())
+    assert all(s["id"] != 1 for s in client.get("/api/sets/deleted").json())
+
+
+def test_purge_after_window(client, db_session):
+    """A set deleted longer than the window is purged on the next list call."""
+    from datetime import datetime, timedelta
+    from kiku.db.models import Set
+
+    s = db_session.get(Set, 1)
+    s.deleted_at = (datetime.now() - timedelta(days=4)).isoformat()
+    db_session.commit()
+
+    # Listing triggers the lazy purge
+    client.get("/api/sets")
+    assert client.get("/api/sets/1").status_code == 404
+    assert all(s["id"] != 1 for s in client.get("/api/sets/deleted").json())
+
+
+def test_restore_missing_set(client):
+    assert client.post("/api/sets/999/restore").status_code == 404

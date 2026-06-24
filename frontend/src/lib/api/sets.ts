@@ -76,6 +76,16 @@ export async function deleteSet(id: number): Promise<void> {
 	await fetch(`${API_BASE}/api/sets/${id}`, { method: 'DELETE' });
 }
 
+/** List soft-deleted sets (the trash), most recently deleted first. */
+export async function getDeletedSets(): Promise<DJSet[]> {
+	return fetchJson<DJSet[]>('/api/sets/deleted');
+}
+
+/** Recover a soft-deleted set from the trash. */
+export async function restoreSet(id: number): Promise<DJSet> {
+	return fetchJson<DJSet>(`/api/sets/${id}/restore`, { method: 'POST' });
+}
+
 /**
  * Build a set via SSE. Calls onEvent for each SSE event.
  * Returns a promise that resolves with the completed set info, or rejects on error.
