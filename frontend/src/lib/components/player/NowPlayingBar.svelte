@@ -261,13 +261,13 @@
 		height: 72px;
 		display: flex;
 		align-items: center;
-		gap: 16px;
-		padding: 0 16px;
+		gap: var(--space-xl);
+		padding: 0 var(--space-xl);
 		background: var(--bg-secondary);
 		border-top: 1px solid var(--border);
 		z-index: 1000;
-		transition: transform 0.25s ease, opacity 0.25s ease;
-		animation: slide-up 0.25s ease forwards;
+		transition: transform var(--dur-slow) ease, opacity var(--dur-slow) ease;
+		animation: slide-up var(--dur-slow) ease forwards;
 	}
 
 	@keyframes slide-up {
@@ -294,7 +294,7 @@
 	.genre-dot {
 		width: 8px;
 		height: 8px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		background: var(--accent);
 		flex-shrink: 0;
 	}
@@ -306,8 +306,8 @@
 	}
 
 	.track-artist {
-		font-size: 12px;
-		font-weight: 600;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
 		color: var(--text-primary);
 		white-space: nowrap;
 		overflow: hidden;
@@ -315,7 +315,7 @@
 	}
 
 	.track-title {
-		font-size: 11px;
+		font-size: var(--text-xs);
 		color: var(--text-secondary);
 		white-space: nowrap;
 		overflow: hidden;
@@ -327,28 +327,28 @@
 		flex: 1;
 		display: flex;
 		align-items: center;
-		gap: 12px;
+		gap: var(--space-lg);
 		min-width: 0;
 	}
 
 	.transport {
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: var(--space-sm);
 		flex-shrink: 0;
 	}
 
 	.transport-btn {
 		width: 28px;
 		height: 28px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		background: var(--bg-tertiary);
 		color: var(--text-primary);
-		font-size: 12px;
+		font-size: var(--text-sm);
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		transition: background 0.15s;
+		transition: background var(--dur-fast) var(--ease-standard);
 		border: 1px solid var(--border);
 	}
 
@@ -365,8 +365,8 @@
 		width: 34px;
 		height: 34px;
 		background: var(--accent);
-		color: #000;
-		font-size: 14px;
+		color: var(--on-accent);
+		font-size: var(--text-md);
 		border-color: var(--accent);
 	}
 
@@ -377,9 +377,9 @@
 	.loading-spinner {
 		width: 14px;
 		height: 14px;
-		border: 2px solid rgba(0, 0, 0, 0.3);
-		border-top-color: #000;
-		border-radius: 50%;
+		border: 2px solid color-mix(in srgb, var(--on-accent) 30%, transparent);
+		border-top-color: var(--on-accent);
+		border-radius: var(--radius-full);
 		animation: spin 0.6s linear infinite;
 	}
 
@@ -392,12 +392,12 @@
 		flex: 1;
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: var(--space-md);
 		min-width: 0;
 	}
 
 	.time {
-		font-size: 10px;
+		font-size: var(--text-2xs);
 		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
 		min-width: 32px;
@@ -421,7 +421,7 @@
 		display: none;
 		height: 4px;
 		background: var(--bg-tertiary);
-		border-radius: 2px;
+		border-radius: var(--radius-xs);
 		overflow: hidden;
 		cursor: pointer;
 	}
@@ -429,15 +429,15 @@
 	.progress-fallback .progress-fill {
 		height: 100%;
 		background: var(--accent);
-		border-radius: 2px;
-		transition: width 0.2s linear;
+		border-radius: var(--radius-xs);
+		transition: width var(--dur-base) linear;
 	}
 
 	/* ── Right: Volume ── */
 	.bar-right {
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: var(--space-sm);
 		flex-shrink: 0;
 	}
 
@@ -448,8 +448,8 @@
 		align-items: center;
 		justify-content: center;
 		color: var(--text-secondary);
-		border-radius: 50%;
-		transition: color 0.15s;
+		border-radius: var(--radius-full);
+		transition: color var(--dur-fast) var(--ease-standard);
 	}
 
 	.volume-btn:hover {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type WaveSurfer from 'wavesurfer.js';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		wsA = null,
@@ -180,9 +181,9 @@
 <div class="crossfade-preview">
 	<div class="crossfade-controls">
 		{#if previewing}
-			<button class="cf-btn stop" onclick={stopPreview}>Stop</button>
+			<Button variant="danger" size="sm" onclick={stopPreview}>Stop</Button>
 		{:else}
-			<button class="cf-btn" onclick={startPreview} {disabled}>Preview Crossfade</button>
+			<Button size="sm" onclick={startPreview} {disabled}>Preview crossfade</Button>
 		{/if}
 		<label class="overlap-label">
 			<span>Overlap</span>
@@ -228,45 +229,20 @@
 
 <style>
 	.crossfade-preview {
-		padding: 8px 0;
+		padding: var(--space-md) 0;
 	}
 
 	.crossfade-controls {
 		display: flex;
 		align-items: center;
-		gap: 16px;
-	}
-
-	.cf-btn {
-		padding: 6px 14px;
-		font-size: 12px;
-		font-weight: 600;
-		border-radius: 4px;
-		background: var(--accent);
-		color: #000;
-		white-space: nowrap;
-		transition: opacity 0.15s;
-	}
-
-	.cf-btn:hover:not(:disabled) {
-		opacity: 0.85;
-	}
-
-	.cf-btn:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.cf-btn.stop {
-		background: var(--energy-high, #ff6b6b);
-		color: #fff;
+		gap: var(--space-xl);
 	}
 
 	.overlap-label {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		font-size: 12px;
+		gap: var(--space-md);
+		font-size: var(--text-sm);
 		color: var(--text-secondary);
 	}
 
@@ -281,7 +257,7 @@
 	}
 
 	.overlap-sec {
-		font-size: 10px;
+		font-size: var(--text-2xs);
 		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
 	}
@@ -289,8 +265,8 @@
 	.bpm-match-label {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		font-size: 12px;
+		gap: var(--space-sm);
+		font-size: var(--text-sm);
 		color: var(--text-secondary);
 		cursor: pointer;
 	}
@@ -300,7 +276,7 @@
 	}
 
 	.rate-hint {
-		font-size: 10px;
+		font-size: var(--text-2xs);
 		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
 	}
@@ -308,19 +284,19 @@
 	.gain-bars {
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
-		margin-top: 8px;
+		gap: var(--space-xs);
+		margin-top: var(--space-md);
 	}
 
 	.gain-row {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: var(--space-md);
 	}
 
 	.gain-label {
-		font-size: 11px;
-		font-weight: 600;
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
 		color: var(--text-secondary);
 		width: 12px;
 	}
@@ -329,13 +305,13 @@
 		flex: 1;
 		height: 6px;
 		background: var(--bg-tertiary);
-		border-radius: 3px;
+		border-radius: var(--radius-xs);
 		overflow: hidden;
 	}
 
 	.gain-fill {
 		height: 100%;
-		border-radius: 3px;
+		border-radius: var(--radius-xs);
 		transition: width 0.05s linear;
 	}
 
@@ -344,6 +320,6 @@
 	}
 
 	.gain-fill.b {
-		background: #FF6B6B;
+		background: var(--energy-high);
 	}
 </style>

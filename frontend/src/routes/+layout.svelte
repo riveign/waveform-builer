@@ -51,7 +51,7 @@
 		height: var(--header-height);
 		display: flex;
 		align-items: center;
-		padding: 0 16px;
+		padding: 0 var(--space-xl);
 		background: var(--bg-secondary);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
@@ -60,20 +60,20 @@
 	.app-logo {
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: var(--space-sm);
 		color: var(--accent);
 	}
 
 	.app-kanji {
-		font-size: 20px;
-		font-weight: 700;
+		font-size: var(--text-xl);
+		font-weight: var(--font-weight-semibold);
 		line-height: 1;
 		color: var(--text-primary);
 	}
 
 	.app-title {
 		font-size: 15px;
-		font-weight: 600;
+		font-weight: var(--font-weight-semibold);
 		letter-spacing: 0.5px;
 		color: var(--accent);
 	}

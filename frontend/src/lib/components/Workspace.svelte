@@ -119,11 +119,13 @@
 	}
 
 	.tab {
-		padding: 8px 20px;
-		font-size: 13px;
+		padding: var(--space-md) var(--space-2xl);
+		font-size: var(--text-base);
 		color: var(--text-secondary);
 		border-bottom: 2px solid transparent;
-		transition: all 0.15s;
+		transition: color var(--dur-fast) var(--ease-standard),
+		            background var(--dur-fast) var(--ease-standard),
+		            border-color var(--dur-fast) var(--ease-standard);
 	}
 
 	.tab:hover {
@@ -137,9 +139,9 @@
 	}
 
 	.shortcut {
-		font-size: 10px;
+		font-size: var(--text-2xs);
 		color: var(--text-dim);
-		margin-left: 4px;
+		margin-left: var(--space-xs);
 		opacity: 0.6;
 	}
 
@@ -154,6 +156,6 @@
 		justify-content: center;
 		height: 100%;
 		color: var(--text-dim);
-		font-size: 14px;
+		font-size: var(--text-md);
 	}
 </style>
