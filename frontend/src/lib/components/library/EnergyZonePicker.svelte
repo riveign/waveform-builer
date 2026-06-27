@@ -1,11 +1,11 @@
 <script lang="ts" module>
 	export const ZONE_COLORS: Record<string, string> = {
-		intro: '#6388b4',
-		warmup: '#4ecdc4',
-		build: '#ffe66d',
-		drive: '#f39c12',
-		peak: '#ff6b6b',
-		close: '#9b59b6',
+		intro: 'var(--zone-intro)',
+		warmup: 'var(--zone-warmup)',
+		build: 'var(--zone-build)',
+		drive: 'var(--zone-drive)',
+		peak: 'var(--zone-peak)',
+		close: 'var(--zone-close)',
 	};
 
 	export const ZONES = ['intro', 'warmup', 'build', 'drive', 'peak', 'close'] as const;
@@ -22,6 +22,8 @@
 </script>
 
 <script lang="ts">
+	import MenuItem from '$lib/components/primitives/MenuItem.svelte';
+
 	let {
 		current = null,
 		onselect,
@@ -33,22 +35,17 @@
 	} = $props();
 </script>
 
-<div class="zone-picker" class:zone-picker-inline={inline}>
+<div class="zone-picker" class:zone-picker-inline={inline} role="menu">
 	{#each ZONES as zone}
-		<button
-			class="zone-btn"
-			class:active={current === zone}
-			style="--zone-color: {ZONE_COLORS[zone]}"
-			title={ZONE_TIPS[zone]}
-			role="menuitem"
-			onclick={() => onselect(zone)}
+		<MenuItem
+			selected={current === zone}
+			onselect={() => onselect(zone)}
 		>
-			<span class="zone-dot"></span>
-			<span class="zone-name">{zone}</span>
-			{#if current === zone}
-				<span class="zone-check" aria-label="current">✓</span>
-			{/if}
-		</button>
+			{#snippet icon()}
+				<span class="zone-dot" style="--zone-color: {ZONE_COLORS[zone]}"></span>
+			{/snippet}
+			{zone}
+		</MenuItem>
 	{/each}
 </div>
 
@@ -56,43 +53,18 @@
 	.zone-picker {
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
+		gap: var(--space-2xs);
 	}
 	.zone-picker-inline {
-		padding: 4px 0 4px 12px;
-		border-left: 2px solid var(--border);
-		margin-left: 10px;
-	}
-	.zone-btn {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 5px 10px;
-		border: none;
-		border-radius: 4px;
-		background: none;
-		cursor: pointer;
-		color: var(--text-primary);
-		font-size: 13px;
-		width: 100%;
-		text-align: left;
-	}
-	.zone-btn:hover {
-		background: var(--bg-secondary);
-	}
-	.zone-btn.active {
-		background: color-mix(in srgb, var(--zone-color) 15%, transparent);
+		padding: var(--space-xs) 0 var(--space-xs) var(--space-lg);
+		border-left: 2px solid var(--border-default);
+		margin-left: var(--space-md);
 	}
 	.zone-dot {
 		width: 10px;
 		height: 10px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		background: var(--zone-color);
 		flex-shrink: 0;
-	}
-	.zone-check {
-		margin-left: auto;
-		font-size: 11px;
-		color: var(--zone-color);
 	}
 </style>

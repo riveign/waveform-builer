@@ -9,9 +9,9 @@
 	let { analysis }: Props = $props();
 
 	function scoreColor(score: number): string {
-		if (score >= 0.7) return 'var(--color-success, #66BB6A)';
-		if (score >= 0.5) return 'var(--color-warning, #FFA726)';
-		return 'var(--color-error, #EF5350)';
+		if (score >= 0.7) return 'var(--score-excellent)';
+		if (score >= 0.5) return 'var(--score-good)';
+		return 'var(--score-poor)';
 	}
 
 	const shapeLabels: Record<string, string> = {
@@ -209,11 +209,11 @@
 	}
 
 	.transition-row.weak {
-		border-left: 3px solid var(--color-error, #EF5350);
+		border-left: 3px solid var(--score-poor);
 	}
 
 	.transition-row.strong {
-		border-left: 3px solid var(--color-success, #66BB6A);
+		border-left: 3px solid var(--score-excellent);
 	}
 
 	.t-pos {

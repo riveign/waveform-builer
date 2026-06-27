@@ -2,6 +2,8 @@
 	import type { DJSet } from '$lib/types';
 	import { listSets, createSet, addTrackToSet } from '$lib/api/sets';
 	import { onMount } from 'svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
+	import MenuItem from '$lib/components/primitives/MenuItem.svelte';
 
 	let {
 		trackId,
@@ -114,14 +116,20 @@
 					class="new-set-input"
 					onkeydown={(e) => { if (e.key === 'Enter') handleCreateAndAdd(); if (e.key === 'Escape') { creatingNew = false; newName = ''; } }}
 				/>
-				<button class="create-btn" onclick={handleCreateAndAdd} disabled={!newName.trim() || adding !== null}>
-					{adding === -1 ? '...' : 'Create'}
-				</button>
+				<Button
+					variant="primary"
+					size="sm"
+					loading={adding === -1}
+					disabled={!newName.trim() || adding !== null}
+					onclick={handleCreateAndAdd}
+				>
+					Create
+				</Button>
 			</div>
 		{:else}
-			<button class="set-row new-set-trigger" onclick={() => { creatingNew = true; setTimeout(() => inputEl?.focus(), 0); }}>
-				+ New set
-			</button>
+			<MenuItem onselect={() => { creatingNew = true; setTimeout(() => inputEl?.focus(), 0); }}>
+				<span class="new-set-trigger">+ New set</span>
+			</MenuItem>
 		{/if}
 
 		{#if loading}
@@ -131,24 +139,23 @@
 		{:else}
 			{#each filtered as set (set.id)}
 				{@const inSet = trackSetIds.has(set.id)}
-				<button
-					class="set-row"
-					class:in-set={inSet}
-					onclick={() => handlePickSet(set)}
+				<MenuItem
 					disabled={inSet || adding !== null}
+					onselect={() => handlePickSet(set)}
 				>
-					<span class="set-name">{set.name}</span>
-					<span class="set-meta">
-						{#if inSet}
-							(already in set)
-						{:else}
-							{set.track_count} tracks
-						{/if}
+					<span class="set-row-body">
+						<span class="set-name">{set.name}</span>
+						<span class="set-meta">
+							{#if inSet}
+								(already in set)
+							{:else if adding === set.id}
+								...
+							{:else}
+								{set.track_count} tracks
+							{/if}
+						</span>
 					</span>
-					{#if adding === set.id}
-						<span class="adding">...</span>
-					{/if}
-				</button>
+				</MenuItem>
 			{/each}
 		{/if}
 	</div>
@@ -168,8 +175,8 @@
 	}
 
 	.search-input {
-		padding: 8px 10px;
-		font-size: 13px;
+		padding: var(--space-md) var(--space-lg);
+		font-size: var(--text-base);
 		border: none;
 		border-bottom: 1px solid var(--border);
 		background: transparent;
@@ -182,36 +189,17 @@
 		flex: 1;
 	}
 
-	.set-row {
+	.set-row-body {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 8px 10px;
+		gap: var(--space-md);
 		width: 100%;
-		border: none;
-		background: none;
-		color: var(--text-primary);
-		font-size: 13px;
-		cursor: pointer;
-		text-align: left;
-	}
-
-	.set-row:hover:not(:disabled) {
-		background: var(--bg-secondary);
-	}
-
-	.set-row:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
-	.set-row.in-set {
-		opacity: 0.5;
+		min-width: 0;
 	}
 
 	.new-set-trigger {
-		color: var(--accent);
-		font-weight: 600;
+		color: var(--accent-text);
+		font-weight: var(--font-weight-semibold);
 	}
 
 	.set-name {
@@ -222,51 +210,30 @@
 	}
 
 	.set-meta {
-		font-size: 11px;
+		font-size: var(--text-xs);
 		color: var(--text-dim);
 		white-space: nowrap;
 	}
 
-	.adding {
-		font-size: 11px;
-		color: var(--text-dim);
-	}
-
 	.new-set-row {
 		display: flex;
-		gap: 4px;
-		padding: 6px 8px;
+		gap: var(--space-xs);
+		padding: var(--space-sm) var(--space-md);
 	}
 
 	.new-set-input {
 		flex: 1;
-		padding: 6px 8px;
-		font-size: 13px;
+		padding: var(--space-sm) var(--space-md);
+		font-size: var(--text-base);
 		background: var(--bg-secondary);
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: var(--radius-sm);
 		color: var(--text-primary);
 	}
 
-	.create-btn {
-		padding: 6px 10px;
-		font-size: 12px;
-		background: var(--accent);
-		color: #000;
-		border: none;
-		border-radius: 4px;
-		cursor: pointer;
-		font-weight: 600;
-	}
-
-	.create-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
 	.loading, .empty {
-		padding: 12px 10px;
-		font-size: 12px;
+		padding: var(--space-lg) var(--space-lg);
+		font-size: var(--text-sm);
 		color: var(--text-dim);
 	}
 
@@ -277,9 +244,9 @@
 		transform: translateX(-50%);
 		background: var(--bg-secondary);
 		color: var(--text-primary);
-		padding: 8px 16px;
-		border-radius: 6px;
-		font-size: 13px;
+		padding: var(--space-md) var(--space-xl);
+		border-radius: var(--radius-md);
+		font-size: var(--text-base);
 		border: 1px solid var(--border);
 		z-index: 1000;
 		animation: toast-in 0.2s ease-out;

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { ScoringWeights } from '$lib/types';
+	import Button from '$lib/components/primitives/Button.svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
 
 	const DEFAULTS: ScoringWeights = {
 		harmonic: 25,
@@ -92,7 +94,7 @@
 	>
 		<span class="toggle-label">Scoring weights</span>
 		{#if !isDefault}
-			<span class="custom-badge">custom</span>
+			<Chip variant="neutral" tone="accent" size="sm">custom</Chip>
 		{/if}
 		<span class="toggle-arrow" class:toggle-open={expanded}>&#9662;</span>
 	</button>
@@ -116,9 +118,11 @@
 				</div>
 			{/each}
 			{#if !isDefault}
-				<button class="reset-btn" type="button" onclick={resetDefaults}>
-					Reset to defaults
-				</button>
+				<div class="reset-action">
+					<Button variant="ghost" size="sm" onclick={resetDefaults}>
+						Reset to defaults
+					</Button>
+				</div>
 			{/if}
 		</div>
 	{/if}
@@ -134,10 +138,10 @@
 	.weights-toggle {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		padding: 6px 0;
-		font-size: 11px;
-		font-weight: 600;
+		gap: var(--space-sm);
+		padding: var(--space-sm) 0;
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
 		color: var(--text-secondary);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
@@ -161,35 +165,24 @@
 		transform: rotate(180deg);
 	}
 
-	.custom-badge {
-		font-size: 9px;
-		font-weight: 500;
-		text-transform: lowercase;
-		letter-spacing: 0;
-		color: var(--accent);
-		background: color-mix(in srgb, var(--accent) 10%, transparent);
-		padding: 1px 5px;
-		border-radius: 3px;
-	}
-
 	.weights-body {
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
-		padding: 8px 10px;
+		gap: var(--space-sm);
+		padding: var(--space-md) var(--space-lg);
 		background: var(--bg-tertiary);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius-md);
 	}
 
 	.weight-row {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: var(--space-md);
 	}
 
 	.weight-label {
-		font-size: 11px;
+		font-size: var(--text-xs);
 		color: var(--text-secondary);
 		width: 90px;
 		flex-shrink: 0;
@@ -203,28 +196,16 @@
 	}
 
 	.weight-value {
-		font-size: 11px;
-		font-weight: 600;
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
 		color: var(--text-primary);
 		width: 32px;
 		text-align: right;
 		font-variant-numeric: tabular-nums;
 	}
 
-	.reset-btn {
+	.reset-action {
 		align-self: flex-end;
-		font-size: 10px;
-		color: var(--text-dim);
-		padding: 2px 8px;
-		border-radius: 3px;
-		background: none;
-		border: none;
-		cursor: pointer;
-		margin-top: 2px;
-		transition: color 0.1s;
-	}
-
-	.reset-btn:hover {
-		color: var(--accent);
+		margin-top: var(--space-2xs);
 	}
 </style>

@@ -32,11 +32,11 @@
 	}
 
 	const dimensions = [
-		{ key: 'harmonic' as const, label: 'Harmonic', weight: 0.25, color: '#9575CD' },
-		{ key: 'energy_fit' as const, label: 'Energy Fit', weight: 0.20, color: '#FF7F50' },
+		{ key: 'harmonic' as const, label: 'Harmonic', weight: 0.25, color: 'var(--zone-close)' },
+		{ key: 'energy_fit' as const, label: 'Energy Fit', weight: 0.20, color: 'var(--energy-high)' },
 		{ key: 'bpm_compat' as const, label: 'BPM', weight: 0.20, color: 'var(--accent-text)' },
-		{ key: 'genre_coherence' as const, label: 'Genre', weight: 0.15, color: '#66BB6A' },
-		{ key: 'track_quality' as const, label: 'Quality', weight: 0.20, color: '#FFB74D' },
+		{ key: 'genre_coherence' as const, label: 'Genre', weight: 0.15, color: 'var(--score-excellent)' },
+		{ key: 'track_quality' as const, label: 'Quality', weight: 0.20, color: 'var(--score-good)' },
 	];
 </script>
 
