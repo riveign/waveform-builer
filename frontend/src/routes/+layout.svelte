@@ -69,23 +69,31 @@
 		overflow: hidden;
 	}
 
+	/* Navbar shares the body's split: first column is exactly --panel-width (over
+	   the sidebar), second is 1fr (over the content pane). Grid origin is x=0 with
+	   no header padding, identical to .two-panel, so the logo|tabs boundary lands on
+	   the SAME x as the sidebar|content boundary — one continuous vertical line. */
 	.app-header {
 		height: var(--band-h);
-		display: flex;
+		display: grid;
+		grid-template-columns: var(--panel-width) 1fr;
 		align-items: stretch;
-		padding: 0 var(--space-xl);
 		background: var(--bg-secondary);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
-		gap: var(--space-2xl);
 	}
 
 	.app-logo {
 		display: flex;
 		align-items: center;
 		gap: var(--space-sm);
+		/* Left-pad to --space-lg so "聴 Kiku" aligns with the sidebar search box
+		   (SearchFilters toolbar pads 0 var(--space-lg)). Right border continues the
+		   sidebar|content divider up through the navbar. */
+		padding-left: var(--space-lg);
 		color: var(--accent);
-		flex-shrink: 0;
+		border-right: 1px solid var(--border);
+		min-width: 0;
 	}
 
 	/* Tabs live in the navbar (right of the logo). Segments stretch to the full

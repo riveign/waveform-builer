@@ -24,7 +24,7 @@
 	--energy-high: var(--red-500);
 	--waveform-bg: var(--surface-waveform);
 	/* ── Dashboard shell tokens (spec 023 grid restructure) ── */
-	--panel-width: 380px;            /* sidebar width — trimmed 500→380 to free content cols */
+	--panel-width: 460px;            /* sidebar width — 380→460 so its right edge meets the navbar's logo|tabs line AND the 7-col track table breathes; content pane still dominant (~68% on 1440px) */
 	--header-height: 48px;
 	--band-h: var(--header-height);  /* shared header-band height: navbar + sidebar first divider */
 	--page-pad: var(--space-xl);     /* content-pane inner padding (page margins, 16px) */
