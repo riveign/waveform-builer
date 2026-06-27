@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { SCTrack } from '$lib/types';
+	import Button from '$lib/components/primitives/Button.svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
 
 	interface Props {
 		tracks: SCTrack[];
@@ -46,9 +48,9 @@
 			Select all ({tracks.length})
 		</label>
 		{#if selected.size > 0}
-			<button class="chase-selected-btn" onclick={() => onchase([...selected])} disabled={loading}>
+			<Button size="sm" loading={loading} onclick={() => onchase([...selected])}>
 				{loading ? 'Chasing...' : `Chase ${selected.size} selected`}
-			</button>
+			</Button>
 		{/if}
 	</div>
 
@@ -73,16 +75,18 @@
 				</div>
 				<span class="track-duration">{formatDuration(track.duration_ms)}</span>
 				{#if track.genre}
-					<span class="track-genre">{track.genre}</span>
+					<Chip variant="genre" size="sm" value={track.genre} title={track.genre} />
 				{/if}
 			</div>
 		{/each}
 	</div>
 
 	{#if hasMore}
-		<button class="load-more-btn" onclick={onloadmore} disabled={loading}>
-			{loading ? 'Reading...' : 'Load more'}
-		</button>
+		<div class="load-more">
+			<Button variant="secondary" loading={loading} onclick={onloadmore}>
+				{loading ? 'Reading...' : 'Load more'}
+			</Button>
+		</div>
 	{/if}
 </div>
 
@@ -107,22 +111,6 @@
 		cursor: pointer;
 	}
 
-	.chase-selected-btn {
-		padding: 6px 14px;
-		font-size: 12px;
-		font-weight: 600;
-		background: var(--accent);
-		color: #000;
-		border: none;
-		border-radius: 6px;
-		cursor: pointer;
-	}
-
-	.chase-selected-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
 	.track-rows {
 		display: flex;
 		flex-direction: column;
@@ -137,7 +125,7 @@
 	}
 
 	.track-row.selected {
-		background: rgba(255, 255, 255, 0.03);
+		background: var(--surface-hover);
 	}
 
 	.mini-art, .mini-art.placeholder {
@@ -176,34 +164,12 @@
 		flex-shrink: 0;
 	}
 
-	.track-genre {
-		font-size: 10px;
-		color: var(--text-dim);
-		padding: 1px 6px;
-		border: 1px solid var(--border);
-		border-radius: 3px;
-		flex-shrink: 0;
-	}
-
-	.load-more-btn {
-		display: block;
-		width: 100%;
-		padding: 10px;
+	.load-more {
 		margin-top: 8px;
-		font-size: 13px;
-		background: transparent;
-		color: var(--text-secondary);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		cursor: pointer;
+		display: flex;
 	}
 
-	.load-more-btn:hover {
-		background: var(--bg-hover);
-	}
-
-	.load-more-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
+	.load-more :global(.btn) {
+		flex: 1;
 	}
 </style>

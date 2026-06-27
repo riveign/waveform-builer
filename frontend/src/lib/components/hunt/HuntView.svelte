@@ -6,6 +6,7 @@
 	import HuntHistory from './HuntHistory.svelte';
 	import SoundCloudConnect from './SoundCloudConnect.svelte';
 	import SoundCloudBrowser from './SoundCloudBrowser.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	const store = getHuntingStore();
 	const sc = getSoundCloudStore();
@@ -51,6 +52,8 @@
 		<p class="subtitle">Paste a set URL or browse your SoundCloud — we'll find every track and show you where to get them</p>
 	</div>
 
+	<!-- Bespoke (not SegmentedControl): the SoundCloud option is conditionally
+	     disabled until connected, and SegmentedControl has no per-option disabled. -->
 	<div class="mode-tabs">
 		<button class="mode-tab" class:active={mode === 'url'} onclick={() => mode = 'url'}>
 			URL Hunt
@@ -68,12 +71,12 @@
 				placeholder="YouTube, SoundCloud, or Mixcloud URL..."
 				disabled={store.loading}
 			/>
-			<button type="submit" disabled={store.loading || !urlInput.trim()}>
+			<Button type="submit" loading={store.loading} disabled={!urlInput.trim()}>
 				{store.loading ? 'Hunting...' : 'Hunt'}
-			</button>
-			<button type="button" class="history-btn" onclick={() => showHistory = !showHistory}>
+			</Button>
+			<Button type="button" variant="secondary" pressed={showHistory} onclick={() => showHistory = !showHistory}>
 				History
-			</button>
+			</Button>
 		</form>
 
 		{#if store.error}
@@ -168,37 +171,12 @@
 		color: var(--text-primary);
 	}
 
-	.hunt-form button {
-		padding: 8px 16px;
-		font-size: 13px;
-		font-weight: 600;
-		border-radius: 6px;
-		cursor: pointer;
-	}
-
-	.hunt-form button[type='submit'] {
-		background: var(--accent);
-		color: #000;
-		border: none;
-	}
-
-	.hunt-form button[type='submit']:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
-	.history-btn {
-		background: transparent;
-		color: var(--text-secondary);
-		border: 1px solid var(--border);
-	}
-
 	.error {
 		padding: 8px 12px;
-		background: rgba(255, 80, 80, 0.1);
-		border: 1px solid rgba(255, 80, 80, 0.3);
+		background: color-mix(in srgb, var(--destructive) 12%, transparent);
+		border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
 		border-radius: 6px;
-		color: #ff5050;
+		color: var(--destructive);
 		font-size: 13px;
 		margin-bottom: 12px;
 	}

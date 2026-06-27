@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getSoundCloudStore } from '$lib/stores/soundcloud.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	const sc = getSoundCloudStore();
 </script>
@@ -11,9 +12,11 @@
 				<img src={sc.avatarUrl} alt="" class="avatar" />
 			{/if}
 			<span class="sc-username">{sc.username}</span>
-			<button class="disconnect-btn" onclick={() => sc.disconnect()}>Disconnect</button>
+			<Button variant="ghost" size="sm" onclick={() => sc.disconnect()}>Disconnect</Button>
 		</div>
 	{:else}
+		<!-- SoundCloud-branded CTA: keeps the SC brand orange (genuine brand color,
+		     not expressible via Button variants) — intentionally bespoke. -->
 		<button class="connect-btn" onclick={() => sc.connect()}>
 			Connect SoundCloud
 		</button>
@@ -43,6 +46,8 @@
 		color: var(--text-secondary);
 	}
 
+	/* SoundCloud brand orange — genuine brand identity color, deliberately not
+	   tokenized onto the cerceta palette. */
 	.connect-btn {
 		padding: 6px 14px;
 		font-size: 12px;
@@ -56,20 +61,5 @@
 
 	.connect-btn:hover {
 		background: #e64d00;
-	}
-
-	.disconnect-btn {
-		padding: 4px 10px;
-		font-size: 11px;
-		background: transparent;
-		color: var(--text-dim);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		cursor: pointer;
-	}
-
-	.disconnect-btn:hover {
-		border-color: #ff5050;
-		color: #ff5050;
 	}
 </style>
