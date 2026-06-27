@@ -7,6 +7,7 @@
 		type SourceInfo,
 		type CorrectionPreview,
 	} from '$lib/api/albums';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		open = $bindable(false),
@@ -155,7 +156,9 @@
 	<div class="dialog-content">
 		<header>
 			<h2>Check &amp; fix metadata</h2>
-			<button class="close" onclick={close} aria-label="Close">×</button>
+			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={close}>
+				{#snippet icon()}×{/snippet}
+			</Button>
 		</header>
 
 		{#if stage === 'source'}
@@ -190,25 +193,25 @@
 			{/if}
 
 			<div class="footer">
-				<button onclick={close}>Cancel</button>
-				<button class="primary" onclick={check} disabled={!chosen || (lookupMode === 'url' && !url)}>
+				<Button variant="secondary" size="sm" onclick={close}>Cancel</Button>
+				<Button variant="primary" size="sm" onclick={check} disabled={!chosen || (lookupMode === 'url' && !url)}>
 					Check
-				</button>
+				</Button>
 			</div>
 		{:else if stage === 'checking'}
 			<div class="status">Reading {chosen}…</div>
 		{:else if stage === 'error'}
 			<div class="status error">{error}</div>
 			<div class="footer">
-				<button onclick={() => (stage = 'source')}>Back</button>
-				<button class="primary" onclick={check}>Try again</button>
+				<Button variant="secondary" size="sm" onclick={() => (stage = 'source')}>Back</Button>
+				<Button variant="primary" size="sm" onclick={check}>Try again</Button>
 			</div>
 		{:else if stage === 'review' && preview}
 			{#if tracksWithChanges.length === 0}
 				<p class="prompt">Good news — your {preview.track_count} track{preview.track_count === 1 ? '' : 's'} already match {preview.source}. Nothing to fix.</p>
 				<div class="footer">
-					<button onclick={() => (stage = 'source')}>Back</button>
-					<button class="primary" onclick={close}>Done</button>
+					<Button variant="secondary" size="sm" onclick={() => (stage = 'source')}>Back</Button>
+					<Button variant="primary" size="sm" onclick={close}>Done</Button>
 				</div>
 			{:else}
 				<p class="prompt">
@@ -244,10 +247,10 @@
 					{/each}
 				</div>
 				<div class="footer">
-					<button onclick={() => (stage = 'source')}>Back</button>
-					<button class="primary" onclick={apply} disabled={changedFields.every((f) => !checked[f])}>
+					<Button variant="secondary" size="sm" onclick={() => (stage = 'source')}>Back</Button>
+					<Button variant="primary" size="sm" onclick={apply} disabled={changedFields.every((f) => !checked[f])}>
 						Fix {tracksWithChanges.length} track{tracksWithChanges.length === 1 ? '' : 's'}
-					</button>
+					</Button>
 				</div>
 			{/if}
 		{:else if stage === 'applying'}
@@ -255,7 +258,7 @@
 		{:else if stage === 'done'}
 			<div class="status">Fixed {appliedCount} track{appliedCount === 1 ? '' : 's'}. ✓</div>
 			<div class="footer">
-				<button class="primary" onclick={close}>Done</button>
+				<Button variant="primary" size="sm" onclick={close}>Done</Button>
 			</div>
 		{/if}
 	</div>
@@ -266,8 +269,8 @@
 		border: 1px solid var(--border);
 		border-radius: 10px;
 		padding: 0;
-		background: var(--bg-elevated, #1b1c20);
-		color: var(--text-primary, #eee);
+		background: var(--bg-secondary);
+		color: var(--text-primary);
 		max-width: 640px;
 		width: 92vw;
 	}
@@ -287,22 +290,14 @@
 		font-size: 15px;
 		margin: 0;
 	}
-	.close {
-		background: none;
-		border: none;
-		color: var(--text-secondary, #999);
-		font-size: 22px;
-		cursor: pointer;
-		line-height: 1;
-	}
 	.prompt {
 		font-size: 13px;
-		color: var(--text-secondary, #bbb);
+		color: var(--text-secondary);
 		margin: 0 0 12px;
 	}
 	.note {
 		font-size: 12px;
-		color: var(--text-tertiary, #7a7b82);
+		color: var(--text-tertiary);
 		margin: 8px 0;
 	}
 	.sources {
@@ -328,7 +323,7 @@
 	}
 	.source-hint {
 		font-size: 11px;
-		color: var(--text-tertiary, #7a7b82);
+		color: var(--text-tertiary);
 		text-transform: none;
 	}
 	.text-input {
@@ -337,7 +332,7 @@
 		padding: 8px 10px;
 		border: 1px solid var(--border);
 		border-radius: 8px;
-		background: var(--bg, #111);
+		background: var(--bg-primary);
 		color: inherit;
 		font-size: 13px;
 		margin-bottom: 12px;
@@ -385,13 +380,13 @@
 		font-variant-numeric: tabular-nums;
 	}
 	.diff-conf.green {
-		color: #4ade80;
+		color: var(--score-excellent);
 	}
 	.diff-conf.yellow {
-		color: #fbbf24;
+		color: var(--score-fair);
 	}
 	.diff-conf.red {
-		color: #f87171;
+		color: var(--score-poor);
 	}
 	.diff-row {
 		display: grid;
@@ -406,19 +401,19 @@
 		text-decoration: line-through;
 	}
 	.diff-field {
-		color: var(--text-tertiary, #7a7b82);
+		color: var(--text-tertiary);
 	}
 	.diff-old {
-		color: #f87171;
+		color: var(--score-poor);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 	.diff-arrow {
-		color: var(--text-tertiary, #7a7b82);
+		color: var(--text-tertiary);
 	}
 	.diff-new {
-		color: #4ade80;
+		color: var(--score-excellent);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -426,33 +421,15 @@
 	.status {
 		padding: 18px 4px;
 		font-size: 13px;
-		color: var(--text-secondary, #bbb);
+		color: var(--text-secondary);
 	}
 	.status.error {
-		color: #f87171;
+		color: var(--destructive);
 	}
 	.footer {
 		display: flex;
 		justify-content: flex-end;
 		gap: 8px;
 		margin-top: 14px;
-	}
-	button {
-		padding: 7px 14px;
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		background: var(--bg, #111);
-		color: inherit;
-		font-size: 13px;
-		cursor: pointer;
-	}
-	button.primary {
-		background: var(--accent, #6366f1);
-		border-color: var(--accent, #6366f1);
-		color: #fff;
-	}
-	button:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
 	}
 </style>

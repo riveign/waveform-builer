@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ImportResult } from '$lib/types';
 	import { importPlaylist, linkSet } from '$lib/api/sets';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		open = $bindable(false),
@@ -153,10 +154,10 @@
 			{/if}
 
 			<div class="actions">
-				<button class="secondary" onclick={handleClose}>Cancel</button>
-				<button class="primary" onclick={doImport} disabled={!file || loading}>
+				<Button variant="secondary" size="sm" onclick={handleClose}>Cancel</Button>
+				<Button variant="primary" size="sm" onclick={doImport} disabled={!file} loading={loading}>
 					{loading ? 'Importing...' : 'Import'}
-				</button>
+				</Button>
 			</div>
 		{:else}
 			<!-- Result -->
@@ -226,7 +227,7 @@
 				{/if}
 
 				<div class="actions">
-					<button class="primary" onclick={handleClose}>Done</button>
+					<Button variant="primary" size="sm" onclick={handleClose}>Done</Button>
 				</div>
 			</div>
 		{/if}
@@ -345,7 +346,7 @@
 	}
 
 	.error {
-		color: var(--color-red, #e74c3c);
+		color: var(--destructive);
 		font-size: 13px;
 		margin: 8px 0;
 	}
@@ -357,30 +358,6 @@
 		margin-top: 16px;
 	}
 
-	button {
-		padding: 8px 16px;
-		border-radius: 6px;
-		font-size: 13px;
-		cursor: pointer;
-		border: 1px solid var(--border);
-	}
-
-	button.primary {
-		background: var(--accent);
-		color: white;
-		border-color: var(--accent);
-	}
-
-	button.primary:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	button.secondary {
-		background: var(--bg-secondary);
-		color: var(--text-primary);
-	}
-
 	.result-header {
 		display: flex;
 		align-items: center;
@@ -389,7 +366,7 @@
 	}
 
 	.result-icon {
-		color: var(--color-green, #2ecc71);
+		color: var(--score-excellent);
 		font-size: 20px;
 	}
 
@@ -401,7 +378,7 @@
 	}
 
 	.warn {
-		color: var(--color-yellow, #f39c12);
+		color: var(--energy-mid);
 	}
 
 	.methods {
@@ -449,7 +426,7 @@
 	}
 
 	.warning {
-		color: var(--color-yellow, #f39c12);
+		color: var(--energy-mid);
 		font-size: 12px;
 		margin: 4px 0;
 	}
@@ -471,6 +448,11 @@
 		width: 100%;
 		text-align: left;
 		margin-bottom: 6px;
+		padding: 8px 16px;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+		cursor: pointer;
+		font-size: 13px;
 		background: var(--bg-secondary);
 		color: var(--text-primary);
 	}

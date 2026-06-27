@@ -6,6 +6,7 @@
 		type MBCandidate,
 		type MBMappingPreviewItem,
 	} from '$lib/api/albums';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		open = $bindable(false),
@@ -123,7 +124,9 @@
 	<div class="dialog-content">
 		<header>
 			<h2>Match on MusicBrainz</h2>
-			<button class="close" onclick={close} aria-label="Close">×</button>
+			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={close}>
+				{#snippet icon()}×{/snippet}
+			</Button>
 		</header>
 
 		{#if stage === 'loading'}
@@ -131,8 +134,8 @@
 		{:else if stage === 'error'}
 			<div class="status error">{error}</div>
 			<div class="footer">
-				<button onclick={close}>Close</button>
-				<button class="primary" onclick={runMatch}>Try again</button>
+				<Button variant="secondary" size="sm" onclick={close}>Close</Button>
+				<Button variant="primary" size="sm" onclick={runMatch}>Try again</Button>
 			</div>
 		{:else if stage === 'pick'}
 			<p class="prompt">Found {candidates.length} possible release{candidates.length === 1 ? '' : 's'}. Does any of these look like your album?</p>
@@ -186,8 +189,8 @@
 				{/each}
 			</div>
 			<div class="footer">
-				<button onclick={() => (stage = 'pick')}>Back</button>
-				<button class="primary" onclick={apply}>Apply mapping</button>
+				<Button variant="secondary" size="sm" onclick={() => (stage = 'pick')}>Back</Button>
+				<Button variant="primary" size="sm" onclick={apply}>Apply mapping</Button>
 			</div>
 		{:else if stage === 'applying'}
 			<div class="status">Writing track numbers...</div>
@@ -199,7 +202,7 @@
 	dialog {
 		border: 1px solid var(--border);
 		border-radius: 10px;
-		background: var(--bg-primary, #0c0c0e);
+		background: var(--bg-primary);
 		color: var(--text-primary);
 		padding: 0;
 		max-width: 720px;
@@ -224,16 +227,6 @@
 		border-bottom: 1px solid var(--border);
 	}
 	h2 { margin: 0; font-size: 15px; font-weight: 600; }
-	.close {
-		appearance: none;
-		background: transparent;
-		border: none;
-		color: var(--text-secondary);
-		font-size: 22px;
-		cursor: pointer;
-		line-height: 1;
-		padding: 0 6px;
-	}
 
 	.prompt {
 		padding: 12px 18px 4px;
@@ -250,7 +243,7 @@
 	}
 	.candidate {
 		appearance: none;
-		background: var(--bg-secondary, rgba(255,255,255,0.04));
+		background: var(--bg-secondary);
 		border: 1px solid var(--border);
 		border-radius: 8px;
 		padding: 10px 14px;
@@ -279,7 +272,7 @@
 		align-items: center;
 		padding: 6px 0;
 		font-size: 12px;
-		border-bottom: 1px solid rgba(255,255,255,0.04);
+		border-bottom: 1px solid var(--border);
 	}
 	.map-head { font-size: 11px; color: var(--text-dim); text-transform: uppercase; }
 	.map-track, .map-mb-title {
@@ -288,7 +281,7 @@
 		white-space: nowrap;
 	}
 	.map-select {
-		background: var(--bg-secondary, #1a1a1d);
+		background: var(--bg-secondary);
 		color: var(--text-primary);
 		border: 1px solid var(--border);
 		border-radius: 4px;
@@ -300,9 +293,9 @@
 		font-variant-numeric: tabular-nums;
 		font-weight: 600;
 	}
-	.map-conf.green { color: #4ade80; }
-	.map-conf.yellow { color: #facc15; }
-	.map-conf.red { color: #f87171; }
+	.map-conf.green { color: var(--score-excellent); }
+	.map-conf.yellow { color: var(--score-fair); }
+	.map-conf.red { color: var(--score-poor); }
 
 	.footer {
 		display: flex;
@@ -311,21 +304,6 @@
 		padding: 12px 18px;
 		border-top: 1px solid var(--border);
 	}
-	.footer button {
-		appearance: none;
-		background: transparent;
-		color: var(--text-secondary);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 6px 14px;
-		font-size: 12px;
-		cursor: pointer;
-	}
-	.footer button.primary {
-		background: var(--accent);
-		color: var(--bg-primary, #000);
-		border-color: var(--accent);
-	}
 
 	.status {
 		padding: 30px;
@@ -333,5 +311,5 @@
 		color: var(--text-secondary);
 		font-size: 13px;
 	}
-	.status.error { color: #f87171; }
+	.status.error { color: var(--destructive); }
 </style>

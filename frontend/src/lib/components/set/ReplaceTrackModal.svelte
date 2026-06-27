@@ -6,6 +6,7 @@
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	const playback = getPlaybackStore();
 	const ui = getUiStore();
@@ -100,9 +101,9 @@
 	}
 
 	function scoreColor(score: number): string {
-		if (score >= 0.7) return 'var(--energy-low, #2ecc71)';
-		if (score >= 0.5) return 'var(--energy-mid, #f39c12)';
-		return 'var(--energy-high, #e94560)';
+		if (score >= 0.7) return 'var(--score-excellent)';
+		if (score >= 0.5) return 'var(--score-fair)';
+		return 'var(--score-poor)';
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -122,9 +123,9 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={handleBackdropClick}>
-	<div class="modal" role="dialog" aria-label="Replace track">
+<!-- Backdrop is presentational; Escape is handled on the window, the dialog below owns focus. -->
+<div class="modal-backdrop" role="presentation" onclick={handleBackdropClick}>
+	<div class="modal" role="dialog" aria-modal="true" aria-label="Replace track">
 		<header class="modal-header">
 			<h3>Replace track</h3>
 			<div class="current-track">
@@ -132,11 +133,13 @@
 				<span class="title">{currentTrack.title ?? 'Untitled'}</span>
 				<span class="artist">{currentTrack.artist ?? ''}</span>
 			</div>
-			<button class="close-btn" onclick={onclose} aria-label="Close">
-				<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
-					<line x1="3" y1="3" x2="11" y2="11" /><line x1="11" y1="3" x2="3" y2="11" />
-				</svg>
-			</button>
+			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={onclose}>
+				{#snippet icon()}
+					<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+						<line x1="3" y1="3" x2="11" y2="11" /><line x1="11" y1="3" x2="3" y2="11" />
+					</svg>
+				{/snippet}
+			</Button>
 		</header>
 
 		{#if context}
@@ -216,36 +219,38 @@
 						</div>
 
 						<div class="actions">
-							<button
-								class="preview-btn"
-								class:active={isPreviewing}
+							<Button
+								variant="ghost"
+								size="sm"
+								iconOnly
+								pressed={isPreviewing}
 								onclick={() => togglePreview(cand.track.id)}
 								title={isPreviewing ? 'Stop preview' : 'Preview snippet'}
-								aria-label={isPreviewing ? 'Stop preview' : 'Preview'}
+								ariaLabel={isPreviewing ? 'Stop preview' : 'Preview'}
 							>
-								{#if isPreviewing}
-									<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-										<rect x="3" y="3" width="3" height="8" rx="1" />
-										<rect x="8" y="3" width="3" height="8" rx="1" />
-									</svg>
-								{:else}
-									<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-										<path d="M3 2v10l9-5L3 2z" />
-									</svg>
-								{/if}
-							</button>
-							<button
-								class="replace-btn"
+								{#snippet icon()}
+									{#if isPreviewing}
+										<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+											<rect x="3" y="3" width="3" height="8" rx="1" />
+											<rect x="8" y="3" width="3" height="8" rx="1" />
+										</svg>
+									{:else}
+										<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+											<path d="M3 2v10l9-5L3 2z" />
+										</svg>
+									{/if}
+								{/snippet}
+							</Button>
+							<Button
+								variant="secondary"
+								size="sm"
 								onclick={() => handleReplace(cand.track.id)}
 								disabled={replacing !== null}
+								loading={replacing === cand.track.id}
 								title="Replace with this track"
 							>
-								{#if replacing === cand.track.id}
-									<span class="spinner"></span>
-								{:else}
-									Replace
-								{/if}
-							</button>
+								Replace
+							</Button>
 						</div>
 					</div>
 				{/each}
@@ -316,25 +321,6 @@
 
 	.current-track .artist {
 		color: var(--text-dim);
-	}
-
-	.close-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 24px;
-		height: 24px;
-		border: none;
-		background: none;
-		color: var(--text-dim);
-		cursor: pointer;
-		border-radius: 4px;
-		padding: 0;
-	}
-
-	.close-btn:hover {
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
 	}
 
 	/* ── Context bar ── */
@@ -430,7 +416,7 @@
 	}
 
 	.error {
-		color: var(--energy-high, #e94560);
+		color: var(--destructive);
 	}
 
 	.candidate {
@@ -558,65 +544,5 @@
 		align-items: center;
 		gap: 4px;
 		flex-shrink: 0;
-	}
-
-	.preview-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 28px;
-		height: 28px;
-		border: none;
-		background: none;
-		color: var(--text-dim);
-		cursor: pointer;
-		border-radius: 4px;
-		padding: 0;
-		transition: background 0.1s, color 0.1s;
-	}
-
-	.preview-btn:hover,
-	.preview-btn.active {
-		background: var(--bg-tertiary);
-		color: var(--accent);
-	}
-
-	.replace-btn {
-		font-size: 11px;
-		font-weight: 500;
-		padding: 4px 10px;
-		border: 1px solid var(--accent);
-		background: none;
-		color: var(--accent);
-		cursor: pointer;
-		border-radius: 4px;
-		transition: background 0.1s, color 0.1s;
-		white-space: nowrap;
-	}
-
-	.replace-btn:hover {
-		background: var(--accent);
-		color: var(--bg-primary);
-	}
-
-	.replace-btn:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	/* ── Spinner ── */
-
-	.spinner {
-		display: inline-block;
-		width: 12px;
-		height: 12px;
-		border: 1.5px solid currentColor;
-		border-top-color: transparent;
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
 	}
 </style>
