@@ -1,17 +1,8 @@
 <script lang="ts">
 	import { getEnergyGenre } from '$lib/api/stats';
+	import { familyColors } from './chartPalette';
 
 	const ENERGY_LEVELS = ['low', 'warmup', 'closing', 'mid', 'dance', 'up', 'high', 'fast', 'peak'] as const;
-
-	const FAMILY_COLORS: Record<string, string> = {
-		Techno: '#40E0D0',
-		House: '#FF7F50',
-		Groove: '#66BB6A',
-		Trance: '#9575CD',
-		Breaks: '#FFB74D',
-		Electronic: '#42A5F5',
-		Other: '#95a5a6',
-	};
 
 	let data: Record<string, Record<string, number>> | null = $state(null);
 	let loading = $state(true);
@@ -39,8 +30,15 @@
 		return 0.15 + (count / max) * 0.85;
 	}
 
+	// Resolve the cerceta family palette from CSS tokens once data has loaded
+	// (recomputes when `families` changes, i.e. after mount + fetch).
+	let famColors = $derived.by(() => {
+		void families;
+		return familyColors();
+	});
+
 	function getFamilyColor(family: string): string {
-		return FAMILY_COLORS[family] ?? FAMILY_COLORS.Other;
+		return famColors[family] ?? famColors.Other;
 	}
 
 	function showTooltip(e: MouseEvent, family: string, level: string, count: number) {

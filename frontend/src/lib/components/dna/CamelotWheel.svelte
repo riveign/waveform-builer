@@ -8,6 +8,7 @@
 		Legend,
 	} from 'chart.js';
 	import { getCamelotStats } from '$lib/api/stats';
+	import { token, chartChrome, rgba } from './chartPalette';
 
 	Chart.register(PolarAreaController, RadialLinearScale, ArcElement, Tooltip, Legend);
 
@@ -32,6 +33,11 @@
 				const minorCounts = CAMELOT_LABELS.map((k) => data[k]?.A ?? 0);
 				const majorCounts = CAMELOT_LABELS.map((k) => data[k]?.B ?? 0);
 
+				const chrome = chartChrome();
+				// Two distinct cerceta hues for the Minor (A) / Major (B) series.
+				const minorHex = token('--teal-400', '#00B1B8');
+				const majorHex = token('--magenta-500', '#E4488C');
+
 				chart = new Chart(canvas, {
 					type: 'polarArea',
 					data: {
@@ -41,18 +47,18 @@
 								label: 'Minor (A)',
 								data: minorCounts,
 								backgroundColor: CAMELOT_LABELS.map(
-									() => 'rgba(64, 224, 208, 0.6)'
+									() => rgba(minorHex, 0.6)
 								),
-								borderColor: 'rgba(64, 224, 208, 0.8)',
+								borderColor: rgba(minorHex, 0.8),
 								borderWidth: 1,
 							},
 							{
 								label: 'Major (B)',
 								data: majorCounts,
 								backgroundColor: CAMELOT_LABELS.map(
-									() => 'rgba(255, 127, 80, 1.0)'
+									() => majorHex
 								),
-								borderColor: 'rgba(255, 127, 80, 0.8)',
+								borderColor: rgba(majorHex, 0.8),
 								borderWidth: 1,
 							},
 						],
@@ -65,7 +71,7 @@
 								display: true,
 								position: 'bottom',
 								labels: {
-									color: '#F5F5F0',
+									color: chrome.text,
 									font: { size: 12 },
 									padding: 16,
 								},
@@ -89,13 +95,13 @@
 						},
 						scales: {
 							r: {
-								grid: { color: 'rgba(63, 65, 74, 0.5)' },
+								grid: { color: chrome.grid },
 								ticks: {
-									color: '#666',
+									color: chrome.tick,
 									backdropColor: 'transparent',
 								},
 								pointLabels: {
-									color: '#A0A1A7',
+									color: chrome.label,
 									font: { size: 11 },
 								},
 							},

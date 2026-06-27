@@ -2,18 +2,9 @@
 	import { Chart, ScatterController, LinearScale, PointElement, Tooltip, Legend } from 'chart.js';
 	import type { MoodPoint } from '$lib/types';
 	import { getMoodScatter } from '$lib/api/stats';
+	import { familyColors, chartChrome } from './chartPalette';
 
 	Chart.register(ScatterController, LinearScale, PointElement, Tooltip, Legend);
-
-	const FAMILY_COLORS: Record<string, string> = {
-		Techno: '#40E0D0',
-		House: '#FF7F50',
-		Groove: '#66BB6A',
-		Trance: '#9575CD',
-		Breaks: '#FFB74D',
-		Electronic: '#42A5F5',
-		Other: '#95a5a6',
-	};
 
 	let canvas: HTMLCanvasElement | undefined = $state();
 	let chart: Chart | null = $state(null);
@@ -21,11 +12,11 @@
 	let loading = $state(true);
 	let error: string | null = $state(null);
 
-	function getFamilyColor(family: string): string {
-		return FAMILY_COLORS[family] ?? FAMILY_COLORS.Other;
-	}
-
 	function buildChart(el: HTMLCanvasElement, points: MoodPoint[]) {
+		const colors = familyColors();
+		const chrome = chartChrome();
+		const getFamilyColor = (family: string): string => colors[family] ?? colors.Other;
+
 		// Group by genre family for datasets
 		const grouped = new Map<string, MoodPoint[]>();
 		for (const p of points) {
@@ -62,23 +53,23 @@
 						title: {
 							display: true,
 							text: 'Happy  \u2190\u2192  Sad',
-							color: '#A0A1A7',
+							color: chrome.label,
 							font: { size: 11 },
 						},
-						grid: { color: '#3F414A' },
-						ticks: { color: '#666', font: { size: 10 } },
-						border: { color: '#3F414A' },
+						grid: { color: chrome.border },
+						ticks: { color: chrome.tick, font: { size: 10 } },
+						border: { color: chrome.border },
 					},
 					y: {
 						title: {
 							display: true,
 							text: 'Aggressive  \u2190\u2192  Relaxed',
-							color: '#A0A1A7',
+							color: chrome.label,
 							font: { size: 11 },
 						},
-						grid: { color: '#3F414A' },
-						ticks: { color: '#666', font: { size: 10 } },
-						border: { color: '#3F414A' },
+						grid: { color: chrome.border },
+						ticks: { color: chrome.tick, font: { size: 10 } },
+						border: { color: chrome.border },
 					},
 				},
 				plugins: {
@@ -89,8 +80,8 @@
 								return `${raw.title} - ${raw.artist} (${raw.x.toFixed(2)}, ${raw.y.toFixed(2)})`;
 							},
 						},
-						backgroundColor: '#0D0D0D',
-						borderColor: '#3F414A',
+						backgroundColor: chrome.surface,
+						borderColor: chrome.border,
 						borderWidth: 1,
 						titleFont: { size: 12 },
 						bodyFont: { size: 11 },
@@ -99,7 +90,7 @@
 					legend: {
 						position: 'bottom' as const,
 						labels: {
-							color: '#A0A1A7',
+							color: chrome.label,
 							font: { size: 11 },
 							usePointStyle: true,
 							pointStyle: 'circle',
@@ -121,7 +112,7 @@
 
 						drawCtx.save();
 						drawCtx.setLineDash([4, 4]);
-						drawCtx.strokeStyle = '#555';
+						drawCtx.strokeStyle = chrome.muted;
 						drawCtx.lineWidth = 1;
 
 						// Vertical crosshair at x=0
@@ -143,7 +134,7 @@
 						// Quadrant labels
 						drawCtx.setLineDash([]);
 						drawCtx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
-						drawCtx.fillStyle = '#555';
+						drawCtx.fillStyle = chrome.muted;
 						drawCtx.textAlign = 'center';
 
 						const padX = 60;
