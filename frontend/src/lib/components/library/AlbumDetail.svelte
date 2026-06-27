@@ -3,6 +3,7 @@
 	import type { Track } from '$lib/types';
 	import { getAlbumTracks, getAlbumCoverUrl, type Album } from '$lib/api/albums';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
+	import Button from '../primitives/Button.svelte';
 	import MusicBrainzMatchModal from './MusicBrainzMatchModal.svelte';
 	import FixMetadataModal from './FixMetadataModal.svelte';
 
@@ -90,7 +91,7 @@
 
 <div class="album-detail">
 	<div class="header-bar">
-		<button class="back" onclick={onback} aria-label="Back to albums">← Albums</button>
+		<Button variant="secondary" size="sm" onclick={onback} ariaLabel="Back to albums">← Albums</Button>
 	</div>
 
 	{#if loading && !album}
@@ -117,15 +118,15 @@
 				</div>
 
 				<div class="actions">
-					<button class="primary" onclick={() => playAlbum(0)} disabled={tracks.length === 0}>
+					<Button variant="primary" size="sm" onclick={() => playAlbum(0)} disabled={tracks.length === 0}>
 						▶ Play album
-					</button>
-					<button class="secondary" onclick={() => (mbModalOpen = true)}>
+					</Button>
+					<Button variant="secondary" size="sm" onclick={() => (mbModalOpen = true)}>
 						Match on MusicBrainz
-					</button>
-					<button class="secondary" onclick={() => (fixModalOpen = true)}>
+					</Button>
+					<Button variant="secondary" size="sm" onclick={() => (fixModalOpen = true)}>
 						Check &amp; fix metadata
-					</button>
+					</Button>
 				</div>
 
 				{#if album.match_status === 'applied' && album.mb_release_id}
@@ -185,16 +186,6 @@
 		padding: 8px 10px;
 		border-bottom: 1px solid var(--border);
 	}
-	.back {
-		background: transparent;
-		border: 1px solid var(--border);
-		color: var(--text-secondary);
-		border-radius: 6px;
-		padding: 4px 12px;
-		font-size: 12px;
-		cursor: pointer;
-	}
-	.back:hover { color: var(--text-primary); border-color: var(--accent); }
 
 	.album-header {
 		display: grid;
@@ -207,8 +198,8 @@
 	.cover-large {
 		width: 200px;
 		height: 200px;
-		background: var(--bg-secondary, #1a1a1d);
-		border-radius: 8px;
+		background: var(--surface-2);
+		border-radius: var(--radius-lg);
 		overflow: hidden;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 		position: relative;
@@ -248,29 +239,9 @@
 
 	.actions {
 		display: flex;
-		gap: 8px;
+		gap: var(--space-md);
 		margin-top: 14px;
 	}
-	.actions button {
-		appearance: none;
-		border-radius: 6px;
-		padding: 7px 16px;
-		font-size: 13px;
-		font-weight: 600;
-		cursor: pointer;
-	}
-	.actions .primary {
-		background: var(--accent);
-		color: var(--bg-primary, #000);
-		border: 1px solid var(--accent);
-	}
-	.actions .primary:disabled { opacity: 0.5; cursor: not-allowed; }
-	.actions .secondary {
-		background: transparent;
-		color: var(--text-primary);
-		border: 1px solid var(--border);
-	}
-	.actions .secondary:hover { border-color: var(--accent); }
 
 	.mb-note {
 		font-size: 11px;
@@ -299,9 +270,9 @@
 		align-items: center;
 		padding: 6px 20px;
 		font-size: 13px;
-		border-bottom: 1px solid var(--border-dim, rgba(255,255,255,0.04));
+		border-bottom: 1px solid var(--border);
 	}
-	.track-row:hover { background: var(--bg-secondary, rgba(255,255,255,0.03)); }
+	.track-row:hover { background: var(--surface-2); }
 
 	.play-btn {
 		appearance: none;

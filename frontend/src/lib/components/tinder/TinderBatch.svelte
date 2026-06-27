@@ -3,6 +3,7 @@
 	import { ZONES, ZONE_COLORS as zoneColors } from '../library/EnergyZonePicker.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { formatKey } from '$lib/utils/camelot';
+	import Button from '../primitives/Button.svelte';
 
 	const player = getPlayerStore();
 
@@ -60,7 +61,7 @@
 <div class="batch-review">
 	<div class="batch-header">
 		<span class="batch-count">{decidedCount}/{items.length} decided</span>
-		<button class="confirm-all-btn" onclick={confirmAll}>Confirm All Remaining</button>
+		<Button variant="secondary" size="sm" onclick={confirmAll}>Confirm all remaining</Button>
 		<button class="submit-btn" onclick={submitBatch} disabled={decidedCount === 0}>
 			Submit {decidedCount}
 		</button>
@@ -130,14 +131,15 @@
 </div>
 
 <style>
-	.batch-review { display: flex; flex-direction: column; gap: 8px; }
-	.batch-header { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
-	.batch-count { font-size: 13px; color: var(--text-secondary); flex: 1; }
-	.confirm-all-btn { padding: 4px 10px; font-size: 12px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
-	.confirm-all-btn:hover { background: var(--bg-hover); }
-	.submit-btn { padding: 6px 16px; font-size: 13px; font-weight: 600; background: #2ecc71; color: #000; border-radius: 6px; cursor: pointer; }
+	/* Tinder decision green — positive-action signal with no design-system token
+	   (DS --energy-low is navy). Consolidated as local vars to preserve the
+	   long-standing confirm appearance; candidate for a future --positive token. */
+	.batch-review { --tinder-confirm: #2ecc71; --tinder-confirm-hover: #27ae60; display: flex; flex-direction: column; gap: var(--space-md); }
+	.batch-header { display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md) 0; }
+	.batch-count { font-size: var(--text-base); color: var(--text-secondary); flex: 1; }
+	.submit-btn { padding: var(--space-sm) var(--space-xl); font-size: var(--text-base); font-weight: var(--font-weight-semibold); background: var(--tinder-confirm); color: var(--surface-1); border-radius: var(--radius-md); cursor: pointer; }
 	.submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-	.submit-btn:hover:not(:disabled) { background: #27ae60; }
+	.submit-btn:hover:not(:disabled) { background: var(--tinder-confirm-hover); }
 
 	.batch-list { display: flex; flex-direction: column; gap: 2px; }
 	.batch-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: var(--bg-secondary); transition: opacity 0.15s; }
@@ -156,7 +158,7 @@
 	.row-actions { display: flex; align-items: center; gap: 4px; }
 	.row-btn { width: 28px; height: 28px; border-radius: 4px; font-size: 14px; background: none; color: var(--text-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 	.row-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-	.row-btn.active { background: #2ecc71; color: #000; }
+	.row-btn.active { background: var(--tinder-confirm); color: var(--surface-1); }
 	.skip-btn.active { background: var(--bg-hover); color: var(--text-secondary); }
 
 	.override-group { display: flex; gap: 1px; }

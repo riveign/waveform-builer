@@ -4,6 +4,7 @@
 	import WavesurferPlayer from '../waveform/WavesurferPlayer.svelte';
 	import MoodRadar from './MoodRadar.svelte';
 	import EnergyConflictBadge from '../set/EnergyConflictBadge.svelte';
+	import Button from '../primitives/Button.svelte';
 	import { ZONES, ZONE_COLORS as zoneColors } from '../library/EnergyZonePicker.svelte';
 	import { formatKey } from '$lib/utils/camelot';
 
@@ -113,9 +114,13 @@
 	<!-- Actions -->
 	<div class="actions">
 		<div class="override-wrapper">
-			<button class="action override" onclick={() => showOverrideMenu = !showOverrideMenu}>
+			<Button
+				variant="secondary"
+				pressed={showOverrideMenu}
+				onclick={() => showOverrideMenu = !showOverrideMenu}
+			>
 				Override <span class="shortcut">&larr; / O</span>
-			</button>
+			</Button>
 			{#if showOverrideMenu}
 				<div class="override-menu">
 					{#each ZONES as zone}
@@ -126,9 +131,9 @@
 				</div>
 			{/if}
 		</div>
-		<button class="action skip" onclick={() => ondecide('skip')}>
+		<Button variant="secondary" onclick={() => ondecide('skip')}>
 			Skip <span class="shortcut">&uarr; / S</span>
-		</button>
+		</Button>
 		<button class="action confirm" onclick={() => ondecide('confirm')}>
 			Confirm <span class="shortcut">&rarr; / Y</span>
 		</button>
@@ -150,15 +155,26 @@
 	.confidence-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
 	.confidence-text { font-size: 11px; color: var(--text-dim); }
 	.teaching-moment { padding: 8px 12px; background: var(--bg-secondary); border-left: 3px solid var(--accent); border-radius: 4px; font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; font-style: italic; }
-	.actions { display: flex; gap: 8px; justify-content: center; }
-	.action { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-	.confirm { background: #2ecc71; color: #000; }
-	.confirm:hover { background: #27ae60; }
-	.skip { background: var(--bg-secondary); color: var(--text-secondary); }
-	.skip:hover { background: var(--bg-hover); }
-	.override { background: var(--bg-secondary); color: var(--text-secondary); }
-	.override:hover { background: var(--bg-hover); }
-	.shortcut { font-size: 10px; opacity: 0.6; margin-left: 4px; }
+	/* Tinder decision green — the positive-action signal. No design-system token
+	   maps to this hue (DS --energy-low is navy, not green), so it's kept as a
+	   single local var here to preserve the long-standing confirm appearance.
+	   Candidate for a future --positive / --confirm semantic token. */
+	.actions { --tinder-confirm: #2ecc71; --tinder-confirm-hover: #27ae60; display: flex; gap: var(--space-md); justify-content: center; }
+	.confirm {
+		height: var(--btn-height);
+		box-sizing: border-box;
+		padding: 0 var(--space-2xl);
+		border: 1px solid transparent;
+		border-radius: var(--btn-radius);
+		font-size: var(--text-md);
+		font-weight: var(--font-weight-semibold);
+		cursor: pointer;
+		background: var(--tinder-confirm);
+		color: var(--surface-1);
+		transition: background var(--dur-fast) var(--ease-standard);
+	}
+	.confirm:hover { background: var(--tinder-confirm-hover); }
+	.shortcut { font-size: var(--text-2xs); opacity: 0.6; margin-left: var(--space-xs); }
 	.override-wrapper { position: relative; }
 	.override-menu { position: absolute; bottom: 100%; left: 0; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; z-index: 10; }
 	.zone-btn { padding: 6px 16px; font-size: 13px; font-weight: 600; text-transform: uppercase; cursor: pointer; border-radius: 4px; background: none; }

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getTinderStore } from '$lib/stores/tinder.svelte';
+	import Button from '../primitives/Button.svelte';
 
 	const store = getTinderStore();
 
@@ -37,31 +38,42 @@
 			<p>Training samples: {store.retrainResult.training_samples}</p>
 		</div>
 	{:else}
-		<button class="retrain-btn" onclick={() => store.triggerRetrain()} disabled={store.retraining}>
-			{store.retraining ? 'Retraining...' : `Retrain model with ${store.sessionConfirmed + store.sessionOverridden} new approvals`}
-		</button>
+		<div class="retrain-row">
+			<Button
+				variant="primary"
+				loading={store.retraining}
+				disabled={store.retraining}
+				onclick={() => store.triggerRetrain()}
+			>
+				{store.retraining ? 'Retraining...' : `Retrain model with ${store.sessionConfirmed + store.sessionOverridden} new approvals`}
+			</Button>
+		</div>
 	{/if}
 
-	<button class="restart-btn" onclick={onrestart}>Review more tracks</button>
+	<div class="restart-row">
+		<Button variant="secondary" onclick={onrestart}>Review more tracks</Button>
+	</div>
 </div>
 
 <style>
-	.summary { max-width: 400px; margin: 40px auto; text-align: center; }
-	h2 { font-size: 20px; color: var(--text-primary); margin: 0 0 4px; }
-	.subtitle { font-size: 14px; color: var(--text-secondary); margin: 0 0 24px; }
-	.stats-grid { display: flex; gap: 16px; justify-content: center; margin-bottom: 24px; }
-	.stat { flex: 1; padding: 12px; background: var(--bg-secondary); border-radius: 8px; }
+	/* Decision-outcome signal hues. No design-system tokens map to confirm-green /
+	   override-amber (DS energy ramp is navy→lilac→magenta), so they're kept as
+	   local vars to preserve the existing summary appearance. Candidates for
+	   future --positive / --caution semantic tokens. */
+	.summary { --tinder-confirm: #2ecc71; --tinder-override: #f39c12; max-width: 400px; margin: var(--space-4xl) auto; text-align: center; }
+	h2 { font-size: var(--text-xl); color: var(--text-primary); margin: 0 0 var(--space-xs); }
+	.subtitle { font-size: var(--text-md); color: var(--text-secondary); margin: 0 0 var(--space-3xl); }
+	.stats-grid { display: flex; gap: var(--space-xl); justify-content: center; margin-bottom: var(--space-3xl); }
+	.stat { flex: 1; padding: var(--space-lg); background: var(--bg-secondary); border-radius: var(--radius-lg); }
 	.stat-num { font-size: 28px; font-weight: 700; }
-	.confirmed .stat-num { color: #2ecc71; }
-	.overridden .stat-num { color: #f39c12; }
+	.confirmed .stat-num { color: var(--tinder-confirm); }
+	.overridden .stat-num { color: var(--tinder-override); }
 	.skipped .stat-num { color: var(--text-dim); }
-	.stat-label { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
-	.retrain-btn { width: 100%; padding: 12px; background: var(--accent); color: var(--bg-primary); border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
-	.retrain-btn:hover { opacity: 0.9; }
-	.retrain-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-	.retrain-result { padding: 12px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 12px; }
-	.retrain-result h3 { font-size: 14px; margin: 0 0 4px; color: #2ecc71; }
-	.retrain-result p { font-size: 12px; color: var(--text-secondary); margin: 2px 0; }
-	.restart-btn { width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-secondary); border-radius: 8px; font-size: 13px; cursor: pointer; }
-	.restart-btn:hover { background: var(--bg-hover); }
+	.stat-label { font-size: var(--text-xs); color: var(--text-dim); margin-top: var(--space-xs); }
+	.retrain-row { margin-bottom: var(--space-md); }
+	.retrain-row :global(.btn) { width: 100%; }
+	.retrain-result { padding: var(--space-lg); background: var(--bg-secondary); border-radius: var(--radius-lg); margin-bottom: var(--space-lg); }
+	.retrain-result h3 { font-size: var(--text-md); margin: 0 0 var(--space-xs); color: var(--tinder-confirm); }
+	.retrain-result p { font-size: var(--text-sm); color: var(--text-secondary); margin: var(--space-2xs) 0; }
+	.restart-row :global(.btn) { width: 100%; }
 </style>

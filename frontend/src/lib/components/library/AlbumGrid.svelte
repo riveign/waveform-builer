@@ -1,10 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { listAlbums, getAlbumCoverUrl, type Album } from '$lib/api/albums';
+	import Button from '../primitives/Button.svelte';
+	import SegmentedControl, { type SegmentOption } from '../primitives/SegmentedControl.svelte';
 
 	let { onselect }: { onselect: (album: Album) => void } = $props();
 
 	type SortMode = 'artist' | 'year' | 'recent';
+
+	const SORT_OPTIONS: SegmentOption<SortMode>[] = [
+		{ value: 'artist', label: 'Artist' },
+		{ value: 'year', label: 'Year' },
+		{ value: 'recent', label: 'Recent' },
+	];
 
 	let albums = $state<Album[]>([]);
 	let total = $state(0);
@@ -111,11 +119,12 @@
 			value={search}
 			oninput={(e) => onSearchInput((e.currentTarget as HTMLInputElement).value)}
 		/>
-		<div class="sort">
-			<button class:active={sort === 'artist'} onclick={() => changeSort('artist')}>Artist</button>
-			<button class:active={sort === 'year'} onclick={() => changeSort('year')}>Year</button>
-			<button class:active={sort === 'recent'} onclick={() => changeSort('recent')}>Recent</button>
-		</div>
+		<SegmentedControl
+			options={SORT_OPTIONS}
+			value={sort}
+			onchange={changeSort}
+			ariaLabel="Sort albums"
+		/>
 	</div>
 
 	{#if loading && albums.length === 0}
@@ -186,9 +195,9 @@
 					</div>
 					{#if albums.length < total}
 						<div class="load-more">
-							<button onclick={loadMore} disabled={loading}>
+							<Button variant="secondary" size="sm" loading={loading} onclick={loadMore}>
 								{loading ? 'Listening...' : `Load ${Math.min(PAGE_LIMIT, total - albums.length)} more`}
-							</button>
+							</Button>
 						</div>
 					{/if}
 				{/if}
@@ -237,33 +246,14 @@
 	.search {
 		flex: 1 1 auto;
 		min-width: 200px;
-		background: var(--bg-secondary, #1a1a1d);
+		background: var(--surface-3);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius-md);
 		color: var(--text-primary);
-		padding: 6px 10px;
-		font-size: 13px;
+		padding: var(--space-sm) var(--space-md);
+		font-size: var(--text-base);
 	}
 	.search:focus { outline: none; border-color: var(--accent); }
-
-	.sort {
-		display: flex;
-		gap: 4px;
-	}
-	.sort button {
-		background: transparent;
-		color: var(--text-secondary);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 4px 10px;
-		font-size: 11px;
-		cursor: pointer;
-	}
-	.sort button.active {
-		background: var(--accent);
-		color: var(--bg-primary, #000);
-		border-color: var(--accent);
-	}
 
 	.meta {
 		padding: 6px 10px;
@@ -298,7 +288,7 @@
 		align-items: baseline;
 		gap: 8px;
 		padding: 6px 14px;
-		background: var(--bg-primary, #0c0c0e);
+		background: var(--surface-1);
 		border-bottom: 1px solid var(--border);
 		font-size: 13px;
 		font-weight: 700;
@@ -335,8 +325,8 @@
 	.cover {
 		width: 100%;
 		aspect-ratio: 1 / 1;
-		background: var(--bg-secondary, #1a1a1d);
-		border-radius: 6px;
+		background: var(--surface-2);
+		border-radius: var(--radius-md);
 		overflow: hidden;
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 		display: flex;
@@ -394,20 +384,7 @@
 	.load-more {
 		display: flex;
 		justify-content: center;
-		padding: 12px;
-	}
-	.load-more button {
-		background: transparent;
-		color: var(--text-secondary);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 6px 14px;
-		font-size: 12px;
-		cursor: pointer;
-	}
-	.load-more button:hover:not(:disabled) {
-		border-color: var(--accent);
-		color: var(--text-primary);
+		padding: var(--space-lg);
 	}
 
 	.status {
@@ -446,6 +423,6 @@
 	}
 	.rail-item:hover {
 		color: var(--accent);
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--surface-hover);
 	}
 </style>

@@ -5,6 +5,7 @@
 	import TinderCard from './TinderCard.svelte';
 	import TinderBatch from './TinderBatch.svelte';
 	import TinderSummary from './TinderSummary.svelte';
+	import Button from '../primitives/Button.svelte';
 
 	const store = getTinderStore();
 
@@ -60,9 +61,14 @@
 				<span>{store.currentIndex + 1} / {store.queue.length}</span>
 				<span class="queue-total">({store.queueTotal} total in queue)</span>
 			</div>
-			<button class="mode-toggle" onclick={() => batchMode = !batchMode}>
+			<Button
+				variant="secondary"
+				size="sm"
+				pressed={batchMode}
+				onclick={() => batchMode = !batchMode}
+			>
 				{batchMode ? 'Card mode' : 'Batch mode'}
-			</button>
+			</Button>
 		</div>
 
 		<!-- Filters -->
@@ -110,8 +116,6 @@
 	.toolbar { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
 	.progress-bar { font-size: 13px; color: var(--text-secondary); }
 	.queue-total { font-size: 11px; color: var(--text-dim); margin-left: 4px; }
-	.mode-toggle { padding: 3px 10px; font-size: 11px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
-	.mode-toggle:hover { background: var(--bg-hover); }
 	.filters { display: flex; gap: 8px; justify-content: center; padding: 8px 0; }
 	.filters select, .filters input { padding: 4px 8px; font-size: 12px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; }
 	.filters input { width: 80px; }
