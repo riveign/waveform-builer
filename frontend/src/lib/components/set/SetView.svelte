@@ -11,6 +11,7 @@
 	import SetComparison from './SetComparison.svelte';
 	import FillReorderDialog from './FillReorderDialog.svelte';
 	import AddFromArtistPanel from './AddFromArtistPanel.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
@@ -386,38 +387,34 @@
 			{/if}
 			<span class="set-meta">{selectedSet.track_count} tracks, {selectedSet.duration_min}min</span>
 			{#if tracksNeedingReview.length > 0}
-				<button class="review-energy-btn" onclick={() => { showEnergyReview = true; }}>
+				<Button variant="primary" size="sm" onclick={() => { showEnergyReview = true; }}>
 					Review energy ({tracksNeedingReview.length})
-				</button>
+				</Button>
 			{/if}
 			{#if waveformTracks.length >= 2 && analysis}
-				<button
-					class="analyze-btn"
-					onclick={handleAnalyze}
-					disabled={analyzingSet}
-				>
+				<Button variant="secondary" size="sm" onclick={handleAnalyze} disabled={analyzingSet}>
 					{analyzingSet ? 'Analyzing...' : 'Re-analyze'}
-				</button>
+				</Button>
 			{:else if waveformTracks.length >= 2 && analyzingSet}
 				<span class="analyzing-status">Analyzing...</span>
 			{/if}
 			{#if waveformTracks.length >= 1}
-				<button class="play-set-btn play-all" onclick={handlePlaySet} title="Play the whole set in order">
+				<Button variant="primary" size="sm" onclick={handlePlaySet} title="Play the whole set in order">
 					▶ Play
-				</button>
+				</Button>
 			{/if}
 			{#if setDetail?.planned_set_id}
-				<button class="compare-btn" onclick={handleCompare} disabled={comparing}>
+				<Button variant="secondary" size="sm" onclick={handleCompare} disabled={comparing}>
 					{comparing ? 'Comparing...' : 'Planned vs played'}
-				</button>
-				<button class="unlink-btn" onclick={handleUnlink} title="Remove the link to the planned set">
+				</Button>
+				<Button variant="ghost" size="sm" onclick={handleUnlink} title="Remove the link to the planned set">
 					Unlink
-				</button>
+				</Button>
 			{:else if setDetail && setDetail.source !== 'kiku'}
 				{#if showLinkPicker}
 					{#if plannedSets.length === 0}
 						<span class="link-empty">No planned sets to link yet — build one first.</span>
-						<button class="unlink-btn" onclick={() => (showLinkPicker = false)}>Cancel</button>
+						<Button variant="ghost" size="sm" onclick={() => (showLinkPicker = false)}>Cancel</Button>
 					{:else}
 						<select class="link-select" bind:value={linkTargetId} aria-label="Choose the planned set">
 							<option value={null}>Which set did you plan from?</option>
@@ -425,59 +422,48 @@
 								<option value={p.id}>{p.name} ({p.track_count} tracks)</option>
 							{/each}
 						</select>
-						<button class="compare-btn" onclick={confirmLink} disabled={linkTargetId === null || linking}>
+						<Button variant="secondary" size="sm" onclick={confirmLink} disabled={linkTargetId === null || linking}>
 							{linking ? 'Linking...' : 'Link'}
-						</button>
-						<button class="unlink-btn" onclick={() => (showLinkPicker = false)}>Cancel</button>
+						</Button>
+						<Button variant="ghost" size="sm" onclick={() => (showLinkPicker = false)}>Cancel</Button>
 					{/if}
 				{:else}
-					<button class="link-btn" onclick={openLinkPicker} title="Link this set to the plan you built it from">
+					<Button variant="ghost" size="sm" onclick={openLinkPicker} title="Link this set to the plan you built it from">
 						Link to a plan
-					</button>
+					</Button>
 				{/if}
 			{/if}
 			{#if waveformTracks.length >= 2}
-				<button
-					class="play-set-btn"
-					onclick={() => pb.startExpress(selectedSet!.id, waveformTracks)}
-					disabled={pb.isActive}
-				>
+				<Button variant="primary" size="sm" onclick={() => pb.startExpress(selectedSet!.id, waveformTracks)} disabled={pb.isActive}>
 					Express
-				</button>
-				<button
-					class="play-set-btn builder"
-					onclick={() => pb.startBuilder(selectedSet!.id, waveformTracks)}
-					disabled={pb.isActive}
-				>
+				</Button>
+				<Button variant="secondary" size="sm" onclick={() => pb.startBuilder(selectedSet!.id, waveformTracks)} disabled={pb.isActive}>
 					Live Builder
-				</button>
+				</Button>
 			{/if}
 			{#if waveformTracks.length >= 3}
-				<button class="assist-btn" onclick={() => { showAssist = true; }}>
+				<Button variant="secondary" size="sm" onclick={() => { showAssist = true; }}>
 					Assist
-				</button>
+				</Button>
 			{/if}
-			<button class="assist-btn" onclick={() => { showArtistPicks = !showArtistPicks; }}>
+			<Button variant="secondary" size="sm" onclick={() => { showArtistPicks = !showArtistPicks; }}>
 				Add from an artist
-			</button>
+			</Button>
 			<select bind:value={exportFormat} class="export-select">
 				<option value="m3u8">M3U8</option>
 				<option value="rekordbox">XML</option>
 			</select>
-			<button class="export-btn" onclick={handleExport} disabled={exporting}>
+			<Button variant="secondary" size="sm" onclick={handleExport} disabled={exporting}>
 				{exporting ? 'Exporting...' : 'Export'}
-			</button>
+			</Button>
 			{#if exportMsg}
 				<span class="export-msg">{exportMsg}</span>
 			{/if}
-			<button
-				class="delete-btn"
-				class:confirm={confirmDelete}
-				onclick={handleDelete}
-				disabled={deleting}
-			>
-				{deleting ? 'Deleting...' : confirmDelete ? 'Confirm delete?' : 'Delete'}
-			</button>
+			<span class="delete-slot">
+				<Button variant={confirmDelete ? 'danger' : 'ghost'} size="sm" onclick={handleDelete} disabled={deleting}>
+					{deleting ? 'Deleting...' : confirmDelete ? 'Confirm delete?' : 'Delete'}
+				</Button>
+			</span>
 		</div>
 
 		{#if loading}
@@ -500,7 +486,7 @@
 
 				{#if analysis}
 					<div class="analysis-bar">
-						<span class="analysis-score" style="color: {analysis.overall_score >= 0.7 ? 'var(--color-success, #66BB6A)' : analysis.overall_score >= 0.5 ? 'var(--color-warning, #FFA726)' : 'var(--color-error, #EF5350)'}">
+						<span class="analysis-score" style="color: {analysis.overall_score >= 0.7 ? 'var(--score-excellent)' : analysis.overall_score >= 0.5 ? 'var(--score-fair)' : 'var(--score-poor)'}">
 							{analysis.overall_score.toFixed(3)}
 						</span>
 						<span class="analysis-arc">
@@ -652,106 +638,15 @@
 		margin-right: auto;
 	}
 
-	.review-energy-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		color: #000;
-		background: var(--accent);
-		border: 1px solid var(--accent);
-		border-radius: 4px;
-		font-weight: 600;
-		transition: all 0.15s;
-	}
-
-	.review-energy-btn:hover {
-		opacity: 0.85;
-	}
-
-	.play-set-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: #000;
-		background: var(--accent);
-		border: 1px solid var(--accent);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.play-set-btn:hover:not(:disabled) {
-		opacity: 0.85;
-	}
-
-	.play-set-btn:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.play-set-btn.play-all {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-	}
-
-	.play-set-btn.builder {
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
-		border-color: var(--border);
-	}
-
-	.play-set-btn.builder:hover:not(:disabled) {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.assist-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.assist-btn:hover {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
+	/* Native select kept (not a button); aligned to the toolbar Button tier. */
 	.export-select {
 		padding: 4px 8px;
 		font-size: 12px;
 		color: var(--text-primary);
 		background: var(--bg-tertiary);
 		border: 1px solid var(--border);
-		border-radius: 4px 0 0 4px;
-		border-right: none;
+		border-radius: var(--radius-sm);
 		cursor: pointer;
-	}
-
-	.export-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 0 4px 4px 0;
-		transition: all 0.15s;
-	}
-
-	.export-btn:hover:not(:disabled) {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.export-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
 	}
 
 	.export-msg {
@@ -759,31 +654,9 @@
 		color: var(--accent);
 	}
 
-	.delete-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		color: var(--text-dim);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
+	.delete-slot {
+		display: inline-flex;
 		margin-left: 4px;
-	}
-
-	.delete-btn:hover:not(:disabled) {
-		color: #e74c3c;
-		border-color: #e74c3c;
-	}
-
-	.delete-btn.confirm {
-		color: #fff;
-		background: #e74c3c;
-		border-color: #e74c3c;
-	}
-
-	.delete-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
 	}
 
 	.timeline-container {
@@ -827,79 +700,6 @@
 	.analyzing-status {
 		font-size: 12px;
 		color: var(--text-dim);
-	}
-
-	.analyze-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.analyze-btn:hover:not(:disabled) {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.analyze-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
-	.compare-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.compare-btn:hover:not(:disabled) {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.compare-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
-	.unlink-btn {
-		padding: 4px 8px;
-		font-size: 11px;
-		color: var(--text-dim);
-		background: transparent;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-	}
-
-	.unlink-btn:hover {
-		color: var(--text-primary);
-	}
-
-	.link-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--text-dim);
-		background: transparent;
-		border: 1px dashed var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.link-btn:hover {
-		color: var(--text-primary);
-		border-color: var(--accent);
 	}
 
 	.link-select {

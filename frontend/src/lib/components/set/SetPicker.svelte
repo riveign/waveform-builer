@@ -3,6 +3,7 @@
 	import { listSets, createSet } from '$lib/api/sets';
 	import { onMount } from 'svelte';
 	import ImportPlaylistDialog from './ImportPlaylistDialog.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 
 	const ui = getUiStore();
@@ -84,16 +85,16 @@
 					onkeydown={(e) => { if (e.key === 'Enter') handleCreateNew(); if (e.key === 'Escape') { creatingNew = false; newName = ''; } }}
 				/>
 			{:else}
-				<button class="new-btn" onclick={() => { creatingNew = true; setTimeout(() => newInputEl?.focus(), 0); }} title="Create new set">
+				<Button variant="primary" size="sm" onclick={() => { creatingNew = true; setTimeout(() => newInputEl?.focus(), 0); }} title="Create new set">
 					+ New
-				</button>
+				</Button>
 			{/if}
-			<button class="build-btn" onclick={() => ui.requestBuild()} title="Build a set with energy, genre and vibe">
+			<Button variant="primary" size="sm" onclick={() => ui.requestBuild()} title="Build a set with energy, genre and vibe">
 				Build
-			</button>
-			<button class="import-btn" onclick={() => importOpen = true} title="Import playlist">
+			</Button>
+			<Button variant="secondary" size="sm" onclick={() => importOpen = true} title="Import playlist">
 				Import
-			</button>
+			</Button>
 		</div>
 	{/if}
 </div>
@@ -116,49 +117,6 @@
 		flex: 1;
 		padding: 8px 10px;
 		font-size: 13px;
-	}
-
-	.import-btn {
-		padding: 8px 12px;
-		font-size: 12px;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: var(--bg-secondary);
-		color: var(--text-primary);
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
-	.import-btn:hover {
-		background: var(--bg-tertiary);
-	}
-
-	.new-btn {
-		padding: 8px 12px;
-		font-size: 12px;
-		border: 1px solid var(--accent);
-		border-radius: 6px;
-		background: var(--accent);
-		color: #000;
-		cursor: pointer;
-		white-space: nowrap;
-		font-weight: 600;
-	}
-
-	.build-btn {
-		padding: 8px 12px;
-		font-size: 12px;
-		border: 1px solid var(--accent);
-		border-radius: 6px;
-		background: var(--accent);
-		color: #000;
-		cursor: pointer;
-		white-space: nowrap;
-		font-weight: 600;
-	}
-
-	.build-btn:hover {
-		opacity: 0.85;
 	}
 
 	.new-set-input {

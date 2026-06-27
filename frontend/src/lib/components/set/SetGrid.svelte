@@ -3,6 +3,7 @@
 	import { listSets, deleteSet, getDeletedSets, restoreSet } from '$lib/api/sets';
 	import { onMount } from 'svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		onselect,
@@ -126,11 +127,11 @@
 					bind:value={search}
 					oninput={refresh}
 				/>
-				<button class="mode-btn" onclick={() => switchMode('trash')} title="Recently deleted sets">
+				<Button variant="secondary" size="sm" onclick={() => switchMode('trash')} title="Recently deleted sets">
 					Recently deleted
-				</button>
+				</Button>
 			{:else}
-				<button class="mode-btn" onclick={() => switchMode('active')}>← Back to sets</button>
+				<Button variant="secondary" size="sm" onclick={() => switchMode('active')}>← Back to sets</Button>
 			{/if}
 		</div>
 	</div>
@@ -282,39 +283,23 @@
 	}
 
 	.card-delete:hover {
-		color: var(--energy-high, #EF5350);
-		border-color: var(--energy-high, #EF5350);
+		color: var(--destructive);
+		border-color: var(--destructive);
 	}
 
 	.card-delete.confirm {
 		opacity: 1;
 		font-size: 11px;
 		font-weight: 600;
-		color: #fff;
-		background: var(--energy-high, #EF5350);
-		border-color: var(--energy-high, #EF5350);
+		color: #FFFFFF;
+		background: var(--destructive);
+		border-color: var(--destructive);
 	}
 
 	.head-actions {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-	}
-
-	.mode-btn {
-		padding: 7px 12px;
-		font-size: 12px;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: var(--bg-secondary);
-		color: var(--text-secondary);
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
-	.mode-btn:hover {
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
 	}
 
 	.set-card.trashed {
@@ -343,7 +328,7 @@
 
 	.card-recover:hover:not(:disabled) {
 		background: var(--accent);
-		color: #000;
+		color: var(--on-accent);
 	}
 
 	.card-recover:disabled {
@@ -352,8 +337,8 @@
 	}
 
 	.trash-tag {
-		background: rgba(239, 83, 80, 0.15);
-		color: var(--energy-high, #EF5350);
+		background: color-mix(in srgb, var(--destructive) 15%, transparent);
+		color: var(--destructive);
 	}
 
 	.card-name {
