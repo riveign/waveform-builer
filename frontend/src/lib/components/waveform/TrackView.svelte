@@ -17,6 +17,7 @@
 	import { ZONE_COLORS } from '../library/EnergyZonePicker.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import Chip from '../primitives/Chip.svelte';
+	import Button from '../primitives/Button.svelte';
 
 	let { track }: { track: Track } = $props();
 
@@ -204,19 +205,28 @@
 		<TrackArtwork trackId={track.id} />
 		<div class="header-text">
 			<div class="title-row">
-				<button class="play-btn" onclick={handlePlay} title={isThisTrackPlaying ? 'Pause' : 'Play'}>
-					{isThisTrackPlaying ? '⏸' : '▶'}
-				</button>
+				<Button
+					iconOnly
+					shape="round"
+					onclick={handlePlay}
+					ariaLabel={isThisTrackPlaying ? 'Pause' : 'Play'}
+					title={isThisTrackPlaying ? 'Pause' : 'Play'}
+				>
+					{#snippet icon()}{isThisTrackPlaying ? '⏸' : '▶'}{/snippet}
+				</Button>
 				<div>
 					<h2 class="track-title">{track.title ?? 'Unknown'}</h2>
 					<span class="track-artist">{track.artist ?? 'Unknown'}</span>
 				</div>
 			</div>
 			<div class="track-meta">
-				<span class="meta-badge" style="color: {getCamelotColor(track.key)}">
-					{formatKey(track.key) || '?'}
-				</span>
-				<span class="meta-badge">{track.bpm ? Math.round(track.bpm) : '?'} BPM</span>
+				<Chip
+					variant="key"
+					color={getCamelotColor(track.key)}
+					value={formatKey(track.key) || '?'}
+					title="Camelot key {formatKey(track.key) || 'unknown'}"
+				/>
+				<Chip variant="bpm" value={track.bpm ? Math.round(track.bpm) : '?'} title="Tempo {track.bpm ? Math.round(track.bpm) + ' BPM' : 'unknown'}" />
 				<div class="zone-badge-wrapper" bind:this={zoneWrapperEl}>
 					<button
 						class="meta-badge meta-badge-interactive zone-badge"
@@ -241,23 +251,26 @@
 					{/if}
 				</div>
 				{#if track.duration_sec}
-					<span class="meta-badge dim">{formatTime(track.duration_sec)}</span>
+					<Chip variant="neutral" size="sm" value={formatTime(track.duration_sec)} title="Track length" />
 				{/if}
 				{#if compatKeys.length}
 					<span class="mixes-label" title="Harmonically compatible keys (Camelot wheel)">Mixes with</span>
 					{#each compatKeys as ck (ck.camelot)}
-						<span
-							class="meta-badge compat-key"
-							style="color: {getCamelotColor(ck.camelot)}"
+						<Chip
+							variant="key"
+							size="sm"
+							color={getCamelotColor(ck.camelot)}
+							value={ck.name}
 							title="{ck.name} — {ck.relation}"
-						>{ck.name}</span>
+						/>
 					{/each}
 				{/if}
-				<button
-					class="meta-badge meta-badge-interactive add-to-set-btn"
+				<Button
+					variant="secondary"
+					size="sm"
 					onclick={() => showAddToSet = !showAddToSet}
 					title="Add to a set"
-				>+ Add to Set</button>
+				>+ Add to set</Button>
 			</div>
 			<!-- Rating inline with header -->
 			<div class="track-rating-row">
@@ -397,10 +410,10 @@
 							<span class="card-label">Mood</span>
 							<span class="card-value">{dominantMood}</span>
 							<div class="mood-grid">
-								<span class="mood-item" title="Happy"><span class="mood-dot" style="background: #2ecc71"></span>{pct(features.mood_happy)}</span>
-								<span class="mood-item" title="Sad"><span class="mood-dot" style="background: #3498db"></span>{pct(features.mood_sad)}</span>
-								<span class="mood-item" title="Aggressive"><span class="mood-dot" style="background: #e74c3c"></span>{pct(features.mood_aggressive)}</span>
-								<span class="mood-item" title="Relaxed"><span class="mood-dot" style="background: #9b59b6"></span>{pct(features.mood_relaxed)}</span>
+								<span class="mood-item" title="Happy"><span class="mood-dot mood-dot--happy"></span>{pct(features.mood_happy)}</span>
+								<span class="mood-item" title="Sad"><span class="mood-dot mood-dot--sad"></span>{pct(features.mood_sad)}</span>
+								<span class="mood-item" title="Aggressive"><span class="mood-dot mood-dot--aggressive"></span>{pct(features.mood_aggressive)}</span>
+								<span class="mood-item" title="Relaxed"><span class="mood-dot mood-dot--relaxed"></span>{pct(features.mood_relaxed)}</span>
 							</div>
 						</div>
 					</div>
@@ -418,10 +431,10 @@
 
 <style>
 	.track-view {
-		padding: 20px 24px;
+		padding: var(--space-2xl) var(--space-3xl);
 		display: flex;
 		flex-direction: column;
-		gap: 20px;
+		gap: var(--space-2xl);
 	}
 
 	/* ── Header ── */
@@ -437,7 +450,7 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 8px;
+		gap: var(--space-md);
 	}
 
 	.title-row {
@@ -446,77 +459,47 @@
 		gap: 10px;
 	}
 
-	.play-btn {
-		width: 36px;
-		height: 36px;
-		border-radius: 50%;
-		background: var(--accent);
-		color: #000;
-		font-size: 15px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-		cursor: pointer;
-		border: none;
-	}
-
-	.play-btn:hover {
-		background: var(--accent-dim);
-	}
-
 	.track-title {
-		font-size: 18px;
-		font-weight: 600;
+		font-size: var(--text-lg);
+		font-weight: var(--font-weight-semibold);
 	}
 
 	.track-artist {
-		font-size: 14px;
+		font-size: var(--text-md);
 		color: var(--text-secondary);
 	}
 
 	.track-meta {
 		display: flex;
-		gap: 8px;
+		gap: var(--space-md);
 		align-items: center;
 		flex-wrap: wrap;
 		position: relative;
 	}
 
 	.meta-badge {
-		font-size: 12px;
-		font-weight: 600;
-		padding: 2px 8px;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
+		padding: var(--space-2xs) var(--space-md);
 		background: var(--bg-tertiary);
-		border-radius: 4px;
+		border-radius: var(--radius-sm);
 		border: none;
 		color: var(--text-primary);
 	}
 
-	.meta-badge.dim {
-		color: var(--text-dim);
-	}
-
 	.mixes-label {
-		font-size: 11px;
+		font-size: var(--text-xs);
 		color: var(--text-dim);
-		margin-left: 4px;
+		margin-left: var(--space-xs);
 		align-self: center;
 	}
-
-	.compat-key {
-		background: transparent;
-		border: 1px solid var(--border);
-		padding: 1px 7px;
-	}
-
 
 	.meta-badge-interactive {
 		cursor: pointer;
 		display: flex;
 		align-items: center;
-		gap: 4px;
-		transition: background 0.1s;
+		gap: var(--space-xs);
+		transition: background var(--dur-fast) var(--ease-standard);
 	}
 
 	.meta-badge-interactive:hover {
@@ -524,14 +507,14 @@
 	}
 
 	.zone-dot-sm {
-		width: 8px;
-		height: 8px;
-		border-radius: 50%;
+		width: var(--space-md);
+		height: var(--space-md);
+		border-radius: var(--radius-full);
 		background: var(--zone-color);
 	}
 
 	.source-check {
-		font-size: 10px;
+		font-size: var(--text-2xs);
 		color: var(--accent);
 	}
 
@@ -543,15 +526,15 @@
 		position: absolute;
 		top: 100%;
 		right: 0;
-		margin-top: 4px;
+		margin-top: var(--space-xs);
 		background: var(--bg-primary);
 		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 4px;
+		border-radius: var(--radius-lg);
+		padding: var(--space-xs);
 		min-width: 150px;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 		z-index: 50;
-		animation: menu-appear 0.1s ease-out;
+		animation: menu-appear var(--dur-fast) var(--ease-standard);
 	}
 
 	@keyframes menu-appear {
@@ -564,22 +547,22 @@
 	.track-rating-row {
 		display: flex;
 		align-items: center;
-		gap: 12px;
+		gap: var(--space-lg);
 	}
 
 	.sync-note {
-		font-size: 11px;
+		font-size: var(--text-xs);
 		color: var(--text-dim);
 	}
 
 	.teaching-moment {
-		font-size: 13px;
+		font-size: var(--text-base);
 		color: var(--accent);
 		background: color-mix(in srgb, var(--accent) 8%, transparent);
-		padding: 8px 12px;
-		border-radius: 6px;
+		padding: var(--space-md) var(--space-lg);
+		border-radius: var(--radius-md);
 		border-left: 3px solid var(--accent);
-		animation: fade-in 0.3s ease-out;
+		animation: fade-in var(--dur-base) var(--ease-standard);
 	}
 
 	@keyframes fade-in {
@@ -598,11 +581,11 @@
 	.meta-grid {
 		display: grid;
 		grid-template-columns: auto 1fr;
-		gap: 6px 16px;
-		font-size: 13px;
-		padding: 12px 14px;
+		gap: var(--space-sm) var(--space-xl);
+		font-size: var(--text-base);
+		padding: var(--space-lg) 14px;
 		background: var(--bg-secondary);
-		border-radius: 8px;
+		border-radius: var(--radius-lg);
 		border: 1px solid var(--border);
 	}
 
@@ -617,15 +600,15 @@
 	.tag-chips {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 6px;
+		gap: var(--space-sm);
 	}
 
 	.track-comment {
-		font-size: 13px;
+		font-size: var(--text-base);
 		font-style: italic;
 		color: var(--text-secondary);
 		margin: 0;
-		padding: 6px 10px;
+		padding: var(--space-sm) 10px;
 		border-left: 2px solid var(--border);
 	}
 
@@ -635,10 +618,10 @@
 		min-height: 80px;
 	}
 
-	.loading, .no-data, .error-msg {
-		padding: 20px;
+	.no-data, .error-msg {
+		padding: var(--space-2xl);
 		text-align: center;
-		font-size: 13px;
+		font-size: var(--text-base);
 		color: var(--text-secondary);
 	}
 
@@ -648,9 +631,9 @@
 
 	.no-data code {
 		background: var(--bg-tertiary);
-		padding: 2px 6px;
-		border-radius: 3px;
-		font-size: 12px;
+		padding: var(--space-2xs) var(--space-sm);
+		border-radius: var(--radius-xs);
+		font-size: var(--text-sm);
 	}
 
 	/* ── What Kiku Hears ── */
@@ -658,11 +641,11 @@
 	.kiku-hears {
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: var(--space-lg);
 	}
 
 	.section-title {
-		font-size: 12px;
+		font-size: var(--text-sm);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		color: var(--text-secondary);
@@ -672,17 +655,17 @@
 	.feature-cards {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 12px;
+		gap: var(--space-lg);
 	}
 
 	.feature-card {
 		display: flex;
 		gap: 14px;
-		padding: 16px 18px;
+		padding: var(--space-xl) 18px;
 		background: var(--bg-secondary);
 		border-radius: 10px;
 		border: 1px solid var(--border);
-		transition: border-color 0.15s;
+		transition: border-color var(--dur-fast) var(--ease-standard);
 	}
 
 	.feature-card:hover {
@@ -697,7 +680,7 @@
 		display: flex;
 		align-items: flex-start;
 		justify-content: center;
-		padding-top: 2px;
+		padding-top: var(--space-2xs);
 	}
 
 	.card-icon svg {
@@ -705,23 +688,23 @@
 		height: 28px;
 	}
 
-	.dance-icon { color: var(--energy-mid, #f39c12); }
-	.mood-icon { color: #9b59b6; }
+	.dance-icon { color: var(--energy-mid); }
+	.mood-icon { color: var(--lilac-400); }
 
 	.card-body {
 		flex: 1;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+		gap: var(--space-sm);
 	}
 
 	.card-label {
-		font-size: 11px;
+		font-size: var(--text-xs);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		color: var(--text-dim);
-		font-weight: 500;
+		font-weight: var(--font-weight-medium);
 	}
 
 	.card-value {
@@ -733,7 +716,7 @@
 	}
 
 	.card-unit {
-		font-size: 13px;
+		font-size: var(--text-base);
 		font-weight: 400;
 		color: var(--text-dim);
 		margin-left: 1px;
@@ -742,70 +725,65 @@
 	.card-bar {
 		height: 5px;
 		background: var(--bg-tertiary);
-		border-radius: 3px;
+		border-radius: var(--radius-xs);
 		overflow: hidden;
-		margin-top: 4px;
+		margin-top: var(--space-xs);
 	}
 
 	.bar-fill {
 		height: 100%;
-		border-radius: 2px;
-		transition: width 0.3s;
+		border-radius: var(--radius-xs);
+		transition: width var(--dur-slow) var(--ease-standard);
 	}
 
 	.bar-fill.energy { background: var(--accent); }
-	.bar-fill.dance { background: var(--energy-mid, #f39c12); }
+	.bar-fill.dance { background: var(--energy-mid); }
 
 	.card-detail {
 		display: flex;
 		gap: 10px;
-		font-size: 11px;
+		font-size: var(--text-xs);
 		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
-		margin-top: 4px;
+		margin-top: var(--space-xs);
 	}
 
 	.mood-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 4px 12px;
-		font-size: 11px;
+		gap: var(--space-xs) var(--space-lg);
+		font-size: var(--text-xs);
 		color: var(--text-secondary);
 		font-variant-numeric: tabular-nums;
-		margin-top: 4px;
+		margin-top: var(--space-xs);
 	}
 
 	.mood-item {
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: var(--space-xs);
 	}
 
 	.mood-dot {
-		width: 6px;
-		height: 6px;
-		border-radius: 50%;
+		width: var(--space-sm);
+		height: var(--space-sm);
+		border-radius: var(--radius-full);
 		flex-shrink: 0;
 	}
-
-	.add-to-set-btn {
-		border: 1px solid var(--accent);
-		color: var(--accent);
-		cursor: pointer;
-		background: transparent;
-		font-weight: 600;
-	}
-
-	.add-to-set-btn:hover {
-		background: var(--accent);
-		color: #000;
-	}
+	/* Mood family colors map to the nearest palette primitives (happy→green,
+	   sad→cyan, aggressive→red, relaxed→lilac) so the swatches stay tokenized.
+	   Each dot is paired with its word label + title, so color is never the
+	   only cue (content-conventions §4). */
+	.mood-dot--happy      { background: var(--green-500); }
+	.mood-dot--sad        { background: var(--cyan-500); }
+	.mood-dot--aggressive { background: var(--red-500); }
+	.mood-dot--relaxed    { background: var(--lilac-400); }
 
 	.add-to-set-popover {
 		position: relative;
 		background: var(--bg-primary);
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius-lg);
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 		z-index: 100;
 		max-width: 300px;
