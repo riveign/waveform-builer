@@ -577,11 +577,17 @@
 </div>
 
 <style>
+	/* Fixed-frame, internal-scroll surface — mirrors the sidebar `.library-browser`:
+	   the set's top bands (SetPicker toolbar, set-name/actions row, energy chart,
+	   analysis bar) stay pinned while ONLY the timeline rows / set grid scroll
+	   beneath them. `flex:1; min-height:0` fills the `.content-grid` frame; the frame
+	   itself never scrolls (`overflow:hidden`) so nothing slides under the navbar. */
 	.set-view {
+		flex: 1;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
-		height: 100%;
-		overflow-y: auto;
+		overflow: hidden;
 	}
 
 	/* Secondary band — set name + actions. Matches the sidebar's filter row:

@@ -104,9 +104,14 @@
 
 	/* Content-pane grid foundation (spec 023 shell). Carries the dense 16px gutter
 	   token and the page padding. Renders as a block for now so existing surfaces
-	   stay full-width — per-surface opt-in to a 12-col card grid is a later wave. */
+	   stay full-width — per-surface opt-in to a 12-col card grid is a later wave.
+	   Flex column + min-height:100% gives full-height surfaces (e.g. .set-view) a
+	   definite frame to fill (so they can host their OWN internal scroller, like the
+	   sidebar), while shorter surfaces still grow and let .tab-content scroll. */
 	.content-grid {
 		--grid-gutter: var(--space-xl);
+		display: flex;
+		flex-direction: column;
 		min-height: 100%;
 	}
 

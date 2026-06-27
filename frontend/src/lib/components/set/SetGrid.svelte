@@ -200,7 +200,11 @@
 </div>
 
 <style>
+	/* Fills the `.set-view` frame so the grid scrolls internally (the SetPicker band
+	   above it stays pinned), matching the loaded-set timeline behaviour. */
 	.set-grid-wrap {
+		flex: 1;
+		min-height: 0;
 		padding: 20px 24px;
 		overflow-y: auto;
 	}
