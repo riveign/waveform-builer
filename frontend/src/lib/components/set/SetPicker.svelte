@@ -102,26 +102,33 @@
 <ImportPlaylistDialog bind:open={importOpen} onimport={handleImport} />
 
 <style>
+	/* Toolbar band — matches the sidebar's search box: same --band-toolbar-h (48px)
+	   and the same zero top offset, so the "Choose a set…" selector's bottom edge /
+	   divider lands at the SAME y as the search box (spec 023 band rhythm). */
 	.set-picker {
-		padding: 10px 16px;
+		display: flex;
+		align-items: center;
+		padding: 0 var(--space-xl);
+		height: var(--band-toolbar-h);
 		border-bottom: 1px solid var(--border);
 	}
 
 	.picker-row {
 		display: flex;
-		gap: 8px;
+		gap: var(--space-md);
 		align-items: center;
+		width: 100%;
 	}
 
 	select {
 		flex: 1;
-		padding: 8px 10px;
-		font-size: 13px;
+		padding: var(--space-md) var(--space-lg);
+		font-size: var(--text-base);
 	}
 
 	.new-set-input {
-		padding: 8px 10px;
-		font-size: 13px;
+		padding: var(--space-md) var(--space-lg);
+		font-size: var(--text-base);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		background: var(--bg-secondary);
@@ -130,6 +137,6 @@
 
 	.dim {
 		color: var(--text-dim);
-		font-size: 13px;
+		font-size: var(--text-base);
 	}
 </style>

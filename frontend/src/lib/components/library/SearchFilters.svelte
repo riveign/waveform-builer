@@ -563,15 +563,15 @@
 		border-bottom: 1px solid var(--border);
 	}
 
-	/* ── Basic row ── */
-	/* The sidebar's first band. Fixed to --band-h (48px) so its bottom divider
-	   lands at the SAME y as the navbar's bottom border — the shared baseline that
-	   aligns the sidebar with the content pane (spec 023 alignment fix). */
+	/* ── Basic row (toolbar band) ── */
+	/* The sidebar's first band. Fixed to --band-toolbar-h (48px) so its bottom divider
+	   lands at the SAME y as the navbar bottom AND the Set view's "Choose a set…"
+	   selector — the shared baseline that aligns the panes (spec 023 band rhythm). */
 	.basic-row {
 		display: flex;
 		gap: var(--space-sm);
 		padding: 0 var(--space-lg);
-		height: var(--band-h);
+		height: var(--band-toolbar-h);
 		align-items: center;
 		border-bottom: 1px solid var(--border);
 	}
@@ -624,11 +624,17 @@
 		color: var(--text-primary);
 	}
 
-	/* ── Quick filters (Button primitives — pressed toggles) ── */
+	/* ── Quick filters (secondary band) ── */
+	/* The sidebar's second band (Recent/Plays/Unplayed/Played). Fixed to
+	   --band-secondary-h (44px) + border-bottom so its divider lands at the SAME y
+	   as the Set view's set name/actions row — second shared baseline. */
 	.quick-filters {
 		display: flex;
 		gap: var(--space-xs);
-		padding: var(--space-sm) var(--space-lg);
+		padding: 0 var(--space-lg);
+		height: var(--band-secondary-h);
+		align-items: center;
+		border-bottom: 1px solid var(--border);
 	}
 
 	/* Leading glyph inside a quick-filter Button label. */

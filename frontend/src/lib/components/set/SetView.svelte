@@ -584,11 +584,15 @@
 		overflow-y: auto;
 	}
 
+	/* Secondary band — set name + actions. Matches the sidebar's filter row:
+	   same --band-secondary-h (44px) + border-bottom, so this divider lands at the
+	   SAME y as the Recent/Plays/Unplayed/Played row (spec 023 band rhythm). */
 	.timeline-controls {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		padding: 8px 16px;
+		gap: var(--space-lg);
+		padding: 0 var(--space-xl);
+		height: var(--band-secondary-h);
 		border-bottom: 1px solid var(--border);
 	}
 
