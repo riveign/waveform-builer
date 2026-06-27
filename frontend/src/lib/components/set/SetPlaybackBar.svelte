@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { formatTime } from '$lib/utils/waveform';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	const pb = getPlaybackStore();
 
@@ -22,39 +23,55 @@
 
 		<div class="bar-center">
 			<div class="transport">
-				<button
-					class="transport-btn"
+				<Button
+					iconOnly
+					shape="round"
+					variant="secondary"
+					size="sm"
+					ariaLabel="Previous track"
+					title="Previous (ArrowLeft)"
 					onclick={() => pb.previous()}
 					disabled={pb.currentIndex <= 0}
-					title="Previous (ArrowLeft)"
 				>
-					&#x23EE;
-				</button>
+					{#snippet icon()}&#x23EE;{/snippet}
+				</Button>
 
-				<button
-					class="transport-btn play"
-					onclick={() => pb.togglePlayPause()}
+				<Button
+					iconOnly
+					shape="round"
+					variant="primary"
+					size="md"
+					ariaLabel={pb.status === 'playing' || pb.status === 'transitioning' ? 'Pause' : 'Play'}
 					title="Play/Pause (Space)"
+					onclick={() => pb.togglePlayPause()}
 				>
-					{pb.status === 'playing' || pb.status === 'transitioning' ? '\u23F8' : '\u25B6'}
-				</button>
+					{#snippet icon()}{pb.status === 'playing' || pb.status === 'transitioning' ? '\u23F8' : '\u25B6'}{/snippet}
+				</Button>
 
-				<button
-					class="transport-btn"
+				<Button
+					iconOnly
+					shape="round"
+					variant="secondary"
+					size="sm"
+					ariaLabel="Next track"
+					title="Next (ArrowRight)"
 					onclick={() => pb.next()}
 					disabled={pb.currentIndex >= pb.tracks.length - 1}
-					title="Next (ArrowRight)"
 				>
-					&#x23ED;
-				</button>
+					{#snippet icon()}&#x23ED;{/snippet}
+				</Button>
 
-				<button
-					class="transport-btn stop"
-					onclick={() => pb.stop()}
+				<Button
+					iconOnly
+					shape="round"
+					variant="danger"
+					size="sm"
+					ariaLabel="Stop playback"
 					title="Stop (Escape)"
+					onclick={() => pb.stop()}
 				>
-					&#x23F9;
-				</button>
+					{#snippet icon()}&#x23F9;{/snippet}
+				</Button>
 			</div>
 
 			<div class="progress-row">
@@ -179,46 +196,6 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-md);
-	}
-
-	.transport-btn {
-		width: 28px;
-		height: 28px;
-		border-radius: var(--radius-full);
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
-		font-size: var(--text-sm);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: background var(--dur-fast) var(--ease-standard);
-		border: 1px solid var(--border);
-	}
-
-	.transport-btn:hover:not(:disabled) {
-		background: var(--bg-hover);
-	}
-
-	.transport-btn:disabled {
-		opacity: 0.3;
-		cursor: default;
-	}
-
-	.transport-btn.play {
-		width: 34px;
-		height: 34px;
-		background: var(--accent);
-		color: var(--on-accent);
-		font-size: var(--text-md);
-		border-color: var(--accent);
-	}
-
-	.transport-btn.play:hover {
-		opacity: 0.85;
-	}
-
-	.transport-btn.stop {
-		font-size: var(--text-2xs);
 	}
 
 	.progress-row {

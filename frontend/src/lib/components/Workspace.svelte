@@ -7,11 +7,23 @@
 	import AlbumsView from './library/AlbumsView.svelte';
 	import SetPlaybackBar from './set/SetPlaybackBar.svelte';
 	import PlaybackDeck from './set/PlaybackDeck.svelte';
+	import SegmentedControl, { type SegmentOption } from './primitives/SegmentedControl.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 
 	const ui = getUiStore();
 	const pb = getPlaybackStore();
+
+	type TabId = 'track' | 'set' | 'dna' | 'tinder' | 'hunt' | 'albums';
+
+	const tabs: SegmentOption<TabId>[] = [
+		{ value: 'track', label: 'Track view', shortcut: '1' },
+		{ value: 'set', label: 'Set timeline', shortcut: '2' },
+		{ value: 'dna', label: 'Taste DNA', shortcut: '3' },
+		{ value: 'tinder', label: 'Energy tinder', shortcut: '4' },
+		{ value: 'hunt', label: 'Track hunter', shortcut: '5' },
+		{ value: 'albums', label: 'Albums', shortcut: '6' },
+	];
 
 	function handleKeydown(e: KeyboardEvent) {
 		const target = e.target as HTMLElement;
@@ -41,24 +53,12 @@
 
 <div class="workspace">
 	<div class="tab-bar">
-		<button class="tab" class:active={ui.activeTab === 'track'} onclick={() => ui.activeTab = 'track'}>
-			Track View <span class="shortcut">1</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'set'} onclick={() => ui.activeTab = 'set'}>
-			Set Timeline <span class="shortcut">2</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'dna'} onclick={() => ui.activeTab = 'dna'}>
-			Taste DNA <span class="shortcut">3</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'tinder'} onclick={() => ui.activeTab = 'tinder'}>
-			Energy Tinder <span class="shortcut">4</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'hunt'} onclick={() => ui.activeTab = 'hunt'}>
-			Track Hunter <span class="shortcut">5</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'albums'} onclick={() => ui.activeTab = 'albums'}>
-			Albums <span class="shortcut">6</span>
-		</button>
+		<SegmentedControl
+			options={tabs}
+			value={ui.activeTab as TabId}
+			onchange={(v) => (ui.activeTab = v)}
+			ariaLabel="Workspace views"
+		/>
 	</div>
 	<div class="tab-content">
 		{#if ui.activeTab === 'track'}
@@ -116,33 +116,6 @@
 		background: var(--bg-secondary);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
-	}
-
-	.tab {
-		padding: var(--space-md) var(--space-2xl);
-		font-size: var(--text-base);
-		color: var(--text-secondary);
-		border-bottom: 2px solid transparent;
-		transition: color var(--dur-fast) var(--ease-standard),
-		            background var(--dur-fast) var(--ease-standard),
-		            border-color var(--dur-fast) var(--ease-standard);
-	}
-
-	.tab:hover {
-		color: var(--text-primary);
-		background: var(--bg-hover);
-	}
-
-	.tab.active {
-		color: var(--accent);
-		border-bottom-color: var(--accent);
-	}
-
-	.shortcut {
-		font-size: var(--text-2xs);
-		color: var(--text-dim);
-		margin-left: var(--space-xs);
-		opacity: 0.6;
 	}
 
 	.tab-content {

@@ -1,5 +1,8 @@
 <script lang="ts">
 	import Button from '$lib/components/primitives/Button.svelte';
+	import SegmentedControl, {
+		type SegmentOption,
+	} from '$lib/components/primitives/SegmentedControl.svelte';
 	import Stack from '$lib/components/primitives/Stack.svelte';
 	import Grid from '$lib/components/primitives/Grid.svelte';
 	import SimilarTrackCard from '$lib/components/library/SimilarTrackCard.svelte';
@@ -26,6 +29,19 @@
 
 	// Interactive rating demo — clicking a star updates this local value live.
 	let demoRating = $state(3);
+
+	// Toggle/pressed demo — the BPM-match toggle reads as on/off without color.
+	let bpmMatchOn = $state(true);
+	let likedOn = $state(false);
+
+	// Segmented-control demo — a mutually-exclusive view switcher.
+	type DemoView = 'flow' | 'grid' | 'detail';
+	const demoSegments: SegmentOption<DemoView>[] = [
+		{ value: 'flow', label: 'Flow' },
+		{ value: 'grid', label: 'Grid' },
+		{ value: 'detail', label: 'Detail' },
+	];
+	let demoView = $state<DemoView>('flow');
 
 	// Removable-filter demo for the chip section — the × actually drops the chip.
 	let filterChips = $state(['Techno', 'deadmau5', 'Anjunadeep']);
@@ -403,6 +419,99 @@
 					</div>
 				</div>
 			{/each}
+		</Stack>
+	</section>
+
+	<!-- 7b. ICON-ONLY BUTTONS -->
+	<section class="ds__section">
+		<h2>Icon buttons</h2>
+		<p class="ds__note">
+			Icon-only buttons square off per size tier — sm is 32px, md/lg are 36/40px — so every one clears
+			the ≈32px target. Each carries a required <code>ariaLabel</code> and a hover <code>title</code>, so
+			the glyph is never the only signal. The round shape powers the transport controls in the player and
+			set bars.
+		</p>
+		<div class="btn-row">
+			<span class="btn-row__label">square</span>
+			<div class="cluster cluster--md">
+				<Button iconOnly size="sm" variant="secondary" ariaLabel="Add to set" title="Add to set">
+					{#snippet icon()}+{/snippet}
+				</Button>
+				<Button iconOnly size="md" variant="secondary" ariaLabel="More actions" title="More actions">
+					{#snippet icon()}⋮{/snippet}
+				</Button>
+				<Button iconOnly size="lg" variant="primary" ariaLabel="Play" title="Play">
+					{#snippet icon()}▶{/snippet}
+				</Button>
+				<Button iconOnly size="md" variant="secondary" disabled ariaLabel="Previous" title="Previous">
+					{#snippet icon()}&#x23EE;{/snippet}
+				</Button>
+			</div>
+		</div>
+		<div class="btn-row">
+			<span class="btn-row__label">round</span>
+			<div class="cluster cluster--md">
+				<Button iconOnly shape="round" size="sm" variant="secondary" ariaLabel="Previous track" title="Previous">
+					{#snippet icon()}&#x23EE;{/snippet}
+				</Button>
+				<Button iconOnly shape="round" size="md" variant="primary" ariaLabel="Play" title="Play">
+					{#snippet icon()}▶{/snippet}
+				</Button>
+				<Button iconOnly shape="round" size="sm" variant="secondary" ariaLabel="Next track" title="Next">
+					{#snippet icon()}&#x23ED;{/snippet}
+				</Button>
+				<Button iconOnly shape="round" size="sm" variant="danger" ariaLabel="Stop playback" title="Stop">
+					{#snippet icon()}&#x23F9;{/snippet}
+				</Button>
+			</div>
+		</div>
+	</section>
+
+	<!-- 7c. TOGGLE / PRESSED -->
+	<section class="ds__section">
+		<h2>Toggle buttons</h2>
+		<p class="ds__note">
+			A toggle advertises <code>aria-pressed</code> and shows its selected state without relying on color
+			— the label gains weight and an underline, reinforced by the surface shift. Click to flip; the state
+			reads the same in monochrome.
+		</p>
+		<div class="cluster cluster--md">
+			<Button variant="ghost" pressed={bpmMatchOn} onclick={() => (bpmMatchOn = !bpmMatchOn)}>
+				BPM match
+			</Button>
+			<Button variant="secondary" pressed={likedOn} onclick={() => (likedOn = !likedOn)}>
+				{likedOn ? 'Liked' : 'Like'}
+			</Button>
+			<Button
+				iconOnly
+				pressed={likedOn}
+				variant="secondary"
+				ariaLabel={likedOn ? 'Remove from favorites' : 'Add to favorites'}
+				title="Favorite"
+				onclick={() => (likedOn = !likedOn)}
+			>
+				{#snippet icon()}{likedOn ? '★' : '☆'}{/snippet}
+			</Button>
+		</div>
+	</section>
+
+	<!-- 7d. SEGMENTED CONTROL -->
+	<section class="ds__section">
+		<h2>Segmented control</h2>
+		<p class="ds__note">
+			A set of mutually-exclusive options as one underline-active control — a <code>tablist</code> with
+			roving focus. Arrow keys (and Home/End) move between segments and select; only one is active at a
+			time. The active segment reads via weight plus the accent underline. This is what drives the
+			workspace tab switcher.
+		</p>
+		<Stack gap="var(--space-lg)">
+			<SegmentedControl
+				options={demoSegments}
+				value={demoView}
+				onchange={(v) => (demoView = v)}
+				ariaLabel="Demo views"
+			/>
+			<span class="ds__note">Showing: <strong>{demoView}</strong></span>
 		</Stack>
 	</section>
 

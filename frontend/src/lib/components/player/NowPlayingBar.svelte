@@ -6,6 +6,7 @@
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { getWaveformOverview } from '$lib/api/waveforms';
 	import { consumePreloadedAudio } from '$lib/utils/audio-preload';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	const player = getPlayerStore();
 
@@ -174,36 +175,44 @@
 		<!-- Center: Transport + Waveform + Progress -->
 		<div class="bar-center">
 			<div class="transport">
-				<button
-					class="transport-btn"
+				<Button
+					iconOnly
+					shape="round"
+					variant="secondary"
+					size="sm"
+					ariaLabel="Previous track"
+					title="Previous"
 					onclick={() => player.previous()}
 					disabled={!player.hasPrevious}
-					title="Previous"
 				>
-					&#x23EE;
-				</button>
+					{#snippet icon()}&#x23EE;{/snippet}
+				</Button>
 
-				<button
-					class="transport-btn play"
-					onclick={() => player.togglePlay()}
-					disabled={player.status === 'loading'}
+				<Button
+					iconOnly
+					shape="round"
+					variant="primary"
+					size="md"
+					ariaLabel={player.isPlaying ? 'Pause' : 'Play'}
 					title={player.isPlaying ? 'Pause' : 'Play'}
+					loading={player.status === 'loading'}
+					onclick={() => player.togglePlay()}
 				>
-					{#if player.status === 'loading'}
-						<span class="loading-spinner"></span>
-					{:else}
-						{player.isPlaying ? '\u23F8' : '\u25B6'}
-					{/if}
-				</button>
+					{#snippet icon()}{player.isPlaying ? '\u23F8' : '\u25B6'}{/snippet}
+				</Button>
 
-				<button
-					class="transport-btn"
+				<Button
+					iconOnly
+					shape="round"
+					variant="secondary"
+					size="sm"
+					ariaLabel="Next track"
+					title="Next"
 					onclick={() => player.next()}
 					disabled={!player.hasNext}
-					title="Next"
 				>
-					&#x23ED;
-				</button>
+					{#snippet icon()}&#x23ED;{/snippet}
+				</Button>
 			</div>
 
 			<div class="waveform-section">
@@ -336,55 +345,6 @@
 		align-items: center;
 		gap: var(--space-sm);
 		flex-shrink: 0;
-	}
-
-	.transport-btn {
-		width: 28px;
-		height: 28px;
-		border-radius: var(--radius-full);
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
-		font-size: var(--text-sm);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: background var(--dur-fast) var(--ease-standard);
-		border: 1px solid var(--border);
-	}
-
-	.transport-btn:hover:not(:disabled) {
-		background: var(--bg-hover);
-	}
-
-	.transport-btn:disabled {
-		opacity: 0.3;
-		cursor: default;
-	}
-
-	.transport-btn.play {
-		width: 34px;
-		height: 34px;
-		background: var(--accent);
-		color: var(--on-accent);
-		font-size: var(--text-md);
-		border-color: var(--accent);
-	}
-
-	.transport-btn.play:hover:not(:disabled) {
-		opacity: 0.85;
-	}
-
-	.loading-spinner {
-		width: 14px;
-		height: 14px;
-		border: 2px solid color-mix(in srgb, var(--on-accent) 30%, transparent);
-		border-top-color: var(--on-accent);
-		border-radius: var(--radius-full);
-		animation: spin 0.6s linear infinite;
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
 	}
 
 	/* ── Waveform section ── */
