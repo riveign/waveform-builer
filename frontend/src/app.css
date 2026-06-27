@@ -35,6 +35,7 @@
 	   Heights land on the 4px spacing grid and hold a 36px --btn-height control centered. */
 	--band-toolbar-h: var(--band-h);  /* 48px — first band on every pane */
 	--band-secondary-h: 44px;         /* 36px control + 4px top/bottom; second band */
+	--playback-bar-h: 72px;           /* NowPlayingBar height — drives content bottom-pad so the last rows clear the fixed bar */
 
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	color: var(--text-primary);

@@ -81,6 +81,12 @@
 		background: var(--bg-secondary);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
+		/* Pin the chrome to the top of the shell. In the fixed-frame model the body
+		   scrolls internally, so sticky keeps the navbar above any in-pane sticky
+		   bands (z 5) and content rows. */
+		position: sticky;
+		top: 0;
+		z-index: 50;
 	}
 
 	.app-logo {
@@ -131,6 +137,8 @@
 	}
 
 	.app-body.has-player {
-		padding-bottom: 72px;
+		/* Clear the fixed NowPlayingBar so the sidebar's internal list + the content
+		   pane don't hide their last rows behind it. Token, not a magic number. */
+		padding-bottom: var(--playback-bar-h);
 	}
 </style>

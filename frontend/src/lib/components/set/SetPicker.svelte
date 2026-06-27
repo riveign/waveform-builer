@@ -111,6 +111,13 @@
 		padding: 0 var(--space-xl);
 		height: var(--band-toolbar-h);
 		border-bottom: 1px solid var(--border);
+		/* First content-pane band: stays put at the top of the content scroll so the
+		   "Choose a set…" selector keeps aligning with the sidebar's search band.
+		   Opaque background so scrolling content doesn't bleed through. */
+		position: sticky;
+		top: 0;
+		z-index: 5;
+		background: var(--bg-primary);
 	}
 
 	.picker-row {

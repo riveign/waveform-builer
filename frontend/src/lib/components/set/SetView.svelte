@@ -594,6 +594,13 @@
 		padding: 0 var(--space-xl);
 		height: var(--band-secondary-h);
 		border-bottom: 1px solid var(--border);
+		/* Second content-pane band: sticks directly beneath the SetPicker toolbar band
+		   (offset by --band-toolbar-h) so the set name/actions row stays visible and
+		   keeps aligning with the sidebar's filter row. Opaque so rows don't bleed. */
+		position: sticky;
+		top: var(--band-toolbar-h);
+		z-index: 4;
+		background: var(--bg-primary);
 	}
 
 	.set-name {
