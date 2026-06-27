@@ -23,8 +23,11 @@
 	--energy-mid: var(--orange-500);
 	--energy-high: var(--red-500);
 	--waveform-bg: var(--surface-waveform);
-	--panel-width: 500px;
+	/* ── Dashboard shell tokens (spec 023 grid restructure) ── */
+	--panel-width: 380px;            /* sidebar width — trimmed 500→380 to free content cols */
 	--header-height: 48px;
+	--band-h: var(--header-height);  /* shared header-band height: navbar + sidebar first divider */
+	--page-pad: var(--space-xl);     /* content-pane inner padding (page margins, 16px) */
 
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	color: var(--text-primary);

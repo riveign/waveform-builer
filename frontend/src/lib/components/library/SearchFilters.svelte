@@ -564,11 +564,16 @@
 	}
 
 	/* ── Basic row ── */
+	/* The sidebar's first band. Fixed to --band-h (48px) so its bottom divider
+	   lands at the SAME y as the navbar's bottom border — the shared baseline that
+	   aligns the sidebar with the content pane (spec 023 alignment fix). */
 	.basic-row {
 		display: flex;
-		gap: 6px;
-		padding: 8px 10px;
+		gap: var(--space-sm);
+		padding: 0 var(--space-lg);
+		height: var(--band-h);
 		align-items: center;
+		border-bottom: 1px solid var(--border);
 	}
 
 	.search-box {
@@ -578,8 +583,8 @@
 		background: var(--bg-tertiary);
 		border: 1px solid var(--border);
 		border-radius: 6px;
-		padding: 0 8px;
-		gap: 6px;
+		padding: 0 var(--space-md);
+		gap: var(--space-sm);
 	}
 
 	.search-box:focus-within {
@@ -596,8 +601,8 @@
 		flex: 1;
 		border: none;
 		background: none;
-		padding: 7px 0;
-		font-size: 13px;
+		padding: var(--space-sm) 0;
+		font-size: var(--text-base);
 		color: var(--text-primary);
 		outline: none;
 		min-width: 0;
@@ -623,7 +628,7 @@
 	.quick-filters {
 		display: flex;
 		gap: var(--space-xs);
-		padding: 0 var(--space-lg) var(--space-sm);
+		padding: var(--space-sm) var(--space-lg);
 	}
 
 	/* Leading glyph inside a quick-filter Button label. */
@@ -646,13 +651,13 @@
 	.advanced {
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
-		padding: 0 10px 10px;
+		gap: var(--space-lg);
+		padding: 0 var(--space-lg) var(--space-lg);
 	}
 
 	.typeahead-row {
 		flex-direction: row;
-		gap: 10px;
+		gap: var(--space-lg);
 	}
 
 	.typeahead-field {
@@ -663,7 +668,7 @@
 	.section {
 		display: flex;
 		flex-direction: column;
-		gap: 5px;
+		gap: var(--space-sm);
 	}
 
 	.section-header {
@@ -816,7 +821,7 @@
 	/* ── Bottom row: BPM, Energy, Rating ── */
 	.bottom-row {
 		flex-direction: row;
-		gap: 10px;
+		gap: var(--space-lg);
 		flex-wrap: wrap;
 	}
 
@@ -838,7 +843,7 @@
 	.bpm-inputs {
 		display: flex;
 		align-items: center;
-		gap: 4px;
+		gap: var(--space-xs);
 	}
 
 	.bpm-sep {
@@ -850,8 +855,8 @@
 	.small-input {
 		flex: 1;
 		min-width: 0;
-		padding: 5px 6px;
-		font-size: 12px;
+		padding: var(--space-sm);
+		font-size: var(--text-sm);
 		background: var(--bg-tertiary);
 		border: 1px solid var(--border);
 		border-radius: 4px;
@@ -868,8 +873,8 @@
 	}
 
 	.small-select {
-		padding: 5px 6px;
-		font-size: 12px;
+		padding: var(--space-sm);
+		font-size: var(--text-sm);
 		background: var(--bg-tertiary);
 		border: 1px solid var(--border);
 		border-radius: 4px;

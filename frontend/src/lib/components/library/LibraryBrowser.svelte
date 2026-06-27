@@ -50,10 +50,10 @@
 	}
 
 	.status {
-		padding: 20px;
+		padding: var(--space-2xl);
 		text-align: center;
 		color: var(--text-secondary);
-		font-size: 13px;
+		font-size: var(--text-base);
 	}
 
 	.status.error {
@@ -61,15 +61,15 @@
 	}
 
 	.track-count {
-		padding: 4px 10px;
-		font-size: 11px;
+		padding: var(--space-sm) var(--space-lg);
+		font-size: var(--text-xs);
 		color: var(--text-dim);
 		border-bottom: 1px solid var(--border);
 	}
 
 	.fuzzy-note {
-		padding: 5px 10px;
-		font-size: 11px;
+		padding: var(--space-sm) var(--space-lg);
+		font-size: var(--text-xs);
 		color: var(--accent);
 		background: var(--bg-tertiary);
 	}

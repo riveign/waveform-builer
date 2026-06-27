@@ -7,24 +7,14 @@
 	import AlbumsView from './library/AlbumsView.svelte';
 	import SetPlaybackBar from './set/SetPlaybackBar.svelte';
 	import PlaybackDeck from './set/PlaybackDeck.svelte';
-	import SegmentedControl, { type SegmentOption } from './primitives/SegmentedControl.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 
 	const ui = getUiStore();
 	const pb = getPlaybackStore();
 
-	type TabId = 'track' | 'set' | 'dna' | 'tinder' | 'hunt' | 'albums';
-
-	const tabs: SegmentOption<TabId>[] = [
-		{ value: 'track', label: 'Track view', shortcut: '1' },
-		{ value: 'set', label: 'Set timeline', shortcut: '2' },
-		{ value: 'dna', label: 'Taste DNA', shortcut: '3' },
-		{ value: 'tinder', label: 'Energy tinder', shortcut: '4' },
-		{ value: 'hunt', label: 'Track hunter', shortcut: '5' },
-		{ value: 'albums', label: 'Albums', shortcut: '6' },
-	];
-
+	// Tab strip now lives in the navbar (+layout.svelte). This component owns the
+	// tab CONTENT switch + the 1–6 number-key shortcuts below.
 	function handleKeydown(e: KeyboardEvent) {
 		const target = e.target as HTMLElement;
 		if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
@@ -52,34 +42,30 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="workspace">
-	<div class="tab-bar">
-		<SegmentedControl
-			options={tabs}
-			value={ui.activeTab as TabId}
-			onchange={(v) => (ui.activeTab = v)}
-			ariaLabel="Workspace views"
-		/>
-	</div>
 	<div class="tab-content">
-		{#if ui.activeTab === 'track'}
-			{#if ui.selectedTrack}
-				<TrackView track={ui.selectedTrack} />
-			{:else}
-				<div class="empty-state">
-					<p>Choose a track to explore its sound</p>
-				</div>
+		<!-- Content-pane grid foundation. Surfaces render full-width for now; the
+		     .grid-12--content host is ready for per-surface card grids (deferred). -->
+		<div class="content-grid">
+			{#if ui.activeTab === 'track'}
+				{#if ui.selectedTrack}
+					<TrackView track={ui.selectedTrack} />
+				{:else}
+					<div class="empty-state">
+						<p>Choose a track to explore its sound</p>
+					</div>
+				{/if}
+			{:else if ui.activeTab === 'set'}
+				<SetView />
+			{:else if ui.activeTab === 'dna'}
+				<DnaView />
+			{:else if ui.activeTab === 'tinder'}
+				<EnergyTinder />
+			{:else if ui.activeTab === 'hunt'}
+				<HuntView />
+			{:else if ui.activeTab === 'albums'}
+				<AlbumsView />
 			{/if}
-		{:else if ui.activeTab === 'set'}
-			<SetView />
-		{:else if ui.activeTab === 'dna'}
-			<DnaView />
-		{:else if ui.activeTab === 'tinder'}
-			<EnergyTinder />
-		{:else if ui.activeTab === 'hunt'}
-			<HuntView />
-		{:else if ui.activeTab === 'albums'}
-			<AlbumsView />
-		{/if}
+		</div>
 	</div>
 
 	{#if pb.isActive}
@@ -111,16 +97,17 @@
 		overflow: hidden;
 	}
 
-	.tab-bar {
-		display: flex;
-		background: var(--bg-secondary);
-		border-bottom: 1px solid var(--border);
-		flex-shrink: 0;
-	}
-
 	.tab-content {
 		flex: 1;
 		overflow-y: auto;
+	}
+
+	/* Content-pane grid foundation (spec 023 shell). Carries the dense 16px gutter
+	   token and the page padding. Renders as a block for now so existing surfaces
+	   stay full-width — per-surface opt-in to a 12-col card grid is a later wave. */
+	.content-grid {
+		--grid-gutter: var(--space-xl);
+		min-height: 100%;
 	}
 
 	.empty-state {

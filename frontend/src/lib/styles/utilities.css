@@ -11,6 +11,8 @@
 	gap: var(--grid-gutter, var(--space-4xl));
 }
 .grid-12--condensed { --grid-gutter: var(--space-xl); } /* 16px */
+/* Dense-dashboard gutter for app content panes (distinct from the 32px showcase default). */
+.grid-12--content { --grid-gutter: var(--space-xl); } /* 16px */
 
 .col-span-1  { grid-column: span 1;  }
 .col-span-2  { grid-column: span 2;  }
