@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Chip from '../primitives/Chip.svelte';
+
 	let {
 		placeholder = 'Search...',
 		selected = $bindable<string[]>([]),
@@ -82,9 +84,15 @@
 	{#if selected.length > 0}
 		<div class="selected-items">
 			{#each selected as item}
-				<button class="selected-chip" type="button" onclick={() => removeItem(item)}>
-					{item} <span class="chip-x">&times;</span>
-				</button>
+				<Chip
+					value={item}
+					size="sm"
+					tone="accent"
+					title={item}
+					removable
+					removeLabel="Remove {item}"
+					onremove={() => removeItem(item)}
+				/>
 			{/each}
 		</div>
 	{/if}
@@ -126,33 +134,7 @@
 	.selected-items {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 3px;
-	}
-
-	.selected-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 3px;
-		font-size: 10px;
-		padding: 2px 7px;
-		border-radius: 10px;
-		background: var(--accent);
-		border: 1px solid var(--accent);
-		color: #000;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.1s;
-	}
-
-	.selected-chip:hover {
-		background: var(--accent-dim);
-		border-color: var(--accent-dim);
-	}
-
-	.chip-x {
-		font-size: 12px;
-		line-height: 1;
-		opacity: 0.7;
+		gap: var(--space-xs);
 	}
 
 	.input-wrap {

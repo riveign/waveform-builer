@@ -8,6 +8,7 @@
 	import { prefetchPeaks } from '$lib/api/waveforms';
 	import { updateTrackRating } from '$lib/api/tracks';
 	import Menu from '../primitives/Menu.svelte';
+	import Button from '../primitives/Button.svelte';
 	import TrackContextMenu from './TrackContextMenu.svelte';
 	import StarRating from './StarRating.svelte';
 
@@ -92,18 +93,19 @@
 					}}
 				>
 					<td class="col-play">
-						<button
-							class="play-btn"
-							class:playing={isCurrentTrack && player.isPlaying}
-							onclick={(e) => handlePlay(e, track)}
-							title={isCurrentTrack && player.isPlaying ? 'Pause' : 'Play'}
-						>
-							{#if isCurrentTrack && player.isPlaying}
-								&#x23F8;
-							{:else}
-								&#x25B6;
-							{/if}
-						</button>
+						<span class="play-slot" class:playing={isCurrentTrack && player.isPlaying}>
+							<Button
+								iconOnly
+								shape="round"
+								variant="ghost"
+								size="sm"
+								onclick={(e) => handlePlay(e, track)}
+								ariaLabel={isCurrentTrack && player.isPlaying ? 'Pause' : 'Play'}
+								title={isCurrentTrack && player.isPlaying ? 'Pause' : 'Play'}
+							>
+								{#snippet icon()}{#if isCurrentTrack && player.isPlaying}&#x23F8;{:else}&#x25B6;{/if}{/snippet}
+							</Button>
+						</span>
 					</td>
 					<td class="col-title" title={track.title ?? ''}>
 						{track.title ?? '?'}
@@ -231,33 +233,26 @@
 	.col-plays { width: 30px; text-align: right; }
 	.col-rating { width: 62px; }
 
-	.play-btn {
+	/* The play control is a Button primitive (iconOnly round). The hover-reveal +
+	   the tight 26px column fit live on this wrapper so the table owns row state
+	   without the primitive needing a per-row class. */
+	.play-slot {
+		display: inline-flex;
+		opacity: 0;
+		transition: opacity var(--dur-fast, 0.15s) var(--ease-standard, ease);
+	}
+	.play-slot :global(.btn--icon.btn--sm) {
 		width: 22px;
 		height: 22px;
-		border-radius: 50%;
-		background: transparent;
-		color: var(--text-dim);
-		font-size: 9px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: all 0.15s;
-		border: none;
-		cursor: pointer;
-		opacity: 0;
+		font-size: var(--text-2xs);
 	}
 
-	.track-row:hover .play-btn,
-	.play-btn.playing {
+	.track-row:hover .play-slot,
+	.play-slot.playing {
 		opacity: 1;
 	}
 
-	.play-btn.playing {
-		color: var(--accent);
-	}
-
-	.play-btn:hover {
-		background: var(--bg-tertiary);
+	.play-slot.playing :global(.btn) {
 		color: var(--accent);
 	}
 

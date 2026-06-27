@@ -4,6 +4,8 @@
 	import { fetchJson } from '$lib/api/client';
 	import { CAMELOT_COLORS } from '$lib/utils/camelot';
 	import Typeahead from './Typeahead.svelte';
+	import Button from '../primitives/Button.svelte';
+	import Chip from '../primitives/Chip.svelte';
 
 	interface GenreFamily {
 		family_name: string;
@@ -247,121 +249,138 @@
 				>&times;</button>
 			{/if}
 		</div>
-		<button
-			class="adv-toggle"
-			class:adv-toggle-active={showAdvanced}
-			type="button"
+		<Button
+			iconOnly
+			size="sm"
+			variant="secondary"
+			pressed={showAdvanced}
 			onclick={toggleAdvanced}
-			aria-label="Toggle advanced filters"
+			ariaLabel="Toggle advanced filters"
 			title="Advanced filters"
 		>
-			<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-				<path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-			</svg>
-		</button>
+			{#snippet icon()}
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+					<path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+				</svg>
+			{/snippet}
+		</Button>
 	</div>
 
 	<!-- Quick filters -->
 	<div class="quick-filters">
-		<button
-			class="quick-btn"
-			class:quick-btn-active={sortRecent}
-			type="button"
-			onclick={toggleRecent}
-		>
-			<svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-				<circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" fill="none"/>
-				<path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-			</svg>
+		<Button size="sm" variant="ghost" pressed={sortRecent} onclick={toggleRecent}>
+			<span class="quick-glyph" aria-hidden="true">
+				<svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+					<circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" fill="none"/>
+					<path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+			</span>
 			Recent
-		</button>
-		<button
-			class="quick-btn"
-			class:quick-btn-active={sortPlays !== ''}
-			type="button"
+		</Button>
+		<Button
+			size="sm"
+			variant="ghost"
+			pressed={sortPlays !== ''}
 			onclick={togglePlaysSort}
 			title="Click to cycle: Most played → Least played → Off"
 		>
-			{#if sortPlays === 'plays'}&#x25BC;{:else if sortPlays === 'plays_asc'}&#x25B2;{:else}&#x266B;{/if}
+			<span class="quick-glyph" aria-hidden="true">{#if sortPlays === 'plays'}&#x25BC;{:else if sortPlays === 'plays_asc'}&#x25B2;{:else}&#x266B;{/if}</span>
 			Plays
-		</button>
-		<button
-			class="quick-btn"
-			class:quick-btn-active={playsFilter === 'unplayed'}
-			type="button"
-			onclick={() => togglePlaysFilter('unplayed')}
-		>
+		</Button>
+		<Button size="sm" variant="ghost" pressed={playsFilter === 'unplayed'} onclick={() => togglePlaysFilter('unplayed')}>
 			Unplayed
-		</button>
-		<button
-			class="quick-btn"
-			class:quick-btn-active={playsFilter === 'played'}
-			type="button"
-			onclick={() => togglePlaysFilter('played')}
-		>
+		</Button>
+		<Button size="sm" variant="ghost" pressed={playsFilter === 'played'} onclick={() => togglePlaysFilter('played')}>
 			Played
-		</button>
+		</Button>
 	</div>
 
 	<!-- Active filter chips -->
 	{#if hasActiveFilters}
 		<div class="active-chips">
 			{#each selectedArtists as a}
-				<button class="chip chip-artist" type="button" onclick={() => { selectedArtists = selectedArtists.filter(x => x !== a); }}>
-					{a} <span class="chip-x">&times;</span>
-				</button>
+				<Chip
+					value={a}
+					size="sm"
+					title="Artist: {a}"
+					removable
+					removeLabel="Remove artist {a}"
+					onremove={() => { selectedArtists = selectedArtists.filter(x => x !== a); }}
+				/>
 			{/each}
 			{#each selectedLabels as lb}
-				<button class="chip chip-label" type="button" onclick={() => { selectedLabels = selectedLabels.filter(x => x !== lb); }}>
-					{lb} <span class="chip-x">&times;</span>
-				</button>
+				<Chip
+					value={lb}
+					size="sm"
+					title="Label: {lb}"
+					removable
+					removeLabel="Remove label {lb}"
+					onremove={() => { selectedLabels = selectedLabels.filter(x => x !== lb); }}
+				/>
 			{/each}
 			{#each [...selectedGenres] as g}
-				<button class="chip chip-genre" type="button" onclick={() => removeGenre(g)}>
-					{g} <span class="chip-x">&times;</span>
-				</button>
+				<Chip
+					variant="genre"
+					value={g}
+					size="sm"
+					title="Genre: {g}"
+					removable
+					removeLabel="Remove genre {g}"
+					onremove={() => removeGenre(g)}
+				/>
 			{/each}
 			{#each [...selectedKeys] as k}
-				<button class="chip chip-key" type="button" onclick={() => removeKey(k)} style="border-color: {CAMELOT_COLORS[k] ?? '#666'}">
-					{k} <span class="chip-x">&times;</span>
-				</button>
+				<Chip
+					variant="key"
+					value={k}
+					color={CAMELOT_COLORS[k]}
+					size="sm"
+					title="Camelot key {k}"
+					removable
+					removeLabel="Remove key {k}"
+					onremove={() => removeKey(k)}
+				/>
 			{/each}
 			{#if bpmMin !== null || bpmMax !== null}
-				<button class="chip" type="button" onclick={clearBpm}>
-					BPM {bpmMin ?? '?'}-{bpmMax ?? '?'} <span class="chip-x">&times;</span>
-				</button>
+				<Chip
+					value="BPM {bpmMin ?? '?'}-{bpmMax ?? '?'}"
+					size="sm"
+					removable
+					removeLabel="Clear BPM filter"
+					onremove={clearBpm}
+				/>
 			{/if}
 			{#if energy}
-				<button class="chip" type="button" onclick={() => { energy = ''; searchNow(); }}>
-					{energy} <span class="chip-x">&times;</span>
-				</button>
+				<Chip value={energy} size="sm" removable removeLabel="Clear folder energy filter" onremove={() => { energy = ''; searchNow(); }} />
 			{/if}
 			{#if energyZone}
-				<button class="chip" type="button" onclick={() => { energyZone = ''; searchNow(); }}>
-					{energyZone} <span class="chip-x">&times;</span>
-				</button>
+				<Chip value={energyZone} size="sm" removable removeLabel="Clear zone filter" onremove={() => { energyZone = ''; searchNow(); }} />
 			{/if}
 			{#if ratingMin}
-				<button class="chip" type="button" onclick={() => { ratingMin = ''; searchNow(); }}>
-					{ratingMin}+ stars <span class="chip-x">&times;</span>
-				</button>
+				<Chip value="{ratingMin}+ stars" size="sm" removable removeLabel="Clear rating filter" onremove={() => { ratingMin = ''; searchNow(); }} />
 			{/if}
 			{#if playsFilter}
-				<button class="chip" type="button" onclick={() => { playsFilter = ''; searchNow(); }}>
-					{playsFilter === 'unplayed' ? 'Unplayed' : 'Played'} <span class="chip-x">&times;</span>
-				</button>
+				<Chip
+					value={playsFilter === 'unplayed' ? 'Unplayed' : 'Played'}
+					size="sm"
+					removable
+					removeLabel="Clear plays filter"
+					onremove={() => { playsFilter = ''; searchNow(); }}
+				/>
 			{/if}
 			{#if sortRecent}
-				<button class="chip" type="button" onclick={() => { sortRecent = false; searchNow(); }}>
-					Recent <span class="chip-x">&times;</span>
-				</button>
+				<Chip value="Recent" size="sm" removable removeLabel="Clear recent sort" onremove={() => { sortRecent = false; searchNow(); }} />
 			{/if}
 			{#if sortPlays}
-				<button class="chip" type="button" onclick={() => { sortPlays = ''; searchNow(); }}>
-					{sortPlays === 'plays' ? 'Most played' : 'Least played'} <span class="chip-x">&times;</span>
-				</button>
+				<Chip
+					value={sortPlays === 'plays' ? 'Most played' : 'Least played'}
+					size="sm"
+					removable
+					removeLabel="Clear plays sort"
+					onremove={() => { sortPlays = ''; searchNow(); }}
+				/>
 			{/if}
-			<button class="clear-all" type="button" onclick={clearAllFilters}>Clear all</button>
+			<Button variant="ghost" size="sm" onclick={clearAllFilters}>Clear all</Button>
 		</div>
 	{/if}
 
@@ -393,7 +412,7 @@
 				<div class="section-header">
 					<span class="section-label">Genre</span>
 					{#if selectedGenres.size > 0}
-						<button class="section-clear" type="button" onclick={() => { selectedGenres = new Set(); searchNow(); }}>Clear</button>
+						<Button variant="ghost" size="sm" onclick={() => { selectedGenres = new Set(); searchNow(); }}>Clear</Button>
 					{/if}
 				</div>
 				{#if genreFamilies.length > 0}
@@ -438,7 +457,7 @@
 				<div class="section-header">
 					<span class="section-label">Key (Camelot)</span>
 					{#if selectedKeys.size > 0}
-						<button class="section-clear" type="button" onclick={() => { selectedKeys = new Set(); searchNow(); }}>Clear</button>
+						<Button variant="ghost" size="sm" onclick={() => { selectedKeys = new Set(); searchNow(); }}>Clear</Button>
 					{/if}
 				</div>
 				<div class="key-grid">
@@ -600,128 +619,27 @@
 		color: var(--text-primary);
 	}
 
-	.adv-toggle {
-		width: 32px;
-		height: 32px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 6px;
-		color: var(--text-secondary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		flex-shrink: 0;
-		transition: all 0.1s;
-	}
-
-	.adv-toggle:hover {
-		background: var(--bg-hover);
-		color: var(--text-primary);
-	}
-
-	.adv-toggle-active {
-		border-color: var(--accent);
-		color: var(--accent);
-	}
-
-	/* ── Quick filters ── */
+	/* ── Quick filters (Button primitives — pressed toggles) ── */
 	.quick-filters {
 		display: flex;
-		gap: 4px;
-		padding: 0 10px 6px;
+		gap: var(--space-xs);
+		padding: 0 var(--space-lg) var(--space-sm);
 	}
 
-	.quick-btn {
+	/* Leading glyph inside a quick-filter Button label. */
+	.quick-glyph {
 		display: inline-flex;
 		align-items: center;
-		gap: 4px;
-		font-size: 11px;
-		padding: 3px 10px;
-		border-radius: 12px;
-		color: var(--text-secondary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		cursor: pointer;
-		transition: all 0.1s;
+		margin-right: var(--space-xs);
 	}
 
-	.quick-btn:hover {
-		border-color: var(--accent);
-		color: var(--text-primary);
-	}
-
-	.quick-btn-active {
-		background: var(--accent);
-		border-color: var(--accent);
-		color: #000;
-		font-weight: 500;
-	}
-
-	.quick-btn-active:hover {
-		background: var(--accent-dim);
-		border-color: var(--accent-dim);
-		color: #000;
-	}
-
-	/* ── Active filter chips ── */
+	/* ── Active filter chips (Chip primitives) ── */
 	.active-chips {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 4px;
-		padding: 0 10px 8px;
+		gap: var(--space-xs);
+		padding: 0 var(--space-lg) var(--space-md);
 		align-items: center;
-	}
-
-	.chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		font-size: 10px;
-		padding: 2px 8px;
-		border-radius: 10px;
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		color: var(--text-secondary);
-		cursor: pointer;
-		transition: all 0.1s;
-	}
-
-	.chip:hover {
-		border-color: var(--accent-coral);
-		color: var(--accent-coral);
-	}
-
-	.chip-genre {
-		background: rgba(var(--accent-rgb, 0, 255, 136), 0.1);
-		border-color: var(--accent);
-		color: var(--accent);
-	}
-
-	.chip-artist {
-		border-color: var(--accent-blue, #42a5f5);
-		color: var(--accent-blue, #42a5f5);
-	}
-
-	.chip-label {
-		border-color: var(--accent-coral, #ff6b6b);
-		color: var(--accent-coral, #ff6b6b);
-	}
-
-	.chip-x {
-		font-size: 12px;
-		line-height: 1;
-		opacity: 0.7;
-	}
-
-	.clear-all {
-		font-size: 10px;
-		color: var(--text-dim);
-		padding: 2px 6px;
-		margin-left: 4px;
-	}
-
-	.clear-all:hover {
-		color: var(--accent-coral);
 	}
 
 	/* ── Advanced panel ── */
@@ -760,17 +678,6 @@
 		color: var(--text-dim);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
-	}
-
-	.section-clear {
-		font-size: 9px;
-		color: var(--text-dim);
-		padding: 1px 5px;
-		border-radius: 3px;
-	}
-
-	.section-clear:hover {
-		color: var(--accent-coral);
 	}
 
 	.subtext {
@@ -857,14 +764,14 @@
 	.genre-chip-active {
 		background: var(--accent);
 		border-color: var(--accent);
-		color: #000;
+		color: var(--on-accent);
 		font-weight: 500;
 	}
 
 	.genre-chip-active:hover {
 		background: var(--accent-dim);
 		border-color: var(--accent-dim);
-		color: #000;
+		color: var(--on-accent);
 	}
 
 	/* ── Camelot key grid ── */
