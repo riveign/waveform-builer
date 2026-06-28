@@ -19,7 +19,7 @@
 			<TasteRadar />
 		</div>
 
-		<div class="dna-grid">
+		<div class="dna-grid grid-12 grid-12--content">
 			<div class="dna-card">
 				<CamelotWheel />
 			</div>
@@ -65,6 +65,7 @@
 		min-height: 0;
 		overflow-y: auto;
 		padding: 20px;
+		container-type: inline-size; /* query container for the chart card grid reflow */
 	}
 
 	.dna-title {
@@ -83,19 +84,17 @@
 		margin-bottom: 16px;
 	}
 
-	.dna-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 16px;
-	}
-
+	/* 12-col content grid: secondary chart cards span 6 (2-up) at full width,
+	   reflowing to 1-up via container query. The hero radar sits in .dna-hero
+	   above, full width. */
 	.dna-card {
 		min-width: 0;
+		grid-column: span 6; /* 2-up */
 	}
 
-	@media (max-width: 900px) {
-		.dna-grid {
-			grid-template-columns: 1fr;
+	@container (max-width: 640px) {
+		.dna-card {
+			grid-column: span 12; /* 1-up */
 		}
 	}
 </style>

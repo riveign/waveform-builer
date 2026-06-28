@@ -149,7 +149,7 @@
 			{/if}
 		</p>
 	{:else}
-		<div class="grid">
+		<div class="grid grid-12 grid-12--content">
 			{#each filtered as s (s.id)}
 				{#if viewMode === 'active'}
 					<div
@@ -207,6 +207,7 @@
 		min-height: 0;
 		padding: 20px 24px;
 		overflow-y: auto;
+		container-type: inline-size;
 	}
 
 	.grid-head {
@@ -234,10 +235,22 @@
 		min-width: 220px;
 	}
 
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-		gap: 12px;
+	/* 12-col content grid: equal column-multiple set cards, span 4 (3-up) at full
+	   width, reflowing to 2-up then 1-up via container queries. */
+	.grid > .set-card {
+		grid-column: span 4; /* 3-up at full content width */
+	}
+
+	@container (max-width: 720px) {
+		.grid > .set-card {
+			grid-column: span 6; /* 2-up */
+		}
+	}
+
+	@container (max-width: 460px) {
+		.grid > .set-card {
+			grid-column: span 12; /* 1-up */
+		}
 	}
 
 	.set-card {

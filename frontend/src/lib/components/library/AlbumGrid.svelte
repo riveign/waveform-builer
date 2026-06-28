@@ -144,7 +144,7 @@
 								<span class="section-label">{section.label}</span>
 								<span class="section-count">{section.albums.length}</span>
 							</div>
-							<div class="grid">
+							<div class="grid grid-12 grid-12--content">
 								{#each section.albums as album (album.album_key)}
 									<button class="card" onclick={() => onselect(album)}>
 										<div class="cover">
@@ -170,7 +170,7 @@
 						</section>
 					{/each}
 				{:else}
-					<div class="grid">
+					<div class="grid grid-12 grid-12--content">
 						{#each albums as album (album.album_key)}
 							<button class="card" onclick={() => onselect(album)}>
 								<div class="cover">
@@ -274,6 +274,7 @@
 		overflow-y: auto;
 		padding-bottom: 16px;
 		position: relative; /* containing block for the sticky section headers */
+		container-type: inline-size; /* query container for the album card grid reflow */
 	}
 
 	/* Per-section wrapper: each header's containing block, so sticky headers
@@ -305,11 +306,25 @@
 		font-weight: 400;
 	}
 
+	/* 12-col content grid: equal column-multiple album cards. Smaller art → span 3
+	   (4-up) at full width, reflowing to 3-up then 2-up via container queries. */
 	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-		gap: 14px;
 		padding: 10px 12px 18px;
+	}
+	.grid > .card {
+		grid-column: span 3; /* 4-up at full content width */
+	}
+
+	@container (max-width: 720px) {
+		.grid > .card {
+			grid-column: span 4; /* 3-up */
+		}
+	}
+
+	@container (max-width: 520px) {
+		.grid > .card {
+			grid-column: span 6; /* 2-up */
+		}
 	}
 	.card {
 		appearance: none;

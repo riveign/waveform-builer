@@ -61,7 +61,7 @@
 		{:else if sc.playlists.length === 0}
 			<div class="empty">No playlists found on your SoundCloud.</div>
 		{:else}
-			<div class="playlist-grid">
+			<div class="playlist-grid grid-12 grid-12--content">
 				{#each sc.playlists as playlist}
 					<SCPlaylistCard
 						{playlist}
@@ -91,6 +91,7 @@
 <style>
 	.sc-browser {
 		margin-top: 12px;
+		container-type: inline-size; /* query container for the playlist card grid reflow */
 	}
 
 	.tab-bar {
@@ -115,9 +116,15 @@
 		font-size: 14px;
 	}
 
-	.playlist-grid {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
+	/* 12-col content grid: playlist row-cards span 6 (2-up) at full width,
+	   reflowing to 1-up via container query so the horizontal card never cramps. */
+	.playlist-grid > :global(.playlist-card) {
+		grid-column: span 6; /* 2-up */
+	}
+
+	@container (max-width: 640px) {
+		.playlist-grid > :global(.playlist-card) {
+			grid-column: span 12; /* 1-up */
+		}
 	}
 </style>

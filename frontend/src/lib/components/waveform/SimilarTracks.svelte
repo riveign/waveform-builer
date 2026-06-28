@@ -102,7 +102,7 @@
 	{:else if available.length === 0}
 		<p class="muted">Nothing in your library mixes cleanly from here yet</p>
 	{:else}
-		<div class="cards-grid">
+		<div class="cards-grid grid-12 grid-12--content">
 			{#each visibleSuggestions as item (item.track.id)}
 				<div class="card-slot" class:dismissing={dismissing.has(item.track.id)}>
 					<SimilarTrackCard
@@ -131,6 +131,7 @@
 		gap: 12px;
 		min-width: 0;
 		overflow: hidden;
+		container-type: inline-size;
 	}
 
 	.section-title {
@@ -147,28 +148,26 @@
 		margin: 0;
 	}
 
+	/* 12-col content grid: every card is an equal column-multiple. Cards span 4
+	   (3-up) at full width and reflow to 2-up then 1-up via container queries —
+	   never a crammed/ragged row. */
 	.cards-grid {
-		display: grid;
-		grid-template-columns: repeat(6, minmax(0, 1fr));
 		grid-auto-rows: 1fr; /* every row the same height → all cards equal */
-		gap: 12px;
 	}
 
-	@media (max-width: 1200px) {
-		.cards-grid {
-			grid-template-columns: repeat(4, minmax(0, 1fr));
+	.cards-grid > :global(.card-slot) {
+		grid-column: span 4; /* 3-up at full content width */
+	}
+
+	@container (max-width: 720px) {
+		.cards-grid > :global(.card-slot) {
+			grid-column: span 6; /* 2-up */
 		}
 	}
 
-	@media (max-width: 900px) {
-		.cards-grid {
-			grid-template-columns: repeat(3, minmax(0, 1fr));
-		}
-	}
-
-	@media (max-width: 600px) {
-		.cards-grid {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
+	@container (max-width: 460px) {
+		.cards-grid > :global(.card-slot) {
+			grid-column: span 12; /* 1-up */
 		}
 	}
 
