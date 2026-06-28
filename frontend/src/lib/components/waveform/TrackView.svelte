@@ -793,35 +793,75 @@
 			display: grid;
 			grid-template-columns: 3fr 1fr;
 			gap: var(--space-xl);
-			/* `stretch` (the grid default) makes BOTH columns share the row
-			   height. The waveform is the anchor: the aside is told `min-height:0`
-			   so its two cards never push the row taller than the player — they
-			   instead flex to fill exactly the waveform's height (top + bottom
-			   flush). The player-section keeps its natural waveform height, so the
-			   row resolves to that height and the cards match it. */
-			align-items: stretch;
+			/* DEFINITE equal height, not `stretch`. `stretch` resolves the row to
+			   MAX(waveform, cards-min-content); because two natural-height cards are
+			   TALLER than the waveform, the row grew to the cards and the waveform
+			   top-aligned with dead space below. Instead we pin a known waveform-block
+			   height (--waveform-block-h: canvas 128 + container bottom-pad 10 +
+			   controls ≈ 28 ≈ 166px) and give BOTH columns exactly that height, so
+			   the cards can never out-grow the waveform — they fill it and stop. */
+			align-items: start;
 		}
 
-		/* Cards column fills the row height the waveform sets, and the two cards
-		   share it equally — each card vertically centres its content and trims
-		   its padding so two fit the waveform height cleanly without cramping. */
+		/* --waveform-block-h: the player's intrinsic height, made definite so the
+		   cards column can borrow it. Kept equal to the waveform's natural size so
+		   the waveform looks unchanged (canvas 128 + 10 bottom-pad + ~28 controls). */
+		.sound-row--with-cards {
+			--waveform-block-h: 166px;
+		}
+
+		.sound-row--with-cards .player-section {
+			height: var(--waveform-block-h);
+		}
+
+		/* The cards column is pinned to the SAME definite height as the waveform.
+		   Not min-height:100% / not stretch — an explicit height the cards split. */
 		.sound-row--with-cards .kiku-hears {
+			height: var(--waveform-block-h);
 			min-height: 0;
 		}
 
 		.sound-row--with-cards .feature-cards {
-			grid-template-columns: 1fr;
-			/* Distribute the column height equally across the stacked cards
-			   (`grid-auto-rows: 1fr`) and let the grid fill the aside. */
-			grid-auto-rows: 1fr;
-			flex: 1;
+			/* Switch from the default responsive grid to a single flex column so the
+			   two cards can `flex: 1 1 0` and split the column height evenly. */
+			display: flex;
+			flex-direction: column;
+			/* Fill the column height below the section title and split it evenly
+			   across the stacked cards. */
+			flex: 1 1 0;
 			min-height: 0;
+			gap: var(--space-md);
 		}
 
 		.sound-row--with-cards .feature-card {
+			/* Each card shares the column height equally and shrinks to fit; content
+			   vertically centred. Vertical padding trimmed so the compressed cards
+			   (~one waveform-height split in two ≈ 64px) read clean, not cramped. */
+			flex: 1 1 0;
 			min-height: 0;
+			overflow: hidden;
 			align-items: center;
-			padding: var(--space-md) 18px;
+			padding: var(--space-xs) 18px;
+		}
+
+		/* Tighten the card-body stack so the tallest card (Energy: label + value +
+		   bar + In/Body/Out detail) fits the ~64px split without clipping. The
+		   value font and bar shrink minimally; gaps collapse to the 2px step. */
+		.sound-row--with-cards .feature-card .card-body {
+			gap: var(--space-2xs);
+		}
+
+		.sound-row--with-cards .feature-card .card-value {
+			font-size: var(--text-lg);
+		}
+
+		.sound-row--with-cards .feature-card .card-bar {
+			height: 4px;
+			margin-top: 0;
+		}
+
+		.sound-row--with-cards .feature-card .card-detail {
+			margin-top: var(--space-2xs);
 		}
 	}
 
