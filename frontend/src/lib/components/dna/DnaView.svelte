@@ -14,41 +14,57 @@
 		<p class="dna-subtitle">Your library's musical fingerprint</p>
 	</div>
 
-	<div class="dna-hero">
-		<TasteRadar />
-	</div>
+	<div class="dna-scroll">
+		<div class="dna-hero">
+			<TasteRadar />
+		</div>
 
-	<div class="dna-grid">
-		<div class="dna-card">
-			<CamelotWheel />
-		</div>
-		<div class="dna-card">
-			<BpmHistogram />
-		</div>
-		<div class="dna-card">
-			<GenreDistribution />
-		</div>
-		<div class="dna-card">
-			<EnergyGenreHeatmap />
-		</div>
-		<div class="dna-card">
-			<MoodScatter />
-		</div>
-		<div class="dna-card">
-			<LibraryGaps />
+		<div class="dna-grid">
+			<div class="dna-card">
+				<CamelotWheel />
+			</div>
+			<div class="dna-card">
+				<BpmHistogram />
+			</div>
+			<div class="dna-card">
+				<GenreDistribution />
+			</div>
+			<div class="dna-card">
+				<EnergyGenreHeatmap />
+			</div>
+			<div class="dna-card">
+				<MoodScatter />
+			</div>
+			<div class="dna-card">
+				<LibraryGaps />
+			</div>
 		</div>
 	</div>
 </div>
 
 <style>
 	.dna-view {
-		padding: 20px;
-		overflow-y: auto;
-		height: 100%;
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
 	}
 
+	/* Pinned top band — title/subtitle stay put while charts scroll beneath. */
 	.dna-header {
-		margin-bottom: 20px;
+		flex-shrink: 0;
+		padding: var(--space-lg) 20px;
+		border-bottom: 1px solid var(--border);
+		background: var(--surface-1);
+	}
+
+	/* Sole scroller — the chart grid scrolls inside the bounded frame. */
+	.dna-scroll {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		padding: 20px;
 	}
 
 	.dna-title {

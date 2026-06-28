@@ -242,6 +242,8 @@
 		border-bottom: 1px solid var(--border);
 		align-items: center;
 		flex-wrap: wrap;
+		flex-shrink: 0;
+		background: var(--surface-1);
 	}
 	.search {
 		flex: 1 1 auto;
