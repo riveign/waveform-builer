@@ -578,10 +578,14 @@
 
 <style>
 	/* Fixed-frame, internal-scroll surface — mirrors the sidebar `.library-browser`:
-	   the set's top bands (SetPicker toolbar, set-name/actions row, energy chart,
-	   analysis bar) stay pinned while ONLY the timeline rows / set grid scroll
+	   the set's top region (SetPicker toolbar, set-name/actions row, energy chart,
+	   analysis bar) stays pinned while ONLY the timeline rows / set grid scroll
 	   beneath them. `flex:1; min-height:0` fills the `.content-grid` frame; the frame
-	   itself never scrolls (`overflow:hidden`) so nothing slides under the navbar. */
+	   itself never scrolls (`overflow:hidden`) so nothing slides under the navbar.
+	   NOTE: this only bounds correctly because `.tab-content` (Workspace) is a flex
+	   column — that gives `.content-grid` a definite height for this `flex:1` to
+	   resolve against. Without it the whole `.set-view` grew to content height and
+	   `.tab-content` scrolled the chart + analysis bar away. */
 	.set-view {
 		flex: 1;
 		min-height: 0;
@@ -684,11 +688,15 @@
 		border-bottom: 1px solid var(--border);
 	}
 
+	/* Pinned top region — energy chart. A `flex-shrink:0` sibling ABOVE the
+	   `.timeline-scroll` scroller (NOT inside it), so it holds fixed while only the
+	   rows scroll beneath. Solid background so scrolled rows can't bleed through. */
 	.top-panel {
 		display: flex;
 		flex-shrink: 0;
 		border-bottom: 1px solid var(--border);
 		min-height: 0;
+		background: var(--bg-primary);
 	}
 
 	.energy-chart-wrapper {
@@ -696,6 +704,9 @@
 		min-width: 0;
 	}
 
+	/* The ONLY scroller in the loaded-set frame. `flex:1; min-height:0` so it takes
+	   the leftover height under the pinned energy chart + analysis bar and scrolls
+	   its rows (timeline / TransitionDetail / SetComparison) internally. */
 	.timeline-scroll {
 		flex: 1;
 		min-height: 0;

@@ -97,8 +97,18 @@
 		overflow: hidden;
 	}
 
+	/* Content scroll region. Flex column so its single child (.content-grid) is
+	   bounded by this region's DEFINITE height — giving full-height surfaces that
+	   opt into `flex:1; min-height:0; overflow:hidden` (set/dna/tinder/hunt/albums)
+	   a real frame for their OWN internal scroller. Without this, `.content-grid`'s
+	   `min-height:100%` lets the column grow to content and THIS region scrolls
+	   everything (e.g. the set's energy chart + analysis bar slid away). Shorter,
+	   non-frame surfaces (track view, empty states) still grow and scroll here. */
 	.tab-content {
 		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
 		overflow-y: auto;
 	}
 
