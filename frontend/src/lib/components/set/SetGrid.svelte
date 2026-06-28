@@ -2,6 +2,8 @@
 	import type { DJSet } from '$lib/types';
 	import { listSets, deleteSet, getDeletedSets, restoreSet } from '$lib/api/sets';
 	import { onMount } from 'svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		onselect,
@@ -125,11 +127,11 @@
 					bind:value={search}
 					oninput={refresh}
 				/>
-				<button class="mode-btn" onclick={() => switchMode('trash')} title="Recently deleted sets">
+				<Button variant="secondary" size="sm" onclick={() => switchMode('trash')} title="Recently deleted sets">
 					Recently deleted
-				</button>
+				</Button>
 			{:else}
-				<button class="mode-btn" onclick={() => switchMode('active')}>← Back to sets</button>
+				<Button variant="secondary" size="sm" onclick={() => switchMode('active')}>← Back to sets</Button>
 			{/if}
 		</div>
 	</div>
@@ -147,7 +149,7 @@
 			{/if}
 		</p>
 	{:else}
-		<div class="grid">
+		<div class="grid grid-12 grid-12--content">
 			{#each filtered as s (s.id)}
 				{#if viewMode === 'active'}
 					<div
@@ -170,7 +172,7 @@
 							{s.track_count} tracks{#if s.duration_min}, {s.duration_min}min{/if}
 						</span>
 						<span class="card-foot">
-							{#if sourceLabel(s.source)}<span class="tag">{sourceLabel(s.source)}</span>{/if}
+							{#if sourceLabel(s.source)}<Chip variant="neutral" value={sourceLabel(s.source)} size="sm" />{/if}
 							{#if shortDate(s.created_at)}<span class="date">{shortDate(s.created_at)}</span>{/if}
 						</span>
 					</div>
@@ -198,9 +200,14 @@
 </div>
 
 <style>
+	/* Fills the `.set-view` frame so the grid scrolls internally (the SetPicker band
+	   above it stays pinned), matching the loaded-set timeline behaviour. */
 	.set-grid-wrap {
+		flex: 1;
+		min-height: 0;
 		padding: 20px 24px;
 		overflow-y: auto;
+		container-type: inline-size;
 	}
 
 	.grid-head {
@@ -228,10 +235,22 @@
 		min-width: 220px;
 	}
 
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-		gap: 12px;
+	/* 12-col content grid: equal column-multiple set cards, span 4 (3-up) at full
+	   width, reflowing to 2-up then 1-up via container queries. */
+	.grid > .set-card {
+		grid-column: span 4; /* 3-up at full content width */
+	}
+
+	@container (max-width: 720px) {
+		.grid > .set-card {
+			grid-column: span 6; /* 2-up */
+		}
+	}
+
+	@container (max-width: 460px) {
+		.grid > .set-card {
+			grid-column: span 12; /* 1-up */
+		}
 	}
 
 	.set-card {
@@ -281,39 +300,23 @@
 	}
 
 	.card-delete:hover {
-		color: var(--energy-high, #EF5350);
-		border-color: var(--energy-high, #EF5350);
+		color: var(--destructive);
+		border-color: var(--destructive);
 	}
 
 	.card-delete.confirm {
 		opacity: 1;
 		font-size: 11px;
 		font-weight: 600;
-		color: #fff;
-		background: var(--energy-high, #EF5350);
-		border-color: var(--energy-high, #EF5350);
+		color: #FFFFFF;
+		background: var(--destructive);
+		border-color: var(--destructive);
 	}
 
 	.head-actions {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-	}
-
-	.mode-btn {
-		padding: 7px 12px;
-		font-size: 12px;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: var(--bg-secondary);
-		color: var(--text-secondary);
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
-	.mode-btn:hover {
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
 	}
 
 	.set-card.trashed {
@@ -342,7 +345,7 @@
 
 	.card-recover:hover:not(:disabled) {
 		background: var(--accent);
-		color: #000;
+		color: var(--on-accent);
 	}
 
 	.card-recover:disabled {
@@ -351,8 +354,8 @@
 	}
 
 	.trash-tag {
-		background: rgba(239, 83, 80, 0.15);
-		color: var(--energy-high, #EF5350);
+		background: color-mix(in srgb, var(--destructive) 15%, transparent);
+		color: var(--destructive);
 	}
 
 	.card-name {
@@ -374,16 +377,6 @@
 		justify-content: space-between;
 		gap: 8px;
 		margin-top: 2px;
-	}
-
-	.tag {
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		padding: 2px 6px;
-		border-radius: 4px;
-		background: var(--bg-tertiary);
-		color: var(--text-dim);
 	}
 
 	.date {

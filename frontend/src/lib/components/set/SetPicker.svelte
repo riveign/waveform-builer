@@ -3,6 +3,7 @@
 	import { listSets, createSet } from '$lib/api/sets';
 	import { onMount } from 'svelte';
 	import ImportPlaylistDialog from './ImportPlaylistDialog.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 
 	const ui = getUiStore();
@@ -84,16 +85,16 @@
 					onkeydown={(e) => { if (e.key === 'Enter') handleCreateNew(); if (e.key === 'Escape') { creatingNew = false; newName = ''; } }}
 				/>
 			{:else}
-				<button class="new-btn" onclick={() => { creatingNew = true; setTimeout(() => newInputEl?.focus(), 0); }} title="Create new set">
+				<Button variant="primary" size="sm" onclick={() => { creatingNew = true; setTimeout(() => newInputEl?.focus(), 0); }} title="Create new set">
 					+ New
-				</button>
+				</Button>
 			{/if}
-			<button class="build-btn" onclick={() => ui.requestBuild()} title="Build a set with energy, genre and vibe">
+			<Button variant="primary" size="sm" onclick={() => ui.requestBuild()} title="Build a set with energy, genre and vibe">
 				Build
-			</button>
-			<button class="import-btn" onclick={() => importOpen = true} title="Import playlist">
+			</Button>
+			<Button variant="secondary" size="sm" onclick={() => importOpen = true} title="Import playlist">
 				Import
-			</button>
+			</Button>
 		</div>
 	{/if}
 </div>
@@ -101,69 +102,40 @@
 <ImportPlaylistDialog bind:open={importOpen} onimport={handleImport} />
 
 <style>
+	/* Toolbar band — matches the sidebar's search box: same --band-toolbar-h (48px)
+	   and the same zero top offset, so the "Choose a set…" selector's bottom edge /
+	   divider lands at the SAME y as the search box (spec 023 band rhythm). */
 	.set-picker {
-		padding: 10px 16px;
+		display: flex;
+		align-items: center;
+		padding: 0 var(--space-xl);
+		height: var(--band-toolbar-h);
 		border-bottom: 1px solid var(--border);
+		/* First content-pane band: stays put at the top of the content scroll so the
+		   "Choose a set…" selector keeps aligning with the sidebar's search band.
+		   Opaque background so scrolling content doesn't bleed through. */
+		position: sticky;
+		top: 0;
+		z-index: 5;
+		background: var(--bg-primary);
 	}
 
 	.picker-row {
 		display: flex;
-		gap: 8px;
+		gap: var(--space-md);
 		align-items: center;
+		width: 100%;
 	}
 
 	select {
 		flex: 1;
-		padding: 8px 10px;
-		font-size: 13px;
-	}
-
-	.import-btn {
-		padding: 8px 12px;
-		font-size: 12px;
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		background: var(--bg-secondary);
-		color: var(--text-primary);
-		cursor: pointer;
-		white-space: nowrap;
-	}
-
-	.import-btn:hover {
-		background: var(--bg-tertiary);
-	}
-
-	.new-btn {
-		padding: 8px 12px;
-		font-size: 12px;
-		border: 1px solid var(--accent);
-		border-radius: 6px;
-		background: var(--accent);
-		color: #000;
-		cursor: pointer;
-		white-space: nowrap;
-		font-weight: 600;
-	}
-
-	.build-btn {
-		padding: 8px 12px;
-		font-size: 12px;
-		border: 1px solid var(--accent);
-		border-radius: 6px;
-		background: var(--accent);
-		color: #000;
-		cursor: pointer;
-		white-space: nowrap;
-		font-weight: 600;
-	}
-
-	.build-btn:hover {
-		opacity: 0.85;
+		padding: var(--space-md) var(--space-lg);
+		font-size: var(--text-base);
 	}
 
 	.new-set-input {
-		padding: 8px 10px;
-		font-size: 13px;
+		padding: var(--space-md) var(--space-lg);
+		font-size: var(--text-base);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		background: var(--bg-secondary);
@@ -172,6 +144,6 @@
 
 	.dim {
 		color: var(--text-dim);
-		font-size: 13px;
+		font-size: var(--text-base);
 	}
 </style>

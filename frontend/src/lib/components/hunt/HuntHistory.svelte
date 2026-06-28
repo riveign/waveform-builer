@@ -83,6 +83,6 @@
 	}
 
 	.owned-count {
-		color: #50c878;
+		color: var(--score-excellent);
 	}
 </style>

@@ -3,6 +3,8 @@
 	import { getArtistPicks, addTrackToSet } from '$lib/api/sets';
 	import { autocompleteArtists } from '$lib/api/tracks';
 	import Typeahead from '$lib/components/library/Typeahead.svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		setId,
@@ -56,9 +58,9 @@
 	}
 
 	function scoreColor(score: number): string {
-		if (score >= 0.7) return 'var(--energy-low, #2ecc71)';
-		if (score >= 0.5) return 'var(--energy-mid, #f39c12)';
-		return 'var(--energy-high, #e94560)';
+		if (score >= 0.7) return 'var(--score-excellent)';
+		if (score >= 0.5) return 'var(--score-fair)';
+		return 'var(--score-poor)';
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -80,11 +82,13 @@
 				<h3>Add from an artist</h3>
 				<p class="hint">Pull a track you already own — ranked by where it fits this set.</p>
 			</div>
-			<button class="close-btn" onclick={onclose} aria-label="Close">
-				<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
-					<line x1="3" y1="3" x2="11" y2="11" /><line x1="11" y1="3" x2="3" y2="11" />
-				</svg>
-			</button>
+			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={onclose}>
+				{#snippet icon()}
+					<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+						<line x1="3" y1="3" x2="11" y2="11" /><line x1="11" y1="3" x2="3" y2="11" />
+					</svg>
+				{/snippet}
+			</Button>
 		</header>
 
 		<div class="search-row">
@@ -122,22 +126,23 @@
 								<div class="pick-reason">{pick.reason}</div>
 								{#if pick.breakdown}
 									<div class="pick-breakdown">
-										<span class="chip">key {Math.round(pick.breakdown.harmonic * 100)}</span>
-										<span class="chip">energy {Math.round(pick.breakdown.energy_fit * 100)}</span>
-										<span class="chip">bpm {Math.round(pick.breakdown.bpm_compat * 100)}</span>
-										<span class="chip">genre {Math.round(pick.breakdown.genre_coherence * 100)}</span>
+										<Chip variant="neutral" size="sm" value="key {Math.round(pick.breakdown.harmonic * 100)}" />
+										<Chip variant="neutral" size="sm" value="energy {Math.round(pick.breakdown.energy_fit * 100)}" />
+										<Chip variant="neutral" size="sm" value="bpm {Math.round(pick.breakdown.bpm_compat * 100)}" />
+										<Chip variant="neutral" size="sm" value="genre {Math.round(pick.breakdown.genre_coherence * 100)}" />
 									</div>
 								{/if}
 							</div>
 							<div class="pick-side">
 								<div class="pick-score" style="color: {scoreColor(pick.score)}">{Math.round(pick.score * 100)}</div>
-								<button
-									class="insert-btn"
+								<Button
+									variant="primary"
+									size="sm"
 									onclick={() => insertPick(pick)}
 									disabled={insertingId === pick.track.id}
 								>
 									{insertingId === pick.track.id ? 'Adding…' : 'Add'}
-								</button>
+								</Button>
 							</div>
 						</li>
 					{/each}
@@ -192,20 +197,6 @@
 		color: var(--text-dim);
 	}
 
-	.close-btn {
-		flex-shrink: 0;
-		background: none;
-		border: none;
-		color: var(--text-dim);
-		cursor: pointer;
-		padding: 2px;
-		line-height: 0;
-	}
-
-	.close-btn:hover {
-		color: var(--text-primary);
-	}
-
 	.search-row {
 		padding: 14px 16px 6px;
 	}
@@ -229,7 +220,7 @@
 	}
 
 	.status.error {
-		color: var(--energy-high, #e94560);
+		color: var(--destructive);
 	}
 
 	.picks {
@@ -301,7 +292,7 @@
 	.pick-reason {
 		margin-top: 6px;
 		font-size: 12px;
-		color: var(--text-secondary, #9a9b9f);
+		color: var(--text-secondary);
 		line-height: 1.4;
 	}
 
@@ -310,14 +301,6 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 5px;
-	}
-
-	.chip {
-		font-size: 10px;
-		padding: 2px 6px;
-		border-radius: 4px;
-		background: var(--bg-tertiary);
-		color: var(--text-dim);
 	}
 
 	.pick-side {
@@ -334,23 +317,4 @@
 		line-height: 1;
 	}
 
-	.insert-btn {
-		font-size: 12px;
-		font-weight: 600;
-		padding: 5px 16px;
-		border: 1px solid var(--accent);
-		border-radius: 6px;
-		background: var(--accent);
-		color: #000;
-		cursor: pointer;
-	}
-
-	.insert-btn:hover:not(:disabled) {
-		opacity: 0.85;
-	}
-
-	.insert-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
 </style>

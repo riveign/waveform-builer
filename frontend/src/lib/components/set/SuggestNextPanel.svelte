@@ -3,6 +3,7 @@
 	import { suggestNext } from '$lib/api/tracks';
 	import { addTrackToSet } from '$lib/api/sets';
 	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		trackId,
@@ -46,10 +47,10 @@
 	}
 
 	function scoreColor(score: number): string {
-		if (score >= 0.8) return 'var(--energy-low, #4ecdc4)';
-		if (score >= 0.6) return 'var(--accent, #00CED1)';
-		if (score >= 0.4) return 'var(--text-secondary, #999)';
-		return 'var(--energy-high, #ff6b6b)';
+		if (score >= 0.8) return 'var(--score-excellent)';
+		if (score >= 0.6) return 'var(--score-good)';
+		if (score >= 0.4) return 'var(--score-fair)';
+		return 'var(--score-poor)';
 	}
 
 	// Load on mount
@@ -85,13 +86,14 @@
 					{#if item.track.bpm}
 						<span class="bpm-badge">{Math.round(item.track.bpm)}</span>
 					{/if}
-					<button
-						class="add-btn"
+					<Button
+						variant="secondary"
+						size="sm"
 						onclick={() => handleAdd(item)}
 						disabled={addingId === item.track.id}
 					>
 						{addingId === item.track.id ? '...' : 'Add'}
-					</button>
+					</Button>
 				</div>
 			{/each}
 		</div>
@@ -118,7 +120,7 @@
 	}
 
 	.suggest-status.error {
-		color: var(--energy-high, #ff6b6b);
+		color: var(--destructive);
 	}
 
 	.suggest-list {
@@ -195,24 +197,4 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	.add-btn {
-		padding: 3px 10px;
-		font-size: 11px;
-		font-weight: 600;
-		border-radius: 3px;
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
-		border: 1px solid var(--border);
-		transition: all 0.15s;
-	}
-
-	.add-btn:hover:not(:disabled) {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.add-btn:disabled {
-		opacity: 0.4;
-	}
 </style>

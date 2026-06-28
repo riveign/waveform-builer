@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { HuntSession } from '$lib/types';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	interface Props {
 		hunt: HuntSession;
@@ -70,9 +71,9 @@
 						{:else if track.acquisition_status === 'wanted'}
 							<span class="status-wanted">wanted</span>
 						{:else}
-							<button class="want-btn" onclick={() => onmarkwanted(track.id)}>
+							<Button variant="ghost" size="sm" onclick={() => onmarkwanted(track.id)}>
 								want
-							</button>
+							</Button>
 						{/if}
 					</td>
 					<td class="col-links">
@@ -125,13 +126,13 @@
 	}
 
 	.badge.owned {
-		background: rgba(80, 200, 120, 0.15);
-		color: #50c878;
+		background: color-mix(in srgb, var(--score-excellent) 15%, transparent);
+		color: var(--score-excellent);
 	}
 
 	.badge.gap {
-		background: rgba(255, 200, 50, 0.15);
-		color: #ffc832;
+		background: color-mix(in srgb, var(--amber-500) 15%, transparent);
+		color: var(--amber-500);
 	}
 
 	.track-table {
@@ -167,28 +168,13 @@
 	}
 
 	.status-owned {
-		color: #50c878;
+		color: var(--score-excellent);
 		font-size: 11px;
 	}
 
 	.status-wanted {
-		color: #ffc832;
+		color: var(--amber-500);
 		font-size: 11px;
-	}
-
-	.want-btn {
-		padding: 2px 8px;
-		font-size: 11px;
-		background: transparent;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		color: var(--text-secondary);
-		cursor: pointer;
-	}
-
-	.want-btn:hover {
-		border-color: #ffc832;
-		color: #ffc832;
 	}
 
 	.store-link {

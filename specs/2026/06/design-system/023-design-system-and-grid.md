@@ -1001,7 +1001,43 @@ Commands:
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+### TODO
+- T1 — Create `tokens.primitives.css` (Tier 1) — Status: Done
+- T2 — Create `tokens.semantic.css` (Tier 2/3 + focus + motion) — Status: Done
+- T3 — Create `utilities.css` (grid / stack / cluster) — Status: Done
+- T4 — Wire imports + alias the 20 legacy vars in `app.css` — Status: Done
+- T5 — Create `Button.svelte` primitive — Status: Done
+- T6 — Create `Stack.svelte` primitive — Status: Done
+- T7 — Create `Grid.svelte` primitive — Status: Done
+- T8 — Create `/design-system` showcase route (+page.ts/+page.svelte) — Status: Done
+- T9 — Type-check gate (`npx svelte-check`) — Status: Done
+
+### Summary
+
+Built the full token foundation + showcase exactly per the Plan, on branch `design-system`.
+
+**Files created (8):**
+- `frontend/src/lib/styles/tokens.primitives.css` — Tier 1: pine 50→950, cyan 500/600, gray ramp (formalized from existing `--bg-*`/`--text-*`), status primitives. No `var()` refs.
+- `frontend/src/lib/styles/tokens.semantic.css` — Tier 2 semantics (accent indirection lever, surfaces, text, borders, status, spacing/type/radius/elevation/motion), Tier 3 `--btn-*`, global `:where(...):focus-visible` ring, and `prefers-reduced-motion` collapse.
+- `frontend/src/lib/styles/utilities.css` — `.grid-12`(+condensed), `.col-span-1..12`, `.stack`(+variants), `.cluster`(+variants).
+- `frontend/src/lib/components/primitives/Button.svelte` — native `<button>`, 4 variants × 3 sizes, disabled/loading (`aria-busy`, keeps label), token-driven styles, ring from global rule.
+- `frontend/src/lib/components/primitives/Stack.svelte` — presentational `.stack`, `gap`→`--stack-gap`.
+- `frontend/src/lib/components/primitives/Grid.svelte` — presentational `.grid-12`, `columns`/`condensed`/`gap` props.
+- `frontend/src/routes/design-system/+page.ts` — `ssr=false; prerender=false` (SPA, matches `+layout.ts`).
+- `frontend/src/routes/design-system/+page.svelte` — 8 honest sections (color+real ratios, spacing, type, radius, elevation, 12-col grid, button matrix, focus-ring demo), scoped `data-theme="pine"` via `:global(...)`. Kiku voice copy.
+
+**Files modified (1):**
+- `frontend/src/app.css` — prepended the 3 `@import`s (primitives→semantic→utilities order); converted all 20 legacy `:root` vars to value-preserving aliases; kept `--panel-width`/`--header-height` literal; dropped the bare `outline:none` on `input/select:focus` (keyboard focus now gets the global ring, mouse suppressed by `:focus:not(:focus-visible)`).
+
+**Key decisions during build:**
+- Energy vars aliased to **primitives** (`--green-500` etc.) not the same-name semantic, per the Plan's resolved same-name-`var()` ambiguity note.
+- Pine pinned to `[data-theme="pine"]` only — `:root` accent source stays `--cyan-*`, so the live app is unchanged.
+- Showcase contrast ratios are the real Research §4 figures (pine-400 7.50:1 text, pine-600 3.20:1 UI-only, white-on-pine-600 6.07:1), with honest AA verdicts per swatch.
+
+**svelte-check:** `327 FILES 0 ERRORS 4 WARNINGS`. All 4 warnings are pre-existing (SimilarTrackCard, TrackView, ReplaceTrackModal, FillReorderDialog) — none in any new file. My additions are clean.
+
+**App-stays-cyan verification:** alias chains resolve to the original hexes — `--accent`→`--accent-9`→`--cyan-500`=`#00CED1`; `--bg-primary`→`--surface-1`→`--gray-950`=`#0D0D0D`; `--text-dim`→`--text-4`→`--gray-400`=`#666666` (≡ `#666`); `--border-focus`→`--border-strong`→`--gray-500`=`#555555` (≡ `#555`). Zero of the 76 components touched. Pine resolves only inside the showcase subtree.
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->

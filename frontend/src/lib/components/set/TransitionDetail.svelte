@@ -9,6 +9,7 @@
 	import HarmonicBadge from './HarmonicBadge.svelte';
 	import BpmBadge from './BpmBadge.svelte';
 	import CrossfadePreview from './CrossfadePreview.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		transition,
@@ -39,25 +40,47 @@
 
 <div class="transition-detail">
 	<div class="transition-header">
-		<button class="back-btn" onclick={() => onBack?.()} title="Back to timeline">
-			<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-				<polyline points="10,3 5,8 10,13" />
-			</svg>
-			Timeline
-		</button>
-		<button class="nav-btn" disabled={!hasPrev} onclick={() => onPrev?.()} title="Previous transition">
-			<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-				<polyline points="10,3 5,8 10,13" />
-			</svg>
-		</button>
+		<Button variant="secondary" size="sm" onclick={() => onBack?.()} title="Back to timeline">
+			{#snippet children()}
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+					<polyline points="10,3 5,8 10,13" />
+				</svg>
+				Timeline
+			{/snippet}
+		</Button>
+		<Button
+			variant="secondary"
+			size="sm"
+			iconOnly
+			ariaLabel="Previous transition"
+			title="Previous transition"
+			disabled={!hasPrev}
+			onclick={() => onPrev?.()}
+		>
+			{#snippet icon()}
+				<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+					<polyline points="10,3 5,8 10,13" />
+				</svg>
+			{/snippet}
+		</Button>
 		<h3 class="transition-title">
 			Transition {transition.position + 1}
 		</h3>
-		<button class="nav-btn" disabled={!hasNext} onclick={() => onNext?.()} title="Next transition">
-			<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-				<polyline points="6,3 11,8 6,13" />
-			</svg>
-		</button>
+		<Button
+			variant="secondary"
+			size="sm"
+			iconOnly
+			ariaLabel="Next transition"
+			title="Next transition"
+			disabled={!hasNext}
+			onclick={() => onNext?.()}
+		>
+			{#snippet icon()}
+				<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+					<polyline points="6,3 11,8 6,13" />
+				</svg>
+			{/snippet}
+		</Button>
 		<div class="header-badges">
 			<HarmonicBadge keyA={transition.key_a} keyB={transition.key_b} />
 			<BpmBadge bpmA={transition.bpm_a} bpmB={transition.bpm_b} />
@@ -81,8 +104,6 @@
 						peaks={transition.waveform_a_overview}
 						duration={a.duration_sec}
 						height={56}
-						waveColor="#00CED1"
-						progressColor="#00A8AB"
 						onready={(ws) => { wsA = ws; }}
 					/>
 					{#if wsA}
@@ -156,65 +177,20 @@
 	.transition-header {
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		margin-bottom: 10px;
-	}
-
-	.back-btn {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		padding: 4px 10px;
-		font-size: 12px;
-		color: var(--text-secondary);
-		background: var(--bg-secondary);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		cursor: pointer;
-		transition: all 0.1s;
-		margin-right: 4px;
-	}
-
-	.back-btn:hover {
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border-color: var(--accent);
+		gap: var(--space-sm);
+		margin-bottom: var(--space-md);
 	}
 
 	.transition-title {
-		font-size: 13px;
-		font-weight: 600;
+		font-size: var(--text-base);
+		font-weight: var(--font-weight-semibold);
 		color: var(--text-primary);
 	}
 
 	.header-badges {
 		display: flex;
-		gap: 6px;
+		gap: var(--space-sm);
 		margin-left: auto;
-	}
-
-	.nav-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 24px;
-		height: 24px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: var(--bg-secondary);
-		color: var(--text-primary);
-		cursor: pointer;
-		padding: 0;
-		transition: background 0.1s, opacity 0.1s;
-	}
-
-	.nav-btn:hover:not(:disabled) {
-		background: var(--bg-tertiary);
-	}
-
-	.nav-btn:disabled {
-		opacity: 0.25;
-		cursor: default;
 	}
 
 	/* ── Two-column layout ── */

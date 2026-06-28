@@ -6,6 +6,7 @@
 	import HuntHistory from './HuntHistory.svelte';
 	import SoundCloudConnect from './SoundCloudConnect.svelte';
 	import SoundCloudBrowser from './SoundCloudBrowser.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	const store = getHuntingStore();
 	const sc = getSoundCloudStore();
@@ -43,66 +44,97 @@
 </script>
 
 <div class="hunt-view">
-	<div class="hunt-header">
-		<div class="header-top">
-			<h2>Track Hunter</h2>
-			<SoundCloudConnect />
+	<!-- Pinned top band: title + mode tabs + hunt form stay put while results scroll -->
+	<div class="hunt-band">
+		<div class="hunt-header">
+			<div class="header-top">
+				<h2>Track Hunter</h2>
+				<SoundCloudConnect />
+			</div>
+			<p class="subtitle">Paste a set URL or browse your SoundCloud — we'll find every track and show you where to get them</p>
 		</div>
-		<p class="subtitle">Paste a set URL or browse your SoundCloud — we'll find every track and show you where to get them</p>
+
+		<!-- Bespoke (not SegmentedControl): the SoundCloud option is conditionally
+		     disabled until connected, and SegmentedControl has no per-option disabled. -->
+		<div class="mode-tabs">
+			<button class="mode-tab" class:active={mode === 'url'} onclick={() => mode = 'url'}>
+				URL Hunt
+			</button>
+			<button class="mode-tab" class:active={mode === 'soundcloud'} onclick={() => mode = 'soundcloud'} disabled={!sc.connected}>
+				SoundCloud
+			</button>
+		</div>
+
+		{#if mode === 'url'}
+			<form class="hunt-form" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+				<input
+					type="url"
+					bind:value={urlInput}
+					placeholder="YouTube, SoundCloud, or Mixcloud URL..."
+					disabled={store.loading}
+				/>
+				<Button type="submit" loading={store.loading} disabled={!urlInput.trim()}>
+					{store.loading ? 'Hunting...' : 'Hunt'}
+				</Button>
+				<Button type="button" variant="secondary" pressed={showHistory} onclick={() => showHistory = !showHistory}>
+					History
+				</Button>
+			</form>
+
+			{#if store.error}
+				<div class="error">{store.error}</div>
+			{/if}
+		{/if}
 	</div>
 
-	<div class="mode-tabs">
-		<button class="mode-tab" class:active={mode === 'url'} onclick={() => mode = 'url'}>
-			URL Hunt
-		</button>
-		<button class="mode-tab" class:active={mode === 'soundcloud'} onclick={() => mode = 'soundcloud'} disabled={!sc.connected}>
-			SoundCloud
-		</button>
-	</div>
-
-	{#if mode === 'url'}
-		<form class="hunt-form" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
-			<input
-				type="url"
-				bind:value={urlInput}
-				placeholder="YouTube, SoundCloud, or Mixcloud URL..."
-				disabled={store.loading}
-			/>
-			<button type="submit" disabled={store.loading || !urlInput.trim()}>
-				{store.loading ? 'Hunting...' : 'Hunt'}
-			</button>
-			<button type="button" class="history-btn" onclick={() => showHistory = !showHistory}>
-				History
-			</button>
-		</form>
-
-		{#if store.error}
-			<div class="error">{store.error}</div>
-		{/if}
-
-		{#if showHistory}
-			<HuntHistory items={store.history} onselect={handleHistorySelect} />
-		{:else if store.currentHunt}
-			<HuntResults hunt={store.currentHunt} onmarkwanted={store.markWanted} />
-		{:else if !store.loading}
-			<div class="empty-state">
-				<p>Hear a set you love? Paste the link above to hunt down every track.</p>
-			</div>
-		{/if}
-	{:else}
-		{#if !sc.connected}
-			<div class="empty-state">
-				<p>Connect your SoundCloud account to browse playlists and chase tracks.</p>
-			</div>
+	<!-- Sole scroller: results / history / browser scroll beneath the pinned band -->
+	<div class="hunt-scroll">
+		{#if mode === 'url'}
+			{#if showHistory}
+				<HuntHistory items={store.history} onselect={handleHistorySelect} />
+			{:else if store.currentHunt}
+				<HuntResults hunt={store.currentHunt} onmarkwanted={store.markWanted} />
+			{:else if !store.loading}
+				<div class="empty-state">
+					<p>Hear a set you love? Paste the link above to hunt down every track.</p>
+				</div>
+			{/if}
 		{:else}
-			<SoundCloudBrowser onhuntresult={handleSCHuntResult} />
+			{#if !sc.connected}
+				<div class="empty-state">
+					<p>Connect your SoundCloud account to browse playlists and chase tracks.</p>
+				</div>
+			{:else}
+				<SoundCloudBrowser onhuntresult={handleSCHuntResult} />
+			{/if}
 		{/if}
-	{/if}
+	</div>
 </div>
 
 <style>
 	.hunt-view {
-		padding: 20px;
+		display: flex;
+		flex-direction: column;
+		flex: 1;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	/* Pinned top band: title + mode tabs + form stay put */
+	.hunt-band {
+		flex-shrink: 0;
+		padding: 20px 20px 0;
+		max-width: 900px;
+		background: var(--surface-1);
+		border-bottom: 1px solid var(--border);
+	}
+
+	/* Sole scroller: results scroll beneath the band */
+	.hunt-scroll {
+		flex: 1;
+		min-height: 0;
+		overflow-y: auto;
+		padding: 16px 20px 20px;
 		max-width: 900px;
 	}
 
@@ -155,7 +187,7 @@
 	.hunt-form {
 		display: flex;
 		gap: 8px;
-		margin-bottom: 16px;
+		margin-bottom: 12px;
 	}
 
 	.hunt-form input {
@@ -168,37 +200,12 @@
 		color: var(--text-primary);
 	}
 
-	.hunt-form button {
-		padding: 8px 16px;
-		font-size: 13px;
-		font-weight: 600;
-		border-radius: 6px;
-		cursor: pointer;
-	}
-
-	.hunt-form button[type='submit'] {
-		background: var(--accent);
-		color: #000;
-		border: none;
-	}
-
-	.hunt-form button[type='submit']:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
-	.history-btn {
-		background: transparent;
-		color: var(--text-secondary);
-		border: 1px solid var(--border);
-	}
-
 	.error {
 		padding: 8px 12px;
-		background: rgba(255, 80, 80, 0.1);
-		border: 1px solid rgba(255, 80, 80, 0.3);
+		background: color-mix(in srgb, var(--destructive) 12%, transparent);
+		border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
 		border-radius: 6px;
-		color: #ff5050;
+		color: var(--destructive);
 		font-size: 13px;
 		margin-bottom: 12px;
 	}

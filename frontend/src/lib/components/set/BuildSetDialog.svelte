@@ -9,6 +9,7 @@
 	import Typeahead from '$lib/components/library/Typeahead.svelte';
 	import { autocompleteArtists } from '$lib/api/tracks';
 	import type { Track } from '$lib/types';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	interface GenreFamily {
 		family_name: string;
@@ -232,8 +233,10 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div class="dialog-card" onclick={(e) => e.stopPropagation()}>
 		<div class="dialog-header">
-			<h2 class="dialog-title">Build a Set</h2>
-			<button class="close-btn" onclick={handleCancel} type="button" aria-label="Close dialog">&times;</button>
+			<h2 class="dialog-title">Build a set</h2>
+			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close dialog" onclick={handleCancel}>
+				{#snippet icon()}×{/snippet}
+			</Button>
 		</div>
 
 		<div class="dialog-body">
@@ -341,13 +344,9 @@
 				<div class="genre-header">
 					<span class="field-label">Genre filter</span>
 					{#if selectedGenres.size > 0}
-						<button
-							class="genre-clear-btn"
-							type="button"
-							onclick={() => { selectedGenres = new Set(); }}
-						>
+						<Button variant="ghost" size="sm" onclick={() => { selectedGenres = new Set(); }}>
 							Clear
-						</button>
+						</Button>
 					{/if}
 				</div>
 				{#if genreFamilies.length > 0}
@@ -429,26 +428,17 @@
 						<span class="seed-track-info">
 							{seedTrack.title ?? 'Untitled'} &mdash; {seedTrack.artist ?? 'Unknown'}
 						</span>
-						<button
-							class="seed-clear-btn"
-							onclick={() => { useSeedTrack = false; }}
-							type="button"
-							aria-label="Remove seed track"
-						>
-							&times;
-						</button>
+						<Button variant="ghost" size="sm" iconOnly ariaLabel="Remove seed track" onclick={() => { useSeedTrack = false; }}>
+							{#snippet icon()}×{/snippet}
+						</Button>
 					</div>
 				{:else}
 					<div class="seed-empty">
 						{#if ui.selectedTrack && !useSeedTrack}
 							<span class="seed-empty-text">No starting track</span>
-							<button
-								class="seed-restore-btn"
-								onclick={() => { useSeedTrack = true; }}
-								type="button"
-							>
+							<Button variant="secondary" size="sm" onclick={() => { useSeedTrack = true; }}>
 								Use selected
-							</button>
+							</Button>
 						{:else}
 							<span class="seed-empty-text">Random start — select a track in the library to use as seed</span>
 						{/if}
@@ -464,26 +454,17 @@
 						<span class="seed-track-info">
 							{endTrack.title ?? 'Untitled'} &mdash; {endTrack.artist ?? 'Unknown'}
 						</span>
-						<button
-							class="seed-clear-btn"
-							onclick={() => { endTrack = null; }}
-							type="button"
-							aria-label="Remove ending track"
-						>
-							&times;
-						</button>
+						<Button variant="ghost" size="sm" iconOnly ariaLabel="Remove ending track" onclick={() => { endTrack = null; }}>
+							{#snippet icon()}×{/snippet}
+						</Button>
 					</div>
 				{:else}
 					<div class="seed-empty">
 						{#if ui.selectedTrack}
 							<span class="seed-empty-text">Land the set near a track — pulls the tail toward it</span>
-							<button
-								class="seed-restore-btn"
-								onclick={() => { endTrack = ui.selectedTrack; }}
-								type="button"
-							>
+							<Button variant="secondary" size="sm" onclick={() => { endTrack = ui.selectedTrack; }}>
 								Use selected
-							</button>
+							</Button>
 						{:else}
 							<span class="seed-empty-text">No ending anchor — select a track in the library to land on</span>
 						{/if}
@@ -493,15 +474,10 @@
 		</div>
 
 		<div class="dialog-footer">
-			<button class="btn-cancel" onclick={handleCancel} type="button">Cancel</button>
-			<button
-				class="btn-build"
-				onclick={handleSubmit}
-				disabled={!canSubmit}
-				type="button"
-			>
-				Build Set
-			</button>
+			<Button variant="secondary" size="sm" onclick={handleCancel}>Cancel</Button>
+			<Button variant="primary" size="sm" onclick={handleSubmit} disabled={!canSubmit}>
+				Build set
+			</Button>
 		</div>
 	</div>
 </dialog>
@@ -566,23 +542,6 @@
 		font-weight: 600;
 		color: var(--text-primary);
 		margin: 0;
-	}
-
-	.close-btn {
-		width: 28px;
-		height: 28px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 18px;
-		color: var(--text-secondary);
-		border-radius: 4px;
-		transition: background 0.1s, color 0.1s;
-	}
-
-	.close-btn:hover {
-		background: var(--bg-hover);
-		color: var(--text-primary);
 	}
 
 	/* ── Body ── */
@@ -679,18 +638,6 @@
 		justify-content: space-between;
 	}
 
-	.genre-clear-btn {
-		font-size: 10px;
-		color: var(--text-dim);
-		padding: 1px 6px;
-		border-radius: 3px;
-		transition: color 0.1s;
-	}
-
-	.genre-clear-btn:hover {
-		color: var(--accent-coral);
-	}
-
 	.genre-families {
 		display: flex;
 		flex-direction: column;
@@ -758,14 +705,14 @@
 	.genre-chip-active {
 		background: var(--accent);
 		border-color: var(--accent);
-		color: #000;
+		color: var(--on-accent);
 		font-weight: 500;
 	}
 
 	.genre-chip-active:hover {
 		background: var(--accent-dim);
 		border-color: var(--accent-dim);
-		color: #000;
+		color: var(--on-accent);
 	}
 
 	/* ── BPM inputs ── */
@@ -807,24 +754,6 @@
 		min-width: 0;
 	}
 
-	.seed-clear-btn {
-		flex-shrink: 0;
-		width: 20px;
-		height: 20px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 14px;
-		color: var(--text-dim);
-		border-radius: 3px;
-		transition: all 0.1s;
-	}
-
-	.seed-clear-btn:hover {
-		color: var(--accent-coral);
-		background: rgba(255, 107, 107, 0.1);
-	}
-
 	.seed-empty {
 		display: flex;
 		align-items: center;
@@ -841,21 +770,6 @@
 		flex: 1;
 	}
 
-	.seed-restore-btn {
-		font-size: 11px;
-		color: var(--accent);
-		padding: 2px 8px;
-		border: 1px solid var(--accent);
-		border-radius: 3px;
-		flex-shrink: 0;
-		transition: all 0.1s;
-	}
-
-	.seed-restore-btn:hover {
-		background: var(--accent);
-		color: #000;
-	}
-
 	/* ── Footer ── */
 	.dialog-footer {
 		display: flex;
@@ -863,41 +777,5 @@
 		gap: 8px;
 		padding: 12px 20px 16px;
 		border-top: 1px solid var(--border);
-	}
-
-	.btn-cancel {
-		padding: 8px 16px;
-		font-size: 13px;
-		color: var(--text-secondary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		transition: all 0.1s;
-	}
-
-	.btn-cancel:hover {
-		background: var(--bg-hover);
-		color: var(--text-primary);
-	}
-
-	.btn-build {
-		padding: 8px 20px;
-		font-size: 13px;
-		font-weight: 600;
-		color: #000;
-		background: var(--accent);
-		border: 1px solid var(--accent);
-		border-radius: 6px;
-		transition: all 0.1s;
-	}
-
-	.btn-build:hover:not(:disabled) {
-		background: var(--accent-dim);
-		border-color: var(--accent-dim);
-	}
-
-	.btn-build:disabled {
-		opacity: 0.4;
-		cursor: default;
 	}
 </style>

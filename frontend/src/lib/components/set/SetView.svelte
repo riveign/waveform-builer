@@ -11,6 +11,10 @@
 	import SetComparison from './SetComparison.svelte';
 	import FillReorderDialog from './FillReorderDialog.svelte';
 	import AddFromArtistPanel from './AddFromArtistPanel.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
+	import Menu from '$lib/components/primitives/Menu.svelte';
+	import MenuItem from '$lib/components/primitives/MenuItem.svelte';
+	import MenuSeparator from '$lib/components/primitives/MenuSeparator.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
@@ -102,6 +106,16 @@
 	let plannedSets = $state<DJSet[]>([]);
 	let linkTargetId = $state<number | null>(null);
 	let linking = $state(false);
+	let exportMenuOpen = $state(false);
+	let moreMenuOpen = $state(false);
+
+	const EXPORT_FORMATS = [
+		{ value: 'm3u8', label: 'M3U8' },
+		{ value: 'rekordbox', label: 'Rekordbox XML' },
+	] as const;
+	let exportFormatLabel = $derived(
+		EXPORT_FORMATS.find((f) => f.value === exportFormat)?.label ?? 'M3U8'
+	);
 
 	/** Tracks that need energy review (not yet approved) */
 	let tracksNeedingReview = $derived(
@@ -385,100 +399,142 @@
 				</button>
 			{/if}
 			<span class="set-meta">{selectedSet.track_count} tracks, {selectedSet.duration_min}min</span>
-			{#if tracksNeedingReview.length > 0}
-				<button class="review-energy-btn" onclick={() => { showEnergyReview = true; }}>
-					Review energy ({tracksNeedingReview.length})
-				</button>
-			{/if}
-			{#if waveformTracks.length >= 2 && analysis}
-				<button
-					class="analyze-btn"
-					onclick={handleAnalyze}
-					disabled={analyzingSet}
-				>
-					{analyzingSet ? 'Analyzing...' : 'Re-analyze'}
-				</button>
-			{:else if waveformTracks.length >= 2 && analyzingSet}
-				<span class="analyzing-status">Analyzing...</span>
-			{/if}
-			{#if waveformTracks.length >= 1}
-				<button class="play-set-btn play-all" onclick={handlePlaySet} title="Play the whole set in order">
-					▶ Play
-				</button>
-			{/if}
-			{#if setDetail?.planned_set_id}
-				<button class="compare-btn" onclick={handleCompare} disabled={comparing}>
-					{comparing ? 'Comparing...' : 'Planned vs played'}
-				</button>
-				<button class="unlink-btn" onclick={handleUnlink} title="Remove the link to the planned set">
-					Unlink
-				</button>
-			{:else if setDetail && setDetail.source !== 'kiku'}
-				{#if showLinkPicker}
-					{#if plannedSets.length === 0}
-						<span class="link-empty">No planned sets to link yet — build one first.</span>
-						<button class="unlink-btn" onclick={() => (showLinkPicker = false)}>Cancel</button>
-					{:else}
-						<select class="link-select" bind:value={linkTargetId} aria-label="Choose the planned set">
-							<option value={null}>Which set did you plan from?</option>
-							{#each plannedSets as p (p.id)}
-								<option value={p.id}>{p.name} ({p.track_count} tracks)</option>
-							{/each}
-						</select>
-						<button class="compare-btn" onclick={confirmLink} disabled={linkTargetId === null || linking}>
-							{linking ? 'Linking...' : 'Link'}
-						</button>
-						<button class="unlink-btn" onclick={() => (showLinkPicker = false)}>Cancel</button>
-					{/if}
-				{:else}
-					<button class="link-btn" onclick={openLinkPicker} title="Link this set to the plan you built it from">
-						Link to a plan
-					</button>
+
+			<!-- Toolbar: intent groups separated by dividers. One accent (Play); the
+			     rest secondary; Delete (danger) isolated far right. Uniform size="sm". -->
+			<div class="toolbar" role="toolbar" aria-label="Set actions">
+				<!-- 1 · Playback — the single accent button -->
+				{#if waveformTracks.length >= 1}
+					<div class="tool-group">
+						<Button variant="primary" size="sm" onclick={handlePlaySet} title="Play the whole set in order">
+							▶ Play
+						</Button>
+					</div>
 				{/if}
-			{/if}
-			{#if waveformTracks.length >= 2}
-				<button
-					class="play-set-btn"
-					onclick={() => pb.startExpress(selectedSet!.id, waveformTracks)}
-					disabled={pb.isActive}
-				>
-					Express
-				</button>
-				<button
-					class="play-set-btn builder"
-					onclick={() => pb.startBuilder(selectedSet!.id, waveformTracks)}
-					disabled={pb.isActive}
-				>
-					Live Builder
-				</button>
-			{/if}
-			{#if waveformTracks.length >= 3}
-				<button class="assist-btn" onclick={() => { showAssist = true; }}>
-					Assist
-				</button>
-			{/if}
-			<button class="assist-btn" onclick={() => { showArtistPicks = !showArtistPicks; }}>
-				Add from an artist
-			</button>
-			<select bind:value={exportFormat} class="export-select">
-				<option value="m3u8">M3U8</option>
-				<option value="rekordbox">XML</option>
-			</select>
-			<button class="export-btn" onclick={handleExport} disabled={exporting}>
-				{exporting ? 'Exporting...' : 'Export'}
-			</button>
-			{#if exportMsg}
-				<span class="export-msg">{exportMsg}</span>
-			{/if}
-			<button
-				class="delete-btn"
-				class:confirm={confirmDelete}
-				onclick={handleDelete}
-				disabled={deleting}
-			>
-				{deleting ? 'Deleting...' : confirmDelete ? 'Confirm delete?' : 'Delete'}
-			</button>
+
+				<!-- 2 · Build / arrange -->
+				{#if waveformTracks.length >= 2}
+					<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+					<div class="tool-group">
+						<Button variant="secondary" size="sm" onclick={() => pb.startBuilder(selectedSet!.id, waveformTracks)} disabled={pb.isActive}>
+							Live Builder
+						</Button>
+						<Button variant="secondary" size="sm" onclick={() => pb.startExpress(selectedSet!.id, waveformTracks)} disabled={pb.isActive}>
+							Express
+						</Button>
+					</div>
+				{/if}
+
+				<!-- 3 · Analyze — keep the energy-review count CTA prominent -->
+				{#if tracksNeedingReview.length > 0 || (waveformTracks.length >= 2 && (analysis || analyzingSet))}
+					<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+					<div class="tool-group">
+						{#if tracksNeedingReview.length > 0}
+							<Button variant="secondary" size="sm" onclick={() => { showEnergyReview = true; }}>
+								Review energy ({tracksNeedingReview.length})
+							</Button>
+						{/if}
+						{#if waveformTracks.length >= 2 && analysis}
+							<Button variant="secondary" size="sm" onclick={handleAnalyze} disabled={analyzingSet}>
+								{analyzingSet ? 'Analyzing...' : 'Re-analyze'}
+							</Button>
+						{:else if waveformTracks.length >= 2 && analyzingSet}
+							<span class="analyzing-status">Analyzing...</span>
+						{/if}
+					</div>
+				{/if}
+
+				<!-- Planned-vs-played comparison — contextual, only when linked -->
+				{#if setDetail?.planned_set_id}
+					<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+					<div class="tool-group">
+						<Button variant="secondary" size="sm" onclick={handleCompare} disabled={comparing}>
+							{comparing ? 'Comparing...' : 'Planned vs played'}
+						</Button>
+					</div>
+				{/if}
+
+				<!-- 4 · Export — format picker + Export as one unit -->
+				<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+				<div class="tool-group export-unit">
+					<Menu bind:open={exportMenuOpen} label="Export format" minWidth={160}>
+						{#snippet trigger({ open, props })}
+							<span {...props}>
+								<Button variant="secondary" size="sm" onclick={open} title="Choose the export format">
+									{exportFormatLabel} ▾
+								</Button>
+							</span>
+						{/snippet}
+						{#each EXPORT_FORMATS as fmt (fmt.value)}
+							<MenuItem selected={exportFormat === fmt.value} onselect={() => { exportFormat = fmt.value; }}>
+								{fmt.label}
+							</MenuItem>
+						{/each}
+					</Menu>
+					<Button variant="secondary" size="sm" onclick={handleExport} disabled={exporting}>
+						{exporting ? 'Exporting...' : 'Export'}
+					</Button>
+				</div>
+				{#if exportMsg}
+					<span class="export-msg">{exportMsg}</span>
+				{/if}
+
+				<!-- More — least-common actions tucked into an overflow menu -->
+				<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+				<div class="tool-group">
+					<Menu bind:open={moreMenuOpen} label="More set actions" minWidth={200}>
+						{#snippet trigger({ open, props })}
+							<span {...props}>
+								<Button variant="ghost" size="sm" iconOnly ariaLabel="More set actions" onclick={open}>
+									{#snippet icon()}⋮{/snippet}
+								</Button>
+							</span>
+						{/snippet}
+						{#if waveformTracks.length >= 3}
+							<MenuItem onselect={() => { showAssist = true; }}>Assist</MenuItem>
+						{/if}
+						<MenuItem onselect={() => { showArtistPicks = !showArtistPicks; }}>Add from an artist</MenuItem>
+						{#if setDetail?.planned_set_id}
+							<MenuSeparator />
+							<MenuItem onselect={handleUnlink}>Unlink from plan</MenuItem>
+						{:else if setDetail && setDetail.source !== 'kiku'}
+							<MenuSeparator />
+							<MenuItem onselect={openLinkPicker}>Link to a plan</MenuItem>
+						{/if}
+					</Menu>
+				</div>
+
+				<!-- 5 · Destructive — isolated on the far right -->
+				<div class="tool-divider tool-divider--strong" role="separator" aria-orientation="vertical"></div>
+				<div class="tool-group">
+					<Button variant={confirmDelete ? 'danger' : 'ghost'} size="sm" onclick={handleDelete} disabled={deleting}>
+						{deleting ? 'Deleting...' : confirmDelete ? 'Confirm delete?' : 'Delete'}
+					</Button>
+				</div>
+			</div>
 		</div>
+
+		{#if showLinkPicker}
+			<!-- Link picker — opened from the More menu; appears as its own band so the
+			     select + actions get room without crowding the toolbar. -->
+			<div class="link-picker-band">
+				{#if plannedSets.length === 0}
+					<span class="link-empty">No planned sets to link yet — build one first.</span>
+					<Button variant="ghost" size="sm" onclick={() => (showLinkPicker = false)}>Cancel</Button>
+				{:else}
+					<select class="link-select" bind:value={linkTargetId} aria-label="Choose the planned set">
+						<option value={null}>Which set did you plan from?</option>
+						{#each plannedSets as p (p.id)}
+							<option value={p.id}>{p.name} ({p.track_count} tracks)</option>
+						{/each}
+					</select>
+					<Button variant="secondary" size="sm" onclick={confirmLink} disabled={linkTargetId === null || linking}>
+						{linking ? 'Linking...' : 'Link'}
+					</Button>
+					<Button variant="ghost" size="sm" onclick={() => (showLinkPicker = false)}>Cancel</Button>
+				{/if}
+			</div>
+		{/if}
 
 		{#if loading}
 			<div class="status">Building your timeline...</div>
@@ -500,7 +556,7 @@
 
 				{#if analysis}
 					<div class="analysis-bar">
-						<span class="analysis-score" style="color: {analysis.overall_score >= 0.7 ? 'var(--color-success, #66BB6A)' : analysis.overall_score >= 0.5 ? 'var(--color-warning, #FFA726)' : 'var(--color-error, #EF5350)'}">
+						<span class="analysis-score" style="color: {analysis.overall_score >= 0.7 ? 'var(--score-excellent)' : analysis.overall_score >= 0.5 ? 'var(--score-fair)' : 'var(--score-poor)'}">
 							{analysis.overall_score.toFixed(3)}
 						</span>
 						<span class="analysis-arc">
@@ -591,19 +647,40 @@
 </div>
 
 <style>
+	/* Fixed-frame, internal-scroll surface — mirrors the sidebar `.library-browser`:
+	   the set's top region (SetPicker toolbar, set-name/actions row, energy chart,
+	   analysis bar) stays pinned while ONLY the timeline rows / set grid scroll
+	   beneath them. `flex:1; min-height:0` fills the `.content-grid` frame; the frame
+	   itself never scrolls (`overflow:hidden`) so nothing slides under the navbar.
+	   NOTE: this only bounds correctly because `.tab-content` (Workspace) is a flex
+	   column — that gives `.content-grid` a definite height for this `flex:1` to
+	   resolve against. Without it the whole `.set-view` grew to content height and
+	   `.tab-content` scrolled the chart + analysis bar away. */
 	.set-view {
+		flex: 1;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
-		height: 100%;
-		overflow-y: auto;
+		overflow: hidden;
 	}
 
+	/* Secondary band — set name + actions. Matches the sidebar's filter row:
+	   same --band-secondary-h (44px) + border-bottom, so this divider lands at the
+	   SAME y as the Recent/Plays/Unplayed/Played row (spec 023 band rhythm). */
 	.timeline-controls {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		padding: 8px 16px;
+		gap: var(--space-lg);
+		padding: 0 var(--space-xl);
+		height: var(--band-secondary-h);
 		border-bottom: 1px solid var(--border);
+		/* Second content-pane band: sticks directly beneath the SetPicker toolbar band
+		   (offset by --band-toolbar-h) so the set name/actions row stays visible and
+		   keeps aligning with the sidebar's filter row. Opaque so rows don't bleed. */
+		position: sticky;
+		top: var(--band-toolbar-h);
+		z-index: 4;
+		background: var(--bg-primary);
 	}
 
 	.set-name {
@@ -652,106 +729,37 @@
 		margin-right: auto;
 	}
 
-	.review-energy-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		color: #000;
-		background: var(--accent);
-		border: 1px solid var(--accent);
-		border-radius: 4px;
-		font-weight: 600;
-		transition: all 0.15s;
+	/* Action toolbar — one horizontal row of intent groups. Even, token-based gaps;
+	   subtle vertical dividers carry the grouping alongside order + spacing (color is
+	   never the only signal). Wraps gracefully on narrow widths. */
+	.toolbar {
+		display: flex;
+		align-items: center;
+		gap: var(--space-md);
+		flex-wrap: wrap;
 	}
 
-	.review-energy-btn:hover {
-		opacity: 0.85;
-	}
-
-	.play-set-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: #000;
-		background: var(--accent);
-		border: 1px solid var(--accent);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.play-set-btn:hover:not(:disabled) {
-		opacity: 0.85;
-	}
-
-	.play-set-btn:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.play-set-btn.play-all {
+	.tool-group {
 		display: inline-flex;
 		align-items: center;
-		gap: 4px;
+		gap: var(--space-sm);
 	}
 
-	.play-set-btn.builder {
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
-		border-color: var(--border);
+	/* Attached export pair (format picker + Export) reads as one unit. */
+	.export-unit {
+		gap: var(--space-xs);
 	}
 
-	.play-set-btn.builder:hover:not(:disabled) {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
+	.tool-divider {
+		width: 1px;
+		align-self: stretch;
+		min-height: 20px;
+		background: var(--border);
 	}
 
-	.assist-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.assist-btn:hover {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.export-select {
-		padding: 4px 8px;
-		font-size: 12px;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px 0 0 4px;
-		border-right: none;
-		cursor: pointer;
-	}
-
-	.export-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 0 4px 4px 0;
-		transition: all 0.15s;
-	}
-
-	.export-btn:hover:not(:disabled) {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.export-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
+	/* Stronger rule isolates the destructive zone on the far right. */
+	.tool-divider--strong {
+		background: var(--border-default);
 	}
 
 	.export-msg {
@@ -759,31 +767,14 @@
 		color: var(--accent);
 	}
 
-	.delete-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		color: var(--text-dim);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-		margin-left: 4px;
-	}
-
-	.delete-btn:hover:not(:disabled) {
-		color: #e74c3c;
-		border-color: #e74c3c;
-	}
-
-	.delete-btn.confirm {
-		color: #fff;
-		background: #e74c3c;
-		border-color: #e74c3c;
-	}
-
-	.delete-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
+	/* Link-to-a-plan picker — its own band beneath the toolbar (opened from More). */
+	.link-picker-band {
+		display: flex;
+		align-items: center;
+		gap: var(--space-md);
+		padding: var(--space-md) var(--space-xl);
+		border-bottom: 1px solid var(--border);
+		background: var(--bg-secondary);
 	}
 
 	.timeline-container {
@@ -794,11 +785,15 @@
 		border-bottom: 1px solid var(--border);
 	}
 
+	/* Pinned top region — energy chart. A `flex-shrink:0` sibling ABOVE the
+	   `.timeline-scroll` scroller (NOT inside it), so it holds fixed while only the
+	   rows scroll beneath. Solid background so scrolled rows can't bleed through. */
 	.top-panel {
 		display: flex;
 		flex-shrink: 0;
 		border-bottom: 1px solid var(--border);
 		min-height: 0;
+		background: var(--bg-primary);
 	}
 
 	.energy-chart-wrapper {
@@ -806,6 +801,9 @@
 		min-width: 0;
 	}
 
+	/* The ONLY scroller in the loaded-set frame. `flex:1; min-height:0` so it takes
+	   the leftover height under the pinned energy chart + analysis bar and scrolls
+	   its rows (timeline / TransitionDetail / SetComparison) internally. */
 	.timeline-scroll {
 		flex: 1;
 		min-height: 0;
@@ -827,79 +825,6 @@
 	.analyzing-status {
 		font-size: 12px;
 		color: var(--text-dim);
-	}
-
-	.analyze-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.analyze-btn:hover:not(:disabled) {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.analyze-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
-	.compare-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.compare-btn:hover:not(:disabled) {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
-	.compare-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
-	.unlink-btn {
-		padding: 4px 8px;
-		font-size: 11px;
-		color: var(--text-dim);
-		background: transparent;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-	}
-
-	.unlink-btn:hover {
-		color: var(--text-primary);
-	}
-
-	.link-btn {
-		padding: 4px 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: var(--text-dim);
-		background: transparent;
-		border: 1px dashed var(--border);
-		border-radius: 4px;
-		transition: all 0.15s;
-	}
-
-	.link-btn:hover {
-		color: var(--text-primary);
-		border-color: var(--accent);
 	}
 
 	.link-select {

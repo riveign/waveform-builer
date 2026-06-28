@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { formatTime } from '$lib/utils/waveform';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	const pb = getPlaybackStore();
 
@@ -22,39 +23,55 @@
 
 		<div class="bar-center">
 			<div class="transport">
-				<button
-					class="transport-btn"
+				<Button
+					iconOnly
+					shape="round"
+					variant="secondary"
+					size="sm"
+					ariaLabel="Previous track"
+					title="Previous (ArrowLeft)"
 					onclick={() => pb.previous()}
 					disabled={pb.currentIndex <= 0}
-					title="Previous (ArrowLeft)"
 				>
-					&#x23EE;
-				</button>
+					{#snippet icon()}&#x23EE;{/snippet}
+				</Button>
 
-				<button
-					class="transport-btn play"
-					onclick={() => pb.togglePlayPause()}
+				<Button
+					iconOnly
+					shape="round"
+					variant="primary"
+					size="md"
+					ariaLabel={pb.status === 'playing' || pb.status === 'transitioning' ? 'Pause' : 'Play'}
 					title="Play/Pause (Space)"
+					onclick={() => pb.togglePlayPause()}
 				>
-					{pb.status === 'playing' || pb.status === 'transitioning' ? '\u23F8' : '\u25B6'}
-				</button>
+					{#snippet icon()}{pb.status === 'playing' || pb.status === 'transitioning' ? '\u23F8' : '\u25B6'}{/snippet}
+				</Button>
 
-				<button
-					class="transport-btn"
+				<Button
+					iconOnly
+					shape="round"
+					variant="secondary"
+					size="sm"
+					ariaLabel="Next track"
+					title="Next (ArrowRight)"
 					onclick={() => pb.next()}
 					disabled={pb.currentIndex >= pb.tracks.length - 1}
-					title="Next (ArrowRight)"
 				>
-					&#x23ED;
-				</button>
+					{#snippet icon()}&#x23ED;{/snippet}
+				</Button>
 
-				<button
-					class="transport-btn stop"
-					onclick={() => pb.stop()}
+				<Button
+					iconOnly
+					shape="round"
+					variant="danger"
+					size="sm"
+					ariaLabel="Stop playback"
 					title="Stop (Escape)"
+					onclick={() => pb.stop()}
 				>
-					&#x23F9;
-				</button>
+					{#snippet icon()}&#x23F9;{/snippet}
+				</Button>
 			</div>
 
 			<div class="progress-row">
@@ -115,8 +132,8 @@
 	.playback-bar {
 		display: flex;
 		align-items: center;
-		gap: 16px;
-		padding: 8px 16px;
+		gap: var(--space-xl);
+		padding: var(--space-md) var(--space-xl);
 		background: var(--bg-secondary);
 		border-top: 1px solid var(--border);
 		flex-shrink: 0;
@@ -132,14 +149,14 @@
 	}
 
 	.mode-badge {
-		font-size: 10px;
-		font-weight: 700;
+		font-size: var(--text-2xs);
+		font-weight: var(--font-weight-semibold);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
-		padding: 2px 6px;
-		border-radius: 3px;
+		padding: var(--space-2xs) var(--space-sm);
+		border-radius: var(--radius-xs);
 		background: var(--accent);
-		color: #000;
+		color: var(--on-accent);
 		white-space: nowrap;
 	}
 
@@ -150,8 +167,8 @@
 	}
 
 	.track-title {
-		font-size: 12px;
-		font-weight: 600;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
 		color: var(--text-primary);
 		white-space: nowrap;
 		overflow: hidden;
@@ -159,7 +176,7 @@
 	}
 
 	.track-artist {
-		font-size: 11px;
+		font-size: var(--text-xs);
 		color: var(--text-secondary);
 		white-space: nowrap;
 		overflow: hidden;
@@ -171,60 +188,20 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 4px;
+		gap: var(--space-xs);
 		min-width: 0;
 	}
 
 	.transport {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-	}
-
-	.transport-btn {
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		background: var(--bg-tertiary);
-		color: var(--text-primary);
-		font-size: 12px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: background 0.15s;
-		border: 1px solid var(--border);
-	}
-
-	.transport-btn:hover:not(:disabled) {
-		background: var(--bg-hover);
-	}
-
-	.transport-btn:disabled {
-		opacity: 0.3;
-		cursor: default;
-	}
-
-	.transport-btn.play {
-		width: 34px;
-		height: 34px;
-		background: var(--accent);
-		color: #000;
-		font-size: 14px;
-		border-color: var(--accent);
-	}
-
-	.transport-btn.play:hover {
-		opacity: 0.85;
-	}
-
-	.transport-btn.stop {
-		font-size: 10px;
+		gap: var(--space-md);
 	}
 
 	.progress-row {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: var(--space-md);
 		width: 100%;
 		max-width: 400px;
 	}
@@ -233,19 +210,19 @@
 		flex: 1;
 		height: 4px;
 		background: var(--bg-tertiary);
-		border-radius: 2px;
+		border-radius: var(--radius-xs);
 		overflow: hidden;
 	}
 
 	.progress-fill {
 		height: 100%;
 		background: var(--accent);
-		border-radius: 2px;
-		transition: width 0.2s linear;
+		border-radius: var(--radius-xs);
+		transition: width var(--dur-base) linear;
 	}
 
 	.time {
-		font-size: 10px;
+		font-size: var(--text-2xs);
 		color: var(--text-dim);
 		font-variant-numeric: tabular-nums;
 		min-width: 32px;
@@ -255,22 +232,22 @@
 	.bar-right {
 		display: flex;
 		align-items: center;
-		gap: 12px;
+		gap: var(--space-lg);
 		flex-shrink: 0;
 	}
 
 	.builder-btn {
-		padding: 4px 10px;
-		font-size: 11px;
-		font-weight: 600;
-		border-radius: 4px;
+		padding: var(--space-xs) var(--space-md);
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
+		border-radius: var(--radius-sm);
 		border: 1px solid var(--border);
-		transition: all 0.15s;
+		transition: background var(--dur-fast) var(--ease-standard);
 	}
 
 	.builder-btn.keep {
 		background: var(--accent);
-		color: #000;
+		color: var(--on-accent);
 		border-color: var(--accent);
 	}
 
@@ -290,8 +267,8 @@
 	.bpm-match-toggle {
 		display: flex;
 		align-items: center;
-		gap: 4px;
-		font-size: 11px;
+		gap: var(--space-xs);
+		font-size: var(--text-xs);
 		color: var(--text-secondary);
 		cursor: pointer;
 		white-space: nowrap;
@@ -303,16 +280,16 @@
 
 	.set-progress {
 		display: flex;
-		gap: 3px;
+		gap: var(--space-2xs);
 		align-items: center;
 	}
 
 	.dot {
 		width: 6px;
 		height: 6px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		background: var(--bg-tertiary);
-		transition: all 0.2s;
+		transition: all var(--dur-base);
 	}
 
 	.dot.played {
@@ -326,7 +303,7 @@
 	}
 
 	.dot.confirmed {
-		background: #4ade80;
+		background: var(--score-excellent);
 	}
 
 	.volume-control {

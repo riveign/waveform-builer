@@ -2,6 +2,7 @@
 	import type { TinderQueueItem, TinderDecision } from '$lib/types';
 	import { getTinderQueue, submitDecision } from '$lib/api/tinder';
 	import TinderCard from '../tinder/TinderCard.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		trackIds,
@@ -81,7 +82,7 @@
 			{#if !done && totalToReview > 0}
 				<span class="progress">{currentIndex + 1} / {totalToReview}</span>
 			{/if}
-			<button class="close-btn" onclick={() => onclose(reviewed > 0)}>Esc</button>
+			<Button variant="ghost" size="sm" title="Close (Esc)" onclick={() => onclose(reviewed > 0)}>Esc</Button>
 		</div>
 
 		{#if loading}
@@ -98,7 +99,9 @@
 				{:else}
 					<div class="done-msg">All done.</div>
 				{/if}
-				<button class="done-btn" onclick={() => onclose(reviewed > 0)}>Close</button>
+				<div class="done-action">
+					<Button variant="primary" onclick={() => onclose(reviewed > 0)}>Close</Button>
+				</div>
 			</div>
 		{:else if currentItem}
 			{#key currentItem.track.id}
@@ -122,7 +125,7 @@
 	.dialog {
 		background: var(--bg-primary);
 		border: 1px solid var(--border);
-		border-radius: 12px;
+		border-radius: var(--radius-xl);
 		width: 560px;
 		max-width: 95vw;
 		max-height: 90vh;
@@ -132,39 +135,26 @@
 	.dialog-header {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		padding: 12px 16px;
+		gap: var(--space-lg);
+		padding: var(--space-lg) var(--space-xl);
 		border-bottom: 1px solid var(--border);
 	}
 
 	.dialog-title {
-		font-weight: 600;
-		font-size: 14px;
+		font-weight: var(--font-weight-semibold);
+		font-size: var(--text-md);
 	}
 
 	.progress {
-		font-size: 12px;
+		font-size: var(--text-sm);
 		color: var(--text-dim);
 		margin-right: auto;
 	}
 
-	.close-btn {
-		padding: 4px 10px;
-		font-size: 11px;
-		color: var(--text-dim);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-	}
-
-	.close-btn:hover {
-		color: var(--text-primary);
-	}
-
 	.dialog-status {
-		padding: 40px 20px;
+		padding: var(--space-5xl) var(--space-2xl);
 		text-align: center;
-		font-size: 13px;
+		font-size: var(--text-base);
 		color: var(--text-secondary);
 	}
 
@@ -176,32 +166,22 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 8px;
-		padding: 40px 20px;
+		gap: var(--space-md);
+		padding: var(--space-5xl) var(--space-2xl);
 	}
 
 	.done-count {
-		font-size: 18px;
-		font-weight: 600;
+		font-size: var(--text-lg);
+		font-weight: var(--font-weight-semibold);
 		color: var(--accent);
 	}
 
 	.done-msg {
-		font-size: 13px;
+		font-size: var(--text-base);
 		color: var(--text-secondary);
 	}
 
-	.done-btn {
-		margin-top: 12px;
-		padding: 8px 24px;
-		font-size: 13px;
-		font-weight: 600;
-		background: var(--accent);
-		color: #000;
-		border-radius: 6px;
-	}
-
-	.done-btn:hover {
-		opacity: 0.9;
+	.done-action {
+		margin-top: var(--space-lg);
 	}
 </style>

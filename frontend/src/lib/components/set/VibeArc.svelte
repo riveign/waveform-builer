@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getTrackFeatures } from '$lib/api/tracks';
+	import Chip from '$lib/components/primitives/Chip.svelte';
 
 	let {
 		trackAId,
@@ -89,15 +90,25 @@
 {#if vibeA && vibeB}
 	<div class="vibe-arc">
 		<div class="vibe-ends">
-			<span class="vibe-pill" title={label(vibeA)}>
-				<span class="dot" style="background: {vibeColor(vibeA.brightness, vibeA.density)};"></span>
-				{label(vibeA)}
-			</span>
+			<Chip
+				variant="vibe"
+				size="sm"
+				value={label(vibeA)}
+				title={label(vibeA)}
+				color={vibeColor(vibeA.brightness, vibeA.density)}
+			>
+				{#snippet icon()}<span class="dot"></span>{/snippet}
+			</Chip>
 			<span class="arrow" class:clash={distance > 0.38}>→</span>
-			<span class="vibe-pill" title={label(vibeB)}>
-				<span class="dot" style="background: {vibeColor(vibeB.brightness, vibeB.density)};"></span>
-				{label(vibeB)}
-			</span>
+			<Chip
+				variant="vibe"
+				size="sm"
+				value={label(vibeB)}
+				title={label(vibeB)}
+				color={vibeColor(vibeB.brightness, vibeB.density)}
+			>
+				{#snippet icon()}<span class="dot"></span>{/snippet}
+			</Chip>
 		</div>
 		{#if teaching}
 			<p class="vibe-teaching" class:clash={distance > 0.38}>{teaching}</p>
@@ -123,24 +134,14 @@
 		flex-wrap: wrap;
 	}
 
-	.vibe-pill {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 11px;
-		color: var(--text-primary);
-		padding: 3px 8px;
-		border-radius: 10px;
-		background: var(--bg-secondary);
-		border: 1px solid var(--border);
-		text-transform: capitalize;
-	}
-
+	/* The vibe Chip carries the dot color via --chip-color (passed as `color`);
+	 * the descriptor word stays readable (Chip's vibe variant). */
 	.dot {
 		width: 10px;
 		height: 10px;
 		border-radius: 50%;
 		flex-shrink: 0;
+		background: var(--chip-color);
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset;
 	}
 

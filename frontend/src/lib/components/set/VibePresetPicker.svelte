@@ -121,8 +121,8 @@
 	.vibe-chip.active {
 		background: var(--accent);
 		border-color: var(--accent);
-		color: #000;
-		font-weight: 600;
+		color: var(--on-accent);
+		font-weight: var(--font-weight-semibold);
 	}
 
 	.vibe-dot {

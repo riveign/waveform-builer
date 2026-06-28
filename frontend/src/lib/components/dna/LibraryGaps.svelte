@@ -6,10 +6,12 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
+	// Severity heat for gap counts. Mapped onto the token book so the swatch reads
+	// in-palette: critical → destructive, medium → amber, low → score-good.
 	function severityColor(count: number): string {
-		if (count < 3) return '#ef5350';
-		if (count <= 7) return '#FFA726';
-		return '#FFEE58';
+		if (count < 3) return 'var(--destructive)';
+		if (count <= 7) return 'var(--amber-500)';
+		return 'var(--score-good)';
 	}
 
 	$effect(() => {
@@ -186,7 +188,7 @@
 	.gap-badge {
 		font-size: 10px;
 		font-weight: 700;
-		color: #0D0D0D;
+		color: var(--gray-950);
 		text-align: center;
 		border-radius: 10px;
 		padding: 2px 6px;
@@ -195,7 +197,7 @@
 
 	.impact-bar-bg {
 		height: 6px;
-		background: rgba(63, 65, 74, 0.4);
+		background: var(--surface-3);
 		border-radius: 3px;
 		overflow: hidden;
 	}

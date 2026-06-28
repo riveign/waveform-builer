@@ -1,5 +1,12 @@
 <script lang="ts">
 	import { fillSet, optimizeOrder, reorderSetTracks, addTrackToSet, type OptimizeOrderResponse } from '$lib/api/sets';
+	import Button from '$lib/components/primitives/Button.svelte';
+	import SegmentedControl, { type SegmentOption } from '$lib/components/primitives/SegmentedControl.svelte';
+
+	const tabOptions: SegmentOption<'fill' | 'reorder'>[] = [
+		{ value: 'fill', label: 'Fill gaps' },
+		{ value: 'reorder', label: 'Reorder' },
+	];
 
 	let {
 		setId,
@@ -113,22 +120,21 @@
 	}
 
 	function scoreColor(score: number): string {
-		if (score >= 0.8) return 'var(--color-success, #66BB6A)';
-		if (score >= 0.6) return 'var(--color-warning, #FFA726)';
-		return 'var(--color-error, #EF5350)';
+		if (score >= 0.8) return 'var(--score-excellent)';
+		if (score >= 0.6) return 'var(--score-fair)';
+		return 'var(--score-poor)';
 	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="dialog-overlay" onclick={onclose} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="dialog" onclick={(e) => e.stopPropagation()}>
+	<!-- Inner panel stops backdrop-dismiss clicks; the overlay above owns Escape. -->
+	<div class="dialog" role="presentation" onclick={(e) => e.stopPropagation()}>
 		<div class="dialog-header">
-			<div class="tabs">
-				<button class="tab" class:active={activeTab === 'fill'} onclick={() => activeTab = 'fill'}>Fill Gaps</button>
-				<button class="tab" class:active={activeTab === 'reorder'} onclick={() => activeTab = 'reorder'}>Reorder</button>
-			</div>
-			<button class="close-btn" onclick={onclose}>&times;</button>
+			<SegmentedControl options={tabOptions} value={activeTab} onchange={(v) => activeTab = v} ariaLabel="Fill or reorder" />
+			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={onclose}>
+				{#snippet icon()}×{/snippet}
+			</Button>
 		</div>
 
 		{#if activeTab === 'fill'}
@@ -146,8 +152,8 @@
 							<input type="number" bind:value={fillMaxTracks} min={1} max={30} class="form-input" />
 						</label>
 						<div class="form-actions">
-							<button class="btn secondary" onclick={onclose}>Cancel</button>
-							<button class="btn primary" onclick={startFill}>Find Tracks</button>
+							<Button variant="secondary" size="sm" onclick={onclose}>Cancel</Button>
+							<Button variant="primary" size="sm" onclick={startFill}>Find tracks</Button>
 						</div>
 					</div>
 				{:else if fillRunning}
@@ -171,16 +177,18 @@
 								</div>
 								<p class="proposal-explanation">{proposal.explanation}</p>
 								<div class="proposal-actions">
-									<button
-										class="btn-sm"
-										class:active={proposal.accepted}
+									<Button
+										variant="ghost"
+										size="sm"
+										pressed={proposal.accepted}
 										onclick={() => { proposals[i].accepted = true; proposals = proposals; }}
-									>Keep</button>
-									<button
-										class="btn-sm"
-										class:active={!proposal.accepted}
+									>Keep</Button>
+									<Button
+										variant="ghost"
+										size="sm"
+										pressed={!proposal.accepted}
 										onclick={() => { proposals[i].accepted = false; proposals = proposals; }}
-									>Skip</button>
+									>Skip</Button>
 								</div>
 							</div>
 						{/each}
@@ -189,10 +197,10 @@
 
 				{#if fillComplete && proposals.length > 0}
 					<div class="form-actions">
-						<button class="btn secondary" onclick={onclose}>Cancel</button>
-						<button class="btn primary" onclick={applyFill} disabled={applying || proposals.filter(p => p.accepted).length === 0}>
+						<Button variant="secondary" size="sm" onclick={onclose}>Cancel</Button>
+						<Button variant="primary" size="sm" onclick={applyFill} loading={applying} disabled={proposals.filter(p => p.accepted).length === 0}>
 							{applying ? 'Applying...' : `Apply ${proposals.filter(p => p.accepted).length} tracks`}
-						</button>
+						</Button>
 					</div>
 				{/if}
 			</div>
@@ -217,8 +225,8 @@
 							</label>
 						</div>
 						<div class="form-actions">
-							<button class="btn secondary" onclick={onclose}>Cancel</button>
-							<button class="btn primary" onclick={startOptimize}>Optimize</button>
+							<Button variant="secondary" size="sm" onclick={onclose}>Cancel</Button>
+							<Button variant="primary" size="sm" onclick={startOptimize}>Optimize</Button>
 						</div>
 					</div>
 				{:else if optimizing}
@@ -256,10 +264,10 @@
 						{/if}
 
 						<div class="form-actions">
-							<button class="btn secondary" onclick={onclose}>Cancel</button>
-							<button class="btn primary" onclick={applyReorder} disabled={applyingReorder || reorderResult.changes.length === 0}>
-								{applyingReorder ? 'Applying...' : 'Apply New Order'}
-							</button>
+							<Button variant="secondary" size="sm" onclick={onclose}>Cancel</Button>
+							<Button variant="primary" size="sm" onclick={applyReorder} loading={applyingReorder} disabled={reorderResult.changes.length === 0}>
+								{applyingReorder ? 'Applying...' : 'Apply new order'}
+							</Button>
 						</div>
 					</div>
 				{/if}
@@ -295,35 +303,6 @@
 		justify-content: space-between;
 		padding: 12px 16px;
 		border-bottom: 1px solid var(--border);
-	}
-
-	.tabs {
-		display: flex;
-		gap: 4px;
-	}
-
-	.tab {
-		padding: 6px 16px;
-		font-size: 13px;
-		font-weight: 600;
-		background: none;
-		border: none;
-		color: var(--text-dim);
-		cursor: pointer;
-		border-radius: 4px;
-	}
-
-	.tab.active {
-		color: var(--text-primary);
-		background: var(--bg-secondary);
-	}
-
-	.close-btn {
-		background: none;
-		border: none;
-		color: var(--text-dim);
-		font-size: 20px;
-		cursor: pointer;
 	}
 
 	.tab-content {
@@ -365,31 +344,6 @@
 		gap: 8px;
 		justify-content: flex-end;
 		margin-top: 12px;
-	}
-
-	.btn {
-		padding: 8px 16px;
-		font-size: 13px;
-		font-weight: 600;
-		border-radius: 6px;
-		cursor: pointer;
-		border: none;
-	}
-
-	.btn.primary {
-		background: var(--accent);
-		color: #000;
-	}
-
-	.btn.secondary {
-		background: var(--bg-secondary);
-		color: var(--text-primary);
-		border: 1px solid var(--border);
-	}
-
-	.btn:disabled {
-		opacity: 0.5;
-		cursor: default;
 	}
 
 	.fill-status {
@@ -442,22 +396,6 @@
 		gap: 6px;
 	}
 
-	.btn-sm {
-		padding: 4px 10px;
-		font-size: 11px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: none;
-		color: var(--text-secondary);
-		cursor: pointer;
-	}
-
-	.btn-sm.active {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
-	}
-
 	.strategy-options {
 		display: flex;
 		flex-direction: column;
@@ -494,7 +432,7 @@
 	}
 
 	.delta.positive {
-		color: var(--color-success, #66BB6A);
+		color: var(--score-excellent);
 	}
 
 	.no-changes {

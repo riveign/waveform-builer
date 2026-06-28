@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { SCPlaylist } from '$lib/types';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	interface Props {
 		playlist: SCPlaylist;
@@ -30,9 +31,11 @@
 			{/if}
 		</div>
 	</div>
-	<button class="chase-btn" onclick={() => onchase(playlist.id)} disabled={chasing}>
-		{chasing ? 'Chasing...' : 'Chase'}
-	</button>
+	<div class="chase">
+		<Button size="sm" loading={chasing} onclick={() => onchase(playlist.id)}>
+			{chasing ? 'Chasing...' : 'Chase'}
+		</Button>
+	</div>
 </div>
 
 <style>
@@ -80,20 +83,7 @@
 		margin: 0 4px;
 	}
 
-	.chase-btn {
-		padding: 6px 14px;
-		font-size: 12px;
-		font-weight: 600;
-		background: var(--accent);
-		color: #000;
-		border: none;
-		border-radius: 6px;
-		cursor: pointer;
+	.chase {
 		flex-shrink: 0;
-	}
-
-	.chase-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
 	}
 </style>

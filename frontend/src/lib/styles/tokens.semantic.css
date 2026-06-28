@@ -1,0 +1,241 @@
+/* ===========================================================================
+ * Tier 2 — SEMANTIC (intent). This is what components SHOULD consume.
+ * Tier 3 (--btn-*), the global :focus-visible rule, and motion live here too.
+ * =========================================================================== */
+:root {
+	/* --- THE FLIP LEVER (Research §3) -------------------------------------
+	 * FLIPPED to CERCETA (teal book palette). The app default is now cerceta.
+	 * The cyan ramp survives as an inert primitive (available for revert/demo);
+	 * the /design-system showcase keeps its [data-theme="cerceta"] block as an
+	 * explicit mirror. To revert the whole app to cyan, repoint these 4 lines
+	 * back at the --cyan-* ramp (and restore --accent-contrast: #000000). */
+	--accent-9:        var(--teal-600);  /* #008A84 solid brand / action fill */
+	--accent-10:       var(--teal-400);  /* #00B1B8 bright hover lift */
+	--accent-11:       var(--teal-500);  /* #44AAA2 accent text on dark (6.96:1) */
+	--accent-contrast: #FFFFFF;          /* legible foreground ON accent-9 (white on teal-600) */
+
+	/* role aliases components actually use */
+	--accent:          var(--accent-9);
+	--accent-hover:    var(--accent-10);
+	--accent-pressed:  var(--teal-700);  /* cerceta pressed step */
+	--accent-text:     var(--accent-11);
+	--on-accent:       var(--accent-contrast);
+
+	/* surfaces (Carbon layer ladder) */
+	--surface-1: var(--gray-950);  /* app bg */
+	--surface-2: var(--gray-850);  /* panel */
+	--surface-3: var(--gray-800);  /* raised / input bg */
+	--surface-hover:    var(--gray-750);
+	--surface-active:   var(--gray-700);
+	--surface-waveform: var(--gray-900);
+
+	/* foreground (shadcn/M3 on- pairing) */
+	--text-1: var(--gray-50);   /* primary */
+	--text-2: var(--gray-200);  /* secondary */
+	--text-3: var(--gray-300);  /* tertiary */
+	--text-4: var(--gray-400);  /* dim */
+
+	/* borders (Radix 6/7/8) — solid color tokens for border-color usage */
+	--border-subtle: var(--gray-600);
+	--border-default: var(--gray-600);
+	--border-strong: var(--gray-500);
+
+	/* status — re-tinted onto the cerceta cool→hot ramp (navy→lilac→magenta) so
+	 * the energy scale reads in-palette rather than as off-book green/orange/red.
+	 * All three steps clear AA body contrast vs the app bg. --destructive moves to
+	 * the magenta accent step (AA text-safe) so error states sit in the book. */
+	--energy-low:  var(--navy-400);    /* cool — low energy (7.78:1) */
+	--energy-mid:  var(--lilac-400);   /* mid — lifting (7.43:1) */
+	--energy-high: var(--magenta-400); /* hot — peak (7.01:1) */
+	--destructive: var(--magenta-500); /* error / danger, in-palette (5.19:1) */
+
+	/* rating — filled star color. Cerceta uses the magenta highlight step (the
+	 * palette's accent/highlight role). To revert, point back at --amber-500. */
+	--star-fill: var(--magenta-400);
+
+	/* energy zones — one source for the 6-zone journey, consumed by the Chip
+	 * `energy` variant and the zone-dot/zone-badge sites. Re-pointed onto the
+	 * cerceta book palette (navy→teal→lilac→magenta journey). To revert, point
+	 * each back at its --zone-*-500 primitive. */
+	--zone-intro:  var(--navy-400);    /* cool blue — doors-open lull */
+	--zone-warmup: var(--teal-400);    /* teal — easing in */
+	--zone-build:  var(--lilac-400);   /* soft lilac — lifting */
+	--zone-drive:  var(--magenta-400); /* magenta — floor moving */
+	--zone-peak:   var(--magenta-300); /* bright highlight — the apex */
+	--zone-close:  var(--lilac-500);   /* dusk violet — comedown */
+
+	/* score quality — one ramp by meaning (excellent/good/fair/poor) for
+	 * transition, bpm and harmony verdicts. Re-pointed onto the cerceta book
+	 * palette. To revert, point each back at its --score-*-500 primitive. */
+	--score-excellent: var(--teal-400);
+	--score-good:      var(--lilac-400);
+	--score-fair:      var(--magenta-400);
+	--score-poor:      var(--magenta-300);
+
+	/* bpm delta — tension coloring from content-conventions §3. Within ±6% of the
+	 * source BPM the transition is seamless (neutral); beyond that it warns. */
+	--bpm-delta-neutral: var(--text-2);
+	--bpm-delta-warn:    var(--score-fair);
+
+	/* --- Focus ring (Research §5; systemic a11y fix) --- */
+	--focus-ring: #5FD0A8;        /* light teal-green; 10.25:1 vs bg — ring sits in the offset gap against the page bg */
+	--focus-ring-width: 2px;
+	--focus-ring-offset: 2px;
+
+	/* --- Spacing (Research §6; 4px hybrid + 2px mini-unit) --- */
+	--space-0: 0;
+	--space-px: 1px;
+	--space-2xs: 2px;
+	--space-xs: 4px;
+	--space-sm: 6px;
+	--space-md: 8px;
+	--space-lg: 12px;
+	--space-xl: 16px;
+	--space-2xl: 20px;
+	--space-3xl: 24px;
+	--space-4xl: 32px;
+	--space-5xl: 48px;
+	--space-6xl: 64px;
+
+	/* --- Type scale (Research §6; 12px body anchor, 9→10 promoted) --- */
+	--text-2xs: 10px;  --lh-2xs: 1.45;
+	--text-xs:  11px;  --lh-xs:  1.45;
+	--text-sm:  12px;  --lh-sm:  1.4;
+	--text-base:13px;  --lh-base:1.4;
+	--text-md:  14px;  --lh-md:  1.4;
+	--text-lg:  16px;  --lh-lg:  1.3;
+	--text-xl:  20px;  --lh-xl:  1.2;
+	--text-2xl: 24px;  --lh-2xl: 1.2;
+	--font-weight-regular: 400;
+	--font-weight-medium:  500;
+	--font-weight-semibold:600;
+
+	/* --- Radius (Research §6) --- */
+	--radius-xs:   2px;
+	--radius-sm:   4px;
+	--radius-md:   6px;
+	--radius-lg:   8px;
+	--radius-xl:   12px;
+	--radius-full: 9999px;
+
+	/* --- Elevation (Research §6; border-first on dark) --- */
+	--elev-0: none;
+	--elev-1: 0 1px 2px rgba(0,0,0,0.4);
+	--elev-2: 0 2px 8px rgba(0,0,0,0.5);
+	--elev-3: 0 8px 24px rgba(0,0,0,0.6);
+
+	/* --- Motion (Research §6) --- */
+	--dur-fast: 120ms;
+	--dur-base: 200ms;
+	--dur-slow: 320ms;
+	--ease-standard:   cubic-bezier(0.2, 0, 0, 1);
+	--ease-decelerate: cubic-bezier(0, 0, 0, 1);
+	--ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
+
+	/* --- Tier 3 — Component (Button) --- */
+	--btn-bg:       var(--accent);
+	--btn-bg-hover: var(--accent-hover);
+	--btn-fg:       var(--on-accent);
+	--btn-radius:   var(--radius-sm);
+	--btn-focus:    var(--focus-ring);
+	--btn-height:   36px;  /* single control height; sizes differ by padding/font only */
+
+	/* --- Tier 3 — Component (Chip) --- mirrors the --btn-* pattern. One radius,
+	 * two heights, two padding/font steps. The default chip is a neutral surface
+	 * label; variants tint via the zone/score/key color flowing in. */
+	--chip-radius:    var(--radius-sm);
+	--chip-bg:        var(--surface-3);
+	--chip-fg:        var(--text-2);
+	--chip-border:    var(--border-subtle);
+	--chip-height-sm: 24px;
+	--chip-height-md: 32px;  /* meets the ≈32px target (content-conventions §5) */
+	--chip-pad-x-sm:  var(--space-sm);
+	--chip-pad-x-md:  var(--space-md);
+	--chip-font-sm:   var(--text-xs);
+	--chip-font-md:   var(--text-sm);
+	--chip-gap:       var(--space-xs);
+	/* Genre is descriptive identity metadata, but a bare-surface label read too
+	 * faint next to the colored key/energy chips. The genre chip gets a visible,
+	 * tinted treatment of its own: a soft accent-tinted surface + accent-strength
+	 * text + a matching border, so it reads as clearly as the other variants
+	 * while staying neutral in meaning. Tokenized so cerceta re-points it. */
+	--chip-genre-bg:     color-mix(in srgb, var(--accent-text) 14%, var(--surface-3));
+	--chip-genre-fg:     var(--accent-text);
+	--chip-genre-border: color-mix(in srgb, var(--accent-text) 34%, transparent);
+
+	/* --- Tier 3 — Component (Rating / StarRating) --- dedicated glyph sizes so
+	 * the star scale is decoupled from the text scale (text tokens read too
+	 * small at the ends). sm reads clearly at a glance; lg is a touch-friendly
+	 * showcase/peak size; md is the default inline size. */
+	--star-size-sm: 14px;
+	--star-size-md: 16px;
+	--star-size-lg: 24px;
+
+	/* --- Tier 3 — Component (Icon) --- one size scale for inline-SVG icons
+	 * (content-conventions §6: one size step, one stroke weight). Meaning-bearing
+	 * glyphs (the harmony moves) size off these; sm is the dense in-card size, md
+	 * the default inline size, lg the showcase/standalone size. Icons draw with
+	 * `currentColor`, so they inherit the chip/theme color rather than owning hex. */
+	--icon-size-sm: 16px;
+	--icon-size-md: 20px;
+	--icon-size-lg: 24px;
+	--icon-stroke: 2;  /* shared stroke weight for line glyphs */
+
+	/* --- Tier 3 — Component (Menu) --- the floating menu surface + its rows.
+	 * One surface (bg/border/radius/shadow), one item geometry. Items meet the
+	 * ≈32px target (content-conventions §5). Inherits the theme via tokens — no
+	 * hardcoded hex, so the cerceta showcase recolors it like everything else. */
+	--menu-bg:           var(--surface-2);
+	--menu-border:       var(--border-default);
+	--menu-radius:       var(--radius-lg);
+	--menu-shadow:       var(--elev-3);
+	--menu-pad:          var(--space-xs);   /* panel inner padding */
+	--menu-item-gap:     var(--space-px);   /* gap between rows */
+	--menu-item-height:  32px;              /* min target — ≈32px (§5) */
+	--menu-item-pad-x:   var(--space-md);
+	--menu-item-radius:  var(--radius-sm);
+	--menu-item-hover:   var(--surface-hover);
+	--menu-item-active:  var(--surface-active);
+
+	/* --- List row (sidebar track table) ---
+	 * Shared density for long, scannable lists. Header + body use the SAME
+	 * column gap + cell padding so the columns line up exactly. Row height is a
+	 * single token tuned for a dense list (smaller than the 32px control band).
+	 * Fixed-column min widths live here so header/body/breakpoints agree.
+	 * Cells are lightweight COLORED TEXT (not chips), so the numeric columns are
+	 * sized to their FULL value (key "11A", bpm "144") — never truncated. */
+	--list-row-height:   30px;             /* dense scannable row, < control band */
+	--list-row-pad-y:    var(--space-xs);
+	--list-row-pad-x:    var(--space-sm);  /* cell inner gutter */
+	--list-row-gap:      var(--space-sm);  /* gap between columns */
+	--list-col-play:     26px;
+	--list-col-key:      34px;             /* full Camelot text e.g. "11A" / "Cm" */
+	--list-col-bpm:      36px;             /* 3-digit integer e.g. "144" */
+	--list-col-energy:   minmax(52px, max-content); /* zone word e.g. "warmup" */
+	--list-col-plays:    30px;
+	--list-col-rating:   84px;             /* all 5 sm stars (14px + pad/gap) fit */
+}
+
+/* Global systemic focus ring — specificity 0 so components can still override.
+ * :focus-visible = keyboard/AT only (not mouse). outline+offset keeps the ring in
+ * the gap against the page bg (Research §5). */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+	outline: var(--focus-ring-width) solid var(--focus-ring);
+	outline-offset: var(--focus-ring-offset);
+}
+:focus:not(:focus-visible) { outline: none; }
+
+/* Reduced motion — collapse token durations so no component touches a literal. */
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		--dur-fast: 0.01ms;
+		--dur-base: 0.01ms;
+		--dur-slow: 0.01ms;
+	}
+	*, *::before, *::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

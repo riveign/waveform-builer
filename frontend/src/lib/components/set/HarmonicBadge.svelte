@@ -1,59 +1,63 @@
 <script lang="ts">
 	import { formatKey, getCamelotColor, harmonicRelationship } from '$lib/utils/camelot';
+	import Chip from '$lib/components/primitives/Chip.svelte';
+	import HarmonyIcon, { toHarmonyRelation } from '$lib/components/primitives/HarmonyIcon.svelte';
 
 	let { keyA, keyB }: { keyA: string | null; keyB: string | null } = $props();
 
 	let rel = $derived(harmonicRelationship(keyA, keyB));
+	let relation = $derived(toHarmonyRelation(rel.label));
 
-	let borderColor = $derived.by(() => {
+	let relColor = $derived.by(() => {
 		switch (rel.type) {
 			case 'same':
 			case 'adjacent':
-				return '#66BB6A';
+				return 'var(--score-excellent)';
 			case 'modeSwitch':
 			case 'adjacentMode':
 			case 'twoAway':
-				return '#FFB74D';
+				return 'var(--score-good)';
 			case 'clash':
-				return '#EF5350';
+				return 'var(--score-poor)';
 			default:
-				return '#666';
+				return 'var(--text-3)';
 		}
 	});
 </script>
 
-<div class="harmonic-badge" style="border-color: {borderColor}">
-	<span class="key" style="color: {getCamelotColor(keyA)}">{formatKey(keyA) || '?'}</span>
+<Chip variant="harmony" color={relColor}>
+	<span class="key" style:color={getCamelotColor(keyA)}>{formatKey(keyA) || '—'}</span>
 	<span class="arrow">→</span>
-	<span class="key" style="color: {getCamelotColor(keyB)}">{formatKey(keyB) || '?'}</span>
-	<span class="rel-label" style="color: {borderColor}">{rel.label}</span>
-</div>
+	<span class="key" style:color={getCamelotColor(keyB)}>{formatKey(keyB) || '—'}</span>
+	{#if relation}
+		<span class="rel-icon" style:color={relColor}>
+			<HarmonyIcon {relation} size="sm" label={rel.label} title={rel.description} />
+		</span>
+	{/if}
+	<span class="rel-label" style:color={relColor}>{rel.label}</span>
+</Chip>
 
 <style>
-	.harmonic-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		padding: 6px 10px;
-		background: var(--bg-secondary);
-		border: 1px solid;
-		border-radius: 6px;
-		font-size: 13px;
-	}
-
 	.key {
-		font-weight: 700;
+		font-weight: var(--font-weight-semibold);
 		font-variant-numeric: tabular-nums;
 	}
-
 	.arrow {
-		color: var(--text-dim);
-		font-size: 12px;
+		color: var(--text-4);
+		font-size: var(--text-sm);
 	}
-
+	.rel-icon {
+		display: inline-flex;
+		align-items: center;
+		margin-left: var(--space-2xs);
+	}
+	.rel-icon :global(.harmony-icon--sm) {
+		width: var(--text-base);
+		height: var(--text-base);
+	}
 	.rel-label {
-		font-size: 11px;
-		font-weight: 500;
-		margin-left: 2px;
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-medium);
+		margin-left: var(--space-2xs);
 	}
 </style>

@@ -24,10 +24,10 @@
 	let hasDualScores = $derived(analysisScore != null && builderScore != null);
 
 	function scoreColor(s: number): string {
-		if (s >= 0.8) return '#66BB6A';
-		if (s >= 0.6) return '#FFB74D';
-		if (s >= 0.4) return '#FF9800';
-		return '#FF6B6B';
+		if (s >= 0.8) return 'var(--score-excellent)';
+		if (s >= 0.6) return 'var(--score-good)';
+		if (s >= 0.4) return 'var(--score-fair)';
+		return 'var(--score-poor)';
 	}
 
 	function scoreLabel(s: number): string {

@@ -3,6 +3,7 @@
 	import { getSoundCloudStore } from '$lib/stores/soundcloud.svelte';
 	import SCPlaylistCard from './SCPlaylistCard.svelte';
 	import SCTrackList from './SCTrackList.svelte';
+	import SegmentedControl from '$lib/components/primitives/SegmentedControl.svelte';
 
 	interface Props {
 		onhuntresult: (hunt: HuntSession) => void;
@@ -39,12 +40,15 @@
 
 <div class="sc-browser">
 	<div class="tab-bar">
-		<button class="tab" class:active={tab === 'playlists'} onclick={() => tab = 'playlists'}>
-			Playlists
-		</button>
-		<button class="tab" class:active={tab === 'likes'} onclick={() => tab = 'likes'}>
-			Likes
-		</button>
+		<SegmentedControl
+			options={[
+				{ value: 'playlists', label: 'Playlists' },
+				{ value: 'likes', label: 'Likes' },
+			]}
+			value={tab}
+			onchange={(v) => (tab = v)}
+			ariaLabel="SoundCloud browse mode"
+		/>
 	</div>
 
 	{#if sc.error}
@@ -57,7 +61,7 @@
 		{:else if sc.playlists.length === 0}
 			<div class="empty">No playlists found on your SoundCloud.</div>
 		{:else}
-			<div class="playlist-grid">
+			<div class="playlist-grid grid-12 grid-12--content">
 				{#each sc.playlists as playlist}
 					<SCPlaylistCard
 						{playlist}
@@ -87,37 +91,20 @@
 <style>
 	.sc-browser {
 		margin-top: 12px;
+		container-type: inline-size; /* query container for the playlist card grid reflow */
 	}
 
 	.tab-bar {
-		display: flex;
-		gap: 2px;
 		margin-bottom: 12px;
 		border-bottom: 1px solid var(--border);
 	}
 
-	.tab {
-		padding: 8px 16px;
-		font-size: 13px;
-		font-weight: 500;
-		background: transparent;
-		color: var(--text-secondary);
-		border: none;
-		border-bottom: 2px solid transparent;
-		cursor: pointer;
-	}
-
-	.tab.active {
-		color: var(--text-primary);
-		border-bottom-color: var(--accent);
-	}
-
 	.sc-error {
 		padding: 8px 12px;
-		background: rgba(255, 80, 80, 0.1);
-		border: 1px solid rgba(255, 80, 80, 0.3);
+		background: color-mix(in srgb, var(--destructive) 12%, transparent);
+		border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
 		border-radius: 6px;
-		color: #ff5050;
+		color: var(--destructive);
 		font-size: 13px;
 		margin-bottom: 12px;
 	}
@@ -129,9 +116,15 @@
 		font-size: 14px;
 	}
 
-	.playlist-grid {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
+	/* 12-col content grid: playlist row-cards span 6 (2-up) at full width,
+	   reflowing to 1-up via container query so the horizontal card never cramps. */
+	.playlist-grid > :global(.playlist-card) {
+		grid-column: span 6; /* 2-up */
+	}
+
+	@container (max-width: 640px) {
+		.playlist-grid > :global(.playlist-card) {
+			grid-column: span 12; /* 1-up */
+		}
 	}
 </style>

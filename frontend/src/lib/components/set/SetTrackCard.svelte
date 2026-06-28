@@ -5,7 +5,8 @@
 	import { getTrackEnergyNumeric, energyColor as getEnergyColor } from '$lib/utils/energy';
 	import { getTrack } from '$lib/api/tracks';
 	import EnergyConflictBadge from './EnergyConflictBadge.svelte';
-	import ContextMenu from '../ContextMenu.svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
+	import Menu from '../primitives/Menu.svelte';
 	import TrackContextMenu from '../library/TrackContextMenu.svelte';
 
 	let {
@@ -111,7 +112,7 @@
 		<div class="title-row">
 			<span class="title" title={track.title ?? ''}>{track.title ?? 'Untitled'}</span>
 			{#if track.genre}
-				<span class="genre-badge">{track.genre}</span>
+				<Chip variant="genre" value={track.genre} size="sm" title={track.genre} />
 			{/if}
 			{#if energyConflict}
 				<EnergyConflictBadge conflict={energyConflict} />
@@ -147,16 +148,16 @@
 </div>
 
 {#if contextMenuOpen}
-	<ContextMenu bind:open={contextMenuOpen} x={contextMenuX} y={contextMenuY}>
+	<Menu bind:open={contextMenuOpen} x={contextMenuX} y={contextMenuY} label="Track actions">
 		{#if loadingContextTrack}
-			<div style="padding: 12px; font-size: 13px; color: var(--text-secondary);">Loading...</div>
+			<div style="padding: 12px; font-size: 13px; color: var(--text-secondary);">Reading the track...</div>
 		{:else if contextMenuFullTrack}
 			<TrackContextMenu
 				track={contextMenuFullTrack}
 				onclose={() => contextMenuOpen = false}
 			/>
 		{/if}
-	</ContextMenu>
+	</Menu>
 {/if}
 
 <style>
@@ -258,17 +259,6 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-	}
-
-	.genre-badge {
-		flex-shrink: 0;
-		font-size: 9px;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		padding: 1px 5px;
-		border-radius: 3px;
-		background: var(--bg-tertiary);
-		color: var(--text-secondary);
 	}
 
 	.meta {

@@ -1,57 +1,34 @@
 <script lang="ts">
 	import type { EnergyConflict } from '$lib/types';
+	import Chip from '$lib/components/primitives/Chip.svelte';
 
 	let { conflict }: { conflict: EnergyConflict } = $props();
 
-	const zoneColors: Record<string, string> = {
-		intro: '#6388b4',
-		warmup: '#4ecdc4',
-		build: '#ffe66d',
-		drive: '#f39c12',
-		peak: '#ff6b6b',
-		close: '#9b59b6',
-	};
+	// Zone colors now live as semantic tokens (--zone-*), single source of truth.
+	function zoneColor(zone: string): string {
+		const known = ['intro', 'warmup', 'build', 'drive', 'peak', 'close'];
+		return known.includes(zone) ? `var(--zone-${zone})` : 'var(--text-2)';
+	}
 </script>
 
-<span class="conflict-badge" title={conflict.message}>
-	<span class="zone" style="color: {zoneColors[conflict.dir_energy] ?? 'var(--text-secondary)'}">
-		{conflict.dir_energy}
-	</span>
+<Chip variant="energy" title={conflict.message}>
+	<span class="zone" style:color={zoneColor(conflict.dir_energy)}>{conflict.dir_energy}</span>
 	<span class="vs">/</span>
-	<span class="zone" style="color: {zoneColors[conflict.predicted] ?? 'var(--text-secondary)'}">
-		{conflict.predicted}
-	</span>
-	<span class="icon">?</span>
-</span>
+	<span class="zone" style:color={zoneColor(conflict.predicted)}>{conflict.predicted}</span>
+	<span class="icon" aria-hidden="true">?</span>
+</Chip>
 
 <style>
-	.conflict-badge {
-		display: inline-flex;
-		align-items: center;
-		gap: 2px;
-		padding: 1px 5px;
-		border-radius: 3px;
-		background: rgba(255, 190, 11, 0.1);
-		border: 1px solid rgba(255, 190, 11, 0.3);
-		font-size: 9px;
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
-		cursor: help;
-	}
-
 	.zone {
-		font-weight: 600;
+		font-weight: var(--font-weight-semibold);
 	}
-
 	.vs {
-		color: var(--text-dim);
-		font-size: 8px;
+		color: var(--text-4);
 	}
-
 	.icon {
-		font-size: 8px;
-		font-weight: 700;
-		color: var(--accent);
-		margin-left: 1px;
+		font-size: var(--text-2xs);
+		font-weight: var(--font-weight-semibold);
+		color: var(--accent-text);
+		margin-left: var(--space-px);
 	}
 </style>

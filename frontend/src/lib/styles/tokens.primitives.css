@@ -1,0 +1,116 @@
+/* ===========================================================================
+ * Tier 1 — PRIMITIVES (raw palette). Components NEVER reference these directly;
+ * only tokens.semantic.css does. The CERCETA (teal) + book ramps below cost
+ * nothing visually until the accent source re-points (Research §3 flip strategy).
+ * The /design-system showcase is the only place that re-points to teal today.
+ *
+ * Ramps are OKLCH-even (consistent hue, perceptual lightness ladder). Source
+ * hexes from the Sara Caldas palette are kept as named anchor steps. Contrast
+ * notes are honest WCAG 2.x ratios vs the app bg #0D0D0D (gray-950).
+ * =========================================================================== */
+:root {
+	/* --- Teal / Cerceta ramp (hue ~190°). PRIMARY family ---------------------
+	 * 500 = #44AAA2 the dominant action color (soft cerceta, 6.96:1 — AA text).
+	 * 400 = #00B1B8 the brighter "lift" for hover/focus only (7.39:1).
+	 * 600 = #008A84 hover/solid-fill step that still clears AA text (4.60:1). */
+	--teal-50:  #E1F9F7; /* 17.67:1 */
+	--teal-100: #C8F2EE; /* 16.10:1 */
+	--teal-200: #9EE0DB; /* 13.09:1 */
+	--teal-300: #70CDC7; /* 10.41:1 */
+	--teal-400: #00B1B8; /* 7.39:1  — bright lift (hover/focus only) */
+	--teal-500: #44AAA2; /* 6.96:1  — PRIMARY action / text-on-dark anchor */
+	--teal-600: #008A84; /* 4.60:1  — solid hover fill (AA text-safe) */
+	--teal-700: #00706C; /* 3.27:1  — pressed / large-UI only */
+	--teal-800: #005652; /* 2.27:1  — non-text */
+	--teal-900: #003B38; /* 1.56:1  — non-text */
+	--teal-950: #002321; /* 1.17:1  — non-text */
+
+	/* --- Navy ramp (hue ~242°). SURFACE TINT / secondary family --------------
+	 * 800 = #005380 the source navy — a dark-on-dark elevated surface/border.
+	 * 400 = #5FABE2 the text-safe step (7.78:1) for any navy text/icon use.
+	 * 500 = #3E94CE also clears AA text (5.86:1). */
+	--navy-50:  #E5F6FF; /* 17.55:1 */
+	--navy-100: #CEECFF; /* 15.80:1 */
+	--navy-200: #A9D7FB; /* 12.77:1 */
+	--navy-300: #83C2F2; /* 10.15:1 */
+	--navy-400: #5FABE2; /* 7.78:1  — text-safe step (AA body) */
+	--navy-500: #3E94CE; /* 5.86:1  — AA text-safe */
+	--navy-600: #277DB4; /* 4.33:1  — large text / UI */
+	--navy-700: #166595; /* 3.08:1  — large UI only */
+	--navy-800: #005380; /* 2.36:1  — SURFACE TINT / border (source navy) */
+	--navy-900: #053450; /* 1.49:1  — deep surface */
+	--navy-950: #001E32; /* 1.14:1  — deepest surface */
+
+	/* --- Magenta ramp (hue ~358°). ACCENT / highlight family -----------------
+	 * 600 = #AF125A the source magenta — fills/borders/icons only (2.83:1).
+	 * 400 = #F969A3 the text-safe highlight step (7.01:1).
+	 * 500 = #E4488C also clears AA text (5.19:1). */
+	--magenta-50:  #FFE8F3; /* 16.74:1 */
+	--magenta-100: #FFD3E8; /* 14.56:1 */
+	--magenta-200: #FFB1D1; /* 11.53:1 */
+	--magenta-300: #FF8DBA; /* 9.04:1 */
+	--magenta-400: #F969A3; /* 7.01:1  — text-safe highlight (AA body) */
+	--magenta-500: #E4488C; /* 5.19:1  — AA text-safe */
+	--magenta-600: #AF125A; /* 2.83:1  — ACCENT fill / border (source magenta) */
+	--magenta-700: #8F004D; /* 2.11:1  — pressed / dim, non-text */
+	--magenta-800: #801347; /* 1.95:1  — non-text */
+	--magenta-900: #5A0930; /* 1.40:1  — non-text */
+	--magenta-950: #38021C; /* 1.10:1  — non-text */
+
+	/* --- Lilac ramp (hue ~326°). SOFT / secondary-text family ----------------
+	 * 300 = #D5B2D5 the source lilac — the safest color for body/large text on
+	 * dark (10.33:1). Carries secondary text, muted headings, chips. */
+	--lilac-50:  #FAF0FA; /* 17.50:1 */
+	--lilac-100: #F2E2F2; /* 15.67:1 */
+	--lilac-200: #E1C8E1; /* 12.54:1 */
+	--lilac-300: #D5B2D5; /* 10.33:1 — SOFT text anchor (source lilac) */
+	--lilac-400: #BA94BA; /* 7.43:1  — AA text-safe tint */
+	--lilac-500: #A47CA5; /* 5.56:1  — AA text-safe */
+	--lilac-600: #8C678D; /* 4.11:1  — large text / UI */
+	--lilac-700: #735273; /* 2.95:1  — large UI only */
+	--lilac-800: #573D58; /* 2.05:1  — non-text */
+	--lilac-900: #3C283C; /* 1.44:1  — non-text */
+	--lilac-950: #241624; /* 1.12:1  — non-text */
+
+	/* --- Cyan ramp (LIVE app accent; :root stays cyan so the app is unchanged) --- */
+	--cyan-500: #00CED1; /* current --accent */
+	--cyan-600: #00A8AB; /* current --accent-dim */
+
+	/* --- Gray ramp (formalized from existing --bg-* and --text-* values) --- */
+	--gray-950: #0D0D0D; /* current --bg-primary */
+	--gray-900: #12121A; /* current --waveform-bg */
+	--gray-850: #1A1B23; /* current --bg-secondary */
+	--gray-800: #242631; /* current --bg-tertiary */
+	--gray-750: #2E3040; /* current --bg-hover */
+	--gray-700: #383A4A; /* current --bg-active */
+	--gray-600: #3F414A; /* current --border */
+	--gray-500: #555555; /* current --border-focus */
+	--gray-400: #666666; /* current --text-dim */
+	--gray-300: #7A7B82; /* current --text-tertiary */
+	--gray-200: #A0A1A7; /* current --text-secondary */
+	--gray-50:  #F5F5F0; /* current --text-primary */
+
+	/* --- Status primitives --- */
+	--green-500:  #4CAF50; /* energy-low */
+	--orange-500: #FF9800; /* energy-mid */
+	--red-500:    #F44336; /* energy-high */
+	--coral-500:  #FF6B6B; /* destructive */
+	--amber-500:  #FFC107; /* star / rating fill (live app star color) */
+
+	/* --- Energy-zone primitives (the live ZONE_COLORS map, promoted) ---
+	 * Single source for the 6 energy zones. Replaces the de-facto ZONE_COLORS
+	 * map + SimilarTrackCard PHASE_PILL_COLORS + EnergyConflictBadge inline dict. */
+	--zone-intro-500:  #6388B4; /* cool blue — the doors-open lull */
+	--zone-warmup-500: #4ECDC4; /* teal — easing the room in */
+	--zone-build-500:  #FFE66D; /* warm yellow — lifting */
+	--zone-drive-500:  #F39C12; /* amber — the floor moving */
+	--zone-peak-500:   #FF6B6B; /* coral-red — the apex */
+	--zone-close-500:  #9B59B6; /* violet — the comedown */
+
+	/* --- Score-quality primitives (one ramp; folds the duplicated thresholds
+	 * in TransitionIndicator / BpmBadge / HarmonicBadge) --- */
+	--score-excellent-500: #66BB6A; /* ≥0.8 */
+	--score-good-500:      #FFB74D; /* ≥0.6 */
+	--score-fair-500:      #FF9800; /* ≥0.4 */
+	--score-poor-500:      #FF6B6B; /* below */
+}

@@ -10,18 +10,9 @@
 	} from 'chart.js';
 	import { getBpmHistogram } from '$lib/api/stats';
 	import type { BpmBin } from '$lib/types';
+	import { familyColors, chartChrome } from './chartPalette';
 
 	Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
-
-	const FAMILY_COLORS: Record<string, string> = {
-		Techno: '#40E0D0',
-		House: '#FF7F50',
-		Groove: '#66BB6A',
-		Trance: '#9575CD',
-		Breaks: '#FFB74D',
-		Electronic: '#42A5F5',
-		Other: '#95a5a6',
-	};
 
 	let canvas: HTMLCanvasElement;
 	let chart: Chart | null = null;
@@ -29,6 +20,7 @@
 	let error = $state<string | null>(null);
 
 	function buildStackedData(bins: BpmBin[]) {
+		const colors = familyColors();
 		const families = [...new Set(bins.map((b) => b.family))].sort();
 		const bpmLabels = [...new Set(bins.map((b) => b.bin_center))].sort((a, b) => a - b);
 		const labelStrings = bpmLabels.map((v) => String(v));
@@ -46,7 +38,7 @@
 			return {
 				label: family,
 				data: bpmLabels.map((bpm) => famMap.get(bpm) ?? 0),
-				backgroundColor: FAMILY_COLORS[family] ?? '#95a5a6',
+				backgroundColor: colors[family] ?? colors.Other,
 				borderColor: 'transparent',
 				borderWidth: 0,
 			};
@@ -67,6 +59,7 @@
 				if (destroyed) return;
 
 				const { labels, datasets } = buildStackedData(data);
+				const chrome = chartChrome();
 
 				chart = new Chart(canvas, {
 					type: 'bar',
@@ -79,7 +72,7 @@
 								display: true,
 								position: 'bottom',
 								labels: {
-									color: '#F5F5F0',
+									color: chrome.text,
 									font: { size: 11 },
 									padding: 12,
 									boxWidth: 12,
@@ -96,9 +89,9 @@
 						scales: {
 							x: {
 								stacked: true,
-								grid: { color: 'rgba(63, 65, 74, 0.4)' },
+								grid: { color: chrome.grid },
 								ticks: {
-									color: '#666',
+									color: chrome.tick,
 									font: { size: 10 },
 									maxRotation: 0,
 									autoSkip: true,
@@ -107,21 +100,21 @@
 								title: {
 									display: true,
 									text: 'BPM',
-									color: '#A0A1A7',
+									color: chrome.label,
 									font: { size: 12 },
 								},
 							},
 							y: {
 								stacked: true,
-								grid: { color: 'rgba(63, 65, 74, 0.4)' },
+								grid: { color: chrome.grid },
 								ticks: {
-									color: '#666',
+									color: chrome.tick,
 									font: { size: 10 },
 								},
 								title: {
 									display: true,
 									text: 'Tracks',
-									color: '#A0A1A7',
+									color: chrome.label,
 									font: { size: 12 },
 								},
 							},

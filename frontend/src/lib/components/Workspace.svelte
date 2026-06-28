@@ -13,6 +13,8 @@
 	const ui = getUiStore();
 	const pb = getPlaybackStore();
 
+	// Tab strip now lives in the navbar (+layout.svelte). This component owns the
+	// tab CONTENT switch + the 1–6 number-key shortcuts below.
 	function handleKeydown(e: KeyboardEvent) {
 		const target = e.target as HTMLElement;
 		if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
@@ -40,46 +42,30 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="workspace">
-	<div class="tab-bar">
-		<button class="tab" class:active={ui.activeTab === 'track'} onclick={() => ui.activeTab = 'track'}>
-			Track View <span class="shortcut">1</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'set'} onclick={() => ui.activeTab = 'set'}>
-			Set Timeline <span class="shortcut">2</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'dna'} onclick={() => ui.activeTab = 'dna'}>
-			Taste DNA <span class="shortcut">3</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'tinder'} onclick={() => ui.activeTab = 'tinder'}>
-			Energy Tinder <span class="shortcut">4</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'hunt'} onclick={() => ui.activeTab = 'hunt'}>
-			Track Hunter <span class="shortcut">5</span>
-		</button>
-		<button class="tab" class:active={ui.activeTab === 'albums'} onclick={() => ui.activeTab = 'albums'}>
-			Albums <span class="shortcut">6</span>
-		</button>
-	</div>
 	<div class="tab-content">
-		{#if ui.activeTab === 'track'}
-			{#if ui.selectedTrack}
-				<TrackView track={ui.selectedTrack} />
-			{:else}
-				<div class="empty-state">
-					<p>Choose a track to explore its sound</p>
-				</div>
+		<!-- Content-pane grid foundation. Surfaces render full-width for now; the
+		     .grid-12--content host is ready for per-surface card grids (deferred). -->
+		<div class="content-grid">
+			{#if ui.activeTab === 'track'}
+				{#if ui.selectedTrack}
+					<TrackView track={ui.selectedTrack} />
+				{:else}
+					<div class="empty-state">
+						<p>Choose a track to explore its sound</p>
+					</div>
+				{/if}
+			{:else if ui.activeTab === 'set'}
+				<SetView />
+			{:else if ui.activeTab === 'dna'}
+				<DnaView />
+			{:else if ui.activeTab === 'tinder'}
+				<EnergyTinder />
+			{:else if ui.activeTab === 'hunt'}
+				<HuntView />
+			{:else if ui.activeTab === 'albums'}
+				<AlbumsView />
 			{/if}
-		{:else if ui.activeTab === 'set'}
-			<SetView />
-		{:else if ui.activeTab === 'dna'}
-			<DnaView />
-		{:else if ui.activeTab === 'tinder'}
-			<EnergyTinder />
-		{:else if ui.activeTab === 'hunt'}
-			<HuntView />
-		{:else if ui.activeTab === 'albums'}
-			<AlbumsView />
-		{/if}
+		</div>
 	</div>
 
 	{#if pb.isActive}
@@ -111,41 +97,32 @@
 		overflow: hidden;
 	}
 
-	.tab-bar {
-		display: flex;
-		background: var(--bg-secondary);
-		border-bottom: 1px solid var(--border);
-		flex-shrink: 0;
-	}
-
-	.tab {
-		padding: 8px 20px;
-		font-size: 13px;
-		color: var(--text-secondary);
-		border-bottom: 2px solid transparent;
-		transition: all 0.15s;
-	}
-
-	.tab:hover {
-		color: var(--text-primary);
-		background: var(--bg-hover);
-	}
-
-	.tab.active {
-		color: var(--accent);
-		border-bottom-color: var(--accent);
-	}
-
-	.shortcut {
-		font-size: 10px;
-		color: var(--text-dim);
-		margin-left: 4px;
-		opacity: 0.6;
-	}
-
+	/* Content scroll region. Flex column so its single child (.content-grid) is
+	   bounded by this region's DEFINITE height — giving full-height surfaces that
+	   opt into `flex:1; min-height:0; overflow:hidden` (set/dna/tinder/hunt/albums)
+	   a real frame for their OWN internal scroller. Without this, `.content-grid`'s
+	   `min-height:100%` lets the column grow to content and THIS region scrolls
+	   everything (e.g. the set's energy chart + analysis bar slid away). Shorter,
+	   non-frame surfaces (track view, empty states) still grow and scroll here. */
 	.tab-content {
 		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
 		overflow-y: auto;
+	}
+
+	/* Content-pane grid foundation (spec 023 shell). Carries the dense 16px gutter
+	   token and the page padding. Renders as a block for now so existing surfaces
+	   stay full-width — per-surface opt-in to a 12-col card grid is a later wave.
+	   Flex column + min-height:100% gives full-height surfaces (e.g. .set-view) a
+	   definite frame to fill (so they can host their OWN internal scroller, like the
+	   sidebar), while shorter surfaces still grow and let .tab-content scroll. */
+	.content-grid {
+		--grid-gutter: var(--space-xl);
+		display: flex;
+		flex-direction: column;
+		min-height: 100%;
 	}
 
 	.empty-state {
@@ -154,6 +131,6 @@
 		justify-content: center;
 		height: 100%;
 		color: var(--text-dim);
-		font-size: 14px;
+		font-size: var(--text-md);
 	}
 </style>

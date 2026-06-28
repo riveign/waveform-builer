@@ -10,6 +10,7 @@
 	} from 'chart.js';
 	import { getLibraryStats, getEnhancedStats } from '$lib/api/stats';
 	import type { LibraryStats, EnhancedStatsResponse } from '$lib/types';
+	import { accentColor, chartChrome, rgba } from './chartPalette';
 
 	Chart.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip);
 
@@ -90,17 +91,20 @@
 				const { strongest, weakest } = findStrongestWeakest(values);
 				teachingNote = `Strongest: ${strongest} — weakest: ${weakest}. A rounder shape means a more versatile collection.`;
 
+				const chrome = chartChrome();
+				const accent = accentColor();
+
 				chart = new Chart(canvas, {
 					type: 'radar',
 					data: {
 						labels: AXES,
 						datasets: [{
 							data: values,
-							backgroundColor: 'rgba(64, 224, 208, 0.15)',
-							borderColor: 'rgba(64, 224, 208, 0.8)',
+							backgroundColor: rgba(accent, 0.15),
+							borderColor: rgba(accent, 0.8),
 							borderWidth: 2,
-							pointBackgroundColor: 'rgba(64, 224, 208, 1)',
-							pointBorderColor: '#0D0D0D',
+							pointBackgroundColor: accent,
+							pointBorderColor: chrome.surface,
 							pointBorderWidth: 1,
 							pointRadius: 4,
 							pointHoverRadius: 6,
@@ -119,8 +123,8 @@
 										return `${ctx.label}: ${Math.round(val * 100)}%`;
 									},
 								},
-								backgroundColor: '#0D0D0D',
-								borderColor: '#3F414A',
+								backgroundColor: chrome.surface,
+								borderColor: chrome.border,
 								borderWidth: 1,
 							},
 						},
@@ -130,18 +134,18 @@
 								max: 1,
 								ticks: {
 									stepSize: 0.25,
-									color: '#555',
+									color: chrome.muted,
 									backdropColor: 'transparent',
 									font: { size: 9 },
 								},
 								grid: {
-									color: 'rgba(63, 65, 74, 0.5)',
+									color: chrome.grid,
 								},
 								angleLines: {
-									color: 'rgba(63, 65, 74, 0.5)',
+									color: chrome.grid,
 								},
 								pointLabels: {
-									color: '#A0A1A7',
+									color: chrome.label,
 									font: { size: 11 },
 								},
 							},

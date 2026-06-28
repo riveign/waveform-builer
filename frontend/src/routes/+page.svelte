@@ -155,6 +155,6 @@
 		align-items: center;
 		justify-content: center;
 		background: rgba(0, 0, 0, 0.55);
-		padding: 24px;
+		padding: var(--space-3xl);
 	}
 </style>

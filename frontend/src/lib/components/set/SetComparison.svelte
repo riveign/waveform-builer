@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { SetComparison, TrackDeviation } from '$lib/types';
+	import Chip from '$lib/components/primitives/Chip.svelte';
+	import Button from '$lib/components/primitives/Button.svelte';
 
 	let {
 		comparison,
@@ -10,10 +12,10 @@
 	} = $props();
 
 	const KIND_COLORS: Record<string, string> = {
-		kept: '#66BB6A',
-		moved: '#FFB74D',
-		cut: '#EF5350',
-		added: '#4FC3F7',
+		kept: 'var(--score-excellent)',
+		moved: 'var(--score-good)',
+		cut: 'var(--score-poor)',
+		added: 'var(--zone-intro)',
 	};
 
 	let plannedSide = $derived(
@@ -38,11 +40,16 @@
 		}
 		return d.kind;
 	}
+
+	/** A soft tinted background for a deviation badge — the kind color at low alpha. */
+	function badgeTint(kind: string): string {
+		return `color-mix(in srgb, ${KIND_COLORS[kind]} 13%, transparent)`;
+	}
 </script>
 
 <div class="comparison">
 	<div class="comparison-header">
-		<button class="back-btn" onclick={onback}>&larr; Timeline</button>
+		<Button variant="secondary" size="sm" onclick={onback}>&larr; Timeline</Button>
 		<span class="title">Planned vs played</span>
 		<span class="count" style="color: {KIND_COLORS.kept}">{comparison.kept_count} kept</span>
 		<span class="count" style="color: {KIND_COLORS.moved}">{comparison.moved_count} moved</span>
@@ -51,9 +58,9 @@
 	</div>
 
 	<div class="arc-row">
-		<span class="arc-chip">arc: {comparison.arc.planned_shape} &rarr; {comparison.arc.played_shape}</span>
-		<span class="arc-chip">keys: {comparison.arc.planned_key_style} &rarr; {comparison.arc.played_key_style}</span>
-		<span class="arc-chip">bpm: {comparison.arc.planned_bpm_style} &rarr; {comparison.arc.played_bpm_style}</span>
+		<Chip variant="neutral" size="sm">arc: {comparison.arc.planned_shape} &rarr; {comparison.arc.played_shape}</Chip>
+		<Chip variant="neutral" size="sm">keys: {comparison.arc.planned_key_style} &rarr; {comparison.arc.played_key_style}</Chip>
+		<Chip variant="neutral" size="sm">bpm: {comparison.arc.planned_bpm_style} &rarr; {comparison.arc.played_bpm_style}</Chip>
 	</div>
 
 	<div class="two-col">
@@ -63,7 +70,7 @@
 				<div class="dev-row" class:dimmed={d.kind === 'cut'}>
 					<span class="pos">{(d.planned_position ?? 0) + 1}</span>
 					<span class="track-title">{d.title ?? `Track ${d.track_id}`}</span>
-					<span class="badge" style="background: {KIND_COLORS[d.kind]}22; color: {KIND_COLORS[d.kind]}">{badgeLabel(d)}</span>
+					<span class="badge" style="background: {badgeTint(d.kind)}; color: {KIND_COLORS[d.kind]}">{badgeLabel(d)}</span>
 				</div>
 			{/each}
 		</div>
@@ -73,7 +80,7 @@
 				<div class="dev-row">
 					<span class="pos">{(d.played_position ?? 0) + 1}</span>
 					<span class="track-title">{d.title ?? `Track ${d.track_id}`}</span>
-					<span class="badge" style="background: {KIND_COLORS[d.kind]}22; color: {KIND_COLORS[d.kind]}">{badgeLabel(d)}</span>
+					<span class="badge" style="background: {badgeTint(d.kind)}; color: {KIND_COLORS[d.kind]}">{badgeLabel(d)}</span>
 				</div>
 			{/each}
 		</div>
@@ -87,7 +94,7 @@
 			{/each}
 			{#each teachingDeviations as d}
 				<p class="moment">
-					<span class="badge" style="background: {KIND_COLORS[d.kind]}22; color: {KIND_COLORS[d.kind]}">{badgeLabel(d)}</span>
+					<span class="badge" style="background: {badgeTint(d.kind)}; color: {KIND_COLORS[d.kind]}">{badgeLabel(d)}</span>
 					{d.teaching_moment}
 				</p>
 			{/each}
@@ -103,80 +110,57 @@
 
 <style>
 	.comparison {
-		padding: 12px 16px;
+		padding: var(--space-lg) var(--space-xl);
 	}
 
 	.comparison-header {
 		display: flex;
 		align-items: center;
-		gap: 12px;
-		margin-bottom: 8px;
-	}
-
-	.back-btn {
-		padding: 4px 10px;
-		font-size: 12px;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-	}
-
-	.back-btn:hover {
-		background: var(--accent);
-		color: #000;
-		border-color: var(--accent);
+		gap: var(--space-lg);
+		margin-bottom: var(--space-md);
 	}
 
 	.title {
-		font-weight: 600;
-		font-size: 14px;
+		font-weight: var(--font-weight-semibold);
+		font-size: var(--text-md);
 		margin-right: auto;
 	}
 
 	.count {
-		font-size: 12px;
-		font-weight: 600;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
 	}
 
 	.arc-row {
 		display: flex;
-		gap: 8px;
+		gap: var(--space-md);
 		flex-wrap: wrap;
-		margin-bottom: 12px;
-	}
-
-	.arc-chip {
-		font-size: 11px;
-		color: var(--text-secondary);
-		padding: 2px 8px;
-		background: var(--bg-tertiary);
-		border-radius: 10px;
+		margin-bottom: var(--space-lg);
 	}
 
 	.two-col {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 16px;
-		margin-bottom: 16px;
+		gap: var(--space-xl);
+		margin-bottom: var(--space-xl);
 	}
 
 	.col h3 {
-		font-size: 12px;
-		font-weight: 600;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		color: var(--text-secondary);
-		margin: 0 0 8px;
+		margin: 0 0 var(--space-md);
 	}
 
 	.dev-row {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 4px 8px;
-		border-radius: 4px;
-		margin-bottom: 2px;
+		gap: var(--space-md);
+		padding: var(--space-xs) var(--space-md);
+		border-radius: var(--radius-sm);
+		margin-bottom: var(--space-2xs);
 		background: var(--bg-secondary);
 	}
 
@@ -185,7 +169,7 @@
 	}
 
 	.pos {
-		font-size: 11px;
+		font-size: var(--text-xs);
 		color: var(--text-dim);
 		width: 20px;
 		text-align: right;
@@ -193,7 +177,7 @@
 	}
 
 	.track-title {
-		font-size: 13px;
+		font-size: var(--text-base);
 		flex: 1;
 		min-width: 0;
 		overflow: hidden;
@@ -202,46 +186,46 @@
 	}
 
 	.badge {
-		font-size: 10px;
-		font-weight: 600;
-		padding: 1px 6px;
-		border-radius: 8px;
+		font-size: var(--text-2xs);
+		font-weight: var(--font-weight-semibold);
+		padding: var(--space-px) var(--space-sm);
+		border-radius: var(--radius-lg);
 		white-space: nowrap;
 	}
 
 	.badge.energy {
-		background: rgba(186, 104, 200, 0.15);
-		color: #BA68C8;
+		background: color-mix(in srgb, var(--zone-close) 15%, transparent);
+		color: var(--zone-close);
 	}
 
 	.teaching-panel {
 		background: var(--bg-secondary);
-		border-radius: 8px;
-		padding: 12px 16px;
+		border-radius: var(--radius-lg);
+		padding: var(--space-lg) var(--space-xl);
 	}
 
 	.teaching-panel h3 {
-		font-size: 12px;
-		font-weight: 600;
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		color: var(--text-secondary);
-		margin: 0 0 8px;
+		margin: 0 0 var(--space-md);
 	}
 
 	.pattern {
-		font-size: 13px;
+		font-size: var(--text-base);
 		font-style: italic;
 		color: var(--text-primary);
-		margin: 0 0 8px;
+		margin: 0 0 var(--space-md);
 	}
 
 	.moment {
-		font-size: 12px;
+		font-size: var(--text-sm);
 		color: var(--text-secondary);
-		margin: 0 0 6px;
+		margin: 0 0 var(--space-sm);
 		display: flex;
 		align-items: baseline;
-		gap: 8px;
+		gap: var(--space-md);
 	}
 </style>

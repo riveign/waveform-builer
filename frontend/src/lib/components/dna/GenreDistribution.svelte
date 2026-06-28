@@ -8,18 +8,9 @@
 	} from 'chart.js';
 	import { getLibraryStats } from '$lib/api/stats';
 	import type { LibraryStats } from '$lib/types';
+	import { familyColors, chartChrome, rgba } from './chartPalette';
 
 	Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
-
-	const FAMILY_COLORS: Record<string, string> = {
-		Techno: '#40E0D0',
-		House: '#FF7F50',
-		Groove: '#66BB6A',
-		Trance: '#9575CD',
-		Breaks: '#FFB74D',
-		Electronic: '#42A5F5',
-		Other: '#95a5a6',
-	};
 
 	const GENRE_TO_FAMILY: Record<string, string> = {
 		'Techno': 'Techno',
@@ -92,7 +83,9 @@
 				const sorted = Object.entries(familyCounts).sort((a, b) => b[1] - a[1]);
 				const labels = sorted.map(([f]) => f);
 				const values = sorted.map(([, c]) => c);
-				const colors = labels.map((f) => FAMILY_COLORS[f] ?? FAMILY_COLORS.Other);
+				const famColors = familyColors();
+				const colors = labels.map((f) => famColors[f] ?? famColors.Other);
+				const chrome = chartChrome();
 
 				chart = new Chart(canvas, {
 					type: 'doughnut',
@@ -101,7 +94,7 @@
 						datasets: [{
 							data: values,
 							backgroundColor: colors,
-							borderColor: 'rgba(13, 13, 13, 0.8)',
+							borderColor: rgba(chrome.surface, 0.8),
 							borderWidth: 2,
 						}],
 					},
@@ -114,7 +107,7 @@
 								display: true,
 								position: 'bottom',
 								labels: {
-									color: '#F5F5F0',
+									color: chrome.text,
 									font: { size: 11 },
 									padding: 12,
 									boxWidth: 12,
@@ -144,11 +137,11 @@
 							drawCtx.textBaseline = 'middle';
 
 							drawCtx.font = 'bold 22px -apple-system, BlinkMacSystemFont, sans-serif';
-							drawCtx.fillStyle = '#F5F5F0';
+							drawCtx.fillStyle = chrome.text;
 							drawCtx.fillText(String(data.total_tracks), centerX, centerY - 8);
 
 							drawCtx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
-							drawCtx.fillStyle = '#A0A1A7';
+							drawCtx.fillStyle = chrome.label;
 							drawCtx.fillText('tracks', centerX, centerY + 12);
 
 							drawCtx.restore();
