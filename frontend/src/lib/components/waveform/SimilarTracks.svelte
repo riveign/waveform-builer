@@ -148,26 +148,35 @@
 		margin: 0;
 	}
 
-	/* 12-col content grid: every card is an equal column-multiple. Cards span 4
-	   (3-up) at full width and reflow to 2-up then 1-up via container queries —
-	   never a crammed/ragged row. */
+	/* 12-col content grid: every card is an equal column-multiple. Cards span 2
+	   (6-up) at full content width — each card lands ≈150px wide, which is the
+	   SimilarTrackCard's COMPACT pill tier (<200px): colored-icon row + bold N★.
+	   Reflow steps down sensibly so the card never crams: 6-up → 4-up → 3-up →
+	   2-up via container queries (the card's own container queries pick the right
+	   internal tier at each width). */
 	.cards-grid {
 		grid-auto-rows: 1fr; /* every row the same height → all cards equal */
 	}
 
 	.cards-grid > :global(.card-slot) {
-		grid-column: span 4; /* 3-up at full content width */
+		grid-column: span 2; /* 6-up at full content width (compact pill tier) */
 	}
 
-	@container (max-width: 720px) {
+	@container (max-width: 860px) {
 		.cards-grid > :global(.card-slot) {
-			grid-column: span 6; /* 2-up */
+			grid-column: span 3; /* 4-up */
 		}
 	}
 
-	@container (max-width: 460px) {
+	@container (max-width: 620px) {
 		.cards-grid > :global(.card-slot) {
-			grid-column: span 12; /* 1-up */
+			grid-column: span 4; /* 3-up */
+		}
+	}
+
+	@container (max-width: 440px) {
+		.cards-grid > :global(.card-slot) {
+			grid-column: span 6; /* 2-up */
 		}
 	}
 

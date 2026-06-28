@@ -12,6 +12,7 @@
 	import SimilarTracks from './SimilarTracks.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import StarRating from '../library/StarRating.svelte';
+	import { capFirst } from '../library/SimilarTrackCard.svelte';
 	import Spinner from '../Spinner.svelte';
 	import EnergyZonePicker from '../library/EnergyZonePicker.svelte';
 	import { ZONE_COLORS } from '../library/EnergyZonePicker.svelte';
@@ -158,6 +159,17 @@
 		}
 	}
 
+	// Persistent curation caption beside the rating stars. Mirrors StarRating's
+	// curation-score read (rating → % of curation weight) but always visible — not
+	// hover-only, so the info is keyboard/AT-reachable (content-conventions §5) —
+	// and folds in the Rekordbox sync note. Sentence case throughout.
+	let ratingCaption = $derived.by(() => {
+		const sync = 'Ratings sync from Rekordbox — changes here last until your next sync';
+		if (localRating === 0) return `Unrated — neutral weight in transitions. ${sync}`;
+		const curationPct = Math.round((localRating / 5) * 40);
+		return `${localRating}★ — ${curationPct}% of curation score. ${sync}`;
+	});
+
 	// Clamp feature values to 0–1 range (some analysers produce >1)
 	function pct(v: number | null | undefined): number {
 		return Math.min(Math.round((v ?? 0) * 100), 100);
@@ -214,9 +226,9 @@
 				>
 					{#snippet icon()}{isThisTrackPlaying ? '⏸' : '▶'}{/snippet}
 				</Button>
-				<div>
-					<h2 class="track-title">{track.title ?? 'Unknown'}</h2>
-					<span class="track-artist">{track.artist ?? 'Unknown'}</span>
+				<div class="title-text">
+					<h2 class="track-title" title={track.title ?? 'Unknown'}>{capFirst(track.title ?? 'Unknown')}</h2>
+					<span class="track-artist" title={track.artist ?? 'Unknown'}>{capFirst(track.artist ?? 'Unknown')}</span>
 				</div>
 			</div>
 			<div class="track-meta">
@@ -229,17 +241,15 @@
 				<Chip variant="bpm" value={track.bpm ? Math.round(track.bpm) : '?'} title="Tempo {track.bpm ? Math.round(track.bpm) + ' BPM' : 'unknown'}" />
 				<div class="zone-badge-wrapper" bind:this={zoneWrapperEl}>
 					<button
-						class="meta-badge meta-badge-interactive zone-badge"
+						class="zone-chip-btn"
+						class:approved={track.energy_source === 'approved'}
 						style="--zone-color: {ZONE_COLORS[localZone ?? ''] ?? 'var(--text-dim)'}"
 						onclick={() => showZonePicker = !showZonePicker}
-						title="Change energy zone"
-						aria-label="Energy zone: {localZone ?? 'not set'}. Click to change."
+						title={track.energy_source === 'approved' ? 'Energy zone (you approved this) — change it' : 'Energy zone — change it'}
+						aria-label="Energy zone: {localZone ?? 'not set'}{track.energy_source === 'approved' ? ', approved by you' : ''}. Click to change."
 					>
 						<span class="zone-dot-sm"></span>
-						{localZone ?? track.energy ?? '?'}
-						{#if track.energy_source === 'approved'}
-							<span class="source-check" title="You approved this zone">✓</span>
-						{/if}
+						{capFirst(localZone ?? track.energy ?? '?')}
 					</button>
 					{#if showZonePicker}
 						<div class="zone-dropdown">
@@ -272,15 +282,18 @@
 					title="Add to a set"
 				>+ Add to set</Button>
 			</div>
-			<!-- Rating inline with header -->
+			<!-- Track signals row — the DJ's rating + what it contributes to curation.
+			     A standalone track has no match-score (NN/100 is a pair-wise verdict),
+			     so this header renders the rating half of the Related-tracks "Track
+			     signals" pattern: editable stars, a compact read of the curation
+			     contribution, and the sync caption. -->
 			<div class="track-rating-row">
 				<StarRating
 					rating={localRating}
 					size="lg"
-					showScore={true}
 					onchange={handleRatingChange}
 				/>
-				<span class="sync-note">Ratings sync from Rekordbox — changes here last until your next sync</span>
+				<span class="curation-note">{ratingCaption}</span>
 			</div>
 		</div>
 	</div>
@@ -459,14 +472,30 @@
 		gap: 10px;
 	}
 
+	/* The text column must be able to shrink so the title/artist ellipsize
+	 * (content-conventions §2) rather than push the row wider than the header. */
+	.title-text {
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
+	/* Title + artist: one line each, ellipsis on overflow, full value on hover
+	 * via title (content-conventions §2). First-letter-capped via capFirst (§1). */
 	.track-title {
 		font-size: var(--text-lg);
 		font-weight: var(--font-weight-semibold);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.track-artist {
 		font-size: var(--text-md);
 		color: var(--text-secondary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.track-meta {
@@ -477,16 +506,6 @@
 		position: relative;
 	}
 
-	.meta-badge {
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-semibold);
-		padding: var(--space-2xs) var(--space-md);
-		background: var(--bg-tertiary);
-		border-radius: var(--radius-sm);
-		border: none;
-		color: var(--text-primary);
-	}
-
 	.mixes-label {
 		font-size: var(--text-xs);
 		color: var(--text-dim);
@@ -494,16 +513,39 @@
 		align-self: center;
 	}
 
-	.meta-badge-interactive {
-		cursor: pointer;
-		display: flex;
+	/* Interactive energy-zone chip. Mirrors the SimilarTrackCard energy chip's
+	 * treatment — zone-colored label + dot (color paired with the zone word, never
+	 * color alone, §4) — but stays a real <button> because it opens the zone
+	 * picker. Surface/hover/focus follow the chip + states conventions (§5). The
+	 * "approved" affordance is a tokenized left border, not a one-off ✓ glyph. */
+	.zone-chip-btn {
+		display: inline-flex;
 		align-items: center;
 		gap: var(--space-xs);
-		transition: background var(--dur-fast) var(--ease-standard);
+		height: var(--chip-height-md);
+		padding: 0 var(--chip-pad-x-md);
+		border: 1px solid transparent;
+		border-radius: var(--chip-radius);
+		background: var(--chip-bg);
+		color: var(--zone-color);
+		font-size: var(--chip-font-md);
+		font-weight: var(--font-weight-medium);
+		line-height: 1;
+		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			background var(--dur-fast) var(--ease-standard),
+			border-color var(--dur-fast) var(--ease-standard);
 	}
 
-	.meta-badge-interactive:hover {
-		background: var(--bg-secondary);
+	.zone-chip-btn:hover {
+		background: var(--surface-hover);
+	}
+
+	/* Approved-by-you: a tokenized accent left edge (consistent affordance), paired
+	 * with the title/aria-label text so it's never color-only (§4). */
+	.zone-chip-btn.approved {
+		border-left: var(--space-2xs) solid var(--accent);
 	}
 
 	.zone-dot-sm {
@@ -511,11 +553,7 @@
 		height: var(--space-md);
 		border-radius: var(--radius-full);
 		background: var(--zone-color);
-	}
-
-	.source-check {
-		font-size: var(--text-2xs);
-		color: var(--accent);
+		flex-shrink: 0;
 	}
 
 	.zone-badge-wrapper {
@@ -550,7 +588,7 @@
 		gap: var(--space-lg);
 	}
 
-	.sync-note {
+	.curation-note {
 		font-size: var(--text-xs);
 		color: var(--text-dim);
 	}
