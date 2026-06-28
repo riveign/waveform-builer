@@ -12,6 +12,9 @@
 	import FillReorderDialog from './FillReorderDialog.svelte';
 	import AddFromArtistPanel from './AddFromArtistPanel.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import Menu from '$lib/components/primitives/Menu.svelte';
+	import MenuItem from '$lib/components/primitives/MenuItem.svelte';
+	import MenuSeparator from '$lib/components/primitives/MenuSeparator.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
@@ -103,6 +106,16 @@
 	let plannedSets = $state<DJSet[]>([]);
 	let linkTargetId = $state<number | null>(null);
 	let linking = $state(false);
+	let exportMenuOpen = $state(false);
+	let moreMenuOpen = $state(false);
+
+	const EXPORT_FORMATS = [
+		{ value: 'm3u8', label: 'M3U8' },
+		{ value: 'rekordbox', label: 'Rekordbox XML' },
+	] as const;
+	let exportFormatLabel = $derived(
+		EXPORT_FORMATS.find((f) => f.value === exportFormat)?.label ?? 'M3U8'
+	);
 
 	/** Tracks that need energy review (not yet approved) */
 	let tracksNeedingReview = $derived(
@@ -386,85 +399,142 @@
 				</button>
 			{/if}
 			<span class="set-meta">{selectedSet.track_count} tracks, {selectedSet.duration_min}min</span>
-			{#if tracksNeedingReview.length > 0}
-				<Button variant="primary" size="sm" onclick={() => { showEnergyReview = true; }}>
-					Review energy ({tracksNeedingReview.length})
-				</Button>
-			{/if}
-			{#if waveformTracks.length >= 2 && analysis}
-				<Button variant="secondary" size="sm" onclick={handleAnalyze} disabled={analyzingSet}>
-					{analyzingSet ? 'Analyzing...' : 'Re-analyze'}
-				</Button>
-			{:else if waveformTracks.length >= 2 && analyzingSet}
-				<span class="analyzing-status">Analyzing...</span>
-			{/if}
-			{#if waveformTracks.length >= 1}
-				<Button variant="primary" size="sm" onclick={handlePlaySet} title="Play the whole set in order">
-					▶ Play
-				</Button>
-			{/if}
-			{#if setDetail?.planned_set_id}
-				<Button variant="secondary" size="sm" onclick={handleCompare} disabled={comparing}>
-					{comparing ? 'Comparing...' : 'Planned vs played'}
-				</Button>
-				<Button variant="ghost" size="sm" onclick={handleUnlink} title="Remove the link to the planned set">
-					Unlink
-				</Button>
-			{:else if setDetail && setDetail.source !== 'kiku'}
-				{#if showLinkPicker}
-					{#if plannedSets.length === 0}
-						<span class="link-empty">No planned sets to link yet — build one first.</span>
-						<Button variant="ghost" size="sm" onclick={() => (showLinkPicker = false)}>Cancel</Button>
-					{:else}
-						<select class="link-select" bind:value={linkTargetId} aria-label="Choose the planned set">
-							<option value={null}>Which set did you plan from?</option>
-							{#each plannedSets as p (p.id)}
-								<option value={p.id}>{p.name} ({p.track_count} tracks)</option>
-							{/each}
-						</select>
-						<Button variant="secondary" size="sm" onclick={confirmLink} disabled={linkTargetId === null || linking}>
-							{linking ? 'Linking...' : 'Link'}
+
+			<!-- Toolbar: intent groups separated by dividers. One accent (Play); the
+			     rest secondary; Delete (danger) isolated far right. Uniform size="sm". -->
+			<div class="toolbar" role="toolbar" aria-label="Set actions">
+				<!-- 1 · Playback — the single accent button -->
+				{#if waveformTracks.length >= 1}
+					<div class="tool-group">
+						<Button variant="primary" size="sm" onclick={handlePlaySet} title="Play the whole set in order">
+							▶ Play
 						</Button>
-						<Button variant="ghost" size="sm" onclick={() => (showLinkPicker = false)}>Cancel</Button>
-					{/if}
-				{:else}
-					<Button variant="ghost" size="sm" onclick={openLinkPicker} title="Link this set to the plan you built it from">
-						Link to a plan
-					</Button>
+					</div>
 				{/if}
-			{/if}
-			{#if waveformTracks.length >= 2}
-				<Button variant="primary" size="sm" onclick={() => pb.startExpress(selectedSet!.id, waveformTracks)} disabled={pb.isActive}>
-					Express
-				</Button>
-				<Button variant="secondary" size="sm" onclick={() => pb.startBuilder(selectedSet!.id, waveformTracks)} disabled={pb.isActive}>
-					Live Builder
-				</Button>
-			{/if}
-			{#if waveformTracks.length >= 3}
-				<Button variant="secondary" size="sm" onclick={() => { showAssist = true; }}>
-					Assist
-				</Button>
-			{/if}
-			<Button variant="secondary" size="sm" onclick={() => { showArtistPicks = !showArtistPicks; }}>
-				Add from an artist
-			</Button>
-			<select bind:value={exportFormat} class="export-select">
-				<option value="m3u8">M3U8</option>
-				<option value="rekordbox">XML</option>
-			</select>
-			<Button variant="secondary" size="sm" onclick={handleExport} disabled={exporting}>
-				{exporting ? 'Exporting...' : 'Export'}
-			</Button>
-			{#if exportMsg}
-				<span class="export-msg">{exportMsg}</span>
-			{/if}
-			<span class="delete-slot">
-				<Button variant={confirmDelete ? 'danger' : 'ghost'} size="sm" onclick={handleDelete} disabled={deleting}>
-					{deleting ? 'Deleting...' : confirmDelete ? 'Confirm delete?' : 'Delete'}
-				</Button>
-			</span>
+
+				<!-- 2 · Build / arrange -->
+				{#if waveformTracks.length >= 2}
+					<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+					<div class="tool-group">
+						<Button variant="secondary" size="sm" onclick={() => pb.startBuilder(selectedSet!.id, waveformTracks)} disabled={pb.isActive}>
+							Live Builder
+						</Button>
+						<Button variant="secondary" size="sm" onclick={() => pb.startExpress(selectedSet!.id, waveformTracks)} disabled={pb.isActive}>
+							Express
+						</Button>
+					</div>
+				{/if}
+
+				<!-- 3 · Analyze — keep the energy-review count CTA prominent -->
+				{#if tracksNeedingReview.length > 0 || (waveformTracks.length >= 2 && (analysis || analyzingSet))}
+					<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+					<div class="tool-group">
+						{#if tracksNeedingReview.length > 0}
+							<Button variant="secondary" size="sm" onclick={() => { showEnergyReview = true; }}>
+								Review energy ({tracksNeedingReview.length})
+							</Button>
+						{/if}
+						{#if waveformTracks.length >= 2 && analysis}
+							<Button variant="secondary" size="sm" onclick={handleAnalyze} disabled={analyzingSet}>
+								{analyzingSet ? 'Analyzing...' : 'Re-analyze'}
+							</Button>
+						{:else if waveformTracks.length >= 2 && analyzingSet}
+							<span class="analyzing-status">Analyzing...</span>
+						{/if}
+					</div>
+				{/if}
+
+				<!-- Planned-vs-played comparison — contextual, only when linked -->
+				{#if setDetail?.planned_set_id}
+					<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+					<div class="tool-group">
+						<Button variant="secondary" size="sm" onclick={handleCompare} disabled={comparing}>
+							{comparing ? 'Comparing...' : 'Planned vs played'}
+						</Button>
+					</div>
+				{/if}
+
+				<!-- 4 · Export — format picker + Export as one unit -->
+				<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+				<div class="tool-group export-unit">
+					<Menu bind:open={exportMenuOpen} label="Export format" minWidth={160}>
+						{#snippet trigger({ open, props })}
+							<span {...props}>
+								<Button variant="secondary" size="sm" onclick={open} title="Choose the export format">
+									{exportFormatLabel} ▾
+								</Button>
+							</span>
+						{/snippet}
+						{#each EXPORT_FORMATS as fmt (fmt.value)}
+							<MenuItem selected={exportFormat === fmt.value} onselect={() => { exportFormat = fmt.value; }}>
+								{fmt.label}
+							</MenuItem>
+						{/each}
+					</Menu>
+					<Button variant="secondary" size="sm" onclick={handleExport} disabled={exporting}>
+						{exporting ? 'Exporting...' : 'Export'}
+					</Button>
+				</div>
+				{#if exportMsg}
+					<span class="export-msg">{exportMsg}</span>
+				{/if}
+
+				<!-- More — least-common actions tucked into an overflow menu -->
+				<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+				<div class="tool-group">
+					<Menu bind:open={moreMenuOpen} label="More set actions" minWidth={200}>
+						{#snippet trigger({ open, props })}
+							<span {...props}>
+								<Button variant="ghost" size="sm" iconOnly ariaLabel="More set actions" onclick={open}>
+									{#snippet icon()}⋮{/snippet}
+								</Button>
+							</span>
+						{/snippet}
+						{#if waveformTracks.length >= 3}
+							<MenuItem onselect={() => { showAssist = true; }}>Assist</MenuItem>
+						{/if}
+						<MenuItem onselect={() => { showArtistPicks = !showArtistPicks; }}>Add from an artist</MenuItem>
+						{#if setDetail?.planned_set_id}
+							<MenuSeparator />
+							<MenuItem onselect={handleUnlink}>Unlink from plan</MenuItem>
+						{:else if setDetail && setDetail.source !== 'kiku'}
+							<MenuSeparator />
+							<MenuItem onselect={openLinkPicker}>Link to a plan</MenuItem>
+						{/if}
+					</Menu>
+				</div>
+
+				<!-- 5 · Destructive — isolated on the far right -->
+				<div class="tool-divider tool-divider--strong" role="separator" aria-orientation="vertical"></div>
+				<div class="tool-group">
+					<Button variant={confirmDelete ? 'danger' : 'ghost'} size="sm" onclick={handleDelete} disabled={deleting}>
+						{deleting ? 'Deleting...' : confirmDelete ? 'Confirm delete?' : 'Delete'}
+					</Button>
+				</div>
+			</div>
 		</div>
+
+		{#if showLinkPicker}
+			<!-- Link picker — opened from the More menu; appears as its own band so the
+			     select + actions get room without crowding the toolbar. -->
+			<div class="link-picker-band">
+				{#if plannedSets.length === 0}
+					<span class="link-empty">No planned sets to link yet — build one first.</span>
+					<Button variant="ghost" size="sm" onclick={() => (showLinkPicker = false)}>Cancel</Button>
+				{:else}
+					<select class="link-select" bind:value={linkTargetId} aria-label="Choose the planned set">
+						<option value={null}>Which set did you plan from?</option>
+						{#each plannedSets as p (p.id)}
+							<option value={p.id}>{p.name} ({p.track_count} tracks)</option>
+						{/each}
+					</select>
+					<Button variant="secondary" size="sm" onclick={confirmLink} disabled={linkTargetId === null || linking}>
+						{linking ? 'Linking...' : 'Link'}
+					</Button>
+					<Button variant="ghost" size="sm" onclick={() => (showLinkPicker = false)}>Cancel</Button>
+				{/if}
+			</div>
+		{/if}
 
 		{#if loading}
 			<div class="status">Building your timeline...</div>
@@ -659,15 +729,37 @@
 		margin-right: auto;
 	}
 
-	/* Native select kept (not a button); aligned to the toolbar Button tier. */
-	.export-select {
-		padding: 4px 8px;
-		font-size: 12px;
-		color: var(--text-primary);
-		background: var(--bg-tertiary);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		cursor: pointer;
+	/* Action toolbar — one horizontal row of intent groups. Even, token-based gaps;
+	   subtle vertical dividers carry the grouping alongside order + spacing (color is
+	   never the only signal). Wraps gracefully on narrow widths. */
+	.toolbar {
+		display: flex;
+		align-items: center;
+		gap: var(--space-md);
+		flex-wrap: wrap;
+	}
+
+	.tool-group {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-sm);
+	}
+
+	/* Attached export pair (format picker + Export) reads as one unit. */
+	.export-unit {
+		gap: var(--space-xs);
+	}
+
+	.tool-divider {
+		width: 1px;
+		align-self: stretch;
+		min-height: 20px;
+		background: var(--border);
+	}
+
+	/* Stronger rule isolates the destructive zone on the far right. */
+	.tool-divider--strong {
+		background: var(--border-default);
 	}
 
 	.export-msg {
@@ -675,9 +767,14 @@
 		color: var(--accent);
 	}
 
-	.delete-slot {
-		display: inline-flex;
-		margin-left: 4px;
+	/* Link-to-a-plan picker — its own band beneath the toolbar (opened from More). */
+	.link-picker-band {
+		display: flex;
+		align-items: center;
+		gap: var(--space-md);
+		padding: var(--space-md) var(--space-xl);
+		border-bottom: 1px solid var(--border);
+		background: var(--bg-secondary);
 	}
 
 	.timeline-container {
