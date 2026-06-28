@@ -1,18 +1,23 @@
 <script lang="ts">
 	import type { Track } from '$lib/types';
 	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
-	import { energyColor, normalizeEnergy } from '$lib/utils/energy';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { preloadOnHover } from '$lib/utils/audio-preload';
 	import { prefetchPeaks } from '$lib/api/waveforms';
 	import { updateTrackRating } from '$lib/api/tracks';
 	import Menu from '../primitives/Menu.svelte';
 	import Button from '../primitives/Button.svelte';
-	import Chip from '../primitives/Chip.svelte';
 	import TrackContextMenu from './TrackContextMenu.svelte';
 	import StarRating from './StarRating.svelte';
 
 	const player = getPlayerStore();
+
+	/** Known energy zones → their semantic --zone-* token (single source of truth,
+	 * matches EnergyZonePicker / EnergyConflictBadge). Unknown/empty falls back to dim. */
+	const ENERGY_ZONES = ['intro', 'warmup', 'build', 'drive', 'peak', 'close'];
+	function zoneColor(zone: string | null | undefined): string {
+		return zone && ENERGY_ZONES.includes(zone) ? `var(--zone-${zone})` : 'var(--text-dim)';
+	}
 
 	function handleHover(track: Track) {
 		preloadOnHover(track.id);
@@ -115,30 +120,25 @@
 						{track.artist ?? '?'}
 					</td>
 					<td class="col-key">
-						<Chip
-							variant="key"
-							size="sm"
-							value={formatKey(track.key) || undefined}
-							color={getCamelotColor(track.key)}
-							title={formatKey(track.key) ? `Camelot ${formatKey(track.key)}` : 'Key unknown'}
-						/>
+						{#if formatKey(track.key)}
+							<span class="cell-key" style:color={getCamelotColor(track.key)} title="Camelot {formatKey(track.key)}">{formatKey(track.key)}</span>
+						{:else}
+							<span class="dim" title="Key unknown">—</span>
+						{/if}
 					</td>
 					<td class="col-bpm">
-						<Chip
-							variant="bpm"
-							size="sm"
-							value={track.bpm ? Math.round(track.bpm) : undefined}
-							title={track.bpm ? `${Math.round(track.bpm)} BPM` : 'BPM unknown'}
-						/>
+						{#if track.bpm}
+							<span class="cell-bpm" title="{Math.round(track.bpm)} BPM">{Math.round(track.bpm)}</span>
+						{:else}
+							<span class="dim" title="BPM unknown">—</span>
+						{/if}
 					</td>
 					<td class="col-energy">
-						<Chip
-							variant="energy"
-							size="sm"
-							value={track.resolved_energy ?? undefined}
-							color={energyColor(normalizeEnergy(track.resolved_energy))}
-							title={track.resolved_energy ? `Energy: ${track.resolved_energy}` : 'Energy unknown'}
-						/>
+						{#if track.resolved_energy}
+							<span class="cell-energy" style:color={zoneColor(track.resolved_energy)} title="Energy zone: {track.resolved_energy}">{track.resolved_energy}</span>
+						{:else}
+							<span class="dim" title="Energy unknown">—</span>
+						{/if}
 					</td>
 					<td class="col-plays">
 						{#if totalPlays > 0}
@@ -217,6 +217,15 @@
 		z-index: 1;
 	}
 
+	/* SOLID opaque header background so scrolled rows are fully masked. The grid
+	 * column-gap on `thead tr` would leave transparent slivers if only the th's
+	 * were painted, so the background lives on the row container itself (full width,
+	 * gaps included) AND on the th's for belt-and-suspenders. */
+	.track-table thead tr {
+		background: var(--bg-tertiary);
+		border-bottom: 1px solid var(--border);
+	}
+
 	th {
 		background: var(--bg-tertiary);
 		padding: var(--list-row-pad-y) 0;
@@ -227,9 +236,7 @@
 		font-weight: 600;
 		color: var(--text-secondary);
 		font-size: var(--text-2xs);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		border-bottom: 1px solid var(--border);
+		letter-spacing: 0.3px;
 	}
 
 	td {
@@ -277,10 +284,33 @@
 	.col-title { display: block; min-width: 0; line-height: var(--list-row-height); }
 	.col-artist { display: block; min-width: 0; line-height: var(--list-row-height); color: var(--text-secondary); }
 	.col-key { justify-content: flex-start; }
-	.col-bpm { justify-content: flex-start; }
+	.col-bpm { justify-content: flex-end; }
 	.col-energy { justify-content: flex-start; }
 	.col-plays { justify-content: flex-end; }
 	.col-rating { justify-content: flex-start; }
+
+	/* Header labels align to their body cells (Plays + BPM read as right-aligned
+	 * numbers, so their th hugs the right too). */
+	th.col-bpm,
+	th.col-plays { justify-content: flex-end; }
+
+	/* DENSE-TABLE cell convention: lightweight COLORED TEXT, no box/border/background.
+	 * (Cards use the heavier <Chip> primitive; this list is dense, so text-only.) */
+	.cell-key {
+		font-weight: var(--font-weight-semibold);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.cell-bpm {
+		color: var(--text-secondary);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.cell-energy {
+		font-weight: var(--font-weight-semibold);
+		white-space: nowrap;
+		text-transform: capitalize;
+	}
 
 	/* The play control is a Button primitive (iconOnly round). Hover-reveal lives
 	 * on this wrapper so the table owns row state. */

@@ -201,17 +201,19 @@
 	 * Shared density for long, scannable lists. Header + body use the SAME
 	 * column gap + cell padding so the columns line up exactly. Row height is a
 	 * single token tuned for a dense list (smaller than the 32px control band).
-	 * Fixed-column min widths live here so header/body/breakpoints agree. */
+	 * Fixed-column min widths live here so header/body/breakpoints agree.
+	 * Cells are lightweight COLORED TEXT (not chips), so the numeric columns are
+	 * sized to their FULL value (key "11A", bpm "144") — never truncated. */
 	--list-row-height:   30px;             /* dense scannable row, < control band */
 	--list-row-pad-y:    var(--space-xs);
 	--list-row-pad-x:    var(--space-sm);  /* cell inner gutter */
 	--list-row-gap:      var(--space-sm);  /* gap between columns */
 	--list-col-play:     26px;
-	--list-col-key:      var(--chip-height-md);  /* room for the key chip */
-	--list-col-bpm:      44px;
-	--list-col-energy:   minmax(56px, max-content);
-	--list-col-plays:    34px;
-	--list-col-rating:   62px;
+	--list-col-key:      34px;             /* full Camelot text e.g. "11A" / "Cm" */
+	--list-col-bpm:      36px;             /* 3-digit integer e.g. "144" */
+	--list-col-energy:   minmax(52px, max-content); /* zone word e.g. "warmup" */
+	--list-col-plays:    30px;
+	--list-col-rating:   84px;             /* all 5 sm stars (14px + pad/gap) fit */
 }
 
 /* Global systemic focus ring — specificity 0 so components can still override.
