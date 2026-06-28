@@ -196,6 +196,22 @@
 	--menu-item-radius:  var(--radius-sm);
 	--menu-item-hover:   var(--surface-hover);
 	--menu-item-active:  var(--surface-active);
+
+	/* --- List row (sidebar track table) ---
+	 * Shared density for long, scannable lists. Header + body use the SAME
+	 * column gap + cell padding so the columns line up exactly. Row height is a
+	 * single token tuned for a dense list (smaller than the 32px control band).
+	 * Fixed-column min widths live here so header/body/breakpoints agree. */
+	--list-row-height:   30px;             /* dense scannable row, < control band */
+	--list-row-pad-y:    var(--space-xs);
+	--list-row-pad-x:    var(--space-sm);  /* cell inner gutter */
+	--list-row-gap:      var(--space-sm);  /* gap between columns */
+	--list-col-play:     26px;
+	--list-col-key:      var(--chip-height-md);  /* room for the key chip */
+	--list-col-bpm:      44px;
+	--list-col-energy:   minmax(56px, max-content);
+	--list-col-plays:    34px;
+	--list-col-rating:   62px;
 }
 
 /* Global systemic focus ring — specificity 0 so components can still override.

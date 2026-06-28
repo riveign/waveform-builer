@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Track } from '$lib/types';
 	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
-	import { formatTime } from '$lib/utils/waveform';
 	import { energyColor, normalizeEnergy } from '$lib/utils/energy';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import { preloadOnHover } from '$lib/utils/audio-preload';
@@ -9,6 +8,7 @@
 	import { updateTrackRating } from '$lib/api/tracks';
 	import Menu from '../primitives/Menu.svelte';
 	import Button from '../primitives/Button.svelte';
+	import Chip from '../primitives/Chip.svelte';
 	import TrackContextMenu from './TrackContextMenu.svelte';
 	import StarRating from './StarRating.svelte';
 
@@ -58,7 +58,7 @@
 	<table class="track-table">
 		<thead>
 			<tr>
-				<th class="col-play"></th>
+				<th class="col-play" aria-label="Play"></th>
 				<th class="col-title">Title</th>
 				<th class="col-artist">Artist</th>
 				<th class="col-key">Key</th>
@@ -71,6 +71,7 @@
 		<tbody>
 			{#each tracks as track (track.id)}
 				{@const isCurrentTrack = player.currentTrack?.id === track.id}
+				{@const totalPlays = (track.play_count ?? 0) + (track.kiku_play_count ?? 0)}
 				<tr
 					class="track-row"
 					class:selected={track.id === selectedId}
@@ -114,21 +115,36 @@
 						{track.artist ?? '?'}
 					</td>
 					<td class="col-key">
-						<span class="key-badge" style="color: {getCamelotColor(track.key)}">
-							{formatKey(track.key) || '?'}
-						</span>
+						<Chip
+							variant="key"
+							size="sm"
+							value={formatKey(track.key) || undefined}
+							color={getCamelotColor(track.key)}
+							title={formatKey(track.key) ? `Camelot ${formatKey(track.key)}` : 'Key unknown'}
+						/>
 					</td>
 					<td class="col-bpm">
-						{track.bpm ? Math.round(track.bpm) : '?'}
+						<Chip
+							variant="bpm"
+							size="sm"
+							value={track.bpm ? Math.round(track.bpm) : undefined}
+							title={track.bpm ? `${Math.round(track.bpm)} BPM` : 'BPM unknown'}
+						/>
 					</td>
 					<td class="col-energy">
-						<span class="energy-tag" style="color: {energyColor(normalizeEnergy(track.resolved_energy))}">{track.resolved_energy ?? '?'}</span>
+						<Chip
+							variant="energy"
+							size="sm"
+							value={track.resolved_energy ?? undefined}
+							color={energyColor(normalizeEnergy(track.resolved_energy))}
+							title={track.resolved_energy ? `Energy: ${track.resolved_energy}` : 'Energy unknown'}
+						/>
 					</td>
 					<td class="col-plays">
-						{#if (track.play_count ?? 0) + (track.kiku_play_count ?? 0) > 0}
-							<span class="plays-count" title="Rekordbox: {track.play_count ?? 0} · Kiku: {track.kiku_play_count ?? 0}">{(track.play_count ?? 0) + (track.kiku_play_count ?? 0)}</span>
+						{#if totalPlays > 0}
+							<span class="plays-count" title="Rekordbox: {track.play_count ?? 0} · Kiku: {track.kiku_play_count ?? 0}">{totalPlays}</span>
 						{:else}
-							<span class="dim">--</span>
+							<span class="dim" title="Never played">—</span>
 						{/if}
 					</td>
 					<td class="col-rating" onclick={(e) => e.stopPropagation()}>
@@ -160,15 +176,39 @@
 	.track-table-wrapper {
 		overflow-y: auto;
 		flex: 1;
+		/* Container query context — column priority responds to the LIST's own
+		 * width, not the viewport, so the sidebar drops columns as it narrows. */
+		container-type: inline-size;
+		container-name: track-list;
 	}
 
 	.track-table {
 		width: 100%;
-		/* Fixed layout so the table always fits the panel — long titles ellipsis
-		   instead of pushing the Rating column off the right edge. */
-		table-layout: fixed;
 		border-collapse: collapse;
-		font-size: 12px;
+		font-size: var(--text-sm);
+	}
+
+	/* Header + every body row share ONE grid template, so columns line up exactly.
+	 * TITLE + ARTIST take the flexible space (minmax(0,1fr)) and ellipsize; the
+	 * short/numeric cells stay fixed and never get crushed.
+	 * Priority order built into the template: PLAYS (lowest) drops first at the
+	 * narrow breakpoint, then ENERGY — header + body drop together since they
+	 * share these vars. */
+	.track-table thead tr,
+	.track-row {
+		display: grid;
+		grid-template-columns:
+			var(--list-col-play)
+			minmax(0, 1.6fr)              /* TITLE — largest flexible */
+			minmax(0, 1fr)               /* ARTIST — smaller flexible */
+			var(--list-col-key)
+			var(--list-col-bpm)
+			var(--list-col-energy)
+			var(--list-col-plays)
+			var(--list-col-rating);
+		align-items: center;
+		column-gap: var(--list-row-gap);
+		padding-inline: var(--list-row-pad-x);
 	}
 
 	thead {
@@ -179,18 +219,24 @@
 
 	th {
 		background: var(--bg-tertiary);
-		padding: 6px 5px;
+		padding: var(--list-row-pad-y) 0;
+		min-height: var(--list-row-height);
+		display: flex;
+		align-items: center;
 		text-align: left;
 		font-weight: 600;
 		color: var(--text-secondary);
-		font-size: 11px;
+		font-size: var(--text-2xs);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		border-bottom: 1px solid var(--border);
 	}
 
 	td {
-		padding: 5px 5px;
+		padding: var(--list-row-pad-y) 0;
+		min-height: var(--list-row-height);
+		display: flex;
+		align-items: center;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -200,7 +246,9 @@
 	.track-row {
 		cursor: grab;
 		transition: background 0.1s;
+		border-bottom: 1px solid var(--bg-tertiary);
 	}
+	.track-row td { border-bottom: none; }
 
 	.track-row:active {
 		cursor: grabbing;
@@ -212,7 +260,7 @@
 
 	.track-row.selected {
 		background: var(--bg-active);
-		border-left: 2px solid var(--accent);
+		box-shadow: inset 2px 0 0 var(--accent);
 	}
 
 	.track-row.now-playing {
@@ -223,19 +271,19 @@
 		color: var(--accent);
 	}
 
-	/* Title + artist have no fixed width — under table-layout:fixed they share the
-	   remaining space and ellipsis, so the fixed columns (incl. Rating) always show. */
-	.col-play { width: 26px; text-align: center; padding: 0 2px; }
-	.col-artist { color: var(--text-secondary); }
-	.col-key { width: 34px; text-align: center; }
-	.col-bpm { width: 36px; text-align: right; }
-	.col-energy { width: 52px; }
-	.col-plays { width: 30px; text-align: right; }
-	.col-rating { width: 62px; }
+	/* Title + artist: 1 line, ellipsis, full value lives in title= (recoverable
+	 * truncation — content-conventions §2). */
+	.col-play { justify-content: center; }
+	.col-title { display: block; min-width: 0; line-height: var(--list-row-height); }
+	.col-artist { display: block; min-width: 0; line-height: var(--list-row-height); color: var(--text-secondary); }
+	.col-key { justify-content: flex-start; }
+	.col-bpm { justify-content: flex-start; }
+	.col-energy { justify-content: flex-start; }
+	.col-plays { justify-content: flex-end; }
+	.col-rating { justify-content: flex-start; }
 
-	/* The play control is a Button primitive (iconOnly round). The hover-reveal +
-	   the tight 26px column fit live on this wrapper so the table owns row state
-	   without the primitive needing a per-row class. */
+	/* The play control is a Button primitive (iconOnly round). Hover-reveal lives
+	 * on this wrapper so the table owns row state. */
 	.play-slot {
 		display: inline-flex;
 		opacity: 0;
@@ -256,23 +304,47 @@
 		color: var(--accent);
 	}
 
-	.key-badge {
-		font-weight: 600;
-		font-size: 11px;
-	}
-
-	.energy-tag {
-		font-size: 11px;
-		color: var(--text-secondary);
-		text-transform: capitalize;
-	}
-
 	.plays-count {
 		color: var(--text-secondary);
-		font-size: 11px;
+		font-size: var(--text-xs);
 	}
 
 	.dim {
 		color: var(--text-dim);
+	}
+
+	/* --- Responsive column priority (container query on the list width) ---
+	 * Drop lowest-priority columns first; header + body share the template vars
+	 * so they always drop together. Keep order: TITLE, ARTIST, KEY, BPM, RATING. */
+
+	/* < ~380px: drop PLAYS (lowest priority). */
+	@container track-list (max-width: 379px) {
+		.track-table thead tr,
+		.track-row {
+			grid-template-columns:
+				var(--list-col-play)
+				minmax(0, 1.6fr)
+				minmax(0, 1fr)
+				var(--list-col-key)
+				var(--list-col-bpm)
+				var(--list-col-energy)
+				var(--list-col-rating);
+		}
+		.col-plays { display: none; }
+	}
+
+	/* < ~320px: also drop ENERGY (next lowest). */
+	@container track-list (max-width: 319px) {
+		.track-table thead tr,
+		.track-row {
+			grid-template-columns:
+				var(--list-col-play)
+				minmax(0, 1.6fr)
+				minmax(0, 1fr)
+				var(--list-col-key)
+				var(--list-col-bpm)
+				var(--list-col-rating);
+		}
+		.col-energy { display: none; }
 	}
 </style>
