@@ -19,6 +19,7 @@
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import Chip from '../primitives/Chip.svelte';
 	import Button from '../primitives/Button.svelte';
+	import HarmonyIcon from '../primitives/HarmonyIcon.svelte';
 
 	let { track }: { track: Track } = $props();
 
@@ -228,7 +229,12 @@
 				</Button>
 				<div class="title-text">
 					<h2 class="track-title" title={track.title ?? 'Unknown'}>{capFirst(track.title ?? 'Unknown')}</h2>
-					<span class="track-artist" title={track.artist ?? 'Unknown'}>{capFirst(track.artist ?? 'Unknown')}</span>
+					<span class="track-subline">
+						<span class="track-artist" title={track.artist ?? 'Unknown'}>{capFirst(track.artist ?? 'Unknown')}</span>
+						{#if track.duration_sec}
+							<span class="track-duration" title="Track length">{formatTime(track.duration_sec)}</span>
+						{/if}
+					</span>
 				</div>
 			</div>
 			<div class="track-meta">
@@ -260,20 +266,25 @@
 						</div>
 					{/if}
 				</div>
-				{#if track.duration_sec}
-					<Chip variant="neutral" size="sm" value={formatTime(track.duration_sec)} title="Track length" />
-				{/if}
 				{#if compatKeys.length}
-					<span class="mixes-label" title="Harmonically compatible keys (Camelot wheel)">Mixes with</span>
-					{#each compatKeys as ck (ck.camelot)}
-						<Chip
-							variant="key"
-							size="sm"
-							color={getCamelotColor(ck.camelot)}
-							value={ck.name}
-							title="{ck.name} — {ck.relation}"
-						/>
-					{/each}
+					<span
+						class="mixes-with"
+						aria-label="Mixes with: {compatKeys.map((ck) => ck.name).join(', ')}"
+						title="Mixes with: {compatKeys.map((ck) => ck.name).join(', ')}"
+					>
+						<span class="mixes-icon" aria-hidden="true">
+							<HarmonyIcon relation="swap" size="sm" label="Mixes with" />
+						</span>
+						{#each compatKeys as ck (ck.camelot)}
+							<Chip
+								variant="key"
+								size="sm"
+								color={getCamelotColor(ck.camelot)}
+								value={ck.name}
+								title="{ck.name} — {ck.relation}"
+							/>
+						{/each}
+					</span>
 				{/if}
 				<Button
 					variant="secondary"
@@ -312,11 +323,13 @@
 		<p class="teaching-moment" aria-live="polite">{teachingMoment}</p>
 	{/if}
 
-	<!-- ── Metadata (compact row) ── -->
+	<!-- ── Metadata: two columns in one row — facts left (8), tags + note right (4).
+	     Reflows to a single stacked column on narrow content widths so neither half
+	     gets crushed. ── -->
 	{#if metaRows.length > 0 || track.playlist_tags.length > 0 || track.comment}
-		<div class="meta-section">
+		<div class="meta-section grid-12 grid-12--content">
 			{#if metaRows.length > 0}
-				<div class="meta-grid">
+				<div class="meta-grid meta-col-facts">
 					{#each metaRows as row}
 						<span class="meta-label">{row.label}</span>
 						<span class="meta-value">{row.value}</span>
@@ -324,49 +337,58 @@
 				</div>
 			{/if}
 
-			{#if track.playlist_tags.length > 0}
-				<div class="tag-chips">
-					{#each track.playlist_tags as tag}
-						<Chip variant="neutral" size="sm" value={tag} title={tag} />
-					{/each}
-				</div>
-			{/if}
+			{#if track.playlist_tags.length > 0 || track.comment}
+				<div class="meta-col-aside">
+					{#if track.playlist_tags.length > 0}
+						<div class="tag-chips">
+							{#each track.playlist_tags as tag}
+								<Chip variant="neutral" size="sm" value={tag} title={tag} />
+							{/each}
+						</div>
+					{/if}
 
-			{#if track.comment}
-				<p class="track-comment">{track.comment}</p>
+					{#if track.comment}
+						<p class="track-comment">{track.comment}</p>
+					{/if}
+				</div>
 			{/if}
 		</div>
 	{/if}
 
-	<!-- ── Waveform Player ── -->
-	<div class="player-section">
-		{#if error}
-			<div class="error-msg">{error}</div>
-		{:else if loadingWaveform}
-			<Spinner label="Drawing the waveform..." />
-		{:else if waveformData}
-			<WavesurferPlayer
-				trackId={track.id}
-				peaks={waveformData.envelope}
-				duration={waveformData.duration_sec}
-				beats={waveformData.beats}
-				spectral={false}
-				visualOnly={true}
-				externalProgress={globalProgress}
-				onseek={handleSeek}
-			/>
-		{:else if !track.has_waveform}
-			<div class="no-data">
-				No waveform yet — run <code>kiku analyze</code> to unlock it
-			</div>
-		{/if}
-	</div>
+	<!-- ── Waveform + What Kiku Hears: one row — player ~3/4 (span 9), analysis
+	     cards stacked in the ~1/4 column (span 3). Container query reflows to a
+	     single stacked column on narrow content widths so the waveform keeps a
+	     usable width and the cards don't get crushed. ── -->
+	<div class="sound-row" class:sound-row--with-cards={features}>
+		<!-- ── Waveform Player ── -->
+		<div class="player-section">
+			{#if error}
+				<div class="error-msg">{error}</div>
+			{:else if loadingWaveform}
+				<Spinner label="Drawing the waveform..." />
+			{:else if waveformData}
+				<WavesurferPlayer
+					trackId={track.id}
+					peaks={waveformData.envelope}
+					duration={waveformData.duration_sec}
+					beats={waveformData.beats}
+					spectral={false}
+					visualOnly={true}
+					externalProgress={globalProgress}
+					onseek={handleSeek}
+				/>
+			{:else if !track.has_waveform}
+				<div class="no-data">
+					No waveform yet — run <code>kiku analyze</code> to unlock it
+				</div>
+			{/if}
+		</div>
 
-	<!-- ── What Kiku Hears (always visible) ── -->
-	{#if features}
-		<div class="kiku-hears">
-			<h3 class="section-title">What Kiku hears</h3>
-			<div class="feature-cards">
+		<!-- ── What Kiku Hears (always visible) ── -->
+		{#if features}
+			<div class="kiku-hears">
+				<h3 class="section-title">What Kiku hears</h3>
+				<div class="feature-cards">
 				<!-- Energy card -->
 				<div class="feature-card">
 					<div class="card-icon">
@@ -434,8 +456,10 @@
 			</div>
 		</div>
 	{/if}
+	</div>
 
 	<!-- ── Sounds Like (always visible, auto-loads) ── -->
+
 	<SimilarTracks trackId={track.id} trackKey={track.key} parentBpm={track.bpm} />
 
 	<!-- ── Sets (at the bottom) ── -->
@@ -490,12 +514,30 @@
 		text-overflow: ellipsis;
 	}
 
+	/* Artist + a quiet duration on one subline. The duration is demoted from a
+	 * chip to muted metadata text so the chip row below carries only the musical
+	 * signals (key / BPM / energy). */
+	.track-subline {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-sm);
+		min-width: 0;
+	}
+
 	.track-artist {
 		font-size: var(--text-md);
 		color: var(--text-secondary);
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		min-width: 0;
+	}
+
+	.track-duration {
+		flex-shrink: 0;
+		font-size: var(--text-xs);
+		color: var(--text-dim);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.track-meta {
@@ -506,11 +548,19 @@
 		position: relative;
 	}
 
-	.mixes-label {
-		font-size: var(--text-xs);
-		color: var(--text-dim);
+	/* "Mixes with" cluster: a small ⇄ glyph (the harmonic-swap shape) stands in
+	 * for the words, followed by the lighter compatible-key chips. The literal
+	 * meaning is preserved for AT via aria-label/title on the wrapper. */
+	.mixes-with {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-xs);
 		margin-left: var(--space-xs);
-		align-self: center;
+	}
+
+	.mixes-icon {
+		display: inline-flex;
+		color: var(--text-dim);
 	}
 
 	/* Interactive energy-zone chip. Mirrors the SimilarTrackCard energy chip's
@@ -608,12 +658,33 @@
 		to   { opacity: 1; }
 	}
 
-	/* ── Metadata section ── */
-
+	/* ── Metadata section: two columns in one row (.grid-12 from the markup) ──
+	 * Facts span 8, the tags + note aside span 4 so the previously-wasted right
+	 * half is used. A container query collapses both to full width when the
+	 * content pane is narrow. */
 	.meta-section {
+		container-type: inline-size;
+		align-items: start;
+		row-gap: var(--space-md);
+	}
+
+	.meta-col-facts {
+		grid-column: span 8;
+	}
+
+	.meta-col-aside {
+		grid-column: span 4;
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		gap: var(--space-md);
+		min-width: 0;
+	}
+
+	@container (max-width: 520px) {
+		.meta-col-facts,
+		.meta-col-aside {
+			grid-column: span 12;
+		}
 	}
 
 	.meta-grid {
@@ -650,10 +721,34 @@
 		border-left: 2px solid var(--border);
 	}
 
-	/* ── Player section ── */
+	/* ── Sound row: waveform ~3/4 + analysis cards ~1/4 in one row ──
+	 * Container-query driven so the split only applies when the content pane is
+	 * wide enough to keep the waveform usable; below that it reflows to a single
+	 * stacked column (waveform full-width, cards beneath). */
+	.sound-row {
+		container-type: inline-size;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-lg);
+	}
 
 	.player-section {
 		min-height: 80px;
+		min-width: 0;
+	}
+
+	@container (min-width: 720px) {
+		.sound-row--with-cards {
+			display: grid;
+			grid-template-columns: 3fr 1fr;
+			gap: var(--space-xl);
+			align-items: start;
+		}
+
+		/* In the 1/4 column the cards always stack vertically. */
+		.sound-row--with-cards .feature-cards {
+			grid-template-columns: 1fr;
+		}
 	}
 
 	.no-data, .error-msg {
