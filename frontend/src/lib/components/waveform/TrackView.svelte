@@ -210,6 +210,12 @@
 		}
 		return rows;
 	});
+
+	// The aside (tags + comment) is what justifies the boxed two-column layout.
+	// Without it, a few facts in a full-width box leaves a wasted empty right
+	// half — so we collapse to a compact inline row instead. "Rich" keeps the
+	// 2-col box; "sparse" (facts only, no aside) renders one tidy line.
+	let hasAside = $derived(track.playlist_tags.length > 0 || Boolean(track.comment));
 </script>
 
 <div class="track-view">
@@ -323,10 +329,13 @@
 		<p class="teaching-moment" aria-live="polite">{teachingMoment}</p>
 	{/if}
 
-	<!-- ── Metadata: two columns in one row — facts left (8), tags + note right (4).
-	     Reflows to a single stacked column on narrow content widths so neither half
-	     gets crushed. ── -->
-	{#if metaRows.length > 0 || track.playlist_tags.length > 0 || track.comment}
+	<!-- ── Metadata ──
+	     Rich (facts + tags/comment): two columns in one row — facts left (8),
+	     tags + note right (4) — reflowing to a stacked column on narrow widths.
+	     Sparse (facts only, no aside): a compact inline row instead of a boxed
+	     2-col grid with an empty right half. Nothing renders when there's
+	     genuinely no extra info. ── -->
+	{#if hasAside}
 		<div class="meta-section grid-12 grid-12--content">
 			{#if metaRows.length > 0}
 				<div class="meta-grid meta-col-facts">
@@ -337,22 +346,29 @@
 				</div>
 			{/if}
 
-			{#if track.playlist_tags.length > 0 || track.comment}
-				<div class="meta-col-aside">
-					{#if track.playlist_tags.length > 0}
-						<div class="tag-chips">
-							{#each track.playlist_tags as tag}
-								<Chip variant="neutral" size="sm" value={tag} title={tag} />
-							{/each}
-						</div>
-					{/if}
+			<div class="meta-col-aside">
+				{#if track.playlist_tags.length > 0}
+					<div class="tag-chips">
+						{#each track.playlist_tags as tag}
+							<Chip variant="neutral" size="sm" value={tag} title={tag} />
+						{/each}
+					</div>
+				{/if}
 
-					{#if track.comment}
-						<p class="track-comment">{track.comment}</p>
-					{/if}
-				</div>
-			{/if}
+				{#if track.comment}
+					<p class="track-comment">{track.comment}</p>
+				{/if}
+			</div>
 		</div>
+	{:else if metaRows.length > 0}
+		<dl class="meta-inline">
+			{#each metaRows as row}
+				<div class="meta-inline-pair">
+					<dt class="meta-label">{row.label}</dt>
+					<dd class="meta-value">{row.value}</dd>
+				</div>
+			{/each}
+		</dl>
 	{/if}
 
 	<!-- ── Waveform + What Kiku Hears: one row — player ~3/4 (span 9), analysis
@@ -713,6 +729,32 @@
 		color: var(--text-primary);
 	}
 
+	/* Sparse state: a single tidy inline row of the present facts, wrapping
+	   gracefully — no boxed grid, no empty half. Pairs are separated by a quiet
+	   middot via the gap; each pair keeps label + value together. */
+	.meta-inline {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: var(--space-sm) var(--space-lg);
+		margin: 0;
+		font-size: var(--text-base);
+	}
+
+	.meta-inline-pair {
+		display: inline-flex;
+		align-items: baseline;
+		gap: var(--space-xs);
+	}
+
+	.meta-inline dt {
+		margin: 0;
+	}
+
+	.meta-inline dd {
+		margin: 0;
+	}
+
 	.tag-chips {
 		display: flex;
 		flex-wrap: wrap;
@@ -751,12 +793,35 @@
 			display: grid;
 			grid-template-columns: 3fr 1fr;
 			gap: var(--space-xl);
-			align-items: start;
+			/* `stretch` (the grid default) makes BOTH columns share the row
+			   height. The waveform is the anchor: the aside is told `min-height:0`
+			   so its two cards never push the row taller than the player — they
+			   instead flex to fill exactly the waveform's height (top + bottom
+			   flush). The player-section keeps its natural waveform height, so the
+			   row resolves to that height and the cards match it. */
+			align-items: stretch;
 		}
 
-		/* In the 1/4 column the cards always stack vertically. */
+		/* Cards column fills the row height the waveform sets, and the two cards
+		   share it equally — each card vertically centres its content and trims
+		   its padding so two fit the waveform height cleanly without cramping. */
+		.sound-row--with-cards .kiku-hears {
+			min-height: 0;
+		}
+
 		.sound-row--with-cards .feature-cards {
 			grid-template-columns: 1fr;
+			/* Distribute the column height equally across the stacked cards
+			   (`grid-auto-rows: 1fr`) and let the grid fill the aside. */
+			grid-auto-rows: 1fr;
+			flex: 1;
+			min-height: 0;
+		}
+
+		.sound-row--with-cards .feature-card {
+			min-height: 0;
+			align-items: center;
+			padding: var(--space-md) 18px;
 		}
 	}
 
