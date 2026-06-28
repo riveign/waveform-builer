@@ -472,6 +472,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2xl);
+		/* Container context for the sound-row's 9/3 split. The query must live on an
+		   ANCESTOR of .sound-row — a `container-type` element cannot be styled by its
+		   OWN container query, so .sound-row can't both establish the context and be
+		   the queried target. .track-view spans the full content pane (~917px on a
+		   1440px screen, content pane minus 48px page padding), well past the 720px
+		   split threshold. */
+		container-type: inline-size;
 	}
 
 	/* ── Header ── */
@@ -722,11 +729,13 @@
 	}
 
 	/* ── Sound row: waveform ~3/4 + analysis cards ~1/4 in one row ──
-	 * Container-query driven so the split only applies when the content pane is
-	 * wide enough to keep the waveform usable; below that it reflows to a single
-	 * stacked column (waveform full-width, cards beneath). */
+	 * Container-query driven (context lives on the ancestor .track-view) so the
+	 * split only applies when the content pane is wide enough to keep the waveform
+	 * usable; below that it reflows to a single stacked column (waveform
+	 * full-width, cards beneath). NOTE: .sound-row must NOT carry `container-type`
+	 * itself — it is the element the query styles, and a container can't be the
+	 * target of its own query. */
 	.sound-row {
-		container-type: inline-size;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-lg);
