@@ -42,6 +42,15 @@ in the §5 table; everything unmarked is still the live backlog.
 Validation (both green): svelte-check 335 files / 0 errors, `npm run build` clean,
 ui-ux-pro-max UX pass PASS, Playwright visual LOOKS GOOD.
 
+- **`9e4053e` — navbar overflow slice.** §4.5 navbar tab overflow: `SegmentedControl`
+  gains a reusable `dense` prop (drops shortcut hints, tightens padding, keeps text
+  labels — purely visual, no ARIA/keyboard change), and `+layout.svelte` condenses the
+  tab-bar below 900px (`condenseTabs` via `clientWidth`) with overflow-x scroll + hidden
+  scrollbar + a `mask-image` edge fade gated behind the condensed state (so the active
+  edge tab is never dimmed at wide widths) + a reserved right-actions slot (optional
+  `rightActions` snippet). 900px breakpoint is a user decision. Validation: svelte-check
+  336/0/0, production build clean, sentinel PASS (1 should-fix — always-on mask fade →
+  fixed by gating behind the scrollable state).
 - **`424dcb4` (PR #31) — a11y slice.** §4.7 keyboard nav for card grids: a reusable
   `use:rovingFocus` action (`lib/actions/rovingFocus.ts`) makes a grid one tab stop with
   Arrow/Home/End roving, applied to the Related and Albums grids; `TrackCard` now activates
@@ -285,11 +294,18 @@ The library sidebar is a fixed 500px. Consider trimming to ~360–420px (frees g
 for the content pane) and/or a collapse toggle that hands the content pane all 12 columns
 on demand. Improves density on smaller screens without a separate mobile layout.
 
-### 4.5 — Navbar tab overflow handling
+### 4.5 — ✅ SHIPPED (9e4053e) — Navbar tab overflow handling
 
-At narrow widths, logo + 6 tabs + future right-actions will crowd. Decide now: horizontal
-scroll, condensed labels, or collapse-to-icons. Recommend scroll-or-condense so tabs never
-clip.
+At narrow widths, logo + 6 tabs + future right-actions will crowd. **Resolved →
+condense-or-scroll at 900px (user decision).** `SegmentedControl` gained a reusable
+`dense` prop that condenses the tab labels below 900px (drops the per-tab
+keyboard-shortcut hints, tightens segment padding, keeps full text labels — purely
+visual, no ARIA/role/keyboard change). `+layout.svelte` drives it via `condenseTabs`
+(`headerWidth > 0 && headerWidth < 900`, measured through `bind:clientWidth`), and the
+tab container gets overflow-x scroll + hidden scrollbar + a `mask-image` edge fade
+**gated behind the condensed `.app-tabs.scrollable` state** so the active edge tab is
+never dimmed at wide widths. A reserved right-aligned actions slot (optional
+`rightActions` snippet) holds future controls so tabs never clip.
 
 ### 4.6 — ✅ SHIPPED (736f865) — Empty, loading, and error state audit
 
@@ -362,7 +378,8 @@ P2 = opportunistic.
 | ✅ 2.5 Data-viz palette decision | **P2 — SHIPPED** (this commit) | Resolved → Option 1: consolidated into `canvasPalette.ts`. |
 | 1.5 Split build chunk | **P2** | Perf hygiene; warning only. |
 | 4.3 Collapsible energy chart | **P2** | Nice arc-focus enhancement on the set view. |
-| 4.4 / 4.5 Sidebar + navbar overflow | **P2** | Responsive robustness for smaller screens. (4.5 recommendation ready; needs a ~900px condense-breakpoint product call.) |
+| 4.4 Collapsible / fluid sidebar | **P2** | Responsive robustness for smaller screens. |
+| ✅ 4.5 Navbar tab overflow | **P2 — SHIPPED** (9e4053e) | Condense `SegmentedControl` labels below 900px (`dense` prop) + overflow-x scroll + gated mask-fade + reserved right-actions slot. |
 | ✅ 4.7 Keyboard navigation coverage | **P2 — SHIPPED** (424dcb4) | `use:rovingFocus` action on Related + Albums grids; `TrackCard` Space-activate. |
 | ✅ 4.8 A11y audit | **P2 — SHIPPED** (424dcb4) | Canvas a11y + modal focus earlier; icon-only labels + scrubber `role="slider"` close it out. |
 | 4.9 Density / responsive polish | **P2** | Extend the Related card's discipline system-wide. |

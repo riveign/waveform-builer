@@ -15,6 +15,7 @@
 		value,
 		onchange,
 		ariaLabel,
+		dense = false,
 	}: {
 		/** The mutually-exclusive choices, rendered left-to-right as one control. */
 		options: SegmentOption<T>[];
@@ -24,6 +25,9 @@
 		onchange: (value: T) => void;
 		/** Names the group for AT (e.g. "Workspace views"). */
 		ariaLabel: string;
+		/** Condensed presentation: tightens padding and hides per-tab shortcut hints
+		 *  so the control fits a narrower container. Keeps real text labels. */
+		dense?: boolean;
 	} = $props();
 
 	let buttons = $state<HTMLButtonElement[]>([]);
@@ -49,7 +53,7 @@
 	}
 </script>
 
-<div class="segmented" role="tablist" aria-label={ariaLabel}>
+<div class="segmented" class:dense role="tablist" aria-label={ariaLabel}>
 	{#each options as opt, i (opt.value)}
 		<button
 			bind:this={buttons[i]}
@@ -63,7 +67,7 @@
 			onkeydown={handleKeydown}
 		>
 			{opt.label}
-			{#if opt.shortcut}<span class="segment__shortcut">{opt.shortcut}</span>{/if}
+			{#if opt.shortcut && !dense}<span class="segment__shortcut">{opt.shortcut}</span>{/if}
 		</button>
 	{/each}
 </div>
@@ -90,6 +94,13 @@
 		transition: color var(--dur-fast) var(--ease-standard),
 		            background var(--dur-fast) var(--ease-standard),
 		            border-color var(--dur-fast) var(--ease-standard);
+	}
+
+	/* Condensed: tighten horizontal padding so all segments fit a narrow bar.
+	   Shortcut hints are dropped in markup (see template), labels stay full text. */
+	.dense .segment {
+		padding-left: var(--space-md);
+		padding-right: var(--space-md);
 	}
 
 	.segment:hover {
