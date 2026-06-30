@@ -3,6 +3,7 @@
 	import { listAlbums, getAlbumCoverUrl, type Album } from '$lib/api/albums';
 	import Button from '../primitives/Button.svelte';
 	import SegmentedControl, { type SegmentOption } from '../primitives/SegmentedControl.svelte';
+	import { rovingFocus } from '$lib/actions/rovingFocus';
 
 	let { onselect }: { onselect: (album: Album) => void } = $props();
 
@@ -146,7 +147,7 @@
 								<span class="section-label">{section.label}</span>
 								<span class="section-count">{section.albums.length}</span>
 							</div>
-							<div class="grid grid-12 grid-12--content">
+							<div class="grid grid-12 grid-12--content" use:rovingFocus>
 								{#each section.albums as album (album.album_key)}
 									<button class="card" onclick={() => onselect(album)}>
 										<div class="cover">
@@ -172,7 +173,7 @@
 						</section>
 					{/each}
 				{:else}
-					<div class="grid grid-12 grid-12--content">
+					<div class="grid grid-12 grid-12--content" use:rovingFocus>
 						{#each albums as album (album.album_key)}
 							<button class="card" onclick={() => onselect(album)}>
 								<div class="cover">

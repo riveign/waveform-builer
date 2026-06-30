@@ -273,7 +273,14 @@
 	onclick={handleCardClick}
 	oncontextmenu={handleContextMenu}
 	ondragstart={handleDragStart}
-	onkeydown={(e) => { if (e.key === 'Enter') handleCardClick(); }}
+	onkeydown={(e) => {
+		// Only the card itself activates on Enter/Space. Without this target guard,
+		// Enter/Space pressed on a nested control (the +/⋮ menu buttons or a
+		// StarRating star) bubbles up here: preventDefault would cancel the native
+		// button's own activation and handleCardClick would fire the wrong action.
+		if (e.target !== e.currentTarget) return;
+		if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick(); }
+	}}
 >
 	<!-- Tier 1: Identity — artwork + title/artist + actions (IDENTICAL both modes) -->
 	<div class="zone-header">

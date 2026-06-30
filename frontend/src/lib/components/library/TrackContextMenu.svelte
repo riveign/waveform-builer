@@ -6,6 +6,8 @@
 	import EnergyZonePicker from './EnergyZonePicker.svelte';
 	import { ZONE_COLORS } from './EnergyZonePicker.svelte';
 	import StarRating from '../primitives/StarRating.svelte';
+	import MenuItem from '../primitives/MenuItem.svelte';
+	import MenuSeparator from '../primitives/MenuSeparator.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 
 	const player = getPlayerStore();
@@ -20,15 +22,13 @@
 		ontrackupdated?: (updated: Partial<Track>) => void;
 	} = $props();
 
-	let showEnergySubmenu = $state(false);
-	let showAddToSet = $state(false);
+	const zoneColor = $derived(ZONE_COLORS[track.resolved_energy ?? ''] ?? 'var(--text-3)');
 
 	async function handleZoneSelect(zone: string) {
 		const previousZone = track.resolved_energy;
 		const previousSource = track.energy_source;
 		const previousConfidence = track.energy_confidence;
 		ontrackupdated?.({ resolved_energy: zone, energy_source: 'approved', energy_confidence: 1.0 });
-		showEnergySubmenu = false;
 		onclose();
 
 		try {
@@ -51,116 +51,69 @@
 	}
 </script>
 
-<div class="menu-section">
-	<span class="menu-label">Energy</span>
-	<button
-		class="menu-item has-submenu"
-		onclick={() => showEnergySubmenu = !showEnergySubmenu}
-		role="menuitem"
-		aria-haspopup="true"
-		aria-expanded={showEnergySubmenu}
-	>
-		<span class="zone-dot" style="background: {ZONE_COLORS[track.resolved_energy ?? ''] ?? 'var(--text-dim)'}"></span>
-		{track.resolved_energy ?? 'not set'}
-		<span class="submenu-arrow">›</span>
-	</button>
+<span class="menu-label" id="ctx-energy-label">Energy</span>
+<MenuItem submenu={energySub} submenuLabel="Energy zone">
+	{#snippet icon()}
+		<span class="zone-dot" style="background: {zoneColor}"></span>
+	{/snippet}
+	{track.resolved_energy ?? 'not set'}
+</MenuItem>
+{#snippet energySub()}
+	<EnergyZonePicker current={track.resolved_energy} onselect={handleZoneSelect} />
+{/snippet}
 
-	{#if showEnergySubmenu}
-		<EnergyZonePicker
-			current={track.resolved_energy}
-			onselect={handleZoneSelect}
-			inline={true}
-		/>
-	{/if}
+<MenuSeparator />
+
+<span class="menu-label" id="ctx-rating-label">Rating</span>
+<div class="menu-item-static" role="group" aria-labelledby="ctx-rating-label">
+	<StarRating
+		rating={track.rating ?? 0}
+		onchange={handleRatingChange}
+		showScore={false}
+	/>
 </div>
 
-<div class="menu-divider"></div>
+<MenuSeparator />
 
-<div class="menu-section">
-	<span class="menu-label">Rating</span>
-	<div class="menu-item-static">
-		<StarRating
-			rating={track.rating ?? 0}
-			onchange={handleRatingChange}
-			showScore={false}
-		/>
-	</div>
-</div>
+<MenuItem submenu={addSub} submenuLabel="Add to set">
+	Add to set
+</MenuItem>
+{#snippet addSub()}
+	<AddToSetPicker
+		trackId={track.id}
+		trackTitle={track.title ?? 'track'}
+		onclose={onclose}
+	/>
+{/snippet}
 
-<div class="menu-divider"></div>
+<MenuSeparator />
 
-<div class="menu-section">
-	<button
-		class="menu-item has-submenu"
-		onclick={() => showAddToSet = !showAddToSet}
-		role="menuitem"
-		aria-haspopup="true"
-		aria-expanded={showAddToSet}
-	>
-		+ Add to Set
-		<span class="submenu-arrow">›</span>
-	</button>
-	{#if showAddToSet}
-		<AddToSetPicker
-			trackId={track.id}
-			trackTitle={track.title ?? 'track'}
-			onclose={onclose}
-		/>
-	{/if}
-</div>
-
-<div class="menu-divider"></div>
-
-<button
-	class="menu-item"
-	role="menuitem"
-	onclick={() => { player.play(track); onclose(); }}
->
-	▶ Play
-</button>
+<MenuItem onselect={() => { player.play(track); onclose(); }}>
+	{#snippet icon()}
+		<span class="play-glyph" aria-hidden="true">▶</span>
+	{/snippet}
+	Play
+</MenuItem>
 
 <style>
-	.menu-item {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 6px 10px;
-		border-radius: 4px;
-		border: none;
-		background: none;
-		width: 100%;
-		text-align: left;
-		color: var(--text-primary);
-		font-size: 13px;
-		cursor: pointer;
-	}
-	.menu-item:hover {
-		background: var(--bg-secondary);
-	}
-	.menu-item-static {
-		padding: 6px 10px;
-	}
 	.menu-label {
-		padding: 2px 10px;
-		font-size: 11px;
-		color: var(--text-secondary);
+		padding: var(--space-2xs) var(--menu-item-pad-x);
+		font-size: var(--text-xs);
+		color: var(--text-2);
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 	}
-	.menu-divider {
-		height: 1px;
-		background: var(--border);
-		margin: 3px 0;
+	.menu-item-static {
+		padding: var(--space-sm) var(--menu-item-pad-x);
 	}
 	.zone-dot {
 		width: 10px;
 		height: 10px;
-		border-radius: 50%;
+		border-radius: var(--radius-full);
 		flex-shrink: 0;
 	}
-	.submenu-arrow {
-		margin-left: auto;
-		color: var(--text-dim);
-		font-size: 14px;
+	.play-glyph {
+		display: inline-flex;
+		font-size: var(--text-xs);
 	}
 </style>

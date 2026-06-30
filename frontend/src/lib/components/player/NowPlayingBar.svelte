@@ -143,13 +143,53 @@
 		player.setVolume(val);
 	}
 
+	/** Clamp a seek time into the valid [0, duration] range. Guards duration=0/NaN. */
+	function clampSeek(t: number): number {
+		const dur = player.duration;
+		if (!Number.isFinite(dur) || dur <= 0) return 0;
+		return Math.max(0, Math.min(t, dur));
+	}
+
 	/** Seek via progress bar click */
 	function handleProgressClick(e: MouseEvent) {
-		const bar = e.currentTarget as HTMLElement;
+		const bar = e.currentTarget;
+		if (!(bar instanceof HTMLElement)) return;
 		const rect = bar.getBoundingClientRect();
+		if (rect.width <= 0) return;
 		const pct = (e.clientX - rect.left) / rect.width;
-		const seekTime = pct * player.duration;
-		player.seek(Math.max(0, Math.min(seekTime, player.duration)));
+		player.seek(clampSeek(pct * player.duration));
+	}
+
+	/** Keyboard seek for the progress slider — parallel path into the same player.seek(). */
+	function handleProgressKeydown(e: KeyboardEvent) {
+		switch (e.key) {
+			case 'ArrowRight':
+			case 'ArrowUp':
+				e.preventDefault();
+				player.seek(clampSeek(player.currentTime + 5));
+				break;
+			case 'ArrowLeft':
+			case 'ArrowDown':
+				e.preventDefault();
+				player.seek(clampSeek(player.currentTime - 5));
+				break;
+			case 'PageUp':
+				e.preventDefault();
+				player.seek(clampSeek(player.currentTime + 15));
+				break;
+			case 'PageDown':
+				e.preventDefault();
+				player.seek(clampSeek(player.currentTime - 15));
+				break;
+			case 'Home':
+				e.preventDefault();
+				player.seek(0);
+				break;
+			case 'End':
+				e.preventDefault();
+				player.seek(clampSeek(player.duration));
+				break;
+		}
 	}
 
 	let progressPct = $derived(player.progress * 100);
@@ -220,9 +260,18 @@
 				<div class="waveform-wrapper">
 					<div class="waveform-container" bind:this={waveformContainer}></div>
 					<!-- Fallback progress bar shown on narrow screens or when waveform is hidden -->
-					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="progress-fallback" onclick={handleProgressClick}>
+					<div
+						class="progress-fallback"
+						role="slider"
+						tabindex="0"
+						aria-label="Seek"
+						aria-valuemin={0}
+						aria-valuemax={Math.round(player.duration)}
+						aria-valuenow={Math.round(player.currentTime)}
+						aria-valuetext={`${formatTime(player.currentTime)} of ${formatTime(player.duration)}`}
+						onclick={handleProgressClick}
+						onkeydown={handleProgressKeydown}
+					>
 						<div class="progress-fill" style="width: {progressPct}%"></div>
 					</div>
 				</div>
@@ -232,7 +281,7 @@
 
 		<!-- Right: Volume -->
 		<div class="bar-right">
-			<button class="volume-btn" onclick={() => player.toggleMute()} title={player.isMuted ? 'Unmute' : 'Mute'}>
+			<button class="volume-btn" onclick={() => player.toggleMute()} aria-label={player.isMuted ? 'Unmute' : 'Mute'} title={player.isMuted ? 'Unmute' : 'Mute'}>
 				{#if player.isMuted || player.volume === 0}
 					<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
 						<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
@@ -255,6 +304,7 @@
 				step="0.05"
 				value={player.volume}
 				oninput={handleVolumeChange}
+				aria-label="Volume"
 				title="Volume"
 			/>
 		</div>

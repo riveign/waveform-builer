@@ -60,16 +60,35 @@
 
 	const isContextMode = $derived(x !== undefined && y !== undefined);
 
-	/** All focusable menu items currently in the panel (in DOM order). */
+	/** The role="menu" panel that currently owns focus — the root panel, or a
+	 *  nested submenu when focus has moved into one. Keeps arrow nav scoped to
+	 *  the active level instead of merging parent + submenu rows. */
+	function activeMenuPanel(): HTMLElement | null {
+		const active = document.activeElement;
+		if (active instanceof HTMLElement) {
+			const owner = active.closest<HTMLElement>('[role="menu"]');
+			if (owner && panelEl?.contains(owner)) return owner;
+		}
+		return panelEl;
+	}
+
+	/** Focusable menu items in the ACTIVE (sub)menu panel, in DOM order. */
 	function itemEls(): HTMLElement[] {
-		if (!panelEl) return [];
+		const scope = activeMenuPanel();
+		if (!scope) return [];
 		return Array.from(
-			panelEl.querySelectorAll<HTMLElement>(
+			scope.querySelectorAll<HTMLElement>(
 				'[role="menuitem"]:not([disabled]):not([aria-disabled="true"]),' +
 					'[role="menuitemradio"]:not([disabled]):not([aria-disabled="true"]),' +
 					'[role="menuitemcheckbox"]:not([disabled]):not([aria-disabled="true"])',
 			),
-		);
+		).filter((el) => el.closest('[role="menu"]') === scope); // exclude deeper-nested rows
+	}
+
+	/** True when focus is inside a nested submenu rather than the root panel. */
+	function inSubmenu(): boolean {
+		const scope = activeMenuPanel();
+		return scope !== null && scope !== panelEl;
 	}
 
 	function focusItem(index: number) {
@@ -142,6 +161,9 @@
 			const idx = current ? els.indexOf(current) : -1;
 			switch (e.key) {
 				case 'Escape':
+					// A submenu handles its own Escape (close submenu only) and
+					// stops propagation; if it reaches here, focus is at the root.
+					if (inSubmenu()) return;
 					e.preventDefault();
 					close();
 					break;
