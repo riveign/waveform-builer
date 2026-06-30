@@ -76,7 +76,11 @@
 
 			<div class="progress-row">
 				<span class="time">{formatTime(pb.currentTime)}</span>
-				<div class="progress-track">
+				<div
+					class="progress-track"
+					role="img"
+					aria-label={`${formatTime(pb.currentTime)} of ${formatTime(trackDuration)}`}
+				>
 					<div class="progress-fill" style="width: {progressPct}%"></div>
 				</div>
 				<span class="time">{formatTime(trackDuration)}</span>
@@ -122,6 +126,7 @@
 					step="0.05"
 					value={pb.volume}
 					oninput={(e) => { pb.volume = Number((e.target as HTMLInputElement).value); }}
+					aria-label="Volume"
 				/>
 			</label>
 		</div>

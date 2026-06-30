@@ -42,6 +42,18 @@ in the §5 table; everything unmarked is still the live backlog.
 Validation (both green): svelte-check 335 files / 0 errors, `npm run build` clean,
 ui-ux-pro-max UX pass PASS, Playwright visual LOOKS GOOD.
 
+- **`424dcb4` (PR #31) — a11y slice.** §4.7 keyboard nav for card grids: a reusable
+  `use:rovingFocus` action (`lib/actions/rovingFocus.ts`) makes a grid one tab stop with
+  Arrow/Home/End roving, applied to the Related and Albums grids; `TrackCard` now activates
+  on Space as well as Enter. §4.8 remainder: `NowPlayingBar` volume button dynamic
+  `aria-label` (Mute/Unmute), progress scrubber promoted to `role="slider"` with
+  `aria-valuemin/max/now`/`aria-valuetext` and keyboard seek, volume slider labeled,
+  `SetPlaybackBar` swept. §2.4 first-class Menu/MenuItem submenu support, with
+  `TrackContextMenu` migrated onto `MenuItem`/`MenuSeparator` (accessible energy-zone +
+  add-to-set submenus) off the last stale pre-design-system tokens. Validation:
+  svelte-check 336 files / 0 errors / 0 warnings, production build clean; sentinel review
+  caught one BLOCKER (roving selector matched nested card buttons) — fixed before commit.
+
 ---
 
 ## 1. Hygiene / cleanup
@@ -138,11 +150,16 @@ they need shapes Button doesn't offer:
   `SetPlaybackBar`: 8 round 28–34px icon buttons with tooltip `title`s) can't be a 36px
   pill. A round icon-button mode unblocks the transport migration.
 
-### 2.4 — Finish the Menu migration
+### 2.4 — ✅ SHIPPED (424dcb4) — Finish the Menu migration
 
-- `TrackContextMenu.svelte` rows aren't yet refactored onto `<MenuItem>`, and its
-  submenus (energy zone, add-to-set) aren't true accessible submenus. (The standalone
-  `EnergyZonePicker` and `AddToSetPicker` pickers were already migrated.)
+`Menu`/`MenuItem` gained first-class submenu support (`submenu?` / `submenuLabel?` props →
+`aria-haspopup="menu"` + `aria-expanded` + a nested `role="menu"` panel; ArrowRight/Enter
+open and focus the first sub-item, ArrowLeft/Escape close and return focus; `Menu` keydown
+is submenu-scope-aware). `TrackContextMenu.svelte` rows are now refactored onto
+`<MenuItem>`/`<MenuSeparator>` with real accessible energy-zone + add-to-set submenus, and
+its last stale pre-design-system tokens + px literals are replaced with semantic tokens
+(optimistic-update + rollback preserved). (The standalone `EnergyZonePicker` and
+`AddToSetPicker` pickers were already migrated.)
 
 ### 2.5 — ✅ SHIPPED (this commit) — A data-viz / canvas palette decision
 
@@ -282,14 +299,19 @@ surfaces (search, hunt, albums, set analysis) for the same three states, in Kiku
 warm empty states, "listening/reading/exploring" loading copy, and "what happened + why +
 what to try" errors that never blame the DJ.
 
-### 4.7 — Keyboard navigation coverage
+### 4.7 — ✅ SHIPPED (424dcb4) — Keyboard navigation coverage
 
 The Related card is `role="button"`, tab-reachable, with a focus ring and on-focus
-actions. Audit the rest: are all card grids arrow-navigable? Are menus and pickers fully
-keyboard-operable? Do transport controls have visible focus? Keyboard parity is part of
-**Grow the Ear** — a DJ who can fly the tool keyboard-first builds instinct faster.
+actions. **Shipped:** a reusable `use:rovingFocus` action (`lib/actions/rovingFocus.ts`)
+makes a card grid a single tab stop — ArrowLeft/Right rove ±1 (wrapping), ArrowUp/Down
+±column-count (reflow-safe clamp), Home/End jump to ends; a MutationObserver re-normalizes
+as cards mount/unmount, with a full `destroy()` teardown. It targets only the *outermost*
+matches, so the nested +/⋮/star buttons inside a card never become roving stops. Applied
+to the Related grid (`SimilarTracks`) and `AlbumGrid`. `TrackCard` now activates on Space
+as well as Enter (preventDefault scroll, guarded to the card target). Keyboard parity is
+part of **Grow the Ear** — a DJ who can fly the tool keyboard-first builds instinct faster.
 
-### 4.8 — Accessibility audit (PARTIAL — canvas a11y + modal focus shipped)
+### 4.8 — ✅ SHIPPED — Accessibility audit (canvas a11y + modal focus + icon labels + scrubber slider)
 
 A focused a11y pass: color-is-never-the-only-signal (the Related card already pairs every
 color with a glyph/word — verify the rest do too), aria-labels on icon-only controls,
@@ -302,8 +324,12 @@ modals/menus. Cross-reference `content-conventions.md` §4.
 - **✅ SHIPPED (this commit) — modal focus management.** A reusable `use:focusTrap` action
   (`lib/actions/focusTrap.ts`) traps + restores focus across 4 bespoke modals
   (`ReplaceTrackModal`, `AddFromArtistPanel`, `FillReorderDialog`, `SetEnergyReview`).
-- **Remaining:** icon-only control labels — `NowPlayingBar` volume `aria-label`, scrubber
-  `role="slider"` — plus a sweep of any remaining icon-only controls and menu focus.
+- **✅ SHIPPED (424dcb4) — icon-only labels + scrubber slider.** `NowPlayingBar` volume
+  button now carries a dynamic `aria-label` (Mute/Unmute), and the progress scrubber is
+  promoted to `role="slider"` with `aria-valuemin/max/now` + `aria-valuetext`
+  ("1:23 of 4:05") and keyboard seek (Arrow ±5s, Home/End), NaN/duration-0 guarded, with
+  pointer click-to-seek preserved; the volume slider is labeled and `SetPlaybackBar` was
+  swept the same way. Nothing outstanding in §4.8.
 
 ### 4.9 — Density / responsive polish
 
@@ -332,12 +358,12 @@ P2 = opportunistic.
 | ✅ 4.1 / 4.2 Sticky bands + header consistency | **P1 — SHIPPED** (736f865) | Cross-tab consistency; the shell feels half-finished without it. |
 | ✅ 4.6 Empty/loading/error audit | **P1 — SHIPPED** (736f865) | Direct voice + principle alignment; user-facing polish. |
 | 2.3 Button tab + round-icon variants | **P2** | Unblocks tab-bar + transport migration; surfaces work tokenized today. |
-| 2.4 Finish Menu migration | **P2** | `TrackContextMenu` rows + real submenus; functional today. |
+| ✅ 2.4 Finish Menu migration | **P2 — SHIPPED** (424dcb4) | First-class Menu/MenuItem submenus + `TrackContextMenu` migrated off stale tokens. |
 | ✅ 2.5 Data-viz palette decision | **P2 — SHIPPED** (this commit) | Resolved → Option 1: consolidated into `canvasPalette.ts`. |
 | 1.5 Split build chunk | **P2** | Perf hygiene; warning only. |
 | 4.3 Collapsible energy chart | **P2** | Nice arc-focus enhancement on the set view. |
 | 4.4 / 4.5 Sidebar + navbar overflow | **P2** | Responsive robustness for smaller screens. (4.5 recommendation ready; needs a ~900px condense-breakpoint product call.) |
-| 4.7 Keyboard navigation coverage | **P2** | Card-grid arrow roving + `TrackCard` Space-activate still open. |
-| 4.8 A11y audit (remainder) | **P2** | Canvas a11y + modal focus shipped; remaining: `NowPlayingBar` volume `aria-label`, scrubber `role="slider"`. |
+| ✅ 4.7 Keyboard navigation coverage | **P2 — SHIPPED** (424dcb4) | `use:rovingFocus` action on Related + Albums grids; `TrackCard` Space-activate. |
+| ✅ 4.8 A11y audit | **P2 — SHIPPED** (424dcb4) | Canvas a11y + modal focus earlier; icon-only labels + scrubber `role="slider"` close it out. |
 | 4.9 Density / responsive polish | **P2** | Extend the Related card's discipline system-wide. |
 | 2.6 Tokenize remaining one-offs | **P2** | Audit-as-you-go; most remaining literals are intentional. |

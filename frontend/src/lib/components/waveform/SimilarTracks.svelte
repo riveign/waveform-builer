@@ -3,6 +3,7 @@
 	import { suggestNext, getTrackAffinities, type TrackAffinity } from '$lib/api/tracks';
 	import SimilarTrackCard from '../library/SimilarTrackCard.svelte';
 	import Spinner from '../Spinner.svelte';
+	import { rovingFocus } from '$lib/actions/rovingFocus';
 
 	let { trackId, trackKey = null, parentBpm = null }: { trackId: number; trackKey?: string | null; parentBpm?: number | null } = $props();
 
@@ -102,7 +103,7 @@
 	{:else if available.length === 0}
 		<p class="muted">Nothing in your library mixes cleanly from here yet</p>
 	{:else}
-		<div class="cards-grid grid-12 grid-12--content">
+		<div class="cards-grid grid-12 grid-12--content" use:rovingFocus>
 			{#each visibleSuggestions as item (item.track.id)}
 				<div class="card-slot" class:dismissing={dismissing.has(item.track.id)}>
 					<SimilarTrackCard
