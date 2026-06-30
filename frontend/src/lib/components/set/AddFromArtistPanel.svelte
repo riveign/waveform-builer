@@ -5,6 +5,7 @@
 	import Typeahead from '$lib/components/library/Typeahead.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import { focusTrap } from '$lib/actions/focusTrap';
 
 	let {
 		setId,
@@ -76,7 +77,7 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="modal-backdrop" role="presentation" onclick={handleBackdropClick}>
-	<div class="modal" role="dialog" aria-label="Add from an artist">
+	<div class="modal" role="dialog" aria-modal="true" aria-label="Add from an artist" use:focusTrap>
 		<header class="modal-header">
 			<div class="head-text">
 				<h3>Add from an artist</h3>

@@ -8,7 +8,7 @@
 	} from 'chart.js';
 	import { getLibraryStats } from '$lib/api/stats';
 	import type { LibraryStats } from '$lib/types';
-	import { familyColors, chartChrome, rgba } from './chartPalette';
+	import { familyColors, chartChrome, rgba } from '$lib/styles/canvasPalette';
 
 	Chart.register(DoughnutController, ArcElement, Tooltip, Legend);
 
@@ -56,6 +56,19 @@
 		const pct = Math.round((sorted[0][1] / stats.total_tracks) * 100);
 		const weakest = sorted[sorted.length - 1];
 		return `${dominant} dominates at ${pct}% — exploring more ${weakest[0]} could widen your mix palette`;
+	});
+
+	/** Accessible summary listing each family's share, for screen readers. */
+	let summary = $derived.by(() => {
+		if (!stats) return '';
+		const familyCounts = aggregateFamilies(stats.genres);
+		const sorted = Object.entries(familyCounts).sort((a, b) => b[1] - a[1]);
+		if (sorted.length === 0) return 'No genre data yet.';
+		const total = sorted.reduce((sum, [, c]) => sum + c, 0);
+		const parts = sorted.map(
+			([fam, c]) => `${fam} ${total > 0 ? Math.round((c / total) * 100) : 0}%`,
+		);
+		return `Genre families across ${stats.total_tracks} tracks: ${parts.join(', ')}.`;
 	});
 
 	function aggregateFamilies(genres: Record<string, number>): Record<string, number> {
@@ -176,7 +189,8 @@
 		<div class="error">{error}</div>
 	{/if}
 	<div class="chart-container" class:hidden={loading || !!error}>
-		<canvas bind:this={canvas}></canvas>
+		<canvas bind:this={canvas} aria-hidden="true"></canvas>
+		<p class="sr-only" role="img" aria-label={summary}>{summary}</p>
 	</div>
 	{#if teachingNote && !loading && !error}
 		<p class="insight">{teachingNote}</p>
@@ -234,5 +248,17 @@
 		color: var(--accent);
 		margin-top: 8px;
 		line-height: 1.4;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

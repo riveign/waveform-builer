@@ -4,6 +4,7 @@
 	import { decodeFloat32, formatTime } from '$lib/utils/waveform';
 	import { getWaveformBands } from '$lib/api/waveforms';
 	import { API_BASE } from '$lib/api/client';
+	import { spectrumBands, token } from '$lib/styles/canvasPalette';
 
 	/**
 	 * Resolve a theme token to a concrete color at runtime. WaveSurfer paints to a
@@ -23,13 +24,10 @@
 		return used || fallback;
 	}
 
-	// Band colors: unplayed / played (darker)
-	const BAND_COLORS = [
-		{ unplayed: '#e74c3c', played: '#c0392b' }, // bass — red
-		{ unplayed: '#e67e22', played: '#d35400' }, // mid-low — orange
-		{ unplayed: '#2ecc71', played: '#27ae60' }, // mid-high — green
-		{ unplayed: '#3498db', played: '#2980b9' }, // high — blue
-	] as const;
+	// Band colors (unplayed / played) come from the centralized canvas palette —
+	// a documented domain palette, so a future retint is a one-file change and
+	// the legend below reads the SAME source.
+	const BAND_COLORS = spectrumBands();
 
 	let {
 		trackId,
@@ -152,9 +150,14 @@
 	}
 
 	// Concrete colors for the canvas: caller-supplied literal, else the resolved
-	// app accent tokens (so the waveform follows the theme flip).
-	const waveColorResolved = $derived(waveColor ?? resolveColor('var(--accent)', '#008A84'));
-	const progressColorResolved = $derived(progressColor ?? resolveColor('var(--accent-hover)', '#00B1B8'));
+	// app accent tokens (so the waveform follows the theme flip). The SSR/probe
+	// fallback comes from the shared palette's teal ramp, not an inline hex.
+	const waveColorResolved = $derived(
+		waveColor ?? resolveColor('var(--accent)', token('--teal-600', '#008A84')),
+	);
+	const progressColorResolved = $derived(
+		progressColor ?? resolveColor('var(--accent-hover)', token('--teal-400', '#00B1B8')),
+	);
 
 	onMount(() => {
 		const peakData = decodeFloat32(peaks);
@@ -302,7 +305,7 @@
 <div class="wavesurfer-player">
 	<div class="controls">
 		{#if !visualOnly}
-			<button class="play-btn" onclick={togglePlay}>
+			<button class="play-btn" onclick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
 				{isPlaying ? '⏸' : '▶'}
 			</button>
 		{/if}
@@ -312,9 +315,11 @@
 				class="spectral-toggle"
 				class:active={spectralActive}
 				onclick={toggleSpectral}
+				aria-pressed={spectralActive}
+				aria-label={spectralActive ? 'Switch to classic waveform' : 'Switch to spectral waveform'}
 				title={spectralActive ? 'Switch to classic view' : 'Switch to spectral view'}
 			>
-				<span class="spectral-icon">
+				<span class="spectral-icon" aria-hidden="true">
 					{#if spectralActive}
 						<span class="band band-low"></span>
 						<span class="band band-midlow"></span>
@@ -328,7 +333,24 @@
 			</button>
 		{/if}
 	</div>
-	<div class="waveform-container" bind:this={container}></div>
+	<div
+		class="waveform-container"
+		bind:this={container}
+		role="img"
+		aria-label={spectralActive
+			? `Spectral waveform, ${formatTime(duration)} long, position ${formatTime(currentTime)}. Bars are split into four frequency bands: bass, low-mid, high-mid and high.`
+			: `Audio waveform, ${formatTime(duration)} long, position ${formatTime(currentTime)}.`}
+	></div>
+	{#if spectralActive}
+		<ul class="band-legend" aria-label="Frequency band colors">
+			{#each BAND_COLORS as band (band.name)}
+				<li class="band-legend-item">
+					<span class="band-legend-swatch" style="background: {band.unplayed}" aria-hidden="true"></span>
+					{band.name}
+				</li>
+			{/each}
+		</ul>
+	{/if}
 </div>
 
 <style>
@@ -410,9 +432,37 @@
 		border-radius: 1px;
 	}
 
+	/* These mirror spectrumBands() in canvasPalette.ts (the domain spectrum
+	   palette). Keep in sync if the band hues are retinted there. */
 	.band-low     { background: #e74c3c; height: 12px; }
 	.band-midlow  { background: #e67e22; height: 9px; }
 	.band-midhigh { background: #2ecc71; height: 7px; }
 	.band-high    { background: #3498db; height: 5px; }
 	.band-classic { background: var(--accent); height: 10px; }
+
+	/* Visible legend mapping band color → frequency name (so color is never the
+	   only signal for the spectral view). */
+	.band-legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px 12px;
+		margin: 0;
+		padding: 0 10px 8px;
+		list-style: none;
+		font-size: 11px;
+		color: var(--text-secondary);
+	}
+
+	.band-legend-item {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+	}
+
+	.band-legend-swatch {
+		display: inline-block;
+		width: 10px;
+		height: 10px;
+		border-radius: 2px;
+	}
 </style>

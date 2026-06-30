@@ -8,7 +8,7 @@
 		Legend,
 	} from 'chart.js';
 	import { getCamelotStats } from '$lib/api/stats';
-	import { token, chartChrome, rgba } from './chartPalette';
+	import { token, chartChrome, rgba } from '$lib/styles/canvasPalette';
 
 	Chart.register(PolarAreaController, RadialLinearScale, ArcElement, Tooltip, Legend);
 
@@ -16,6 +16,8 @@
 	let chart: Chart | null = null;
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	/** Accessible summary of harmonic coverage, for screen readers. */
+	let summary = $state('');
 
 	const CAMELOT_LABELS = Array.from({ length: 12 }, (_, i) => String(i + 1));
 
@@ -32,6 +34,21 @@
 
 				const minorCounts = CAMELOT_LABELS.map((k) => data[k]?.A ?? 0);
 				const majorCounts = CAMELOT_LABELS.map((k) => data[k]?.B ?? 0);
+
+				const total = [...minorCounts, ...majorCounts].reduce((a, b) => a + b, 0);
+				const covered = CAMELOT_LABELS.filter(
+					(_, i) => minorCounts[i] + majorCounts[i] > 0,
+				).length;
+				let busiestIdx = 0;
+				let busiestCount = -1;
+				CAMELOT_LABELS.forEach((_, i) => {
+					const c = minorCounts[i] + majorCounts[i];
+					if (c > busiestCount) {
+						busiestCount = c;
+						busiestIdx = i;
+					}
+				});
+				summary = `Camelot key coverage: ${total} tracks across ${covered} of 12 key positions. Busiest is key ${CAMELOT_LABELS[busiestIdx]} with ${busiestCount} tracks.`;
 
 				const chrome = chartChrome();
 				// Two distinct cerceta hues for the Minor (A) / Major (B) series.
@@ -136,7 +153,8 @@
 		<div class="error">{error}</div>
 	{/if}
 	<div class="chart-container" class:hidden={loading || !!error}>
-		<canvas bind:this={canvas}></canvas>
+		<canvas bind:this={canvas} aria-hidden="true"></canvas>
+		<p class="sr-only" role="img" aria-label={summary}>{summary}</p>
 	</div>
 </div>
 
@@ -184,5 +202,17 @@
 
 	.error {
 		color: var(--energy-high);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>
