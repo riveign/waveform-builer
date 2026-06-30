@@ -1,10 +1,26 @@
-# Related Tracks Card — Guidelines
+# Track Card — Guidelines (two modes)
 
-The Related tracks card (`frontend/src/lib/components/library/SimilarTrackCard.svelte`)
-is the densest information surface in Kiku: it answers "what mixes well from
-here, and *why*?" in one scannable tile. It renders inside the **Related tracks**
-section (`frontend/src/lib/components/waveform/SimilarTracks.svelte`) on the track
-view.
+The **Track card** is the densest information surface in Kiku — one scannable
+tile that reads a track top-to-bottom. It runs in **two modes** off **one shared
+shell** so the DJ learns one card and reads it everywhere:
+
+| Mode | Component | Asks | Lives where |
+|------|-----------|------|-------------|
+| **Related** | `library/SimilarTrackCard.svelte` | "What mixes well from *here*, and *why*?" | the **Related tracks** section (`waveform/SimilarTracks.svelte`) on the track view |
+| **Standalone** | `library/StandaloneTrackCard.svelte` | "What *is* this track?" | anywhere a single track stands on its own — a library card grid, a search result, a header |
+
+Both wrappers are thin: they bind their props into a discriminated `mode` union
+and delegate to the shared base **`library/TrackCard.svelte`**, which owns the
+3-tier shell, artwork + fallback, `capFirst` capitalization, the container-query
+tiers and every token. The shell is **identical** in both modes; only **Tier 2
+and Tier 3 swap** (see [Mode differences](#mode-differences)).
+
+> **Why two modes, not two cards.** A related card is *comparative* — every
+> number on it (harmony move, BPM delta, match score, affinity) is measured
+> *against a reference track*. A standalone track has no reference, so those
+> signals would be **phantoms**. Splitting the modes by a union means the
+> standalone card *structurally cannot* render a score it can't justify — that is
+> "Opinions You Can See Through" enforced by the type system, not by discipline.
 
 This doc covers what is **specific** to this card. For everything shared —
 capitalization, overflow, number formatting, color-as-meaning, states,
@@ -15,7 +31,49 @@ them.
 
 ---
 
-## Anatomy
+## When to use each mode
+
+- **Reach for Related** when the track is being weighed *against another* — the
+  "what comes next" suggestions under a now-playing or selected track. The
+  comparison *is* the point; the card exists to show the *why* of a transition.
+- **Reach for Standalone** when the track stands alone — browsing the library as
+  a card grid, a search result, or presenting a single track's identity and
+  quality. There is no "from" track, so the card must not invent a score. If you
+  find yourself wanting to show a match number on a standalone card, that is the
+  signal you actually have a *reference track* and want Related mode.
+- **Never** hand-roll a track tile. Both modes are the same primitive; a bespoke
+  row drifts from the shared anatomy, capitalization and tokens.
+
+---
+
+## Mode differences
+
+Tier 1 (identity) is **byte-for-byte identical** across modes. Tiers 2 and 3 swap:
+
+| Tier | **Related** (comparative) | **Standalone** (absolute / own quality) |
+|------|---------------------------|------------------------------------------|
+| **2 — attributes** | Key chip + **harmony-move glyph** + harmony-derived color · BPM chip + **signed delta** (green/orange/red) · energy zone | Key · BPM · energy zone as **bare `plain`-mode colored text** — **no harmony glyph, no delta**. The color carries the meaning; the values are facts, not transitions. |
+| **3 — signals** | Match **score `NN/100`** (lead) · `N★` rating · **affinity strength** bar | The track's **own quality read**: `N★` rating (lead) · **play count** · **energy settledness** (Settled / Inferred / —). **No score, no affinity, no harmony** — there is no reference. |
+| **compact pill** | harmony · metronome · **match-strength bars** · `N★` | key dot · metronome · `N★` — **no match bars** |
+
+The standalone Tier-2 chips use the `plain` `<Chip>` mode (bare colored text, no
+box) — these are descriptive facts, lighter than the related card's transition
+chips. The standalone Tier-3 columns reuse the same three-balanced-column grid as
+Related, so a mixed grid of cards still reads as aligned columns.
+
+**Standalone "energy settledness"** is the honest standalone analogue of the
+related card's match strength — it reads the track's *own* confidence, not a
+pair-wise verdict:
+
+| Energy source | Word | Color | Meaning |
+|---------------|------|-------|---------|
+| `approved` | **Settled** | `--score-excellent` | you confirmed this zone |
+| inferred | **Inferred** | `--score-good` | Kiku's read, not yet approved |
+| none | `—` (muted) | `--text-3` | no zone yet — never a blank gap |
+
+---
+
+## Anatomy (Related mode)
 
 The card stacks three tiers, separated by dividers, reading top-to-bottom from
 *what it is* → *why it fits* → *how good + what to do*. At its **regular** width
@@ -263,6 +321,45 @@ argue back, without two numerics fighting for the same glance.
 
 ---
 
+## Standalone mode
+
+The standalone card shares Tier 1 with Related verbatim, then **swaps Tiers 2 and
+3** for the absolute, no-reference reads (full table in
+[Mode differences](#mode-differences)).
+
+**Tier 2 — absolute attributes.** Key, BPM and energy zone, each a `plain`-mode
+`<Chip>` (bare colored text, no box / border / fill). There is **no harmony-move
+glyph** and **no BPM delta** — both are pair-wise, and a standalone track has no
+pair. The key chip's color is the *absolute* Camelot color (the wheel position),
+not a harmony-quality color; energy keeps the shared `--zone-*` color. Lighter
+than the related chips on purpose: these are facts, not transition signals.
+
+**Tier 3 — the track's own quality read.** The same three-balanced-column grid,
+reading left → center → right:
+
+1. **Rating (lead, left)** — the DJ's `N★` (`StarRating display="compact"`). In
+   standalone mode the rating *is* the headline (there is no score to outrank it),
+   so it aligns START. Unrated → the canonical muted `—`, never a blank gap.
+2. **Plays (center)** — total play count (Rekordbox + Kiku), the DJ's own usage
+   signal. Never played → muted `—`.
+3. **Energy settledness (right)** — Settled / Inferred / `—`, the track's own
+   energy-read confidence (see the table in [Mode differences](#mode-differences)).
+   A word + tokenized color, never color alone (§4); the full meaning is in the
+   `title`.
+
+**What is deliberately ABSENT.** No match `NN/100`, no affinity strength bar, no
+harmony move — every one of those is a comparison with a reference track the
+standalone card does not have. They are not "hidden"; the `standalone` arm of the
+mode union simply doesn't carry the fields, so they *cannot* render. This is the
+"Show the Why" / "Opinions You Can See Through" principles made structural: the
+card only ever shows a signal it can stand behind.
+
+**Compact pill.** Artwork + title, then a single evenly-distributed icon row —
+**key dot · metronome · `N★`** (no match-strength bars). Each icon keeps its real
+value in its `title`/aria-label.
+
+---
+
 ## States
 
 Per [content-conventions §5](./content-conventions.md#5-states). Card-specific
@@ -273,7 +370,7 @@ behavior:
 | **Default** | Resting card; `--surface-2`, `--border-subtle`. |
 | **Hover** | `border-color: var(--border-strong)`; transition via `--dur-fast`. |
 | **Focus-visible** | Keyboard ring from the global `--focus-ring` rule (card is `role="button"`, `tabindex="0"`). |
-| **Selected** | `border: var(--space-2xs) solid var(--accent)`. NOTE: `isSelected` is declared but never set true — wire it or drop the rule (see Open items). |
+| **Selected** | *Removed (spec 023 follow-up).* The card had a dead `isSelected` state + `.selected` rule that was never set true; there is no card-local selection concept (selection is via `ui.selectedTrack` / tab switch), so it was dropped rather than wired. |
 | **No-artwork fallback** | Inline music-note SVG in `--text-4` on `--surface-1`. |
 | **Affinity set/unset** | Set → the Tier-3 strength word reads the terse opinion (**Great** / **Not for me**) with the full opinion + strength in `title`; unset → the terse word reads the score band (**Great** / **Likely** / **Weak**). At compact this verdict is the colored match-bars icon, value in its `title`/aria-label. |
 | **Loading** | Owned by the wrapper: `<Spinner label="Finding what mixes..." />`. |
@@ -337,7 +434,10 @@ Resolved (spec 023, step 5):
    `--score-*` tokens (the latter also drives the BPM delta's green/orange/red magnitude
    scale); no hardcoded hex remains on this card.
 
-Still open (needs user confirmation):
-
-3. **Selected state**: `isSelected` is dead (never set true). Wire it to a real
-   selection concept or remove the `.selected` rule.
+3. ~~**Selected state**~~ — **RESOLVED (dropped)**: `isSelected` was dead (never
+   set true) and there is no card-local selection concept — selection lives in
+   `ui.selectedTrack` / the tab switch, not a per-card boolean. The `isSelected`
+   state and the `.selected` rule were removed when the shared base
+   (`TrackCard.svelte`) was factored out. If a real multi-select concept ever
+   lands, wire a `selected?: boolean` onto the shared shell rather than reviving
+   a dead local.

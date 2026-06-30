@@ -10,7 +10,7 @@
 	} from 'chart.js';
 	import { getBpmHistogram } from '$lib/api/stats';
 	import type { BpmBin } from '$lib/types';
-	import { familyColors, chartChrome } from './chartPalette';
+	import { familyColors, chartChrome } from '$lib/styles/canvasPalette';
 
 	Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
@@ -18,6 +18,25 @@
 	let chart: Chart | null = null;
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	/** Accessible summary of the tempo spread, for screen readers. */
+	let summary = $state('');
+
+	function buildSummary(bins: BpmBin[]): string {
+		if (bins.length === 0) return 'No tempo data yet.';
+		const centers = [...new Set(bins.map((b) => b.bin_center))].sort((a, b) => a - b);
+		const totals = new Map<number, number>();
+		for (const b of bins) totals.set(b.bin_center, (totals.get(b.bin_center) ?? 0) + b.count);
+		let peakBpm = centers[0];
+		let peakCount = 0;
+		for (const [bpm, count] of totals) {
+			if (count > peakCount) {
+				peakCount = count;
+				peakBpm = bpm;
+			}
+		}
+		const total = [...totals.values()].reduce((a, b) => a + b, 0);
+		return `BPM distribution across ${total} tracks, from ${centers[0]} to ${centers[centers.length - 1]} BPM. Most tracks cluster around ${peakBpm} BPM.`;
+	}
 
 	function buildStackedData(bins: BpmBin[]) {
 		const colors = familyColors();
@@ -58,6 +77,7 @@
 
 				if (destroyed) return;
 
+				summary = buildSummary(data);
 				const { labels, datasets } = buildStackedData(data);
 				const chrome = chartChrome();
 
@@ -149,7 +169,8 @@
 		<div class="error">{error}</div>
 	{/if}
 	<div class="chart-container" class:hidden={loading || !!error}>
-		<canvas bind:this={canvas}></canvas>
+		<canvas bind:this={canvas} aria-hidden="true"></canvas>
+		<p class="sr-only" role="img" aria-label={summary}>{summary}</p>
 	</div>
 </div>
 
@@ -197,5 +218,17 @@
 
 	.error {
 		color: var(--energy-high);
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

@@ -43,7 +43,7 @@ so stylized casing past the first glyph is preserved (`deadmau5` → `Deadmau5`,
 but `MEDUZA` and `LOUDER` stay as they are). The underlying library value is never
 mutated — it's a presentational cap only, and the full original is always exposed
 on hover via `title` (§2). Implemented by the shared `capFirst()` helper in
-`SimilarTrackCard.svelte`.
+`TrackCard.svelte` (re-exported from `SimilarTrackCard.svelte` for existing callers).
 
 ---
 
@@ -271,5 +271,5 @@ means a single change to a token or primitive updates every surface at once.
 
 - `BRANDING.md` — voice, tone, word choices, the 7 "Even Over" principles.
 - `frontend/src/lib/styles/tokens.semantic.css` — the semantic token vocabulary.
-- `frontend/docs/design-system/related-tracks-card.md` — a worked example that
-  applies every rule above to one card.
+- `frontend/docs/design-system/track-card.md` — a worked example that applies
+  every rule above to the two-mode Track card (Related + Standalone).

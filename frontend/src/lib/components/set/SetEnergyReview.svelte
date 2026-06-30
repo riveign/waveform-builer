@@ -3,6 +3,7 @@
 	import { getTinderQueue, submitDecision } from '$lib/api/tinder';
 	import TinderCard from '../tinder/TinderCard.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import { focusTrap } from '$lib/actions/focusTrap';
 
 	let {
 		trackIds,
@@ -76,7 +77,15 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div class="overlay" onclick={() => onclose(reviewed > 0)}>
-	<div class="dialog" onclick={(e) => e.stopPropagation()}>
+	<div
+		class="dialog"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Review energy"
+		tabindex="-1"
+		use:focusTrap
+		onclick={(e) => e.stopPropagation()}
+	>
 		<div class="dialog-header">
 			<span class="dialog-title">Review energy</span>
 			{#if !done && totalToReview > 0}

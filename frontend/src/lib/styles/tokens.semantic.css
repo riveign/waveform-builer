@@ -162,6 +162,24 @@
 	--chip-genre-bg:     color-mix(in srgb, var(--accent-text) 14%, var(--surface-3));
 	--chip-genre-fg:     var(--accent-text);
 	--chip-genre-border: color-mix(in srgb, var(--accent-text) 34%, transparent);
+	/* mode="tone" — a generic FILLED soft-tint badge that generalizes the genre
+	 * recipe above: the flowing meaning color (--chip-color, falling back to the
+	 * accent) tinted 14% into the surface, the meaning color as fg, and a 34%
+	 * border. Any variant/color reuses the same recipe; cerceta re-points the
+	 * underlying tokens, never raw hex. */
+	--chip-tone-bg:      color-mix(in srgb, var(--chip-color, var(--accent-text)) 14%, var(--surface-3));
+	/* fg (F3): the raw meaning color at full strength on the 14% tint falls below
+	 * WCAG AA 4.5:1 for both the lighter score/zone hues (worst ~3.55:1, lilac-500)
+	 * and the dark Camelot violets (worst ~3.61:1, 11A) — the latter sit too close
+	 * to the dark tint. Lift the fg toward --text-1 (55% meaning / 45% text-1): the
+	 * chip still reads in its meaning hue, but EVERY supported meaning token and all
+	 * 24 raw Camelot hues now clear 4.5:1 against this bg (worst 4.92:1 at 11A).
+	 * Stays token/color-mix driven — cerceta re-points --text-1 and the lift follows. */
+	--chip-tone-fg:      color-mix(in srgb, var(--chip-color, var(--accent-text)) 55%, var(--text-1));
+	--chip-tone-border:  color-mix(in srgb, var(--chip-color, var(--accent-text)) 34%, transparent);
+	/* mode="plain" — bare colored text, no box. Padding collapses so the chip is
+	 * just the (optionally colored) label; kept as a token for symmetry. */
+	--chip-plain-pad:    0;
 
 	/* --- Tier 3 — Component (Rating / StarRating) --- dedicated glyph sizes so
 	 * the star scale is decoupled from the text scale (text tokens read too

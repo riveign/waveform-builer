@@ -97,7 +97,9 @@
 	{#if loading && !album}
 		<div class="status">Reading the album...</div>
 	{:else if error}
-		<div class="status error">{error}</div>
+		<div class="status error" role="alert">
+			Couldn't open this album. Try heading back and picking it again.
+		</div>
 	{:else if album}
 		<div class="album-header">
 			<div class="cover-large">
@@ -183,8 +185,15 @@
 	}
 
 	.header-bar {
-		padding: 8px 10px;
+		display: flex;
+		align-items: center;
+		min-height: var(--band-toolbar-h);
+		padding: 0 var(--space-xl);
 		border-bottom: 1px solid var(--border);
+		position: sticky;
+		top: 0;
+		z-index: 5;
+		background: var(--bg-primary);
 	}
 
 	.album-header {

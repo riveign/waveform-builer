@@ -7,6 +7,7 @@
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import { focusTrap } from '$lib/actions/focusTrap';
 
 	const playback = getPlaybackStore();
 	const ui = getUiStore();
@@ -125,7 +126,7 @@
 
 <!-- Backdrop is presentational; Escape is handled on the window, the dialog below owns focus. -->
 <div class="modal-backdrop" role="presentation" onclick={handleBackdropClick}>
-	<div class="modal" role="dialog" aria-modal="true" aria-label="Replace track">
+	<div class="modal" role="dialog" aria-modal="true" aria-label="Replace track" use:focusTrap>
 		<header class="modal-header">
 			<h3>Replace track</h3>
 			<div class="current-track">

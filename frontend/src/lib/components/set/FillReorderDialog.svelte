@@ -2,6 +2,7 @@
 	import { fillSet, optimizeOrder, reorderSetTracks, addTrackToSet, type OptimizeOrderResponse } from '$lib/api/sets';
 	import Button from '$lib/components/primitives/Button.svelte';
 	import SegmentedControl, { type SegmentOption } from '$lib/components/primitives/SegmentedControl.svelte';
+	import { focusTrap } from '$lib/actions/focusTrap';
 
 	const tabOptions: SegmentOption<'fill' | 'reorder'>[] = [
 		{ value: 'fill', label: 'Fill gaps' },
@@ -129,7 +130,16 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="dialog-overlay" onclick={onclose} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
 	<!-- Inner panel stops backdrop-dismiss clicks; the overlay above owns Escape. -->
-	<div class="dialog" role="presentation" onclick={(e) => e.stopPropagation()}>
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div
+		class="dialog"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Fill or reorder set"
+		tabindex="-1"
+		use:focusTrap
+		onclick={(e) => e.stopPropagation()}
+	>
 		<div class="dialog-header">
 			<SegmentedControl options={tabOptions} value={activeTab} onchange={(v) => activeTab = v} ariaLabel="Fill or reorder" />
 			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={onclose}>

@@ -6,7 +6,8 @@
 	import Stack from '$lib/components/primitives/Stack.svelte';
 	import Grid from '$lib/components/primitives/Grid.svelte';
 	import SimilarTrackCard from '$lib/components/library/SimilarTrackCard.svelte';
-	import StarRating from '$lib/components/library/StarRating.svelte';
+	import StandaloneTrackCard from '$lib/components/library/StandaloneTrackCard.svelte';
+	import StarRating from '$lib/components/primitives/StarRating.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
 	import HarmonyIcon, {
 		HARMONY_RELATION_LABEL,
@@ -229,6 +230,46 @@
 	];
 
 	const noop = () => {};
+
+	// STANDALONE-mode states — the same card shell, but each track on its OWN terms:
+	// absolute key / BPM / energy (no delta, no harmony move) and its own quality
+	// read (rating · plays · energy settledness). NO match score, NO affinity — there
+	// is no reference track, so those phantom signals never render.
+	const standaloneStates: { label: string; track: Track }[] = [
+		{
+			label: 'Settled · played · rated',
+			track: mockTrack({
+				id: 9101, title: 'Midnight Drive', artist: 'Lena Vox',
+				bpm: 128, key: '8A', rating: 5, genre_family: 'Techno',
+				resolved_energy: 'peak', energy_source: 'approved',
+				play_count: 12, kiku_play_count: 3,
+			}),
+		},
+		{
+			label: 'Inferred energy · never played',
+			track: mockTrack({
+				id: 9102, title: 'Off Axis', artist: 'Corner Theory',
+				bpm: 138, key: '3B', rating: 3, genre_family: 'House',
+				resolved_energy: 'build', energy_source: 'inferred',
+			}),
+		},
+		{
+			label: 'Unrated · no energy yet',
+			track: mockTrack({
+				id: 9103, title: 'Untagged Bootleg With A Very Long Title That Clamps',
+				artist: 'Unknown Pressing', bpm: 150, key: '9A', rating: 0,
+				genre_family: 'Groove',
+			}),
+		},
+		{
+			label: 'Rated · settled · light plays',
+			track: mockTrack({
+				id: 9104, title: 'Warm Up Tool', artist: 'Slow Hands',
+				bpm: 124, key: '7A', rating: 4, genre_family: 'Trance',
+				resolved_energy: 'warmup', energy_source: 'approved', play_count: 2,
+			}),
+		},
+	];
 </script>
 
 <div class="ds" data-theme="cerceta">
@@ -930,6 +971,47 @@
 						affinity={s.affinity}
 						onaffinitychange={noop}
 					/>
+				</div>
+			{/each}
+		</div>
+	</section>
+
+	<!-- 13b. STANDALONE TRACK CARD -->
+	<section class="ds__section">
+		<h2>Standalone track card</h2>
+		<p class="ds__note">
+			The <strong>same card shell</strong>, run in its second mode. Where the Related card answers
+			"what mixes well from <em>here</em>, and why?", the standalone card answers "what <em>is</em>
+			this track?" — it shows a track on its <strong>own terms</strong>, with no reference to mix from.
+			Tier 1 (identity) is identical to the Related card. Tier 2 swaps the comparative chips for
+			<strong>absolute attributes</strong> — key, BPM and energy zone as bare <code>plain</code>-mode
+			colored text, with <strong>no harmony-move glyph and no BPM delta</strong> (there is nothing to
+			compare against). Tier 3 swaps the pair-wise verdict for the track's <strong>own quality
+			read</strong>: the DJ's rating (<code>N★</code>), play count, and how <strong>settled</strong> its
+			energy zone is (Settled = you approved it · Inferred = Kiku's read · — = not set yet).
+		</p>
+		<p class="ds__note">
+			Crucially, the standalone card <strong>cannot</strong> render a match score, an affinity strength,
+			or a harmony move — those signals only exist on the comparative <code>related</code> arm of the
+			card's mode union, so they are structurally absent here. That is "Opinions You Can See Through"
+			made literal: no phantom <code>NN/100</code> where there is no reference to score against.
+		</p>
+
+		<p class="related-density-label">Regular — ~250px columns (rating · plays · energy-settledness)</p>
+		<div class="related-grid related-grid--regular">
+			{#each standaloneStates as s (s.track.id)}
+				<div class="related-cell">
+					<span class="related-cell__label">{s.label}</span>
+					<StandaloneTrackCard track={s.track} />
+				</div>
+			{/each}
+		</div>
+
+		<p class="related-density-label">Compact — ~190px columns (pill: artwork + title / key dot · metronome · N★ — no match bars)</p>
+		<div class="related-grid related-grid--compact">
+			{#each standaloneStates as s (s.track.id)}
+				<div class="related-cell">
+					<StandaloneTrackCard track={s.track} />
 				</div>
 			{/each}
 		</div>

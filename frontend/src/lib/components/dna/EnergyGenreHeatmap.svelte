@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getEnergyGenre } from '$lib/api/stats';
-	import { familyColors } from './chartPalette';
+	import { familyColors } from '$lib/styles/canvasPalette';
 
 	const ENERGY_LEVELS = ['low', 'warmup', 'closing', 'mid', 'dance', 'up', 'high', 'fast', 'peak'] as const;
 

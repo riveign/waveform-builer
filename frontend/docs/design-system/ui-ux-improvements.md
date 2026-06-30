@@ -18,11 +18,37 @@ entry names the files involved so you can start without re-discovering the groun
 
 ---
 
+## 0. Recently shipped (2026-06-30)
+
+Two commits on branch `design-system` (not yet pushed/merged) cleared the P0 wave, most
+of P1, and a focused slice of P2. Shipped items below are marked **✅ SHIPPED** inline and
+in the §5 table; everything unmarked is still the live backlog.
+
+- **`736f865` — P0 + P1 + UX-pass.** P0 hygiene (1.1 delete 3 orphaned `set/` comps · 1.3
+  cyan→teal canvas fallbacks · 1.4 `app.css` comment · 1.6 dead `isSelected` dropped). P1
+  (2.1 Chip `plain`/`tone`/`clickToRemove` modes · 2.2 `StarRating`→primitive · item 3
+  two-mode `TrackCard` + `StandaloneTrackCard` · 4.1/4.2 sticky bands + header consistency
+  across Track/DNA/Tinder/Hunt/Albums · 4.6 empty/loading/error states in Kiku voice).
+  UX-pass fixes: **F1** `role="alert"` on 7 error surfaces · **F2** `clickToRemove` ≥44px
+  hit area · **F3** tone-chip AA contrast.
+- **focused-P2 follow-up (this commit).** §2.5 resolved → Option 1 (consolidate):
+  `chartPalette.ts` → `lib/styles/canvasPalette.ts` with `deviationColors()` /
+  `spectrumBands()`, `EnergyFlowChart` + `WavesurferPlayer` de-literalized. Canvas chart
+  a11y (part of §4.8): every `<canvas>` now carries a screen-reader summary, and
+  `EnergyFlowChart`'s color-only fit-quality cue is fixed. Reusable `use:focusTrap` action
+  (`lib/actions/focusTrap.ts`) applied to 4 bespoke modals (`ReplaceTrackModal`,
+  `AddFromArtistPanel`, `FillReorderDialog`, `SetEnergyReview`).
+
+Validation (both green): svelte-check 335 files / 0 errors, `npm run build` clean,
+ui-ux-pro-max UX pass PASS, Playwright visual LOOKS GOOD.
+
+---
+
 ## 1. Hygiene / cleanup
 
 Low-risk debt to clear before it calcifies. None of these block the spec-023 PR.
 
-### 1.1 — Remove the three orphaned `set/` components
+### 1.1 — ✅ SHIPPED (736f865) — Remove the three orphaned `set/` components
 
 Zero callers anywhere; safe to delete outright.
 
@@ -43,7 +69,7 @@ by the vibe system (brightness + density). They render empty or never render.
 Recommendation: delete both alongside the vibe-vs-mood deprecation already tracked in
 project memory. If kept, they need a real data source first.
 
-### 1.3 — Re-point stale cyan canvas fallbacks to teal
+### 1.3 — ✅ SHIPPED (736f865) — Re-point stale cyan canvas fallbacks to teal
 
 `--accent` is flipped to teal, but a few runtime canvas fallbacks still hold the old cyan
 hex. They only fire if `getComputedStyle` fails, so this is latent inconsistency, not an
@@ -53,7 +79,7 @@ active bug — but it should match.
 - `WavesurferPlayer.svelte:156-157` — `resolveColor('var(--accent)', '#00CED1')`
 - `NowPlayingBar.svelte:122-123` — same pattern, `'#00A8AB'`
 
-### 1.4 — Fix the stale comment in `app.css:7`
+### 1.4 — ✅ SHIPPED (736f865) — Fix the stale comment in `app.css:7`
 
 Reads "`--accent stays CYAN until the deliberate flip`". The flip already happened in
 `tokens.semantic.css` (`--accent-9: var(--teal-600)`). Correct or delete the comment.
@@ -64,10 +90,13 @@ Reads "`--accent stays CYAN until the deliberate flip`". The flip already happen
 Non-blocking, but worth a `manualChunks` split or a route-level dynamic import to keep
 first-load lean. Ties to Kiku's efficiency principle.
 
-### 1.6 — Wire or drop the dead `isSelected` state on the Related card
+### 1.6 — ✅ SHIPPED (736f865) — Wire or drop the dead `isSelected` state on the Related card — DONE (dropped)
 
-`SimilarTrackCard.svelte` declares `isSelected` and styles `.selected`, but the prop is
-never set true. Either wire it to a real selection concept or remove the rule.
+`SimilarTrackCard.svelte` declared `isSelected` and styled `.selected`, but the prop was
+never set true. **Resolved:** dropped (no card-local selection concept — selection lives
+in `ui.selectedTrack` / the tab switch). Removed when the shared base `TrackCard.svelte`
+was factored out for the two-mode card (§3). If a real multi-select concept ever lands,
+add a `selected?: boolean` to the shared shell rather than reviving a dead local.
 
 ---
 
@@ -76,7 +105,7 @@ never set true. Either wire it to a real selection concept or remove the rule.
 The migration is broad but not total. These close the remaining gaps so the system can
 express every surface without bespoke fallback.
 
-### 2.1 — Add the three missing Chip modes
+### 2.1 — ✅ SHIPPED (736f865) — Add the three missing Chip modes
 
 Several sites are blocked purely because `Chip` can't yet express their shape. Adding
 these unblocks the whole chip leftover wave at once:
@@ -91,7 +120,7 @@ these unblocks the whole chip leftover wave at once:
 `clickToRemove`. Note: the Related card already resolved its own genre treatment to
 *colored text* rather than a chip — `plain` would formalize that pattern systemwide.
 
-### 2.2 — Promote `StarRating` to a primitive
+### 2.2 — ✅ SHIPPED (736f865) — Promote `StarRating` to a primitive
 
 `StarRating` lives at `lib/components/library/StarRating.svelte` but behaves as a
 primitive (5 import sites). Relocate it to `lib/components/primitives/` (or formally
@@ -115,19 +144,17 @@ they need shapes Button doesn't offer:
   submenus (energy zone, add-to-set) aren't true accessible submenus. (The standalone
   `EnergyZonePicker` and `AddToSetPicker` pickers were already migrated.)
 
-### 2.5 — A data-viz / canvas palette decision
+### 2.5 — ✅ SHIPPED (this commit) — A data-viz / canvas palette decision
 
-Chart.js and `<canvas>` can't read CSS custom properties directly, so chart colors live
-as literal rgba/hex resolved at runtime. The DNA charts were recolored to cerceta via a
-shared `chartPalette.ts`, but the per-chart status palettes are still scattered:
+**Resolved → Option 1 (consolidate), implemented.** The shared `chartPalette.ts` was
+renamed/relocated to `lib/styles/canvasPalette.ts` and is now the single source of truth
+for canvas colors. The previously-scattered status palettes moved in behind named helpers:
 
-- `EnergyFlowChart` status rgba (green/yellow/red deviation colors)
-- `WavesurferPlayer` frequency-band spectrum hexes
+- `EnergyFlowChart` deviation rgba (green/yellow/red) → `deviationColors()`
+- `WavesurferPlayer` frequency-band spectrum hexes → `spectrumBands()`
 
-Decision to make: consolidate these into one canvas-palette constants module (single
-source of truth, cerceta-aware via a `resolveColor` step), or accept them as domain
-colors and document the boundary. Pick one and write it down so the next recolor is a
-one-file change.
+Both consumers are de-literalized and resolve through the module (cerceta-aware via the
+existing `resolveColor` step). The next recolor is now a one-file change.
 
 ### 2.6 — Tokenize remaining one-off constants (where it pays)
 
@@ -138,9 +165,15 @@ Audit any new one-offs against that bar before tokenizing for its own sake.
 
 ---
 
-## 3. The two-mode Track card
+## 3. ✅ SHIPPED (736f865) — The two-mode Track card
 
-This is the biggest unbuilt thread. The Related card was built; its standalone twin was
+Built: shared `library/TrackCard.svelte` base, discriminated-union `mode`, the two thin
+wrappers (`SimilarTrackCard` = related, `StandaloneTrackCard` = standalone), and the
+generalized `track-card.md` docs. Only step 5 (adopting `StandaloneTrackCard` into the
+TrackView header / search results / library lists) is deferred — see the per-step notes
+below; those editor surfaces belong to a later shell + states wave.
+
+This was the biggest unbuilt thread. The Related card was built; its standalone twin was
 documented in intent but never made. The card has two jobs that look similar but answer
 different questions, and conflating them weakens both.
 
@@ -173,20 +206,31 @@ show the track's own quality signals instead — rating, plays, energy fit to it
 
 ### Build outline
 
-1. **Factor the shared shell** out of `SimilarTrackCard.svelte` — the 3-tier anatomy
-   (identity → attributes → signals), artwork fallback, capitalization, responsive
-   container-query tiers, and token usage are common to both modes.
-2. **Parameterize by `mode: 'related' | 'standalone'`** (or split into two thin wrappers
-   over a shared base). Tier 1 (identity) is identical. Tier 2 swaps comparative chips for
-   absolute chips. Tier 3 swaps match/affinity for the track's own quality read.
-3. **Standalone Tier 2** — absolute Key / BPM / Energy chips (reuse the `plain`/`key`/
-   `bpm`/`energy` Chip variants from §2.1, minus the delta).
-4. **Standalone Tier 3** — rating (`N★`) + play count + energy-fit, no `NN/100`, no
-   strength bars.
-5. **Adopt it** in TrackView header, search results, and library lists, replacing the
-   current hand-rolled track rows.
-6. **Generalize the docs** — fold `related-tracks-card.md` into a two-mode "Track card"
-   guide so both variants share one source of truth.
+1. **Factor the shared shell** out of `SimilarTrackCard.svelte` — **DONE**. The 3-tier
+   anatomy (identity → attributes → signals), artwork fallback, capitalization, responsive
+   container-query tiers and token usage now live in the shared base
+   `library/TrackCard.svelte`.
+2. **Parameterize by `mode`** — **DONE**, as a **discriminated union** `mode: { kind:
+   'related'; ... } | { kind: 'standalone'; track }` (no cast/`!`), with two thin wrappers
+   (`SimilarTrackCard.svelte` = related, `StandaloneTrackCard.svelte` = standalone) over
+   the shared base. Tier 1 identical; Tiers 2/3 swap.
+3. **Standalone Tier 2** — **DONE**. Absolute Key / BPM / Energy as `plain`-mode `<Chip>`s
+   (no delta, no harmony glyph).
+4. **Standalone Tier 3** — **DONE**. Rating (`N★`, lead) + play count + energy
+   settledness (Settled / Inferred / —). No `NN/100`, no strength bars, no harmony move.
+5. **Adopt it** — **PARTIAL / follow-on**. `StandaloneTrackCard` is live and demoed in the
+   `/design-system` showcase. Adopting it into the **TrackView header**, **search results**
+   and **library lists** is deferred: those surfaces are either *interactive editors*
+   (the TrackView header has an editable rating, an interactive zone picker, play +
+   add-to-set — a card would regress them), *deliberately dense tables*
+   (`TrackTable.svelte` — the doc and the audit both keep it a table), or *comparative*
+   (`InSetTrackSearch.svelte` scores against a `lastTrackId`, so it is Related-shaped, and
+   still carries raw hex). These row replacements belong with the later **shell + states**
+   wave, which can redesign those editor surfaces deliberately rather than as a side effect
+   of a card-primitive wave.
+6. **Generalize the docs** — **DONE**. `related-tracks-card.md` → `track-card.md`, now the
+   single two-mode source of truth (When to use each · Mode differences · Related anatomy ·
+   Standalone mode).
 
 This directly serves **Show the Why** (each mode shows the signals that are actually
 meaningful in its context) and **Opinions You Can See Through** (no phantom score where
@@ -198,14 +242,14 @@ there's nothing to score against).
 
 Enhancements this work surfaced, each tied to a Kiku principle.
 
-### 4.1 — Per-surface sticky band rhythm (consistency pass)
+### 4.1 — ✅ SHIPPED (736f865) — Per-surface sticky band rhythm (consistency pass)
 
 Only the Set tab has the sticky `--band-toolbar-h` / `--band-secondary-h` rhythm. The
 Track, DNA, Tinder, Hunt, and Albums tabs lack the same toolbar bands, so headers feel
 different per tab. Define each tab's band and apply the sticky pattern uniformly. A calm,
 predictable shell lets the DJ stay mid-flow rather than re-learning each tab.
 
-### 4.2 — Header consistency across tabs
+### 4.2 — ✅ SHIPPED (736f865) — Header consistency across tabs
 
 Related to 4.1: the navbar moved to `+layout.svelte`, but per-tab secondary headers
 (filter rows, search rows, titles) were only formalized on the Set tab. Run a consistency
@@ -230,7 +274,7 @@ At narrow widths, logo + 6 tabs + future right-actions will crowd. Decide now: h
 scroll, condensed labels, or collapse-to-icons. Recommend scroll-or-condense so tabs never
 clip.
 
-### 4.6 — Empty, loading, and error state audit
+### 4.6 — ✅ SHIPPED (736f865) — Empty, loading, and error state audit
 
 The Related card models this well (`<Spinner label="Finding what mixes...">`, the muted
 "Nothing in your library mixes cleanly from here yet" empty state). Sweep the other
@@ -245,12 +289,21 @@ actions. Audit the rest: are all card grids arrow-navigable? Are menus and picke
 keyboard-operable? Do transport controls have visible focus? Keyboard parity is part of
 **Grow the Ear** — a DJ who can fly the tool keyboard-first builds instinct faster.
 
-### 4.8 — Accessibility audit
+### 4.8 — Accessibility audit (PARTIAL — canvas a11y + modal focus shipped)
 
 A focused a11y pass: color-is-never-the-only-signal (the Related card already pairs every
 color with a glyph/word — verify the rest do too), aria-labels on icon-only controls,
 canvas charts exposing their data via accessible summaries, and focus management in
 modals/menus. Cross-reference `content-conventions.md` §4.
+
+- **✅ SHIPPED (this commit) — canvas chart summaries.** Every `<canvas>` now carries a
+  screen-reader summary, and `EnergyFlowChart`'s color-only fit-quality cue is fixed
+  (color is no longer the sole signal).
+- **✅ SHIPPED (this commit) — modal focus management.** A reusable `use:focusTrap` action
+  (`lib/actions/focusTrap.ts`) traps + restores focus across 4 bespoke modals
+  (`ReplaceTrackModal`, `AddFromArtistPanel`, `FillReorderDialog`, `SetEnergyReview`).
+- **Remaining:** icon-only control labels — `NowPlayingBar` volume `aria-label`, scrubber
+  `role="slider"` — plus a sweep of any remaining icon-only controls and menu focus.
 
 ### 4.9 — Density / responsive polish
 
@@ -268,22 +321,23 @@ P2 = opportunistic.
 
 | Item | Tier | Rationale |
 |------|------|-----------|
-| 1.3 Stale cyan canvas fallbacks → teal | **P0** | Visible inconsistency with the shipped cerceta flip; cheap. |
-| 1.4 Fix stale `app.css` comment | **P0** | Actively misleading; one-line fix. |
-| 1.1 Delete 3 orphaned `set/` components | **P0** | Zero callers, zero risk, reduces dead surface in the PR. |
-| 1.6 Wire-or-drop Related card `isSelected` | **P0** | Dead state shipped in the new card; resolve before merge. |
+| ✅ 1.3 Stale cyan canvas fallbacks → teal | **P0 — SHIPPED** (736f865) | Visible inconsistency with the shipped cerceta flip; cheap. |
+| ✅ 1.4 Fix stale `app.css` comment | **P0 — SHIPPED** (736f865) | Actively misleading; one-line fix. |
+| ✅ 1.1 Delete 3 orphaned `set/` components | **P0 — SHIPPED** (736f865) | Zero callers, zero risk, reduces dead surface in the PR. |
+| ✅ 1.6 Wire-or-drop Related card `isSelected` | **P0 — SHIPPED** (736f865) | Dead state shipped in the new card; resolve before merge. |
 | 1.2 Decide the two Mood components | **P1** | Needs the vibe-vs-mood deprecation call; not blocking. |
-| 2.1 Add three Chip modes | **P1** | Unblocks the largest batch of leftover migrations (`SearchFilters` +6). |
-| 2.2 Promote `StarRating` to primitive | **P1** | Small, unblocks inline-star migration. |
-| 3 Two-mode Track card | **P1** | Biggest unbuilt thread; high product value (Show the Why). Depends on 2.1. |
-| 4.1 / 4.2 Sticky bands + header consistency | **P1** | Cross-tab consistency; the shell feels half-finished without it. |
-| 4.6 Empty/loading/error audit | **P1** | Direct voice + principle alignment; user-facing polish. |
+| ✅ 2.1 Add three Chip modes | **P1 — SHIPPED** (736f865) | Unblocks the largest batch of leftover migrations (`SearchFilters` +6). |
+| ✅ 2.2 Promote `StarRating` to primitive | **P1 — SHIPPED** (736f865) | Small, unblocks inline-star migration. |
+| ✅ 3 Two-mode Track card | **P1 — SHIPPED** (736f865) | Biggest unbuilt thread; high product value (Show the Why). Step-5 adoption deferred. |
+| ✅ 4.1 / 4.2 Sticky bands + header consistency | **P1 — SHIPPED** (736f865) | Cross-tab consistency; the shell feels half-finished without it. |
+| ✅ 4.6 Empty/loading/error audit | **P1 — SHIPPED** (736f865) | Direct voice + principle alignment; user-facing polish. |
 | 2.3 Button tab + round-icon variants | **P2** | Unblocks tab-bar + transport migration; surfaces work tokenized today. |
 | 2.4 Finish Menu migration | **P2** | `TrackContextMenu` rows + real submenus; functional today. |
-| 2.5 Data-viz palette decision | **P2** | A decision, then a small consolidation; charts already cerceta. |
+| ✅ 2.5 Data-viz palette decision | **P2 — SHIPPED** (this commit) | Resolved → Option 1: consolidated into `canvasPalette.ts`. |
 | 1.5 Split build chunk | **P2** | Perf hygiene; warning only. |
 | 4.3 Collapsible energy chart | **P2** | Nice arc-focus enhancement on the set view. |
-| 4.4 / 4.5 Sidebar + navbar overflow | **P2** | Responsive robustness for smaller screens. |
-| 4.7 / 4.8 Keyboard + a11y audit | **P2** | Important, larger scope; schedule as a dedicated pass. |
+| 4.4 / 4.5 Sidebar + navbar overflow | **P2** | Responsive robustness for smaller screens. (4.5 recommendation ready; needs a ~900px condense-breakpoint product call.) |
+| 4.7 Keyboard navigation coverage | **P2** | Card-grid arrow roving + `TrackCard` Space-activate still open. |
+| 4.8 A11y audit (remainder) | **P2** | Canvas a11y + modal focus shipped; remaining: `NowPlayingBar` volume `aria-label`, scrubber `role="slider"`. |
 | 4.9 Density / responsive polish | **P2** | Extend the Related card's discipline system-wide. |
 | 2.6 Tokenize remaining one-offs | **P2** | Audit-as-you-go; most remaining literals are intentional. |

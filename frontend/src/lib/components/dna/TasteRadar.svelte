@@ -10,7 +10,7 @@
 	} from 'chart.js';
 	import { getLibraryStats, getEnhancedStats } from '$lib/api/stats';
 	import type { LibraryStats, EnhancedStatsResponse } from '$lib/types';
-	import { accentColor, chartChrome, rgba } from './chartPalette';
+	import { accentColor, chartChrome, rgba } from '$lib/styles/canvasPalette';
 
 	Chart.register(RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip);
 
@@ -19,6 +19,8 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	let teachingNote = $state('');
+	/** Accessible summary of each radar axis, for screen readers. */
+	let summary = $state('');
 
 	const AXES = [
 		'Energy Range',
@@ -90,6 +92,10 @@
 				const values = computeAxes(stats, enhanced);
 				const { strongest, weakest } = findStrongestWeakest(values);
 				teachingNote = `Strongest: ${strongest} — weakest: ${weakest}. A rounder shape means a more versatile collection.`;
+				summary =
+					'Taste radar across six axes: ' +
+					AXES.map((axis, i) => `${axis} ${Math.round(values[i] * 100)}%`).join(', ') +
+					`. Strongest is ${strongest}, weakest is ${weakest}.`;
 
 				const chrome = chartChrome();
 				const accent = accentColor();
@@ -182,7 +188,8 @@
 		<div class="error">{error}</div>
 	{/if}
 	<div class="chart-container" class:hidden={loading || !!error}>
-		<canvas bind:this={canvas}></canvas>
+		<canvas bind:this={canvas} aria-hidden="true"></canvas>
+		<p class="sr-only" role="img" aria-label={summary}>{summary}</p>
 	</div>
 	{#if teachingNote && !loading && !error}
 		<p class="insight">{teachingNote}</p>
@@ -244,5 +251,17 @@
 		color: var(--accent);
 		margin-top: 8px;
 		line-height: 1.4;
+	}
+
+	.sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
 	}
 </style>

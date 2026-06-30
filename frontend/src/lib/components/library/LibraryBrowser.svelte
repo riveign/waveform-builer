@@ -5,6 +5,7 @@
 	import { getTrackStore } from '$lib/stores/tracks.svelte';
 	import SearchFilters from './SearchFilters.svelte';
 	import TrackTable from './TrackTable.svelte';
+	import Spinner from '../Spinner.svelte';
 
 	let { onselect }: { onselect: (track: Track) => void } = $props();
 
@@ -27,9 +28,9 @@
 	<SearchFilters onsearch={handleSearch} />
 
 	{#if store.loading}
-		<div class="status">Reading your library...</div>
+		<div class="status"><Spinner label="Reading your library..." /></div>
 	{:else if store.error}
-		<div class="status error">{store.error}</div>
+		<div class="status error" role="alert">Couldn't read your library. Something hiccuped between here and the database — try the search again.</div>
 	{:else if store.tracks.length === 0}
 		<div class="status">Nothing matched those filters. Try loosening the search?</div>
 	{:else}

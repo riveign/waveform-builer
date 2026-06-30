@@ -119,8 +119,8 @@
 		ws = WaveSurfer.create({
 			container: waveformContainer,
 			height: 40,
-			waveColor: resolveColor('var(--accent)', '#00CED1'),
-			progressColor: resolveColor('var(--accent-hover)', '#00A8AB'),
+			waveColor: resolveColor('var(--accent)', '#008A84'),
+			progressColor: resolveColor('var(--accent-hover)', '#00B1B8'),
 			cursorColor: 'rgba(255,255,255,0.5)',
 			cursorWidth: 1,
 			barWidth: 2,

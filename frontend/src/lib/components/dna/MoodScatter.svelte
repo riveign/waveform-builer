@@ -2,7 +2,7 @@
 	import { Chart, ScatterController, LinearScale, PointElement, Tooltip, Legend } from 'chart.js';
 	import type { MoodPoint } from '$lib/types';
 	import { getMoodScatter } from '$lib/api/stats';
-	import { familyColors, chartChrome } from './chartPalette';
+	import { familyColors, chartChrome } from '$lib/styles/canvasPalette';
 
 	Chart.register(ScatterController, LinearScale, PointElement, Tooltip, Legend);
 
