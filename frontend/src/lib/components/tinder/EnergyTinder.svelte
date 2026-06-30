@@ -44,47 +44,49 @@
 
 <div class="energy-tinder">
 	{#if store.loading}
-		<div class="status">Loading your review queue...</div>
+		<div class="status">Reading your review queue...</div>
 	{:else if store.error}
-		<div class="status error">{store.error}</div>
+		<div class="status error" role="alert">
+			<p>Couldn't read your review queue.</p>
+			<p class="hint">The predictions may still be settling — give it a moment and try again.</p>
+		</div>
 	{:else if store.queue.length === 0}
 		<div class="empty">
-			<p>No tracks to review right now.</p>
-			<p class="hint">Run the autotagger first to generate predictions.</p>
+			<p>Nothing to review right now — your queue is clear.</p>
+			<p class="hint">Run the autotagger first, and fresh predictions will land here to confirm.</p>
 		</div>
 	{:else if store.isComplete}
 		<TinderSummary onrestart={loadWithFilters} />
 	{:else}
-		<!-- Pinned top band: queue progress + mode toggle + filters -->
-		<div class="tinder-band">
-			<div class="toolbar">
-				<div class="progress-bar">
-					<span>{store.currentIndex + 1} / {store.queue.length}</span>
-					<span class="queue-total">({store.queueTotal} total in queue)</span>
-				</div>
-				<Button
-					variant="secondary"
-					size="sm"
-					pressed={batchMode}
-					onclick={() => batchMode = !batchMode}
-				>
-					{batchMode ? 'Card mode' : 'Batch mode'}
-				</Button>
+		<!-- Toolbar band: queue progress + mode toggle (sticky, matches Set tab) -->
+		<div class="toolbar">
+			<div class="progress-bar">
+				<span>{store.currentIndex + 1} / {store.queue.length}</span>
+				<span class="queue-total">({store.queueTotal} total in queue)</span>
 			</div>
+			<Button
+				variant="secondary"
+				size="sm"
+				pressed={batchMode}
+				onclick={() => batchMode = !batchMode}
+			>
+				{batchMode ? 'Card mode' : 'Batch mode'}
+			</Button>
+		</div>
 
-			<div class="filters">
-				<select bind:value={genreFamily} onchange={loadWithFilters}>
-					<option value="">All genres</option>
-					<option value="techno">Techno</option>
-					<option value="house">House</option>
-					<option value="groove">Groove</option>
-					<option value="trance">Trance</option>
-					<option value="breaks">Breaks</option>
-					<option value="electronic">Electronic</option>
-				</select>
-				<input type="number" placeholder="BPM min" bind:value={bpmMin} onchange={loadWithFilters} />
-				<input type="number" placeholder="BPM max" bind:value={bpmMax} onchange={loadWithFilters} />
-			</div>
+		<!-- Secondary band: genre/BPM filters (sticky beneath the toolbar band) -->
+		<div class="filters">
+			<select bind:value={genreFamily} onchange={loadWithFilters}>
+				<option value="">All genres</option>
+				<option value="techno">Techno</option>
+				<option value="house">House</option>
+				<option value="groove">Groove</option>
+				<option value="trance">Trance</option>
+				<option value="breaks">Breaks</option>
+				<option value="electronic">Electronic</option>
+			</select>
+			<input type="number" placeholder="BPM min" bind:value={bpmMin} onchange={loadWithFilters} />
+			<input type="number" placeholder="BPM max" bind:value={bpmMax} onchange={loadWithFilters} />
 		</div>
 
 		<!-- Sole scroller: the card/batch stage scrolls beneath the pinned band -->
@@ -114,17 +116,32 @@
 	.energy-tinder { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 	.status { padding: 40px; text-align: center; color: var(--text-secondary); }
 	.status.error { color: var(--energy-high); }
+	.status p { margin: 4px 0; }
 	.empty { text-align: center; padding: 40px; color: var(--text-dim); }
 	.empty p { margin: 4px 0; }
-	.hint { font-size: 12px; }
-	/* Pinned top band: progress/mode toggle + filters stay put */
-	.tinder-band { flex-shrink: 0; padding: 4px 12px 8px; background: var(--surface-1); border-bottom: 1px solid var(--border); }
-	/* Sole scroller: card/batch stage scrolls beneath the band */
-	.tinder-stage { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
-	.toolbar { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
+	.hint { font-size: 12px; color: var(--text-dim); }
+	/* Toolbar band: progress + mode toggle, sticky (matches Set tab recipe) */
+	.toolbar {
+		display: flex; align-items: center; justify-content: space-between;
+		padding: 0 var(--space-xl);
+		height: var(--band-toolbar-h);
+		border-bottom: 1px solid var(--border);
+		position: sticky; top: 0; z-index: 5;
+		background: var(--bg-primary);
+	}
+	/* Secondary band: genre/BPM filters, sticky beneath the toolbar band */
+	.filters {
+		display: flex; align-items: center; gap: var(--space-md); justify-content: center;
+		padding: 0 var(--space-xl);
+		height: var(--band-secondary-h);
+		border-bottom: 1px solid var(--border);
+		position: sticky; top: var(--band-toolbar-h); z-index: 4;
+		background: var(--bg-primary);
+	}
+	/* Sole scroller: card/batch stage scrolls beneath the pinned bands */
+	.tinder-stage { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-lg); }
 	.progress-bar { font-size: 13px; color: var(--text-secondary); }
 	.queue-total { font-size: 11px; color: var(--text-dim); margin-left: 4px; }
-	.filters { display: flex; gap: 8px; justify-content: center; padding: 8px 0; }
 	.filters select, .filters input { padding: 4px 8px; font-size: 12px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; }
 	.filters input { width: 80px; }
 </style>

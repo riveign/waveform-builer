@@ -5,7 +5,7 @@
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import EnergyZonePicker from './EnergyZonePicker.svelte';
 	import { ZONE_COLORS } from './EnergyZonePicker.svelte';
-	import StarRating from './StarRating.svelte';
+	import StarRating from '../primitives/StarRating.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 
 	const player = getPlayerStore();

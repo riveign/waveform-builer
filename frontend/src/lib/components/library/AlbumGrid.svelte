@@ -130,7 +130,9 @@
 	{#if loading && albums.length === 0}
 		<div class="status">Reading your library...</div>
 	{:else if error}
-		<div class="status error">{error}</div>
+		<div class="status error" role="alert">
+			Couldn't read your albums. The library may be mid-sync — give it a moment and try again.
+		</div>
 	{:else if albums.length === 0}
 		<div class="status">No albums yet — sync your library to see them here.</div>
 	{:else}
@@ -238,12 +240,16 @@
 	.controls {
 		display: flex;
 		gap: 8px;
-		padding: 10px;
+		min-height: var(--band-toolbar-h);
+		padding: 0 var(--space-xl);
 		border-bottom: 1px solid var(--border);
 		align-items: center;
 		flex-wrap: wrap;
 		flex-shrink: 0;
-		background: var(--surface-1);
+		position: sticky;
+		top: 0;
+		z-index: 5;
+		background: var(--bg-primary);
 	}
 	.search {
 		flex: 1 1 auto;

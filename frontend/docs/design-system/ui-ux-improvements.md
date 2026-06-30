@@ -64,10 +64,13 @@ Reads "`--accent stays CYAN until the deliberate flip`". The flip already happen
 Non-blocking, but worth a `manualChunks` split or a route-level dynamic import to keep
 first-load lean. Ties to Kiku's efficiency principle.
 
-### 1.6 — Wire or drop the dead `isSelected` state on the Related card
+### 1.6 — Wire or drop the dead `isSelected` state on the Related card — DONE (dropped)
 
-`SimilarTrackCard.svelte` declares `isSelected` and styles `.selected`, but the prop is
-never set true. Either wire it to a real selection concept or remove the rule.
+`SimilarTrackCard.svelte` declared `isSelected` and styled `.selected`, but the prop was
+never set true. **Resolved:** dropped (no card-local selection concept — selection lives
+in `ui.selectedTrack` / the tab switch). Removed when the shared base `TrackCard.svelte`
+was factored out for the two-mode card (§3). If a real multi-select concept ever lands,
+add a `selected?: boolean` to the shared shell rather than reviving a dead local.
 
 ---
 
@@ -173,20 +176,31 @@ show the track's own quality signals instead — rating, plays, energy fit to it
 
 ### Build outline
 
-1. **Factor the shared shell** out of `SimilarTrackCard.svelte` — the 3-tier anatomy
-   (identity → attributes → signals), artwork fallback, capitalization, responsive
-   container-query tiers, and token usage are common to both modes.
-2. **Parameterize by `mode: 'related' | 'standalone'`** (or split into two thin wrappers
-   over a shared base). Tier 1 (identity) is identical. Tier 2 swaps comparative chips for
-   absolute chips. Tier 3 swaps match/affinity for the track's own quality read.
-3. **Standalone Tier 2** — absolute Key / BPM / Energy chips (reuse the `plain`/`key`/
-   `bpm`/`energy` Chip variants from §2.1, minus the delta).
-4. **Standalone Tier 3** — rating (`N★`) + play count + energy-fit, no `NN/100`, no
-   strength bars.
-5. **Adopt it** in TrackView header, search results, and library lists, replacing the
-   current hand-rolled track rows.
-6. **Generalize the docs** — fold `related-tracks-card.md` into a two-mode "Track card"
-   guide so both variants share one source of truth.
+1. **Factor the shared shell** out of `SimilarTrackCard.svelte` — **DONE**. The 3-tier
+   anatomy (identity → attributes → signals), artwork fallback, capitalization, responsive
+   container-query tiers and token usage now live in the shared base
+   `library/TrackCard.svelte`.
+2. **Parameterize by `mode`** — **DONE**, as a **discriminated union** `mode: { kind:
+   'related'; ... } | { kind: 'standalone'; track }` (no cast/`!`), with two thin wrappers
+   (`SimilarTrackCard.svelte` = related, `StandaloneTrackCard.svelte` = standalone) over
+   the shared base. Tier 1 identical; Tiers 2/3 swap.
+3. **Standalone Tier 2** — **DONE**. Absolute Key / BPM / Energy as `plain`-mode `<Chip>`s
+   (no delta, no harmony glyph).
+4. **Standalone Tier 3** — **DONE**. Rating (`N★`, lead) + play count + energy
+   settledness (Settled / Inferred / —). No `NN/100`, no strength bars, no harmony move.
+5. **Adopt it** — **PARTIAL / follow-on**. `StandaloneTrackCard` is live and demoed in the
+   `/design-system` showcase. Adopting it into the **TrackView header**, **search results**
+   and **library lists** is deferred: those surfaces are either *interactive editors*
+   (the TrackView header has an editable rating, an interactive zone picker, play +
+   add-to-set — a card would regress them), *deliberately dense tables*
+   (`TrackTable.svelte` — the doc and the audit both keep it a table), or *comparative*
+   (`InSetTrackSearch.svelte` scores against a `lastTrackId`, so it is Related-shaped, and
+   still carries raw hex). These row replacements belong with the later **shell + states**
+   wave, which can redesign those editor surfaces deliberately rather than as a side effect
+   of a card-primitive wave.
+6. **Generalize the docs** — **DONE**. `related-tracks-card.md` → `track-card.md`, now the
+   single two-mode source of truth (When to use each · Mode differences · Related anatomy ·
+   Standalone mode).
 
 This directly serves **Show the Why** (each mode shows the signals that are actually
 meaningful in its context) and **Opinions You Can See Through** (no phantom score where

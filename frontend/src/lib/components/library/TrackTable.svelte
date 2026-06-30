@@ -8,7 +8,7 @@
 	import Menu from '../primitives/Menu.svelte';
 	import Button from '../primitives/Button.svelte';
 	import TrackContextMenu from './TrackContextMenu.svelte';
-	import StarRating from './StarRating.svelte';
+	import StarRating from '../primitives/StarRating.svelte';
 
 	const player = getPlayerStore();
 

@@ -11,7 +11,7 @@
 	import SetAppearances from './SetAppearances.svelte';
 	import SimilarTracks from './SimilarTracks.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
-	import StarRating from '../library/StarRating.svelte';
+	import StarRating from '../primitives/StarRating.svelte';
 	import { capFirst } from '../library/SimilarTrackCard.svelte';
 	import Spinner from '../Spinner.svelte';
 	import EnergyZonePicker from '../library/EnergyZonePicker.svelte';
@@ -219,30 +219,44 @@
 </script>
 
 <div class="track-view">
-	<!-- ── Header: artwork + title/artist + badges ── -->
+	<!-- ── Toolbar band: persistent identity strip (play + title/artist) ──
+	     Pinned sticky to the scroller top so the track you're exploring stays
+	     anchored while the attributes, waveform and related cards scroll beneath
+	     it. Same band rhythm as the Set tab (height var(--band-toolbar-h),
+	     sticky top:0 z:5, opaque bg + bottom divider) so every tab reads with the
+	     same vertical rhythm. -->
+	<div class="track-band">
+		<Button
+			iconOnly
+			shape="round"
+			onclick={handlePlay}
+			ariaLabel={isThisTrackPlaying ? 'Pause' : 'Play'}
+			title={isThisTrackPlaying ? 'Pause' : 'Play'}
+		>
+			{#snippet icon()}{isThisTrackPlaying ? '⏸' : '▶'}{/snippet}
+		</Button>
+		<div class="title-text">
+			<h2 class="track-title" title={track.title ?? 'Unknown'}>{capFirst(track.title ?? 'Unknown')}</h2>
+			<span class="track-subline">
+				<span class="track-artist" title={track.artist ?? 'Unknown'}>{capFirst(track.artist ?? 'Unknown')}</span>
+				{#if track.duration_sec}
+					<span class="track-duration" title="Track length">{formatTime(track.duration_sec)}</span>
+				{/if}
+			</span>
+		</div>
+	</div>
+
+	<!-- ── Body: scrolls beneath the band ── -->
+	<div class="track-body">
+	<!-- ── Header: artwork + absolute attributes + your rating ──
+	     This is the standalone-track read open-coded as an interactive editor —
+	     absolute key / BPM / energy (no mix-from comparison, so no match score),
+	     plus an editable rating and zone picker. It mirrors StandaloneTrackCard's
+	     "track on its own terms" model (StandaloneTrackCard itself is the static,
+	     grid-sized version; this header stays interactive). -->
 	<div class="track-header">
 		<TrackArtwork trackId={track.id} />
 		<div class="header-text">
-			<div class="title-row">
-				<Button
-					iconOnly
-					shape="round"
-					onclick={handlePlay}
-					ariaLabel={isThisTrackPlaying ? 'Pause' : 'Play'}
-					title={isThisTrackPlaying ? 'Pause' : 'Play'}
-				>
-					{#snippet icon()}{isThisTrackPlaying ? '⏸' : '▶'}{/snippet}
-				</Button>
-				<div class="title-text">
-					<h2 class="track-title" title={track.title ?? 'Unknown'}>{capFirst(track.title ?? 'Unknown')}</h2>
-					<span class="track-subline">
-						<span class="track-artist" title={track.artist ?? 'Unknown'}>{capFirst(track.artist ?? 'Unknown')}</span>
-						{#if track.duration_sec}
-							<span class="track-duration" title="Track length">{formatTime(track.duration_sec)}</span>
-						{/if}
-					</span>
-				</div>
-			</div>
 			<div class="track-meta">
 				<Chip
 					variant="key"
@@ -379,7 +393,10 @@
 		<!-- ── Waveform Player ── -->
 		<div class="player-section">
 			{#if error}
-				<div class="error-msg">{error}</div>
+				<div class="error-msg" role="alert">
+					<p class="error-headline">Couldn't draw this waveform.</p>
+					<p class="error-detail">The track's analysis may still be running, or its file moved since the last scan — try again in a moment, or pick another track.</p>
+				</div>
 			{:else if loadingWaveform}
 				<Spinner label="Drawing the waveform..." />
 			{:else if waveformData}
@@ -480,19 +497,46 @@
 
 	<!-- ── Sets (at the bottom) ── -->
 	<SetAppearances trackId={track.id} />
+	</div>
 </div>
 
 <style>
 	.track-view {
-		padding: var(--space-2xl) var(--space-3xl);
+		display: flex;
+		flex-direction: column;
+		/* No padding here: the toolbar band must span the full scroller width and
+		   pin to top:0 (the body carries the page padding instead). */
+	}
+
+	/* ── Toolbar band ──
+	   Replicates the Set tab's reference band recipe (set/SetPicker.svelte):
+	   height var(--band-toolbar-h), sticky top:0 z:5, opaque background and a
+	   bottom divider, so the Track tab reads with the same vertical rhythm as
+	   every other tab. Holds the persistent play + title/artist identity. */
+	.track-band {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 0 var(--space-xl);
+		height: var(--band-toolbar-h);
+		border-bottom: 1px solid var(--border);
+		position: sticky;
+		top: 0;
+		z-index: 5;
+		background: var(--bg-primary);
+	}
+
+	/* ── Body: the scrolling document beneath the band ── */
+	.track-body {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2xl);
+		padding: var(--space-2xl) var(--space-3xl);
 		/* Container context for the sound-row's 9/3 split. The query must live on an
 		   ANCESTOR of .sound-row — a `container-type` element cannot be styled by its
 		   OWN container query, so .sound-row can't both establish the context and be
-		   the queried target. .track-view spans the full content pane (~917px on a
-		   1440px screen, content pane minus 48px page padding), well past the 720px
+		   the queried target. .track-body spans the full content pane (~917px on a
+		   1440px screen, content pane minus page padding), well past the 720px
 		   split threshold. */
 		container-type: inline-size;
 	}
@@ -513,25 +557,24 @@
 		gap: var(--space-md);
 	}
 
-	.title-row {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-	}
-
 	/* The text column must be able to shrink so the title/artist ellipsize
-	 * (content-conventions §2) rather than push the row wider than the header. */
+	 * (content-conventions §2) rather than push the row wider than the band.
+	 * It grows to fill the band beside the play button. */
 	.title-text {
+		flex: 1;
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
+		justify-content: center;
 	}
 
 	/* Title + artist: one line each, ellipsis on overflow, full value on hover
-	 * via title (content-conventions §2). First-letter-capped via capFirst (§1). */
+	 * via title (content-conventions §2). First-letter-capped via capFirst (§1).
+	 * Sized + line-height tightened so title + subline both fit the 48px band. */
 	.track-title {
-		font-size: var(--text-lg);
+		font-size: var(--text-md);
 		font-weight: var(--font-weight-semibold);
+		line-height: 1.2;
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -545,10 +588,11 @@
 		align-items: baseline;
 		gap: var(--space-sm);
 		min-width: 0;
+		line-height: 1.2;
 	}
 
 	.track-artist {
-		font-size: var(--text-md);
+		font-size: var(--text-sm);
 		color: var(--text-secondary);
 		white-space: nowrap;
 		overflow: hidden;
@@ -872,8 +916,25 @@
 		color: var(--text-secondary);
 	}
 
+	/* Error state (content-conventions §5): a calm "what happened" headline plus a
+	   "why + what to try" detail line — never an alarming raw dump, never blame the
+	   DJ. The headline carries the warm warn color; the detail stays muted. */
 	.error-msg {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-xs);
+	}
+
+	.error-headline {
+		margin: 0;
+		font-weight: var(--font-weight-medium);
 		color: var(--energy-high);
+	}
+
+	.error-detail {
+		margin: 0;
+		font-size: var(--text-sm);
+		color: var(--text-dim);
 	}
 
 	.no-data code {

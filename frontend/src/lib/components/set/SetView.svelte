@@ -539,7 +539,7 @@
 		{#if loading}
 			<div class="status">Building your timeline...</div>
 		{:else if error}
-			<div class="status error">{error}</div>
+			<div class="status error" role="alert">Couldn't build the timeline. Something tripped while reading the set — try again, or pick another set.</div>
 		{:else if waveformTracks.length > 0}
 			<div class="timeline-container" bind:this={timelineContainerEl}>
 				<div class="top-panel">
@@ -581,7 +581,7 @@
 					{#if showComparison && comparison}
 						<SetComparison {comparison} onback={() => { showComparison = false; }} />
 					{:else if loadingTransition}
-						<div class="status">Analyzing the transition...</div>
+						<div class="status">Reading the transition...</div>
 					{:else if transition}
 						<TransitionDetail
 							{transition}

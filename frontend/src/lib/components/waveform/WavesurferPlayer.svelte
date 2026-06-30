@@ -153,8 +153,8 @@
 
 	// Concrete colors for the canvas: caller-supplied literal, else the resolved
 	// app accent tokens (so the waveform follows the theme flip).
-	const waveColorResolved = $derived(waveColor ?? resolveColor('var(--accent)', '#00CED1'));
-	const progressColorResolved = $derived(progressColor ?? resolveColor('var(--accent-hover)', '#00A8AB'));
+	const waveColorResolved = $derived(waveColor ?? resolveColor('var(--accent)', '#008A84'));
+	const progressColorResolved = $derived(progressColor ?? resolveColor('var(--accent-hover)', '#00B1B8'));
 
 	onMount(() => {
 		const peakData = decodeFloat32(peaks);

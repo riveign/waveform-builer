@@ -73,7 +73,7 @@
 
 	/** Determine deviation color for a point. */
 	function deviationColor(actual: number | null, target: number | null): string {
-		if (actual === null || target === null) return 'rgba(64, 224, 208, 0.9)';
+		if (actual === null || target === null) return 'rgba(0, 138, 132, 0.9)';
 		const dev = Math.abs(actual - target);
 		if (dev <= 0.15) return 'rgba(102, 187, 106, 0.9)';   // green — good fit
 		if (dev <= 0.3) return 'rgba(255, 183, 77, 0.9)';     // yellow — acceptable

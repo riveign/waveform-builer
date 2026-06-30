@@ -10,6 +10,13 @@
 		| 'level';
 	export type ChipSize = 'sm' | 'md';
 	export type ChipTone = 'default' | 'success' | 'warn' | 'danger' | 'accent';
+	/** Presentational mode — orthogonal to `variant`/`color`.
+	 *  - `box`           : default border + surface fill (current behavior).
+	 *  - `plain`         : bare (colored) text, no box / bg / border.
+	 *  - `tone`          : filled soft-tint badge derived from the meaning color.
+	 *  - `clickToRemove` : the whole chip is a remove <button> (distinct from the
+	 *                      `removable` prop, which adds a secondary inline × button). */
+	export type ChipMode = 'box' | 'plain' | 'tone' | 'clickToRemove';
 </script>
 
 <script lang="ts">
@@ -20,6 +27,7 @@
 		variant = 'neutral',
 		value,
 		size = 'md',
+		mode = 'box',
 		tone = 'default',
 		color,
 		icon,
@@ -34,6 +42,8 @@
 		/** The single canonical formatted value (BPM integer, "8A", "Peak"). */
 		value?: string | number;
 		size?: ChipSize;
+		/** Presentational mode — box (default), plain, tone, or clickToRemove. */
+		mode?: ChipMode;
 		/** Secondary status axis for neutral/level chips (filter type, ownership). */
 		tone?: ChipTone;
 		/** Dynamic color (Camelot key, zone, vibe HSL). Flows in from the caller so
@@ -63,15 +73,15 @@
 	// the metronome. The chip's title still carries the tempo meaning for AT.
 	const showMetronome = $derived(variant === 'bpm' && !icon);
 	const bpmTitle = $derived(variant === 'bpm' ? (title ?? 'Beats per minute') : title);
+
+	// clickToRemove turns the WHOLE chip into a remove button. It is mutually
+	// exclusive with the `removable` inline × button — the whole-chip click
+	// already removes, so a second control would be redundant/confusing.
+	const isClickToRemove = $derived(mode === 'clickToRemove');
+	const showInlineRemove = $derived(removable && !isClickToRemove);
 </script>
 
-<span
-	class="chip chip--{variant} chip--{size} chip--tone-{tone}"
-	class:chip--colored={Boolean(color)}
-	class:chip--empty={isEmpty && !children}
-	style:--chip-color={color ?? null}
-	title={bpmTitle}
->
+{#snippet body()}
 	{#if icon}
 		<span class="chip__icon" aria-hidden="true">{@render icon()}</span>
 	{:else if showMetronome}
@@ -80,7 +90,7 @@
 	<span class="chip__label">
 		{#if children}{@render children()}{:else}{display}{/if}
 	</span>
-	{#if removable}
+	{#if showInlineRemove}
 		<button
 			type="button"
 			class="chip__remove"
@@ -90,8 +100,35 @@
 		>
 			×
 		</button>
+	{:else if isClickToRemove}
+		<span class="chip__x" aria-hidden="true">×</span>
 	{/if}
-</span>
+{/snippet}
+
+{#if isClickToRemove}
+	<button
+		type="button"
+		class="chip chip--{variant} chip--{size} chip--tone-{tone} chip--mode-{mode}"
+		class:chip--colored={Boolean(color)}
+		class:chip--empty={isEmpty && !children}
+		style:--chip-color={color ?? null}
+		title={bpmTitle}
+		aria-label={removeLabel}
+		onclick={onremove}
+	>
+		{@render body()}
+	</button>
+{:else}
+	<span
+		class="chip chip--{variant} chip--{size} chip--tone-{tone} chip--mode-{mode}"
+		class:chip--colored={Boolean(color)}
+		class:chip--empty={isEmpty && !children}
+		style:--chip-color={color ?? null}
+		title={bpmTitle}
+	>
+		{@render body()}
+	</span>
+{/if}
 
 <style>
 	.chip {
@@ -176,6 +213,106 @@
 	}
 	.chip--genre:hover {
 		background: var(--chip-genre-bg);
+	}
+
+	/* --- mode=plain — bare (colored) text, no box / bg / border / padding.
+	 * Formalizes the genre-colored-text + colored list-cell pattern. The label
+	 * still carries the meaning; color is paired with the always-present text. */
+	.chip--mode-plain {
+		background: transparent;
+		border-color: transparent;
+		padding: var(--chip-plain-pad);
+		height: auto;
+	}
+	.chip--mode-plain:hover {
+		background: transparent;
+	}
+	/* colored plain chips flow the meaning color to the label (all colorable
+	 * variants, not just the box-colored set above). */
+	.chip--mode-plain.chip--colored .chip__label {
+		color: var(--chip-color);
+	}
+	/* status-driven plain text reuses the tone color path on neutral/level. */
+	.chip--mode-plain.chip--tone-success .chip__label {
+		color: var(--score-excellent);
+	}
+	.chip--mode-plain.chip--tone-warn .chip__label {
+		color: var(--score-good);
+	}
+	.chip--mode-plain.chip--tone-danger .chip__label {
+		color: var(--destructive);
+	}
+	.chip--mode-plain.chip--tone-accent .chip__label {
+		color: var(--accent-text);
+	}
+
+	/* --- mode=tone — a FILLED soft-tint badge (not an outline). Generalizes the
+	 * genre recipe: tint the flowing meaning color (--chip-color, → accent) into
+	 * the surface, use it as fg, and a matching soft border. Status tones reuse
+	 * the same recipe by feeding their token into --chip-color at the call site,
+	 * or fall back to the accent tint here. */
+	.chip--mode-tone {
+		background: var(--chip-tone-bg);
+		color: var(--chip-tone-fg);
+		border-color: var(--chip-tone-border);
+	}
+	.chip--mode-tone:hover {
+		background: var(--chip-tone-bg);
+	}
+	/* tone keeps the label readable in the meaning color even on colorable
+	 * variants whose box rules would otherwise re-tint only the label. */
+	.chip--mode-tone.chip--colored .chip__label {
+		color: var(--chip-tone-fg);
+	}
+
+	/* --- mode=clickToRemove — the WHOLE chip is the remove button. Reset the
+	 * UA button chrome so it matches the span chip, then add affordances. The
+	 * trailing × is decorative (the accessible name comes from aria-label). */
+	.chip--mode-clickToRemove {
+		position: relative; /* anchors the invisible ≥44px hit-area overlay (F2) */
+		font-family: inherit;
+		font-weight: var(--font-weight-medium);
+		text-align: inherit;
+		cursor: pointer;
+		appearance: none;
+		-webkit-appearance: none;
+	}
+	/* Touch-target guard (F2): a clickToRemove chip's visible box is only
+	 * 24–32px tall, below the 44px minimum tap target. Expand the *interactive*
+	 * area to ≥44×44 with a transparent centered overlay WITHOUT growing the
+	 * visual chip — the box still renders at its chip height; only the hittable
+	 * region grows. The overlay is the button's own ::before so it inherits the
+	 * click, stays keyboard-irrelevant (decorative), and never reflows layout. */
+	.chip--mode-clickToRemove::before {
+		content: '';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		min-width: 44px;
+		min-height: 44px;
+		width: 100%;
+		height: 100%;
+		/* invisible — purely a hit-slop, no paint */
+	}
+	.chip--mode-clickToRemove:hover {
+		background: var(--surface-hover);
+	}
+	/* keep the filled/plain hover intent when combined with another mode class. */
+	.chip--mode-clickToRemove.chip--mode-tone:hover {
+		background: var(--chip-tone-bg);
+	}
+	.chip__x {
+		display: inline-flex;
+		align-items: center;
+		flex-shrink: 0;
+		margin-right: calc(-1 * var(--space-2xs));
+		color: var(--text-3);
+		font-size: var(--text-md);
+		line-height: 1;
+	}
+	.chip--mode-clickToRemove:hover .chip__x {
+		color: var(--text-1);
 	}
 
 	/* --- bpm delta — signed value, colored by the ±6% tension rule.

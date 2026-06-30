@@ -4,7 +4,7 @@
 
 :root {
 	/* Legacy vars kept alive as ALIASES onto the semantic layer (Research §2).
-	 * Zero of the 76 components change; --accent stays CYAN until the deliberate flip. */
+	 * Zero of the 76 components change; --accent now flips to teal via tokens.semantic.css (--accent-9: var(--teal-600)). */
 	--bg-primary: var(--surface-1);
 	--bg-secondary: var(--surface-2);
 	--bg-tertiary: var(--surface-3);

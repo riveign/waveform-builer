@@ -7,6 +7,7 @@
 	import SoundCloudConnect from './SoundCloudConnect.svelte';
 	import SoundCloudBrowser from './SoundCloudBrowser.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import Spinner from '$lib/components/Spinner.svelte';
 
 	const store = getHuntingStore();
 	const sc = getSoundCloudStore();
@@ -44,28 +45,31 @@
 </script>
 
 <div class="hunt-view">
-	<!-- Pinned top band: title + mode tabs + hunt form stay put while results scroll -->
-	<div class="hunt-band">
-		<div class="hunt-header">
-			<div class="header-top">
-				<h2>Track Hunter</h2>
-				<SoundCloudConnect />
-			</div>
+	<!-- Toolbar band — title + SoundCloud connect. Sticky top:0, matches the Set
+	     tab's SetPicker band so its divider lands at the sidebar search-box Y. -->
+	<div class="hunt-toolbar">
+		<h2>Track Hunter</h2>
+		<SoundCloudConnect />
+	</div>
+
+	<!-- Secondary band — mode tabs. Sticky beneath the toolbar band, matches the
+	     Set tab's --band-secondary-h rhythm.
+	     Bespoke (not SegmentedControl): the SoundCloud option is conditionally
+	     disabled until connected, and SegmentedControl has no per-option disabled. -->
+	<div class="hunt-modes">
+		<button class="mode-tab" class:active={mode === 'url'} onclick={() => mode = 'url'}>
+			URL Hunt
+		</button>
+		<button class="mode-tab" class:active={mode === 'soundcloud'} onclick={() => mode = 'soundcloud'} disabled={!sc.connected}>
+			SoundCloud
+		</button>
+	</div>
+
+	<!-- Non-sticky search strip: subtitle + form + error scroll away under the bands. -->
+	{#if mode === 'url'}
+		<div class="hunt-search">
 			<p class="subtitle">Paste a set URL or browse your SoundCloud — we'll find every track and show you where to get them</p>
-		</div>
 
-		<!-- Bespoke (not SegmentedControl): the SoundCloud option is conditionally
-		     disabled until connected, and SegmentedControl has no per-option disabled. -->
-		<div class="mode-tabs">
-			<button class="mode-tab" class:active={mode === 'url'} onclick={() => mode = 'url'}>
-				URL Hunt
-			</button>
-			<button class="mode-tab" class:active={mode === 'soundcloud'} onclick={() => mode = 'soundcloud'} disabled={!sc.connected}>
-				SoundCloud
-			</button>
-		</div>
-
-		{#if mode === 'url'}
 			<form class="hunt-form" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 				<input
 					type="url"
@@ -82,19 +86,26 @@
 			</form>
 
 			{#if store.error}
-				<div class="error">{store.error}</div>
+				<!-- What happened + why + what to try — never a raw dump, never blame the DJ. -->
+				<div class="error" role="alert">
+					Couldn't chase that link. It may not be a set we can read yet — check the URL and try again.
+				</div>
 			{/if}
-		{/if}
-	</div>
+		</div>
+	{/if}
 
-	<!-- Sole scroller: results / history / browser scroll beneath the pinned band -->
+	<!-- Sole scroller: results / history / browser scroll beneath the pinned bands -->
 	<div class="hunt-scroll">
 		{#if mode === 'url'}
 			{#if showHistory}
 				<HuntHistory items={store.history} onselect={handleHistorySelect} />
+			{:else if store.loading}
+				<div class="loading-state">
+					<Spinner label="Chasing down the tracks..." />
+				</div>
 			{:else if store.currentHunt}
 				<HuntResults hunt={store.currentHunt} onmarkwanted={store.markWanted} />
-			{:else if !store.loading}
+			{:else}
 				<div class="empty-state">
 					<p>Hear a set you love? Paste the link above to hunt down every track.</p>
 				</div>
@@ -120,16 +131,52 @@
 		overflow: hidden;
 	}
 
-	/* Pinned top band: title + mode tabs + form stay put */
-	.hunt-band {
-		flex-shrink: 0;
-		padding: 20px 20px 0;
-		max-width: 900px;
-		background: var(--surface-1);
+	/* Toolbar band — title + SoundCloud connect. Matches the Set tab's SetPicker:
+	   same --band-toolbar-h (48px) + zero top offset, so this divider lands at the
+	   same y as the sidebar search box (spec 023 band rhythm). Opaque background so
+	   scrolling content doesn't bleed through. */
+	.hunt-toolbar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-lg);
+		padding: 0 var(--space-xl);
+		height: var(--band-toolbar-h);
 		border-bottom: 1px solid var(--border);
+		position: sticky;
+		top: 0;
+		z-index: 5;
+		background: var(--bg-primary);
 	}
 
-	/* Sole scroller: results scroll beneath the band */
+	.hunt-toolbar h2 {
+		margin: 0;
+		font-size: 18px;
+	}
+
+	/* Secondary band — mode tabs. Sticks directly beneath the toolbar band (offset
+	   by --band-toolbar-h), same --band-secondary-h (44px) + border as the Set tab. */
+	.hunt-modes {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		padding: 0 var(--space-xl);
+		height: var(--band-secondary-h);
+		border-bottom: 1px solid var(--border);
+		position: sticky;
+		top: var(--band-toolbar-h);
+		z-index: 4;
+		background: var(--bg-primary);
+	}
+
+	/* Non-sticky search strip beneath the bands. */
+	.hunt-search {
+		flex-shrink: 0;
+		padding: var(--space-lg) var(--space-xl) 0;
+		max-width: 900px;
+	}
+
+	/* Sole scroller: results scroll beneath the pinned bands */
 	.hunt-scroll {
 		flex: 1;
 		min-height: 0;
@@ -138,39 +185,24 @@
 		max-width: 900px;
 	}
 
-	.hunt-header h2 {
-		margin: 0 0 4px;
-		font-size: 18px;
-	}
-
-	.header-top {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 4px;
-	}
-
 	.subtitle {
 		color: var(--text-secondary);
 		font-size: 13px;
 		margin: 0 0 12px;
 	}
 
-	.mode-tabs {
-		display: flex;
-		gap: 2px;
-		margin-bottom: 12px;
-		border-bottom: 1px solid var(--border);
-	}
-
 	.mode-tab {
-		padding: 8px 16px;
+		display: inline-flex;
+		align-items: center;
+		height: 100%;
+		padding: 0 16px;
 		font-size: 13px;
 		font-weight: 500;
 		background: transparent;
 		color: var(--text-secondary);
 		border: none;
 		border-bottom: 2px solid transparent;
+		margin-bottom: -1px;
 		cursor: pointer;
 	}
 
@@ -215,5 +247,11 @@
 		color: var(--text-dim);
 		padding: 60px 20px;
 		font-size: 14px;
+	}
+
+	.loading-state {
+		display: flex;
+		justify-content: center;
+		padding: 60px 20px;
 	}
 </style>
