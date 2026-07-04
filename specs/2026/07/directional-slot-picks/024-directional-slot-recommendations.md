@@ -199,7 +199,1516 @@ The sibling `src/kiku/setbuilder/artist_picks.py` (verified, 141 lines) is the e
 - Coverage: Camelot helpers + ranker fully unit-tested; endpoint covered; frontend type-checked via `svelte-check` (no FE test harness). Lint via `py_compile` (ruff not installed); full backend suite `python -m pytest tests/ -x -q` green.
 
 ## Plan
-<!-- Filled by /spec PLAN -->
+
+### Task Outline
+1. Camelot move helpers in `src/kiku/setbuilder/camelot.py` — `camelot_str`, `step_wheel`, `flip_mode`, `move_targets`, `intent_allowed_keys`, `intent_energy_delta`
+2. New `src/kiku/setbuilder/slot_picks.py` — `SlotPick` dataclass + `rank_slot_picks()` (both-neighbor, direction-aware, caveat)
+3. Schemas — `SlotSuggestionItem` + `SlotSuggestionsResponse` in `api/schemas.py`
+4. API endpoint — `GET /{set_id}/slots/{position}/suggestions` in `routes/sets.py`
+5. CLI — `kiku slot-suggest <set> <position> --mode --intent [--keys --energy-delta]` in `cli.py`
+6. Frontend types — `SlotSuggestion`, `SlotSuggestionsResponse` in `types/index.ts`
+7. Frontend API client — `getSlotSuggestions()` in `api/sets.ts`
+8. Frontend component — `AddSlotPicksPanel.svelte` (NEW)
+9. Frontend mount — wire panel into `SetView.svelte`
+10. Unit test — `tests/test_camelot.py` additions (move helpers, wrap, intent maps)
+11. Unit test — `tests/test_slot_picks.py` (NEW — both modes, filter, shift, caveat)
+12. API test — `tests/api/test_slot_suggestions_api.py` (NEW)
+13. Lint / type-check (py_compile + svelte-check + pytest)
+14. Commit changed files
+
+### Files
+- `src/kiku/setbuilder/camelot.py`
+  - Append the directional vocabulary after `harmonic_score` (:109): `camelot_str`, `step_wheel` (mod-12 wrap `((n-1+δ)%12)+1`), `flip_mode`, `move_targets`, `intent_allowed_keys`, `intent_energy_delta`. Pure, no DB. Reuses the existing `parse_camelot` (:43).
+- `src/kiku/setbuilder/slot_picks.py` (NEW)
+  - `SlotPick` dataclass; `rank_slot_picks(session, set_id, position, mode, intent, allowed_keys, energy_delta, n, weights, discovery_density)`; reuses `score_replacement` (scoring.py:532), `parse_energy_json/parse_energy_string` (constraints.py:65,49), `harmonic_score` + the new camelot helpers. Mirrors `artist_picks.py` shape (energy-profile parse block :86-95; in-set exclusion :83; sort/top-n :139-140).
+- `src/kiku/api/schemas.py`
+  - Add `SlotSuggestionItem` + `SlotSuggestionsResponse` after `ReplaceTrackRequest` (:552). Reuse `TrackResponse` (:25) + `ReplacementBreakdown` (:512).
+- `src/kiku/api/routes/sets.py`
+  - Add `SlotSuggestionItem, SlotSuggestionsResponse` to the schema import block (:16-44); append `GET /{set_id}/slots/{position}/suggestions` after `get_artist_picks` (ends :1251), reusing `_track_response` (:1067) and the `_BD_FIELDS` filter idiom (:1231-1234).
+- `src/kiku/cli.py`
+  - Add `slot-suggest` command after `artist_picks_cmd` (ends :475); id-or-name set resolution (:439-443); rich `Table` (mirror :457-475).
+- `frontend/src/lib/types/index.ts`
+  - Add `SlotSuggestion` + `SlotSuggestionsResponse` after `ArtistPicksResponse` (:561). Reuse `Track` (:7) + `ReplacementBreakdown` (:510).
+- `frontend/src/lib/api/sets.ts`
+  - Add `SlotSuggestionsResponse` to the type import block (:1-17); add `getSlotSuggestions()` after `getArtistPicks` (:210).
+- `frontend/src/lib/components/set/AddSlotPicksPanel.svelte` (NEW)
+  - Insert/replace toggle + named-move buttons (Push higher / Brighten / Cool down / Hold) + slot number input; ranked cards with move + caveat; apply via `addTrackToSet` (insert) / `replaceTrackInSet` (replace). Mirrors `AddFromArtistPanel.svelte`.
+- `frontend/src/lib/components/set/SetView.svelte`
+  - Import (after :13); `showSlotPicks` state (after :90); `MenuItem` toggle (after :496); panel mount (after the `AddFromArtistPanel` block :640-646).
+- `tests/test_camelot.py` — append move-helper unit tests.
+- `tests/test_slot_picks.py` (NEW) — ranker unit tests.
+- `tests/api/test_slot_suggestions_api.py` (NEW) — endpoint integration tests.
+
+### Tasks
+
+#### Task 1 — camelot.py: directional move helpers
+Tools: editor
+Append after `harmonic_score` (ends :109). Pure functions, no DB. `step_wheel` uses `((n - 1 + delta) % 12) + 1` so `12 + (+1)` → `1` and `1 + (-1)` → `12` (the wheel-wrap gotcha). The directional move is measured against the PREVIOUS neighbor's key; `cool_down` on a `B` key yields two targets (wheel `-1` OR mode `B→A`).
+Diff:
+````diff
+--- a/src/kiku/setbuilder/camelot.py
++++ b/src/kiku/setbuilder/camelot.py
+@@
+     if wheel_diff == 1 and let_a != let_b:
+         return 0.6
+ 
+     return 0.2
++
++
++# ── Directional move vocabulary (reused by slot_picks + the API/CLI) ──
++
++_INTENT_ENERGY_DELTA = {
++    "push_higher": 0.15,
++    "brighten": 0.05,
++    "cool_down": -0.15,
++    "hold": 0.0,
++}
++
++
++def camelot_str(key: tuple[int, str]) -> str:
++    """Format a ``(number, letter)`` Camelot key as its canonical string.
++
++    ``(9, "A") -> "9A"``.
++    """
++    num, letter = key
++    return f"{num}{letter}"
++
++
++def step_wheel(key: tuple[int, str], delta: int) -> tuple[int, str]:
++    """Step ``delta`` positions around the 12-slot wheel, same letter.
++
++    Wraps ``12 -> 1`` (up) and ``1 -> 12`` (down) so the number stays in 1..12.
++    """
++    num, letter = key
++    stepped = ((num - 1 + delta) % 12) + 1
++    return (stepped, letter)
++
++
++def flip_mode(key: tuple[int, str]) -> tuple[int, str]:
++    """Flip the mode ``A<->B`` at the same wheel number (minor<->major)."""
++    num, letter = key
++    return (num, "B" if letter == "A" else "A")
++
++
++def move_targets(neighbor_key: str | None, intent: str) -> list[tuple[int, str]]:
++    """Enumerate the target Camelot key(s) for a named move, relative to a neighbor.
++
++    ``push_higher`` -> ``[+1 same letter]``            (8A -> 9A)
++    ``brighten``    -> ``[mode flip]``                 (8A -> 8B)
++    ``cool_down``   -> ``[-1 same letter]`` (+ B->A)   (8A -> 7A ; 8B -> 7B and 8A)
++    ``hold``        -> ``[]``  (no key constraint)
++
++    Returns ``[]`` for an unparseable neighbor or an unknown intent.
++    """
++    base = parse_camelot(neighbor_key)
++    if base is None or intent == "hold":
++        return []
++    if intent == "push_higher":
++        return [step_wheel(base, 1)]
++    if intent == "brighten":
++        return [flip_mode(base)]
++    if intent == "cool_down":
++        targets = [step_wheel(base, -1)]
++        if base[1] == "B":
++            targets.append(flip_mode(base))
++        return targets
++    return []
++
++
++def intent_allowed_keys(neighbor_key: str | None, intent: str) -> set[str] | None:
++    """Map a named intent to the allowed candidate-key set, relative to a neighbor.
++
++    Returns ``None`` for ``hold`` (no key filter) or when no targets can be
++    derived (unparseable neighbor / unknown intent) — i.e. no hard filter.
++    """
++    targets = move_targets(neighbor_key, intent)
++    if not targets:
++        return None
++    return {camelot_str(t) for t in targets}
++
++
++def intent_energy_delta(intent: str) -> float:
++    """Energy-target shift a named intent applies to the smooth baseline."""
++    return _INTENT_ENERGY_DELTA.get(intent, 0.0)
+````
+
+Verification:
+- `.venv/bin/python -c "from kiku.setbuilder.camelot import move_targets, intent_allowed_keys, intent_energy_delta, step_wheel; assert move_targets('8A','push_higher')==[(9,'A')]; assert step_wheel((12,'A'),1)==(1,'A'); assert step_wheel((1,'A'),-1)==(12,'A'); assert intent_allowed_keys('8A','brighten')=={'8B'}; assert intent_allowed_keys('8A','hold') is None; assert set(move_targets('8B','cool_down'))=={(7,'B'),(8,'A')}; assert intent_energy_delta('cool_down')==-0.15"` (full cases in Task 10).
+
+#### Task 2 — slot_picks.py: SlotPick + rank_slot_picks
+Tools: editor
+Create `src/kiku/setbuilder/slot_picks.py`. Reuses `score_replacement` as the sole both-neighbor scorer. Resolves `(prev, next)` by `mode` (insert N→N/N+1; replace N→N-1/N+1, track N dropped via the in-set exclusion). Applies the intent's energy shift to the baseline `target_energy_at`. Hard-filters by key when a constraint is present. Builds the honesty caveat with the `T = CLEAN_THRESHOLD = 0.8` algorithm.
+Diff:
+````diff
+--- /dev/null
++++ b/src/kiku/setbuilder/slot_picks.py
+@@
++"""Directional slot-recommendation ranker.
++
++Given a set, a slot ``position``, a ``mode`` (insert | replace) and a named
++directional ``intent`` (push_higher | brighten | cool_down | hold), rank the
++DJ's OWN tracks that make that harmonic move while still mixing cleanly out of
++the predecessor AND into the FIXED successor. Reuses ``score_replacement`` (the
++both-neighbor scorer) — no parallel scorer. Library excavation only.
++"""
++
++from __future__ import annotations
++
++import json
++from dataclasses import dataclass
++
++from sqlalchemy.orm import Session
++
++from kiku.config import BPM_TOLERANCE
++from kiku.db.models import Set, Track
++from kiku.setbuilder.camelot import (
++    camelot_str,
++    harmonic_score,
++    intent_allowed_keys,
++    intent_energy_delta,
++    move_targets,
++    parse_camelot,
++)
++from kiku.setbuilder.constraints import parse_energy_json, parse_energy_string
++from kiku.setbuilder.scoring import score_replacement
++
++# Harmonic scores >= this read as a clean mix (same 1.0 / adjacent 0.85 / mode
++# flip 0.8); below it a transition turns harsh. Grounds the honesty caveat.
++CLEAN_THRESHOLD = 0.8
++
++_MOVE_NAMES = {
++    "push_higher": "energy boost",
++    "brighten": "brighten",
++    "cool_down": "cool down",
++    "hold": "hold",
++}
++
++
++@dataclass
++class SlotPick:
++    """One ranked slot candidate with its harmonic move and any honesty caveat."""
++
++    track: Track
++    from_key: str | None  # the predecessor's key the move departs from
++    to_key: str | None  # the candidate's key
++    move: str  # human-readable move description (Show the Why)
++    energy_shift: float  # the applied energy-target shift
++    score: float  # both-neighbor combined score
++    incoming_breakdown: dict | None
++    outgoing_breakdown: dict | None
++    caveat: str | None  # set when the slot resists the requested move
++
++
++def _resolve_neighbors(ordered_tracks: list, position: int, mode: str):
++    """Resolve ``(prev, next)`` tracks for a slot per ``mode``.
++
++    insert at N  -> neighbors are tracks N and N+1 (the set grows between them)
++    replace at N -> neighbors are N-1 and N+1 (track N is dropped)
++    """
++    total = len(ordered_tracks)
++    if mode == "insert":
++        prev = ordered_tracks[position] if 0 <= position < total else None
++        nxt = ordered_tracks[position + 1] if position + 1 < total else None
++    else:  # replace
++        prev = ordered_tracks[position - 1] if position > 0 else None
++        nxt = ordered_tracks[position + 1] if position + 1 < total else None
++    return prev, nxt
++
++
++def _achievable_alt(prev_key: str | None, next_key: str | None):
++    """Find the directional alt whose target keeps BOTH harmonic sides clean.
++
++    Returns ``(alt_intent, alt_target_key_str)`` maximizing ``min(both sides)``
++    with both ``>= CLEAN_THRESHOLD``, or ``None`` when no directional alt is
++    both-clean.
++    """
++    best = None
++    best_min = -1.0
++    for alt in ("push_higher", "brighten", "cool_down"):
++        for tgt in move_targets(prev_key, alt):
++            tgt_str = camelot_str(tgt)
++            m = min(
++                harmonic_score(prev_key, tgt_str),
++                harmonic_score(tgt_str, next_key),
++            )
++            if m >= CLEAN_THRESHOLD and m > best_min:
++                best_min = m
++                best = (alt, tgt_str)
++    return best
++
++
++def _build_caveat(prev, cand, nxt, intent: str) -> str | None:
++    """Return an honesty caveat when the slot resists the requested move, else None.
++
++    Trips when the move mixes cleanly OUT of the predecessor
++    (``h_in >= T``) but the FIXED successor drags a harmonic side below clean
++    (``min < T``). Names the achievable move and the anchor that resists — the
++    teaching, not an afterthought. Guards missing neighbors and ``hold``.
++    """
++    if prev is None or nxt is None or intent == "hold":
++        return None
++    h_in = harmonic_score(prev.key, cand.key)
++    h_out = harmonic_score(cand.key, nxt.key)
++    if h_in < CLEAN_THRESHOLD or min(h_in, h_out) >= CLEAN_THRESHOLD:
++        return None  # move side already unclean (not our promise), or both clean
++    requested_name = _MOVE_NAMES.get(intent, intent)
++    alt = _achievable_alt(prev.key, nxt.key)
++    if alt:
++        alt_intent, alt_to = alt
++        alt_name = _MOVE_NAMES.get(alt_intent, alt_intent)
++        return (
++            f"The next track ({nxt.key}) pulls back toward it, so the cleanest "
++            f"move here is a {alt_name} ({prev.key}→{alt_to}), not a full "
++            f"{requested_name}."
++        )
++    return (
++        f"The next track ({nxt.key}) resists a clean {requested_name} here — "
++        f"holding a compatible key mixes smoother than forcing the move."
++    )
++
++
++def _build_move(prev, cand, nxt, intent: str, energy_shift: float, caveat: str | None) -> str:
++    """Build the move description shown on every pick (never a bare ranked list)."""
++    move_name = _MOVE_NAMES.get(intent, intent)
++    from_key = prev.key if prev else None
++    to_key = cand.key
++    shift = f"{energy_shift:+.2f}"
++    head = f"{from_key} → {to_key} {move_name}" if from_key else f"{to_key} {move_name}"
++    if caveat:
++        return f"{head} ({shift} energy) — see the caveat below."
++    if nxt is not None:
++        return f"{head}, {shift} energy, mixes into {nxt.key} clean."
++    return f"{head}, {shift} energy."
++
++
++def rank_slot_picks(
++    session: Session,
++    set_id: int,
++    position: int,
++    mode: str,
++    intent: str,
++    allowed_keys: set[str] | None = None,
++    energy_delta: float | None = None,
++    n: int = 10,
++    weights: dict[str, float] | None = None,
++    discovery_density: float = 0.0,
++) -> list[SlotPick]:
++    """Rank owned tracks that make the requested directional move at a slot.
++
++    Returns up to ``n`` picks ordered by both-neighbor score (descending), each
++    carrying its harmonic move and an honesty caveat when the slot resists it.
++    Returns an empty list when the set is missing, the position is out of range,
++    or nothing owned fits the requested move.
++    """
++    s = session.get(Set, set_id)
++    if not s:
++        return []
++
++    ordered = sorted(s.tracks, key=lambda st: st.position)
++    ordered_tracks = [st.track for st in ordered]
++    set_track_ids = {st.track_id for st in ordered}
++    total = len(ordered_tracks)
++    if position < 0 or position >= total:
++        return []
++
++    prev, nxt = _resolve_neighbors(ordered_tracks, position, mode)
++
++    # Energy profile (JSON first, then string fallback) -> baseline target.
++    profile = None
++    if s.energy_profile:
++        try:
++            try:
++                profile = parse_energy_json(s.energy_profile)
++            except (json.JSONDecodeError, KeyError):
++                profile = parse_energy_string(s.energy_profile)
++        except Exception:
++            profile = None
++    baseline = 0.5
++    if profile is not None:
++        elapsed = (position / max(total - 1, 1)) * (s.duration_min or 120)
++        baseline = profile.target_energy_at(elapsed)
++
++    # Directional shift: explicit override else the intent's shift.
++    energy_shift = energy_delta if energy_delta is not None else intent_energy_delta(intent)
++    shifted_target = min(1.0, max(0.0, baseline + energy_shift))
++
++    # Key constraint: explicit override else derived from the intent, measured
++    # against the PREVIOUS neighbor (mixing OUT of the predecessor is the move).
++    prev_key = prev.key if prev else None
++    if allowed_keys is not None:
++        key_filter = {camelot_str(pc) for k in allowed_keys if (pc := parse_camelot(k))}
++        key_filter = key_filter or None
++    else:
++        key_filter = intent_allowed_keys(prev_key, intent)
++
++    # Candidate pool: exclude in-set, BPM pre-filter around the neighbours
++    # (mirrors get_replacements: a +/-2*BPM_TOLERANCE window).
++    q = session.query(Track).filter(Track.id.notin_(set_track_ids))
++    ref_bpms = [t.bpm for t in (prev, nxt) if t and t.bpm and t.bpm > 0]
++    ref_bpm = sum(ref_bpms) / len(ref_bpms) if ref_bpms else 0
++    if ref_bpm and ref_bpm > 0:
++        q = q.filter(
++            Track.bpm.between(ref_bpm * (1 - BPM_TOLERANCE * 2), ref_bpm * (1 + BPM_TOLERANCE * 2))
++        )
++    candidates = q.all()
++
++    picks: list[SlotPick] = []
++    for cand in candidates:
++        # Hard key filter when a constraint is present (drop keyless / off-key).
++        if key_filter is not None:
++            pc = parse_camelot(cand.key)
++            if pc is None or camelot_str(pc) not in key_filter:
++                continue
++        combined, incoming, outgoing = score_replacement(
++            cand, prev, nxt, target_energy=shifted_target,
++            weights=weights, discovery_density=discovery_density,
++        )
++        caveat = _build_caveat(prev, cand, nxt, intent)
++        move = _build_move(prev, cand, nxt, intent, energy_shift, caveat)
++        picks.append(SlotPick(
++            track=cand,
++            from_key=prev.key if prev else None,
++            to_key=cand.key,
++            move=move,
++            energy_shift=round(energy_shift, 3),
++            score=combined,
++            incoming_breakdown=incoming,
++            outgoing_breakdown=outgoing,
++            caveat=caveat,
++        ))
++
++    picks.sort(key=lambda p: p.score, reverse=True)
++    return picks[:n]
+````
+
+Verification:
+- `.venv/bin/python -m py_compile src/kiku/setbuilder/slot_picks.py` (full behavior in Task 11).
+
+#### Task 3 — schemas.py: SlotSuggestionItem + SlotSuggestionsResponse
+Tools: editor
+Add after `ReplaceTrackRequest` (:551-552), in the Replace-Track models block. Reuses `TrackResponse` (:25) and `ReplacementBreakdown` (:512) — the `score_replacement` breakdown's extra `vibe`/`artist` keys are dropped upstream (Task 4 filters to `_BD_FIELDS`), so the model stays the replacements shape.
+Diff:
+````diff
+--- a/src/kiku/api/schemas.py
++++ b/src/kiku/api/schemas.py
+@@
+ class ReplaceTrackRequest(BaseModel):
+     new_track_id: int
++
++
++class SlotSuggestionItem(BaseModel):
++    track: TrackResponse
++    from_key: str | None = None
++    to_key: str | None = None
++    move: str
++    energy_shift: float
++    score: float
++    incoming_breakdown: ReplacementBreakdown | None = None
++    outgoing_breakdown: ReplacementBreakdown | None = None
++    caveat: str | None = None
++
++
++class SlotSuggestionsResponse(BaseModel):
++    set_id: int
++    position: int
++    mode: str
++    intent: str
++    allowed_keys: list[str] | None = None
++    energy_delta: float
++    suggestions: list[SlotSuggestionItem]
+````
+
+Verification:
+- `.venv/bin/python -c "from kiku.api.schemas import SlotSuggestionItem, SlotSuggestionsResponse"`.
+
+#### Task 4 — sets.py: GET /{set_id}/slots/{position}/suggestions endpoint
+Tools: editor
+Two edits. Edit 4a adds the schema imports; Edit 4b appends the endpoint after `get_artist_picks` (ends :1251). Mirrors `get_replacements` (404 missing set, 404 invalid position) + validates `mode`/`intent`. Empty `suggestions` (200) when the slot is too tight for any owned track.
+
+Edit 4a — imports (add to the block at :16-44, after `SetWaveformTrackResponse` :39):
+````diff
+--- a/src/kiku/api/routes/sets.py
++++ b/src/kiku/api/routes/sets.py
+@@
+     SetUpdateRequest,
+     SetWaveformTrackResponse,
++    SlotSuggestionItem,
++    SlotSuggestionsResponse,
+     TrackSummary,
+     TransitionResponse,
+     TransitionScoreBreakdown,
+     UnmatchedTrack,
+ )
+````
+
+Edit 4b — append endpoint (after `get_artist_picks`'s final `return ArtistPicksResponse(...)` :1251):
+````diff
+--- a/src/kiku/api/routes/sets.py
++++ b/src/kiku/api/routes/sets.py
+@@
+     return ArtistPicksResponse(set_id=set_id, artist=artist, picks=picks)
++
++
++@router.get("/{set_id}/slots/{position}/suggestions", response_model=SlotSuggestionsResponse)
++def get_slot_suggestions(
++    set_id: int,
++    position: int,
++    mode: str = "insert",
++    intent: str = "hold",
++    allowed_keys: str | None = None,
++    energy_delta: float | None = None,
++    n: int = 10,
++    db: Session = Depends(get_db),
++):
++    """Rank owned tracks that make a directional move at a slot, both-neighbor aware.
++
++    ``mode`` (insert|replace) + ``intent`` (push_higher|brighten|cool_down|hold)
++    name the slot and the direction; Kiku answers with tracks the DJ already
++    owns, each reporting the harmonic move and any caveat when the slot resists
++    it. Library excavation only.
++    """
++    from kiku.setbuilder.camelot import intent_energy_delta
++    from kiku.setbuilder.slot_picks import rank_slot_picks
++
++    s = db.get(Set, set_id)
++    if not s:
++        raise HTTPException(status_code=404, detail="Set not found")
++
++    if mode not in ("insert", "replace"):
++        raise HTTPException(status_code=400, detail="mode must be 'insert' or 'replace'")
++    if intent not in ("push_higher", "brighten", "cool_down", "hold"):
++        raise HTTPException(
++            status_code=400,
++            detail="intent must be one of push_higher, brighten, cool_down, hold",
++        )
++
++    ordered = sorted(s.tracks, key=lambda st: st.position)
++    if position < 0 or position >= len(ordered):
++        raise HTTPException(status_code=404, detail="Invalid position")
++
++    keys = None
++    if allowed_keys:
++        keys = {k.strip() for k in allowed_keys.split(",") if k.strip()} or None
++
++    ranked = rank_slot_picks(
++        db, set_id, position, mode, intent,
++        allowed_keys=keys, energy_delta=energy_delta, n=n,
++    )
++
++    _BD_FIELDS = {
++        "harmonic", "energy_fit", "bpm_compat", "genre_coherence",
++        "track_quality", "total", "discovery_label", "set_appearances",
++    }
++
++    def _bd(b: dict | None) -> ReplacementBreakdown | None:
++        if not b:
++            return None
++        return ReplacementBreakdown(**{k: v for k, v in b.items() if k in _BD_FIELDS})
++
++    resolved_delta = energy_delta if energy_delta is not None else intent_energy_delta(intent)
++    suggestions = [
++        SlotSuggestionItem(
++            track=_track_response(p.track),
++            from_key=p.from_key,
++            to_key=p.to_key,
++            move=p.move,
++            energy_shift=p.energy_shift,
++            score=p.score,
++            incoming_breakdown=_bd(p.incoming_breakdown),
++            outgoing_breakdown=_bd(p.outgoing_breakdown),
++            caveat=p.caveat,
++        )
++        for p in ranked
++    ]
++    return SlotSuggestionsResponse(
++        set_id=set_id,
++        position=position,
++        mode=mode,
++        intent=intent,
++        allowed_keys=sorted(keys) if keys else None,
++        energy_delta=round(resolved_delta, 3),
++        suggestions=suggestions,
++    )
+````
+
+Verification:
+- `.venv/bin/python -m py_compile src/kiku/api/routes/sets.py`.
+- Endpoint behavior covered in Task 12.
+
+#### Task 5 — cli.py: kiku slot-suggest command
+Tools: editor
+Append after `artist_picks_cmd` (ends :475). `click.Choice` validates `mode`/`intent` at the CLI boundary. Warm, never-blame copy; no banned words.
+Diff:
+````diff
+--- a/src/kiku/cli.py
++++ b/src/kiku/cli.py
+@@
+     console.print(table)
++
++
++@cli.command("slot-suggest")
++@click.argument("set_name_or_id")
++@click.argument("position", type=int)
++@click.option(
++    "--mode",
++    type=click.Choice(["insert", "replace"]),
++    default="insert",
++    help="Grow the set (insert) or swap the track at the slot (replace)",
++)
++@click.option(
++    "--intent",
++    type=click.Choice(["push_higher", "brighten", "cool_down", "hold"]),
++    default="hold",
++    help="The directional move to make at this slot",
++)
++@click.option(
++    "--keys",
++    "allowed_keys",
++    default=None,
++    help="Comma-separated Camelot keys to hard-filter candidates (advanced override)",
++)
++@click.option(
++    "--energy-delta",
++    type=float,
++    default=None,
++    help="Explicit energy-target shift, overriding the intent's shift",
++)
++@click.option("-n", "--num", default=10, help="Number of picks")
++def slot_suggest_cmd(set_name_or_id, position, mode, intent, allowed_keys, energy_delta, num):
++    """Recommend owned tracks that make a directional move at a slot.
++
++    Name a slot and a direction — push_higher, brighten, cool_down, or
++    hold — and Kiku ranks tracks you own that make that move while still
++    mixing out of the track before AND into the track after. Each pick shows the
++    move, the energy shift, and any caveat when the slot resists.
++    """
++    from kiku.db.models import Set, get_session
++    from kiku.setbuilder.slot_picks import rank_slot_picks
++
++    session = get_session()
++
++    # Resolve set by ID or name.
++    try:
++        set_id = int(set_name_or_id)
++        s = session.get(Set, set_id)
++    except ValueError:
++        s = session.query(Set).filter(Set.name.ilike(f"%{set_name_or_id}%")).first()
++
++    if not s:
++        console.print(f"[yellow]Couldn't find set '{set_name_or_id}'.[/]")
++        return
++
++    keys = None
++    if allowed_keys:
++        keys = {k.strip() for k in allowed_keys.split(",") if k.strip()} or None
++
++    picks = rank_slot_picks(
++        session, s.id, position, mode, intent,
++        allowed_keys=keys, energy_delta=energy_delta, n=num,
++    )
++    if not picks:
++        console.print(
++            f"[yellow]No owned track makes a clean {intent.replace('_', ' ')} at slot "
++            f"{position + 1} of '{s.name}' — the slot may be too tight for that move. "
++            f"Try 'hold', or a different direction.[/]"
++        )
++        return
++
++    table = Table(
++        title=f"Slot {position + 1} of '{s.name}' — {mode}, {intent.replace('_', ' ')}"
++    )
++    table.add_column("#", justify="right", style="dim")
++    table.add_column("Title", style="cyan")
++    table.add_column("Artist")
++    table.add_column("Move", style="magenta")
++    table.add_column("Energy", justify="right")
++    table.add_column("Score", justify="right", style="green")
++    table.add_column("Caveat", style="yellow")
++
++    for i, p in enumerate(picks, 1):
++        table.add_row(
++            str(i),
++            p.track.title or "?",
++            p.track.artist or "?",
++            p.move,
++            f"{p.energy_shift:+.2f}",
++            f"{p.score:.3f}",
++            p.caveat or "—",
++        )
++
++    console.print(table)
+````
+
+Verification:
+- `.venv/bin/python -m py_compile src/kiku/cli.py`.
+- `source .venv/bin/activate && kiku slot-suggest <set> 3 --mode insert --intent brighten` prints a ranked Table or a warm empty message.
+
+#### Task 6 — types/index.ts: SlotSuggestion + SlotSuggestionsResponse
+Tools: editor
+Add after `ArtistPicksResponse` (:557-561). Reuses `Track` (:7) + `ReplacementBreakdown` (:510).
+Diff:
+````diff
+--- a/frontend/src/lib/types/index.ts
++++ b/frontend/src/lib/types/index.ts
+@@
+ export interface ArtistPicksResponse {
+ 	set_id: number;
+ 	artist: string;
+ 	picks: ArtistPick[];
+ }
++
++export interface SlotSuggestion {
++	track: Track;
++	from_key: string | null;
++	to_key: string | null;
++	move: string;
++	energy_shift: number;
++	score: number;
++	incoming_breakdown: ReplacementBreakdown | null;
++	outgoing_breakdown: ReplacementBreakdown | null;
++	caveat: string | null;
++}
++
++export interface SlotSuggestionsResponse {
++	set_id: number;
++	position: number;
++	mode: string;
++	intent: string;
++	allowed_keys: string[] | null;
++	energy_delta: number;
++	suggestions: SlotSuggestion[];
++}
+````
+
+Verification:
+- Covered by svelte-check (Task 13).
+
+#### Task 7 — api/sets.ts: getSlotSuggestions client
+Tools: editor
+Two edits: import the type, add the function after `getArtistPicks` (ends :210).
+
+Edit 7a — import (add to the block at :1-17):
+````diff
+--- a/frontend/src/lib/api/sets.ts
++++ b/frontend/src/lib/api/sets.ts
+@@
+ 	SetWaveformTrack,
++	SlotSuggestionsResponse,
+ 	TransitionDetail,
+ } from '$lib/types';
+````
+
+Edit 7b — function (after `getArtistPicks` :210):
+````diff
+--- a/frontend/src/lib/api/sets.ts
++++ b/frontend/src/lib/api/sets.ts
+@@
+ 	const qs = new URLSearchParams({ artist, n: String(n) });
+ 	return fetchJson<ArtistPicksResponse>(`/api/sets/${setId}/artist-picks?${qs}`);
+ }
++
++export async function getSlotSuggestions(
++	setId: number,
++	position: number,
++	opts: { mode: string; intent: string; allowedKeys?: string; energyDelta?: number; n?: number }
++): Promise<SlotSuggestionsResponse> {
++	const qs = new URLSearchParams({ mode: opts.mode, intent: opts.intent });
++	if (opts.allowedKeys) qs.set('allowed_keys', opts.allowedKeys);
++	if (opts.energyDelta !== undefined) qs.set('energy_delta', String(opts.energyDelta));
++	if (opts.n !== undefined) qs.set('n', String(opts.n));
++	return fetchJson<SlotSuggestionsResponse>(
++		`/api/sets/${setId}/slots/${position}/suggestions?${qs}`
++	);
++}
+````
+
+Verification:
+- Covered by svelte-check (Task 13).
+
+#### Task 8 — AddSlotPicksPanel.svelte (NEW)
+Tools: editor
+Mirrors `AddFromArtistPanel.svelte` (floating panel, Svelte 5 runes, `$props`/`$state`/`$derived`). Insert/replace toggle + a slot number input + four named-move buttons (Push higher / Brighten / Cool down / Hold). Ranked cards show the move + caveat; apply routes to `addTrackToSet` (insert) or `replaceTrackInSet` (replace), then `onApplied()`. Voice: "set", warm, never blame; no banned words.
+Diff:
+````diff
+--- /dev/null
++++ b/frontend/src/lib/components/set/AddSlotPicksPanel.svelte
+@@
++<script lang="ts">
++	import type { SlotSuggestion } from '$lib/types';
++	import { getSlotSuggestions, addTrackToSet, replaceTrackInSet } from '$lib/api/sets';
++
++	let {
++		setId,
++		trackCount,
++		onApplied,
++		onclose,
++	}: {
++		setId: number;
++		trackCount: number;
++		onApplied: () => void;
++		onclose: () => void;
++	} = $props();
++
++	const MOVES = [
++		{ intent: 'push_higher', label: 'Push higher' },
++		{ intent: 'brighten', label: 'Brighten' },
++		{ intent: 'cool_down', label: 'Cool down' },
++		{ intent: 'hold', label: 'Hold' },
++	];
++
++	let mode = $state<'insert' | 'replace'>('insert');
++	let intent = $state<string | null>(null);
++	// 1-based in the UI; the API/back end is 0-based.
++	let slotDisplay = $state(1);
++	let position = $derived(Math.max(0, Math.min(trackCount - 1, slotDisplay - 1)));
++	let suggestions = $state<SlotSuggestion[]>([]);
++	let loading = $state(false);
++	let searched = $state(false);
++	let error = $state<string | null>(null);
++	let applyingId = $state<number | null>(null);
++
++	async function loadSuggestions(nextIntent: string) {
++		intent = nextIntent;
++		loading = true;
++		searched = true;
++		error = null;
++		try {
++			const res = await getSlotSuggestions(setId, position, { mode, intent, n: 8 });
++			suggestions = res.suggestions;
++		} catch (e) {
++			error = e instanceof Error ? e.message : 'Something went wrong reading your library.';
++			suggestions = [];
++		} finally {
++			loading = false;
++		}
++	}
++
++	async function applyPick(pick: SlotSuggestion) {
++		applyingId = pick.track.id;
++		try {
++			if (mode === 'insert') {
++				await addTrackToSet(setId, pick.track.id, position);
++			} else {
++				await replaceTrackInSet(setId, position, pick.track.id);
++			}
++			onApplied();
++			onclose();
++		} catch (e) {
++			error = e instanceof Error ? e.message : "Couldn't apply that pick.";
++		} finally {
++			applyingId = null;
++		}
++	}
++</script>
++
++<div class="slot-panel">
++	<div class="panel-header">
++		<h3>Directional slot pick</h3>
++		<button class="close-btn" onclick={onclose} aria-label="Close">×</button>
++	</div>
++	<p class="hint">
++		Name a slot and a direction — Kiku ranks tracks you own that make the move
++		while still mixing out of the track before and into the one after.
++	</p>
++
++	<div class="controls">
++		<div class="mode-toggle" role="group" aria-label="Insert or replace">
++			<button class:active={mode === 'insert'} onclick={() => { mode = 'insert'; }}>Insert</button>
++			<button class:active={mode === 'replace'} onclick={() => { mode = 'replace'; }}>Replace</button>
++		</div>
++		<label class="slot-input">
++			Slot
++			<input type="number" min="1" max={trackCount} bind:value={slotDisplay} />
++		</label>
++	</div>
++
++	<div class="moves">
++		{#each MOVES as m (m.intent)}
++			<button
++				class="move-btn"
++				class:active={intent === m.intent}
++				onclick={() => loadSuggestions(m.intent)}
++			>
++				{m.label}
++			</button>
++		{/each}
++	</div>
++
++	{#if loading}
++		<div class="status">Reading your library…</div>
++	{:else if error}
++		<div class="status error">{error}</div>
++	{:else if searched && suggestions.length === 0}
++		<div class="status">
++			No owned track makes that move here cleanly — try Hold, or another direction.
++		</div>
++	{:else}
++		<ul class="picks">
++			{#each suggestions as pick (pick.track.id)}
++				<li class="pick-card">
++					<div class="pick-main">
++						<div class="pick-title">{pick.track.title ?? 'Untitled'}</div>
++						<div class="pick-artist">{pick.track.artist ?? ''}</div>
++						<div class="pick-move">{pick.move}</div>
++						{#if pick.caveat}
++							<div class="pick-caveat">{pick.caveat}</div>
++						{/if}
++					</div>
++					<div class="pick-side">
++						<div class="pick-score">{Math.round(pick.score * 100)}</div>
++						<button
++							class="apply-btn"
++							onclick={() => applyPick(pick)}
++							disabled={applyingId === pick.track.id}
++						>
++							{applyingId === pick.track.id
++								? 'Applying…'
++								: mode === 'insert'
++									? `Insert at ${slotDisplay}`
++									: `Replace ${slotDisplay}`}
++						</button>
++					</div>
++				</li>
++			{/each}
++		</ul>
++	{/if}
++</div>
++
++<style>
++	.slot-panel {
++		position: absolute;
++		top: 56px;
++		right: 16px;
++		z-index: 30;
++		width: 400px;
++		max-height: 72vh;
++		overflow-y: auto;
++		background: var(--surface, #1b1c20);
++		border: 1px solid var(--border, #2a2b30);
++		border-radius: 10px;
++		padding: 14px;
++		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
++	}
++	.panel-header {
++		display: flex;
++		align-items: center;
++		justify-content: space-between;
++	}
++	.panel-header h3 {
++		margin: 0;
++		font-size: 15px;
++	}
++	.close-btn {
++		background: none;
++		border: none;
++		color: var(--text-secondary, #9a9b9f);
++		font-size: 20px;
++		cursor: pointer;
++		line-height: 1;
++	}
++	.hint {
++		margin: 4px 0 10px;
++		font-size: 12px;
++		color: var(--text-secondary, #9a9b9f);
++	}
++	.controls {
++		display: flex;
++		align-items: center;
++		gap: 12px;
++		margin-bottom: 10px;
++	}
++	.mode-toggle {
++		display: inline-flex;
++		border: 1px solid var(--border, #2a2b30);
++		border-radius: 6px;
++		overflow: hidden;
++	}
++	.mode-toggle button {
++		background: transparent;
++		border: none;
++		color: var(--text-secondary, #9a9b9f);
++		padding: 5px 10px;
++		font-size: 12px;
++		cursor: pointer;
++	}
++	.mode-toggle button.active {
++		background: var(--accent, #7aa2f7);
++		color: #10131a;
++	}
++	.slot-input {
++		font-size: 12px;
++		color: var(--text-secondary, #9a9b9f);
++		display: inline-flex;
++		align-items: center;
++		gap: 6px;
++	}
++	.slot-input input {
++		width: 56px;
++		padding: 4px 6px;
++		background: var(--surface-2, #23242a);
++		border: 1px solid var(--border, #2a2b30);
++		border-radius: 6px;
++		color: inherit;
++	}
++	.moves {
++		display: flex;
++		flex-wrap: wrap;
++		gap: 6px;
++		margin-bottom: 8px;
++	}
++	.move-btn {
++		font-size: 12px;
++		padding: 5px 10px;
++		border: 1px solid var(--border, #2a2b30);
++		border-radius: 6px;
++		background: transparent;
++		color: var(--text-secondary, #9a9b9f);
++		cursor: pointer;
++	}
++	.move-btn.active {
++		border-color: var(--accent, #7aa2f7);
++		color: var(--accent, #7aa2f7);
++	}
++	.status {
++		margin-top: 12px;
++		font-size: 13px;
++		color: var(--text-secondary, #9a9b9f);
++	}
++	.status.error {
++		color: var(--danger, #e06c75);
++	}
++	.picks {
++		list-style: none;
++		margin: 12px 0 0;
++		padding: 0;
++		display: flex;
++		flex-direction: column;
++		gap: 8px;
++	}
++	.pick-card {
++		display: flex;
++		justify-content: space-between;
++		gap: 10px;
++		padding: 10px;
++		border: 1px solid var(--border, #2a2b30);
++		border-radius: 8px;
++	}
++	.pick-title {
++		font-weight: 600;
++		font-size: 13px;
++	}
++	.pick-artist {
++		font-size: 12px;
++		color: var(--text-secondary, #9a9b9f);
++	}
++	.pick-move {
++		margin-top: 4px;
++		font-size: 12px;
++		color: var(--text-tertiary, #7a7b82);
++	}
++	.pick-caveat {
++		margin-top: 6px;
++		font-size: 12px;
++		color: var(--warn, #e5c07b);
++	}
++	.pick-side {
++		display: flex;
++		flex-direction: column;
++		align-items: flex-end;
++		gap: 8px;
++	}
++	.pick-score {
++		font-size: 18px;
++		font-weight: 700;
++		color: var(--accent, #7aa2f7);
++	}
++	.apply-btn {
++		font-size: 12px;
++		padding: 5px 9px;
++		border: 1px solid var(--accent, #7aa2f7);
++		border-radius: 6px;
++		background: transparent;
++		color: var(--accent, #7aa2f7);
++		cursor: pointer;
++		white-space: nowrap;
++	}
++	.apply-btn:disabled {
++		opacity: 0.5;
++		cursor: default;
++	}
++</style>
+````
+
+Verification:
+- Covered by svelte-check (Task 13). Manual E2E: button opens panel, choose insert/replace + slot + a direction, ranked cards show move + caveat, apply inserts/replaces at the slot and the timeline reloads.
+
+#### Task 9 — SetView.svelte: mount AddSlotPicksPanel
+Tools: editor
+Four edits: import, state flag, MenuItem toggle, panel mount. Reuses `handleTracksChanged` (:355) as the reload path and `selectedSet.track_count` for the slot bound.
+
+Edit 9a — import (after `AddFromArtistPanel` import, :13):
+````diff
+--- a/frontend/src/lib/components/set/SetView.svelte
++++ b/frontend/src/lib/components/set/SetView.svelte
+@@
+ 	import AddFromArtistPanel from './AddFromArtistPanel.svelte';
++	import AddSlotPicksPanel from './AddSlotPicksPanel.svelte';
+````
+
+Edit 9b — state flag (after `let showArtistPicks = $state(false);` :90):
+````diff
+--- a/frontend/src/lib/components/set/SetView.svelte
++++ b/frontend/src/lib/components/set/SetView.svelte
+@@
+ 	let showArtistPicks = $state(false);
++	let showSlotPicks = $state(false);
+````
+
+Edit 9c — MenuItem toggle (after the "Add from an artist" MenuItem :496):
+````diff
+--- a/frontend/src/lib/components/set/SetView.svelte
++++ b/frontend/src/lib/components/set/SetView.svelte
+@@
+ 						<MenuItem onselect={() => { showArtistPicks = !showArtistPicks; }}>Add from an artist</MenuItem>
++						<MenuItem onselect={() => { showSlotPicks = !showSlotPicks; }}>Directional slot pick</MenuItem>
+````
+
+Edit 9d — panel mount (after the `AddFromArtistPanel` block :640-646):
+````diff
+--- a/frontend/src/lib/components/set/SetView.svelte
++++ b/frontend/src/lib/components/set/SetView.svelte
+@@
+ 	{#if showArtistPicks && selectedSet}
+ 		<AddFromArtistPanel
+ 			setId={selectedSet.id}
+ 			onInserted={handleTracksChanged}
+ 			onclose={() => { showArtistPicks = false; }}
+ 		/>
+ 	{/if}
++
++	{#if showSlotPicks && selectedSet}
++		<AddSlotPicksPanel
++			setId={selectedSet.id}
++			trackCount={selectedSet.track_count}
++			onApplied={handleTracksChanged}
++			onclose={() => { showSlotPicks = false; }}
++		/>
++	{/if}
+ </div>
+````
+
+Verification:
+- Covered by svelte-check (Task 13). Manual E2E per Task 8.
+
+#### Task 10 — tests/test_camelot.py: move-helper additions
+Tools: editor
+Extend the import line and append tests for the new helpers, including the wheel wrap (`12A→1A` up, `1A→12A` down), brighten flip, cool_down's two-target set, intent→keys (`hold`→None), and intent→energy delta.
+
+Edit 10a — import:
+````diff
+--- a/tests/test_camelot.py
++++ b/tests/test_camelot.py
+@@
+-from kiku.setbuilder.camelot import harmonic_score, parse_camelot
++from kiku.setbuilder.camelot import (
++    camelot_str,
++    flip_mode,
++    harmonic_score,
++    intent_allowed_keys,
++    intent_energy_delta,
++    move_targets,
++    parse_camelot,
++    step_wheel,
++)
+````
+
+Edit 10b — append tests (after `test_unknown_key`, :44):
+````diff
+--- a/tests/test_camelot.py
++++ b/tests/test_camelot.py
+@@
+ def test_unknown_key():
+     assert harmonic_score(None, "8A") == 0.5
+     assert harmonic_score("8A", None) == 0.5
++
++
++def test_camelot_str():
++    assert camelot_str((9, "A")) == "9A"
++    assert camelot_str((12, "B")) == "12B"
++
++
++def test_step_wheel_wrap():
++    assert step_wheel((8, "A"), 1) == (9, "A")
++    assert step_wheel((8, "A"), -1) == (7, "A")
++    assert step_wheel((12, "A"), 1) == (1, "A")  # wrap up
++    assert step_wheel((1, "A"), -1) == (12, "A")  # wrap down
++
++
++def test_flip_mode():
++    assert flip_mode((8, "A")) == (8, "B")
++    assert flip_mode((8, "B")) == (8, "A")
++
++
++def test_move_targets_push_higher():
++    assert move_targets("8A", "push_higher") == [(9, "A")]
++    assert move_targets("12A", "push_higher") == [(1, "A")]  # wheel wrap
++
++
++def test_move_targets_brighten():
++    assert move_targets("8A", "brighten") == [(8, "B")]
++
++
++def test_move_targets_cool_down():
++    assert move_targets("8A", "cool_down") == [(7, "A")]
++    assert set(move_targets("8B", "cool_down")) == {(7, "B"), (8, "A")}
++
++
++def test_move_targets_hold_and_unparseable():
++    assert move_targets("8A", "hold") == []
++    assert move_targets(None, "push_higher") == []
++    assert move_targets("nonsense", "push_higher") == []
++
++
++def test_intent_allowed_keys():
++    assert intent_allowed_keys("8A", "push_higher") == {"9A"}
++    assert intent_allowed_keys("8A", "brighten") == {"8B"}
++    assert intent_allowed_keys("8B", "cool_down") == {"7B", "8A"}
++    assert intent_allowed_keys("8A", "hold") is None
++    assert intent_allowed_keys(None, "push_higher") is None
++
++
++def test_intent_energy_delta():
++    assert intent_energy_delta("push_higher") == 0.15
++    assert intent_energy_delta("brighten") == 0.05
++    assert intent_energy_delta("cool_down") == -0.15
++    assert intent_energy_delta("hold") == 0.0
+````
+
+Verification:
+- `source .venv/bin/activate && python -m pytest tests/test_camelot.py -q`.
+
+#### Task 11 — tests/test_slot_picks.py (NEW): ranker
+Tools: editor
+Uses MagicMock tracks with the proven `test_artist_picks.py` recipe (`audio_features=None`, a real `resolved_energy_zone` tuple, `playlist_tags=None`, numeric quality fields, `.key`/`.bpm`/`.dir_genre`/`.rb_genre`) so the real scoring internals run against mocks. A fake session stubs `.get(Set, id)` + `query(Track)...all()`. Covers both modes' neighbor resolution, the allowed-keys hard filter, energy-shift re-ranking, the honesty/caveat path (resisting successor → alt named), the both-clean path (caveat None), in-set exclusion for replace, and the end-slot single-neighbor case.
+Diff:
+````diff
+--- /dev/null
++++ b/tests/test_slot_picks.py
+@@
++"""Unit tests for the directional slot-pick ranker."""
++
++from __future__ import annotations
++
++from unittest.mock import MagicMock
++
++from kiku.setbuilder.slot_picks import rank_slot_picks
++
++
++def _track(track_id, key="8A", bpm=124.0, genre="techno", zone="build"):
++    t = MagicMock()
++    t.id = track_id
++    t.artist = f"Artist {track_id}"
++    t.title = f"Track {track_id}"
++    t.key = key
++    t.bpm = bpm
++    t.dir_genre = genre
++    t.rb_genre = genre
++    t.dir_energy = "mid"
++    t.energy_predicted = None
++    t.rating = 3
++    t.play_count = 0
++    t.kiku_play_count = 0
++    t.playlist_tags = None
++    # Scoring reads audio_features.energy first, then resolved_energy_zone.
++    t.audio_features = None
++    t.resolved_energy_zone = (zone, "dir_energy", 0.6)
++    return t
++
++
++def _set_track(track, position):
++    st = MagicMock()
++    st.track = track
++    st.track_id = track.id
++    st.position = position
++    return st
++
++
++def _make_session(set_obj, pool):
++    """Fake session: .get(Set, id) -> set_obj; query(Track)...all() -> pool."""
++    session = MagicMock()
++    session.get.return_value = set_obj
++    query = MagicMock()
++    query.filter.return_value = query
++    query.all.return_value = pool
++    session.query.return_value = query
++    return session
++
++
++def _make_set(set_tracks, energy_profile=None, duration_min=60):
++    s = MagicMock()
++    s.tracks = set_tracks
++    s.energy_profile = energy_profile
++    s.duration_min = duration_min
++    return s
++
++
++def test_missing_set_returns_empty():
++    session = _make_session(None, [])
++    assert rank_slot_picks(session, 999, 0, "insert", "hold") == []
++
++
++def test_out_of_range_position_returns_empty():
++    in_set = [_track(1), _track(2)]
++    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
++    session = _make_session(s, [_track(10)])
++    assert rank_slot_picks(session, 1, 9, "insert", "hold") == []
++
++
++def test_insert_mode_neighbors_and_ranking():
++    in_set = [_track(1, key="8A"), _track(2, key="8A"), _track(3, key="8A")]
++    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
++    pool = [_track(10 + i, key="8A") for i in range(6)]
++    session = _make_session(s, pool)
++    picks = rank_slot_picks(session, 1, 1, "insert", "hold", n=3)
++    assert len(picks) == 3
++    assert picks[0].score >= picks[1].score >= picks[2].score
++    for p in picks:
++        assert p.caveat is None  # hold never trips the caveat
++
++
++def test_replace_excludes_in_set_track():
++    shared = _track(2, key="8A")
++    in_set = [_track(1, key="8A"), shared, _track(3, key="8A")]
++    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
++    # ilike/BPM prefilter could hand back an in-set track — exclusion must drop it.
++    pool = [shared, _track(20, key="8A")]
++    session = _make_session(s, pool)
++    picks = rank_slot_picks(session, 1, 1, "replace", "hold")
++    ids = {p.track.id for p in picks}
++    assert 2 not in ids
++    assert 20 in ids
++
++
++def test_allowed_keys_hard_filter():
++    in_set = [_track(1, key="8A"), _track(2, key="8A"), _track(3, key="8A")]
++    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
++    pool = [_track(10, key="9A"), _track(11, key="8B"), _track(12, key="9A")]
++    session = _make_session(s, pool)
++    picks = rank_slot_picks(
++        session, 1, 1, "replace", "hold", allowed_keys={"9A"}
++    )
++    assert {p.track.id for p in picks} == {10, 12}
++
++
++def test_energy_shift_reranks():
++    # Two candidates identical but for energy zone; the shift decides the order.
++    in_set = [_track(1, key="8A"), _track(2, key="8A"), _track(3, key="8A")]
++    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
++    hot = _track(10, key="8A", zone="peak")
++    cool = _track(11, key="8A", zone="warmup")
++    session = _make_session(s, [hot, cool])
++    # Shift the target UP → the hotter track ranks first.
++    up = rank_slot_picks(session, 1, 1, "replace", "hold", energy_delta=0.4)
++    assert up[0].track.id == 10
++    # Shift the target DOWN → the cooler track ranks first.
++    down = rank_slot_picks(session, 1, 1, "replace", "hold", energy_delta=-0.4)
++    assert down[0].track.id == 11
++
++
++def test_caveat_names_achievable_alt():
++    # prev 8A, next 7B: a push_higher (candidate 9A) mixes clean out of 8A
++    # (0.85) but clashes into 7B (0.2) — the alt brighten (8A→8B) keeps both
++    # sides >= 0.8, so the caveat must recommend brighten to 8B.
++    in_set = [_track(1, key="8A"), _track(2, key="10A"), _track(3, key="7B")]
++    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
++    pool = [_track(10, key="9A")]  # matches push_higher's allowed key {9A}
++    session = _make_session(s, pool)
++    picks = rank_slot_picks(session, 1, 1, "replace", "push_higher")
++    assert len(picks) == 1
++    assert picks[0].caveat is not None
++    assert "brighten" in picks[0].caveat
++    assert "8B" in picks[0].caveat
++
++
++def test_no_caveat_when_both_sides_clean():
++    # prev 8A, next 9A: push_higher candidate 9A mixes 0.85 out, 1.0 in — clean.
++    in_set = [_track(1, key="8A"), _track(2, key="10A"), _track(3, key="9A")]
++    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
++    pool = [_track(10, key="9A")]
++    session = _make_session(s, pool)
++    picks = rank_slot_picks(session, 1, 1, "replace", "push_higher")
++    assert len(picks) == 1
++    assert picks[0].caveat is None
++
++
++def test_end_slot_single_neighbor():
++    # Insert at the last slot → prev = last track, next = None (one neighbor).
++    in_set = [_track(1, key="8A"), _track(2, key="8A")]
++    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
++    pool = [_track(10, key="8A")]
++    session = _make_session(s, pool)
++    picks = rank_slot_picks(session, 1, 1, "insert", "hold")
++    assert len(picks) == 1
++    assert picks[0].caveat is None  # no successor to assess
+````
+
+Verification:
+- `source .venv/bin/activate && python -m pytest tests/test_slot_picks.py -q`.
+
+#### Task 12 — tests/api/test_slot_suggestions_api.py (NEW): endpoint
+Tools: editor
+Uses `client` + `db_session` from `tests/api/conftest.py`. The seed keys are only `8A` (even ids) / `8B` (odd ids), set 1 holds ids 1-5. `brighten`/`hold` are directly testable; `push_higher` (needs `9A`) returns the warm-empty path on the default seed and is proven positively by inserting a purpose-keyed `9A` track. For a `brighten` insert at position 1, `prev = ordered[1]` = track 2 (`8A`) → allowed key `{8B}` → the seed's odd-id `8B` tracks (7,9,11,13,15,17) fall in the BPM window.
+Diff:
+````diff
+--- /dev/null
++++ b/tests/api/test_slot_suggestions_api.py
+@@
++"""Integration tests for GET /api/sets/{set_id}/slots/{position}/suggestions."""
++
++from __future__ import annotations
++
++from kiku.db.models import Track
++
++
++def test_brighten_insert_ranked(client):
++    # Insert at slot 1 → prev = track 2 (8A) → brighten targets 8B; seed's
++    # odd-id 8B tracks (not in set) qualify.
++    resp = client.get(
++        "/api/sets/1/slots/1/suggestions",
++        params={"mode": "insert", "intent": "brighten"},
++    )
++    assert resp.status_code == 200
++    body = resp.json()
++    assert body["set_id"] == 1
++    assert body["position"] == 1
++    assert body["mode"] == "insert"
++    assert body["intent"] == "brighten"
++    suggestions = body["suggestions"]
++    assert len(suggestions) >= 1
++    ids = {sg["track"]["id"] for sg in suggestions}
++    assert ids.isdisjoint({1, 2, 3, 4, 5})  # in-set tracks excluded
++    for sg in suggestions:
++        assert sg["move"]  # Show the Why — never a bare ranked list
++        assert "caveat" in sg
++    scores = [sg["score"] for sg in suggestions]
++    assert scores == sorted(scores, reverse=True)
++
++
++def test_hold_ranked(client):
++    resp = client.get(
++        "/api/sets/1/slots/2/suggestions",
++        params={"mode": "insert", "intent": "hold"},
++    )
++    assert resp.status_code == 200
++    assert len(resp.json()["suggestions"]) >= 1
++
++
++def test_push_higher_warm_empty_on_default_seed(client):
++    # prev key is 8A → push_higher needs a 9A candidate; the seed has none.
++    resp = client.get(
++        "/api/sets/1/slots/1/suggestions",
++        params={"mode": "insert", "intent": "push_higher"},
++    )
++    assert resp.status_code == 200
++    assert resp.json()["suggestions"] == []
++
++
++def test_push_higher_with_seeded_key(client, db_session):
++    # Add a purpose-keyed 9A track in the neighbours' BPM window.
++    db_session.add(Track(
++        id=99, title="Lift", artist="Purpose", bpm=123.0, key="9A",
++        dir_genre="techno", dir_energy="high", duration_sec=320.0,
++        rating=4, play_count=5, kiku_play_count=1,
++    ))
++    db_session.commit()
++    resp = client.get(
++        "/api/sets/1/slots/1/suggestions",
++        params={"mode": "insert", "intent": "push_higher"},
++    )
++    assert resp.status_code == 200
++    ids = {sg["track"]["id"] for sg in resp.json()["suggestions"]}
++    assert 99 in ids
++
++
++def test_missing_set_404(client):
++    resp = client.get(
++        "/api/sets/9999/slots/0/suggestions",
++        params={"mode": "insert", "intent": "hold"},
++    )
++    assert resp.status_code == 404
++
++
++def test_invalid_mode_400(client):
++    resp = client.get(
++        "/api/sets/1/slots/0/suggestions",
++        params={"mode": "sideways", "intent": "hold"},
++    )
++    assert resp.status_code == 400
++
++
++def test_invalid_intent_400(client):
++    resp = client.get(
++        "/api/sets/1/slots/0/suggestions",
++        params={"mode": "insert", "intent": "levitate"},
++    )
++    assert resp.status_code == 400
++
++
++def test_out_of_range_position_404(client):
++    resp = client.get(
++        "/api/sets/1/slots/99/suggestions",
++        params={"mode": "insert", "intent": "hold"},
++    )
++    assert resp.status_code == 404
+````
+
+Verification:
+- `source .venv/bin/activate && python -m pytest tests/api/test_slot_suggestions_api.py -q`.
+
+#### Task 13 — Lint / type-check (changed files)
+Tools: shell
+ruff is NOT installed — use `py_compile` for Python. Capture the svelte-check baseline (currently 0 errors, 4 warnings from the 020 slice) — only NEW errors are failures.
+Commands:
+- `source .venv/bin/activate && python -m py_compile src/kiku/setbuilder/camelot.py src/kiku/setbuilder/slot_picks.py src/kiku/api/schemas.py src/kiku/api/routes/sets.py src/kiku/cli.py tests/test_camelot.py tests/test_slot_picks.py tests/api/test_slot_suggestions_api.py`
+- `cd /home/mantis/Development/mantis-dev/waveform-builer/frontend && npx svelte-check --tsconfig ./tsconfig.json 2>&1 | tail -3` (expect `0 errors`; warnings unchanged from baseline)
+- `source .venv/bin/activate && python -m pytest tests/ -q` (full backend suite; the new camelot/slot_picks/API tests green — note the 5 pre-existing `test_energy.py` failures are unrelated to this spec)
+
+Expectations:
+- All `py_compile` succeed; svelte-check 0 errors; new tests pass; no regression beyond the known `test_energy.py` baseline.
+
+#### Task 14 — Commit changed files
+Tools: git
+Commit ONLY the files created/modified in Tasks 1-12 (leave untracked `trees/`, `BACKEND_MIGRATION.md`, `SOUNDCLOUD_EXPORT.md`, `scripts/sc_feasibility_spike.py`, `frontend/test-results/`). Never commit to main.
+Commands:
+- `cd <directional-slot-picks worktree root> && git branch --show-current` (expect `directional-slot-picks`; abort if `main`)
+- `git add src/kiku/setbuilder/camelot.py src/kiku/setbuilder/slot_picks.py src/kiku/api/schemas.py src/kiku/api/routes/sets.py src/kiku/cli.py frontend/src/lib/types/index.ts frontend/src/lib/api/sets.ts frontend/src/lib/components/set/AddSlotPicksPanel.svelte frontend/src/lib/components/set/SetView.svelte tests/test_camelot.py tests/test_slot_picks.py tests/api/test_slot_suggestions_api.py`
+- Commit message:
+  ```
+  spec(024): IMPLEMENT - directional slot recommendations (camelot moves, ranker, API, CLI, UI)
+
+  Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+  ```
+
+### Validate
+
+Each Human Section requirement → compliance note with task/line refs.
+
+- **HLO: name a slot + a direction; rank owned tracks that make the move while mixing out of the track before AND into the track after; each reports the harmonic MOVE + why; library only** (L5): `rank_slot_picks` resolves `(prev, next)` by mode and scores via `score_replacement` against both neighbors; every `SlotPick` carries `move` + `caveat` + breakdowns; candidate pool is the DJ's own library minus in-set ids (Task 2). Surfaced via API/CLI/UI (Tasks 4,5,8).
+- **HLO: serves Arc / Grow-the-Ear / Opinions-you-can-see-through** (L5): both-neighbor scoring judges the slot against the flow (Arc); the `move` string + caveat teach the harmonic move (Grow-the-Ear); `move` + `energy_shift` + `incoming/outgoing_breakdown` show the math (Opinions) — Tasks 2,3,4.
+- **MLO: Camelot move helpers enumerate target key(s) per named move; map intent → allowed_keys + energy shift; unit-tested standalone** (L8): `move_targets`, `intent_allowed_keys`, `intent_energy_delta`, `step_wheel` (wrap), `flip_mode`, `camelot_str` in `camelot.py` (Task 1); proven in Task 10.
+- **MLO: ranker module with mode/intent + optional allowed_keys/energy_delta; reuses score_replacement on BOTH neighbors; hard-filters by allowed keys; scores against the shifted energy target; returns ranked owned tracks with move + caveat** (L9): `rank_slot_picks(... mode, intent, allowed_keys, energy_delta ...)` (Task 2) — `shifted_target = clamp(baseline + shift)`, key hard-filter, `score_replacement` reuse; proven Task 11.
+- **MLO: API `GET /sets/{id}/slots/{position}/suggestions?mode=&intent=&allowed_keys=&energy_delta=&n=` mirroring replacements + per-candidate move/caveat** (L10): Task 4 endpoint returns `SlotSuggestionsResponse{...suggestions:[{track,from_key,to_key,move,energy_shift,score,incoming/outgoing_breakdown,caveat}]}`.
+- **MLO: CLI `kiku slot-suggest <set> <position> --mode --intent [--allowed-keys --energy-delta]` — warm ranked table with move/why/caveat** (L11): Task 5 `slot-suggest` (`--keys` flag maps to the `allowed_keys` param), rich Table with Move / Energy / Score / Caveat columns; warm empty message.
+- **MLO: frontend slot affordance — insert/replace + named-move buttons + ranked cards with move+caveat + one-click apply** (L12): Task 8 `AddSlotPicksPanel` (mode toggle + Push higher/Brighten/Cool down/Hold + slot input), cards show `move` + `caveat`, apply via `addTrackToSet` (insert) / `replaceTrackInSet` (replace); mounted Task 9.
+- **MLO: tests — camelot helper, ranker (both modes/filter/shift/caveat), API** (L13): Tasks 10, 11, 12.
+- **DT: two modes — insert neighbors N/N+1 (set grows), replace neighbors N-1/N+1 (swap)** (L23-26): `_resolve_neighbors` (Task 2); proven `test_insert_mode_neighbors_and_ranking` + `test_replace_excludes_in_set_track` (Task 11).
+- **DT: direction — push_higher +1 same letter, brighten mode flip, cool_down -1 or B→A, hold no shift; + allowed_keys/energy_delta overrides** (L27-37): `move_targets` per intent + `intent_energy_delta` (Task 1); explicit override precedence in `rank_slot_picks` (Task 2, `allowed_keys is not None` / `energy_delta is not None`).
+- **DT: honesty constraint — never silently return a bad transition; name the achievable move / the anchor that resists; every candidate reports the move** (L39-40): `_build_caveat` (T=0.8 detection + `_achievable_alt`) names the resisting successor and the achievable alt; `_build_move` always states the move (Task 2); proven `test_caveat_names_achievable_alt` + `test_no_caveat_when_both_sides_clean` (Task 11).
+- **DT: reuse score_replacement (both-neighbor), get_replacements machinery, target_energy_at; new camelot helpers** (L42-47): `score_replacement` is the sole scorer; energy-profile parse + BPM prefilter + in-set exclusion mirror `get_replacements`; `target_energy_at` shifted by the intent (Task 2).
+- **DT: library excavation only; allowed_keys HARD filter (hold none); honesty over silence; Show the Why; warm voice / no banned words; warm edge cases; DO NOT OVERCOMPLICATE** (L49-56): pool from local `Track` query minus in-set (Task 2); `key_filter` hard-drops off-key when a constraint is present, `hold`→None; caveat surfaces the ceiling; `move`+breakdown on every pick; CLI/UI copy uses "set"/"flow", warm empty messages, no banned words (Tasks 5,8); minimal helper+ranker+endpoint+CLI+one panel reusing the replacements machinery.
+- **DT: testing — camelot enumeration + wrap + intent maps; ranker both modes/filter/shift/caveat; API 200+move+caveat/mode+intent parse/overrides/in-set exclusion/404/out-of-range warm** (L58-62): Tasks 10, 11, 12 cover each; the `push_higher` seed gotcha handled by a warm-empty assertion plus a purpose-keyed positive test.
+- **DT: E2E manual acceptance — open set, pick slot, choose insert/replace + direction, cards show move+caveat, one-click apply** (L62): Task 8/9 verification notes the manual flow.
+- **Behavior: reuse score_replacement + the replacements endpoint machinery (no parallel path); camelot moves as clean tested functions; make the honesty caveat real** (L64-65): Task 1 (standalone tested camelot vocabulary), Task 2 (reuses `score_replacement`, no new scorer; `_build_caveat` is the teaching), Task 4 (mirrors `get_artist_picks`/`get_replacements`).
 
 ## Plan Review
 <!-- Filled if required to validate plan -->
