@@ -11,6 +11,7 @@
 	import SetComparison from './SetComparison.svelte';
 	import FillReorderDialog from './FillReorderDialog.svelte';
 	import AddFromArtistPanel from './AddFromArtistPanel.svelte';
+	import AddSlotPicksPanel from './AddSlotPicksPanel.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
 	import Menu from '$lib/components/primitives/Menu.svelte';
 	import MenuItem from '$lib/components/primitives/MenuItem.svelte';
@@ -95,6 +96,7 @@
 	let showEnergyReview = $state(false);
 	let showAssist = $state(false);
 	let showArtistPicks = $state(false);
+	let showSlotPicks = $state(false);
 	let confirmDelete = $state(false);
 	let deleting = $state(false);
 	let pickerRefresh = $state(0);
@@ -515,6 +517,7 @@
 							<MenuItem onselect={() => { showAssist = true; }}>Assist</MenuItem>
 						{/if}
 						<MenuItem onselect={() => { showArtistPicks = !showArtistPicks; }}>Add from an artist</MenuItem>
+						<MenuItem onselect={() => { showSlotPicks = !showSlotPicks; }}>Directional slot pick</MenuItem>
 						{#if setDetail?.planned_set_id}
 							<MenuSeparator />
 							<MenuItem onselect={handleUnlink}>Unlink from plan</MenuItem>
@@ -663,6 +666,15 @@
 			setId={selectedSet.id}
 			onInserted={handleTracksChanged}
 			onclose={() => { showArtistPicks = false; }}
+		/>
+	{/if}
+
+	{#if showSlotPicks && selectedSet}
+		<AddSlotPicksPanel
+			setId={selectedSet.id}
+			trackCount={selectedSet.track_count}
+			onApplied={handleTracksChanged}
+			onclose={() => { showSlotPicks = false; }}
 		/>
 	{/if}
 </div>

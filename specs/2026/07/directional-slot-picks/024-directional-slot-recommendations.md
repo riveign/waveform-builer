@@ -1714,7 +1714,32 @@ Each Human Section requirement → compliance note with task/line refs.
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+### TODO
+1. Camelot move helpers (`src/kiku/setbuilder/camelot.py`) — Status: Done
+2. Ranker `slot_picks.py` (`src/kiku/setbuilder/slot_picks.py`) — Status: Done (see deviation)
+3. Schemas `SlotSuggestionItem` + `SlotSuggestionsResponse` (`src/kiku/api/schemas.py`) — Status: Done
+4. API endpoint `GET /{set_id}/slots/{position}/suggestions` (`src/kiku/api/routes/sets.py`) — Status: Done
+5. CLI `kiku slot-suggest` (`src/kiku/cli.py`) — Status: Done
+6. Frontend types (`frontend/src/lib/types/index.ts`) — Status: Done
+7. Frontend API client `getSlotSuggestions` (`frontend/src/lib/api/sets.ts`) — Status: Done
+8. Frontend `AddSlotPicksPanel.svelte` (NEW) — Status: Done
+9. Frontend mount in `SetView.svelte` — Status: Done
+10. Unit tests `tests/test_camelot.py` — Status: Done (16 passed)
+11. Unit tests `tests/test_slot_picks.py` (NEW) — Status: Done (9 passed)
+12. API tests `tests/api/test_slot_suggestions_api.py` (NEW) — Status: Done (8 passed)
+13. Lint / type-check / full suite — Status: Done (406 passed; svelte-check 0 errors/0 warnings)
+14. Commit — Status: Done (see hash below)
+
+### Notes & Deviations
+- All planned diffs applied against the real file content with no context drift; anchor line refs were accurate.
+- **Task 2 / Task 11 deviation (in-set exclusion):** the Task 2 diff excluded in-set tracks purely via the SQL `Track.id.notin_(set_track_ids)` query filter. The Task 11 unit test `test_replace_excludes_in_set_track` uses a pure `MagicMock` session whose `.filter()` is a no-op, so the SQL-only exclusion was not observable and the test failed (an in-set track leaked into `pool.all()`). Fix: added an explicit Python-side guard at the top of the candidate loop in `rank_slot_picks` (`if cand.id in set_track_ids: continue`). This is defensive (a library function may be called with any pool), keeps the exclusion testable, and changes no scoring numbers. Production DB behavior is unchanged (SQL filter still runs); the API test also asserts exclusion via `isdisjoint({1..5})`.
+- **Task 11 caveat/harmonic scenario reproduced exactly as planned:** prev `8A`, next `7B`, candidate `9A` → `h_in = harmonic_score(8A,9A) = 0.85`, `h_out = harmonic_score(9A,7B) = 0.2`; `_achievable_alt` selected `brighten → 8B` (both sides ≥ 0.8: `h(8A,8B)=0.8`, `h(8B,7B)=0.85`). Caveat contains "brighten" and "8B" as expected. No expectation adjustment needed.
+- **Task 11 energy-shift scenario:** zone→numeric peak=0.9 / warmup=0.25; energy_delta +0.4 ranks the peak track first, −0.4 ranks the warmup track first. Reproduced as planned.
+- **Task 12 push_higher seed gotcha handled per Plan:** default seed has only 8A/8B, so `push_higher` (needs 9A) is asserted via the warm-empty path plus a purpose-keyed 9A track (id=99) inserted in-test for the positive case.
+- **Task 13 baseline differs from Plan (better):** svelte-check reported **0 errors, 0 warnings** across 337 files (the Plan noted a 4-warning 020-slice baseline — not present on this branch). Full backend suite = **406 passed, 0 failures**; the Plan's anticipated ~5 pre-existing `test_energy.py` failures are NOT present on this branch (`test_energy.py` passes). Only unrelated `datetime.utcnow` DeprecationWarnings remain.
+- **Environment note (no committed change):** the worktree frontend had no `node_modules`/`.svelte-kit`. To type-check, symlinked the main repo's `node_modules` into the worktree and ran `svelte-kit sync` to generate the worktree's `.svelte-kit`. Both are gitignored — nothing outside the Plan's file list is committed.
+
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->

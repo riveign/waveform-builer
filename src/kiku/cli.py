@@ -475,6 +475,99 @@ def artist_picks_cmd(set_name_or_id: str, artist: str, num: int):
     console.print(table)
 
 
+@cli.command("slot-suggest")
+@click.argument("set_name_or_id")
+@click.argument("position", type=int)
+@click.option(
+    "--mode",
+    type=click.Choice(["insert", "replace"]),
+    default="insert",
+    help="Grow the set (insert) or swap the track at the slot (replace)",
+)
+@click.option(
+    "--intent",
+    type=click.Choice(["push_higher", "brighten", "cool_down", "hold"]),
+    default="hold",
+    help="The directional move to make at this slot",
+)
+@click.option(
+    "--keys",
+    "allowed_keys",
+    default=None,
+    help="Comma-separated Camelot keys to hard-filter candidates (advanced override)",
+)
+@click.option(
+    "--energy-delta",
+    type=float,
+    default=None,
+    help="Explicit energy-target shift, overriding the intent's shift",
+)
+@click.option("-n", "--num", default=10, help="Number of picks")
+def slot_suggest_cmd(set_name_or_id, position, mode, intent, allowed_keys, energy_delta, num):
+    """Recommend owned tracks that make a directional move at a slot.
+
+    Name a slot and a direction — push_higher, brighten, cool_down, or
+    hold — and Kiku ranks tracks you own that make that move while still
+    mixing out of the track before AND into the track after. Each pick shows the
+    move, the energy shift, and any caveat when the slot resists.
+    """
+    from kiku.db.models import Set, get_session
+    from kiku.setbuilder.slot_picks import rank_slot_picks
+
+    session = get_session()
+
+    # Resolve set by ID or name.
+    try:
+        set_id = int(set_name_or_id)
+        s = session.get(Set, set_id)
+    except ValueError:
+        s = session.query(Set).filter(Set.name.ilike(f"%{set_name_or_id}%")).first()
+
+    if not s:
+        console.print(f"[yellow]Couldn't find set '{set_name_or_id}'.[/]")
+        return
+
+    keys = None
+    if allowed_keys:
+        keys = {k.strip() for k in allowed_keys.split(",") if k.strip()} or None
+
+    picks = rank_slot_picks(
+        session, s.id, position, mode, intent,
+        allowed_keys=keys, energy_delta=energy_delta, n=num,
+    )
+    if not picks:
+        console.print(
+            f"[yellow]No owned track makes a clean {intent.replace('_', ' ')} at slot "
+            f"{position + 1} of '{s.name}' — the slot may be too tight for that move. "
+            f"Try 'hold', or a different direction.[/]"
+        )
+        return
+
+    table = Table(
+        title=f"Slot {position + 1} of '{s.name}' — {mode}, {intent.replace('_', ' ')}"
+    )
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Title", style="cyan")
+    table.add_column("Artist")
+    table.add_column("Move", style="magenta")
+    table.add_column("Energy", justify="right")
+    table.add_column("Score", justify="right", style="green")
+    table.add_column("Caveat", style="yellow")
+
+    for i, p in enumerate(picks, 1):
+        table.add_row(
+            str(i),
+            p.track.title or "?",
+            p.track.artist or "?",
+            p.move,
+            f"{p.energy_shift:+.2f}",
+            f"{p.score:.3f}",
+            p.caveat or "—",
+        )
+
+    console.print(table)
+
+
 @cli.command()
 @click.option("--duration", default=120, help="Set duration in minutes")
 @click.option("--energy", default="journey",

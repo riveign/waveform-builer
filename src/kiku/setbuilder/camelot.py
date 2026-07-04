@@ -107,3 +107,80 @@ def harmonic_score(key_a: str | None, key_b: str | None) -> float:
         return 0.6
 
     return 0.2
+
+
+# ── Directional move vocabulary (reused by slot_picks + the API/CLI) ──
+
+_INTENT_ENERGY_DELTA = {
+    "push_higher": 0.15,
+    "brighten": 0.05,
+    "cool_down": -0.15,
+    "hold": 0.0,
+}
+
+
+def camelot_str(key: tuple[int, str]) -> str:
+    """Format a ``(number, letter)`` Camelot key as its canonical string.
+
+    ``(9, "A") -> "9A"``.
+    """
+    num, letter = key
+    return f"{num}{letter}"
+
+
+def step_wheel(key: tuple[int, str], delta: int) -> tuple[int, str]:
+    """Step ``delta`` positions around the 12-slot wheel, same letter.
+
+    Wraps ``12 -> 1`` (up) and ``1 -> 12`` (down) so the number stays in 1..12.
+    """
+    num, letter = key
+    stepped = ((num - 1 + delta) % 12) + 1
+    return (stepped, letter)
+
+
+def flip_mode(key: tuple[int, str]) -> tuple[int, str]:
+    """Flip the mode ``A<->B`` at the same wheel number (minor<->major)."""
+    num, letter = key
+    return (num, "B" if letter == "A" else "A")
+
+
+def move_targets(neighbor_key: str | None, intent: str) -> list[tuple[int, str]]:
+    """Enumerate the target Camelot key(s) for a named move, relative to a neighbor.
+
+    ``push_higher`` -> ``[+1 same letter]``            (8A -> 9A)
+    ``brighten``    -> ``[mode flip]``                 (8A -> 8B)
+    ``cool_down``   -> ``[-1 same letter]`` (+ B->A)   (8A -> 7A ; 8B -> 7B and 8A)
+    ``hold``        -> ``[]``  (no key constraint)
+
+    Returns ``[]`` for an unparseable neighbor or an unknown intent.
+    """
+    base = parse_camelot(neighbor_key)
+    if base is None or intent == "hold":
+        return []
+    if intent == "push_higher":
+        return [step_wheel(base, 1)]
+    if intent == "brighten":
+        return [flip_mode(base)]
+    if intent == "cool_down":
+        targets = [step_wheel(base, -1)]
+        if base[1] == "B":
+            targets.append(flip_mode(base))
+        return targets
+    return []
+
+
+def intent_allowed_keys(neighbor_key: str | None, intent: str) -> set[str] | None:
+    """Map a named intent to the allowed candidate-key set, relative to a neighbor.
+
+    Returns ``None`` for ``hold`` (no key filter) or when no targets can be
+    derived (unparseable neighbor / unknown intent) — i.e. no hard filter.
+    """
+    targets = move_targets(neighbor_key, intent)
+    if not targets:
+        return None
+    return {camelot_str(t) for t in targets}
+
+
+def intent_energy_delta(intent: str) -> float:
+    """Energy-target shift a named intent applies to the smooth baseline."""
+    return _INTENT_ENERGY_DELTA.get(intent, 0.0)

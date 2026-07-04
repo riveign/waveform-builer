@@ -37,6 +37,8 @@ from kiku.api.schemas import (
     SetTrackResponse,
     SetUpdateRequest,
     SetWaveformTrackResponse,
+    SlotSuggestionItem,
+    SlotSuggestionsResponse,
     TrackSummary,
     TransitionResponse,
     TransitionScoreBreakdown,
@@ -1249,3 +1251,85 @@ def get_artist_picks(
         for p in ranked
     ]
     return ArtistPicksResponse(set_id=set_id, artist=artist, picks=picks)
+
+
+@router.get("/{set_id}/slots/{position}/suggestions", response_model=SlotSuggestionsResponse)
+def get_slot_suggestions(
+    set_id: int,
+    position: int,
+    mode: str = "insert",
+    intent: str = "hold",
+    allowed_keys: str | None = None,
+    energy_delta: float | None = None,
+    n: int = 10,
+    db: Session = Depends(get_db),
+):
+    """Rank owned tracks that make a directional move at a slot, both-neighbor aware.
+
+    ``mode`` (insert|replace) + ``intent`` (push_higher|brighten|cool_down|hold)
+    name the slot and the direction; Kiku answers with tracks the DJ already
+    owns, each reporting the harmonic move and any caveat when the slot resists
+    it. Library excavation only.
+    """
+    from kiku.setbuilder.camelot import intent_energy_delta
+    from kiku.setbuilder.slot_picks import rank_slot_picks
+
+    s = db.get(Set, set_id)
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    if mode not in ("insert", "replace"):
+        raise HTTPException(status_code=400, detail="mode must be 'insert' or 'replace'")
+    if intent not in ("push_higher", "brighten", "cool_down", "hold"):
+        raise HTTPException(
+            status_code=400,
+            detail="intent must be one of push_higher, brighten, cool_down, hold",
+        )
+
+    ordered = sorted(s.tracks, key=lambda st: st.position)
+    if position < 0 or position >= len(ordered):
+        raise HTTPException(status_code=404, detail="Invalid position")
+
+    keys = None
+    if allowed_keys:
+        keys = {k.strip() for k in allowed_keys.split(",") if k.strip()} or None
+
+    ranked = rank_slot_picks(
+        db, set_id, position, mode, intent,
+        allowed_keys=keys, energy_delta=energy_delta, n=n,
+    )
+
+    _BD_FIELDS = {
+        "harmonic", "energy_fit", "bpm_compat", "genre_coherence",
+        "track_quality", "total", "discovery_label", "set_appearances",
+    }
+
+    def _bd(b: dict | None) -> ReplacementBreakdown | None:
+        if not b:
+            return None
+        return ReplacementBreakdown(**{k: v for k, v in b.items() if k in _BD_FIELDS})
+
+    resolved_delta = energy_delta if energy_delta is not None else intent_energy_delta(intent)
+    suggestions = [
+        SlotSuggestionItem(
+            track=_track_response(p.track),
+            from_key=p.from_key,
+            to_key=p.to_key,
+            move=p.move,
+            energy_shift=p.energy_shift,
+            score=p.score,
+            incoming_breakdown=_bd(p.incoming_breakdown),
+            outgoing_breakdown=_bd(p.outgoing_breakdown),
+            caveat=p.caveat,
+        )
+        for p in ranked
+    ]
+    return SlotSuggestionsResponse(
+        set_id=set_id,
+        position=position,
+        mode=mode,
+        intent=intent,
+        allowed_keys=sorted(keys) if keys else None,
+        energy_delta=round(resolved_delta, 3),
+        suggestions=suggestions,
+    )
