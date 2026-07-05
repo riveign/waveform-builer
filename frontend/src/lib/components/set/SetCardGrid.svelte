@@ -36,7 +36,7 @@
 	}
 </script>
 
-<div class="card-grid" role="list" aria-label="Set at a glance">
+<div class="card-grid" role="group" aria-label="Set at a glance">
 	{#each tracks as track, i (track.position ?? i)}
 		{@const prevKey = i > 0 ? tracks[i - 1].key : null}
 		{@const move = i > 0 ? harmonicMove(prevKey, track.key) : null}
@@ -47,7 +47,8 @@
 		<div
 			class="grid-card"
 			class:selected={ui.selectedTrackInSet === track.track_id}
-			role="listitem"
+			role="button"
+				aria-label="Select {track.title ?? 'Untitled'} by {track.artist ?? 'Unknown'}"
 			tabindex="0"
 			onclick={() => selectTrack(track.track_id)}
 			onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTrack(track.track_id); } }}
