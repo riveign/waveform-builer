@@ -145,26 +145,21 @@
 				<div class="score-panel-label">Vibe</div>
 				<VibeArc trackAId={a.track_id} trackBId={b.track_id} />
 			</div>
-			<div class="score-panel">
-				<div class="score-panel-label">Builder score</div>
-				<ScoreBreakdown breakdown={transition.score_breakdown} keyA={transition.key_a} keyB={transition.key_b} />
+			<div class="score-panel scores-panel">
+				<div class="score-panel-label">Score breakdown</div>
+				<ScoreBreakdown
+					breakdown={transition.score_breakdown}
+					analysisBreakdown={analysisTransition?.scores ?? null}
+					keyA={transition.key_a}
+					keyB={transition.key_b}
+				/>
+				{#if analysisTransition?.teaching_moment}
+					<div class="teaching-block">{analysisTransition.teaching_moment}</div>
+				{/if}
+				{#if analysisTransition?.suggestion}
+					<div class="suggestion-block">{analysisTransition.suggestion}</div>
+				{/if}
 			</div>
-			{#if analysisTransition}
-				<div class="score-panel analysis">
-					<div class="score-panel-label">Context-aware score</div>
-					<ScoreBreakdown breakdown={analysisTransition.scores} keyA={transition.key_a} keyB={transition.key_b} />
-					{#if analysisTransition.teaching_moment}
-						<div class="teaching-block">
-							<span class="teaching-text">{analysisTransition.teaching_moment}</span>
-						</div>
-					{/if}
-					{#if analysisTransition.suggestion}
-						<div class="suggestion-block">
-							{analysisTransition.suggestion}
-						</div>
-					{/if}
-				</div>
-			{/if}
 		</div>
 	</div>
 </div>
@@ -199,7 +194,7 @@
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 		gap: 12px;
-		align-items: start;
+		align-items: stretch;
 	}
 
 	/* ── Column 1: Tracks ── */
@@ -284,8 +279,9 @@
 		font-weight: 500;
 	}
 
-	.score-panel.analysis .score-panel-label {
-		color: var(--accent);
+	.scores-panel {
+		flex: 1;
+		min-height: 0;
 	}
 
 	.teaching-block {

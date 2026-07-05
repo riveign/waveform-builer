@@ -1243,6 +1243,11 @@ Frontend-only redesign, 7 files, exactly per Plan. TransitionIndicator + SetCard
 - No frontend test harness exists (per Research); the one pure fn (`harmonicMove`) is covered by the desk-check; components covered by manual E2E acceptance (Task 9 checklist).
 - No backend change (Research Q1) → no backend test delta.
 
+### Follow-up refinements (post-mockup review with the user)
+- [0033a52] SetCardGrid a11y — grid cards changed from `role="listitem"` → `role="button"` + `aria-label` (in a `role="group"` container), clearing both a11y warnings. `svelte-check` → 0 errors, 0 warnings.
+- [22f82b1] SetTimeline — removed the pre-existing vertical `.energy-sidebar` (markup + CSS). It duplicated the per-track energy the card's horizontal bar already shows (now with a target tick), and read as a second bar in the left gutter.
+- Transition Detail redesign (this commit): `ScoreBreakdown.svelte` gains an optional `analysisBreakdown` prop → dual "on their own / in your arc" mode: one row per dimension showing both values (single value when they agree, `own → arc` + lift/drop bar when they diverge ≥0.15), gated per-dimension notes (visible only when diverging or weak <0.5, else a label tooltip), and one-line total cards. `TransitionDetail.svelte` collapses the two stacked `<ScoreBreakdown>` panels (Builder + Context-aware, 10 rows, 4/5 identical) into one, and the score column flexes to equal-height so its bottom aligns with the players column. `svelte-check` → 0 errors, 0 warnings. Built from a user-approved mockup; same build-vs-ctx thesis as the row/strip work.
+
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
 
