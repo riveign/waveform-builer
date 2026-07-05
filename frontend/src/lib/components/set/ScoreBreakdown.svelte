@@ -46,21 +46,10 @@
 		return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
 	}
 
-	/** Whether this dimension earns a visible note in dual mode: it diverges,
-	 * or it's weak enough to be a real teaching moment. Otherwise the note
-	 * lives in the label tooltip. */
-	function isNoteworthy(own: number, arc: number): boolean {
-		return Math.abs(own - arc) >= DIVERGE || arc < WEAK;
-	}
-
-	/** The note shown for a dual-mode dimension (null → tooltip only). */
-	function dualNote(key: string, own: number, arc: number): string | null {
-		const diverges = Math.abs(own - arc) >= DIVERGE;
-		if (diverges) {
-			return `On their own ${lcFirst(getTeachingNote(key, own))} — in your arc, ${lcFirst(getTeachingNote(key, arc))}.`;
-		}
-		if (arc < WEAK) return getTeachingNote(key, arc);
-		return null;
+	/** A note for a non-diverging dimension: shown only when it's weak enough
+	 * to be a real teaching moment; otherwise it lives in the label tooltip. */
+	function weakNote(key: string, arc: number): string | null {
+		return arc < WEAK ? getTeachingNote(key, arc) : null;
 	}
 
 	const dimensions = [
@@ -97,10 +86,11 @@
 				{@const own = breakdown[dim.key]}
 				{@const arc = analysisBreakdown[dim.key]}
 				{@const diverges = Math.abs(own - arc) >= DIVERGE}
-				{@const note = dualNote(dim.key, own, arc)}
+				{@const wNote = weakNote(dim.key, arc)}
+				{@const hasNote = diverges || wNote !== null}
 				<div class="dim-group" class:diverge={diverges}>
 					<div class="dim-row">
-						<span class="dim-label" title={note ? null : getTeachingNote(dim.key, arc)}>
+						<span class="dim-label" title={hasNote ? null : getTeachingNote(dim.key, arc)}>
 							{dim.label}<span class="dim-weight">×{dim.weight}</span>
 						</span>
 						<div class="dim-bar">
@@ -124,8 +114,10 @@
 							{/if}
 						</span>
 					</div>
-					{#if note}
-						<div class="dim-note" class:split={diverges}>{note}</div>
+					{#if diverges}
+						<div class="dim-note split">On their own <b>{lcFirst(getTeachingNote(dim.key, own))}</b> — in your arc, <b>{lcFirst(getTeachingNote(dim.key, arc))}</b>.</div>
+					{:else if wNote}
+						<div class="dim-note">{wNote}</div>
 					{/if}
 				</div>
 			{/each}
@@ -400,6 +392,12 @@
 
 	.dual .dim-note.split {
 		color: var(--text-secondary);
+	}
+
+	.dual .dim-note.split b {
+		color: var(--accent-text);
+		font-style: normal;
+		font-weight: 600;
 	}
 
 	/* ── Total (single) ── */

@@ -285,13 +285,14 @@
 	}
 
 	.teaching-block {
-		padding: 6px 10px;
-		background: var(--bg-secondary);
-		border-radius: 4px;
+		padding: 8px 12px;
+		background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent);
+		border-left: 3px solid var(--accent);
+		border-radius: 0 var(--radius-md) var(--radius-md) 0;
 		font-size: 12px;
-		color: var(--text-primary);
+		color: var(--text-secondary);
 		font-style: italic;
-		line-height: 1.4;
+		line-height: 1.45;
 	}
 
 	.suggestion-block {
