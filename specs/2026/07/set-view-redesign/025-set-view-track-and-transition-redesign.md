@@ -1235,7 +1235,7 @@ Frontend-only redesign, 7 files, exactly per Plan. TransitionIndicator + SetCard
 - [x] Task 7 — SetView.svelte: host list/grid SegmentedControl toggle — Status: Done
 - [x] Task 8 — Type-check gate (svelte-check) — Status: Done (0 errors; 2 a11y warnings on new SetCardGrid, Plan-authored markup, gate is error-based)
 - [x] Task 9 — harmonicMove desk-check truth table — Status: Done (all 11 rows pass)
-- [x] Task 10 — Commit (spec-025 files only) — Status: In Progress
+- [x] Task 10 — Commit (spec-025 files only) — Status: Done [83c5d01]
 
 ### Evidence
 - `svelte-check`: `COMPLETED 337 FILES 0 ERRORS 2 WARNINGS 1 FILES_WITH_PROBLEMS`. The 2 warnings are a11y notices (`a11y_no_noninteractive_tabindex`, `a11y_no_noninteractive_element_interactions`) on the Plan-specified `role="listitem"` interactive card in `SetCardGrid.svelte`. Zero new errors; gate (Task 8) is defined as 0 errors.
