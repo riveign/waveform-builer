@@ -208,33 +208,6 @@
 			<SetCardGrid tracks={items} {energyTargets} {analysis} />
 		{:else}
 		<div class="timeline-content">
-			<!-- Energy sidebar -->
-			<div class="energy-sidebar" aria-label="Energy profile">
-				{#each items as item, i (item.id)}
-					{@const norm = getTrackEnergyNumeric(item.energy_value, item.energy)}
-					{@const target = energyTargets[i]}
-					<div class="energy-row">
-						<div class="energy-bar-track">
-							{#if norm !== null}
-								<div
-									class="energy-fill"
-									class:low={norm < 0.35}
-									class:mid={norm >= 0.35 && norm < 0.7}
-									class:high={norm >= 0.7}
-									style="height: {norm * 100}%"
-								></div>
-							{/if}
-							{#if target !== undefined}
-								<div class="energy-target-line" style="bottom: {target * 100}%"></div>
-							{/if}
-						</div>
-					</div>
-					{#if i < items.length - 1}
-						<div class="energy-gap"></div>
-					{/if}
-				{/each}
-			</div>
-
 			<!-- Track list with DnD -->
 			<div
 				class="track-list"
@@ -410,66 +383,6 @@
 		display: flex;
 		gap: 0;
 		padding: 0 12px;
-	}
-
-	/* ── Energy sidebar ── */
-
-	.energy-sidebar {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		width: 20px;
-		flex-shrink: 0;
-		padding-top: 4px;
-	}
-
-	.energy-row {
-		height: 44px;
-		display: flex;
-		align-items: center;
-	}
-
-	.energy-gap {
-		height: 32px;
-	}
-
-	.energy-bar-track {
-		position: relative;
-		width: 8px;
-		height: 32px;
-		background: var(--bg-tertiary);
-		border-radius: 4px;
-		overflow: visible;
-		display: flex;
-		flex-direction: column;
-		justify-content: flex-end;
-	}
-
-	.energy-fill {
-		width: 100%;
-		border-radius: 4px;
-		transition: height 0.2s;
-	}
-
-	.energy-fill.low {
-		background: var(--energy-low, #2ecc71);
-	}
-
-	.energy-fill.mid {
-		background: var(--energy-mid, #f39c12);
-	}
-
-	.energy-fill.high {
-		background: var(--energy-high, #e94560);
-	}
-
-	.energy-target-line {
-		position: absolute;
-		left: -2px;
-		right: -2px;
-		height: 2px;
-		background: var(--text-dim);
-		border-radius: 1px;
 	}
 
 	/* ── Track list ── */
