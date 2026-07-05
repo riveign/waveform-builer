@@ -78,7 +78,110 @@ Do not touch the set-building/scoring path in v1 — record it as a documented f
 Critical: AI can ONLY modify this section.
 
 ## Research
-<!-- Filled by /spec RESEARCH -->
+
+The tag mirrors the existing `playlist_tags` JSON-in-Text pattern end to end. Every extension point
+below is verified against current source (line numbers are current as of this stage).
+
+### Backend
+
+- **`src/kiku/db/models.py:64`** — `playlist_tags = Column(Text)` on `Track` is the exact storage
+  precedent (JSON list stored as Text). New `set_roles = Column(Text)` column goes right after it
+  (before `last_synced` at L65). No `AudioFeatures` change — this is DJ intent, belongs on `Track`.
+- **Canonical roles constant** — no existing home; define `SET_ROLES = ("opener", "closer", "break")`
+  in a small module. `src/kiku/analysis/autotag.py:27` (`ENERGY_ZONES`) is the sibling precedent, but
+  set-roles are not energy, so a dedicated location (`src/kiku/setbuilder/` or a new
+  `src/kiku/set_roles.py`) is cleaner and import-cycle-safe (schemas + store + route all need it).
+- **Migration** — head revision is **`d0e1f2a3b4c5`** (verified via `alembic heads`). New migration
+  copies `alembic/versions/a7b8c9d0e1f2_add_vibe_columns.py` (single `op.add_column` /
+  `op.drop_column` pair), with `down_revision = 'd0e1f2a3b4c5'`. Column is `sa.Text()`, nullable.
+- **Request schema** — `src/kiku/api/schemas.py:8-16` `TrackRatingRequest` (Pydantic + `field_validator`)
+  is the template. New `TrackSetRolesRequest` holds `roles: list[str]` and validates each against
+  `SET_ROLES` (reject unknown), dedupes, allows empty list = clear.
+- **Response schema** — `src/kiku/api/schemas.py:52` `playlist_tags: list[str] = []` is the exact
+  precedent. Add `set_roles: list[str] = []` right after it (L52).
+- **Response builder** — `src/kiku/api/routes/tracks.py:44-51` parses `playlist_tags` JSON into
+  `tags`; L82 passes `playlist_tags=tags`. Mirror both: parse `set_roles` JSON → `roles`, pass
+  `set_roles=roles` in the `TrackResponse(...)` call (add after L82).
+- **PATCH route** — `src/kiku/api/routes/tracks.py:175-189` `update_track_rating` is the exact
+  template: get-or-404, mutate column, `db.commit()`, `db.refresh()`, return `_track_to_response`.
+  New `PATCH /{track_id}/set-roles` writes `track.set_roles = json.dumps(validated_roles)` (or
+  `None`/`"[]"` when empty). Add its schema import to the `from kiku.api.schemas import (...)` block
+  at L10-23.
+- **Filter (hand-building)** — `src/kiku/db/store.py:87-176` `search_tracks`. The `rating_min` block
+  at L158-159 is the simplest filter precedent. Add a keyword-only `set_role: str | None = None`
+  param; SQLite has no JSON operators guaranteed, so filter with `Track.set_roles.ilike(f'%"{role}"%')`
+  (roles are stored as a JSON string list, so the quoted token match is exact-enough and index-free).
+  Wire through the route: `src/kiku/api/routes/tracks.py:87-105` (add `set_role` Query param),
+  pass-through at L107-125, and add to the `other_filters` tuple at L131-134.
+
+### Frontend
+
+- **Picker** — `frontend/src/lib/components/library/EnergyZonePicker.svelte` (module script defines
+  list + colors + tips; renders `MenuItem`s). Clone as `SetRolePicker.svelte` with
+  `ROLES = ['opener','closer','break']`. Difference from energy: roles are **multi-select toggles**
+  (a track can hold several), so `MenuItem selected={roles.includes(role)}` and `onselect` toggles
+  membership rather than replacing a single value.
+- **Context menu** — `frontend/src/lib/components/library/TrackContextMenu.svelte`. The energy block
+  (L54-63, submenu + `handleZoneSelect` optimistic pattern at L27-39) and rating block (L67-74) are
+  the templates. Add a "Set role" section + `handleRoleToggle()` doing optimistic
+  `ontrackupdated?.({ set_roles })` → `updateTrackSetRoles()` → rollback on catch (mirrors L41-51).
+- **API client** — `frontend/src/lib/api/tracks.ts:56-62` `updateTrackRating`. Add
+  `updateTrackSetRoles(trackId, roles: string[])` PATCHing `/api/tracks/${id}/set-roles`. Add
+  `set_role?: string` to `SearchParams` (L4-21) for the filter.
+- **Type** — `frontend/src/lib/types/index.ts:34` `playlist_tags: string[]`. Add
+  `set_roles: string[];` right after it in `interface Track` (L7-36).
+- **Badge** — render sites that already read `playlist_tags`/`resolved_energy`:
+  `TrackCard.svelte`, `TrackTable.svelte`, `RelatedTrackCard.svelte` (all in
+  `frontend/src/lib/components/library/`). A small role chip (opener/closer/break) rendered from
+  `track.set_roles`.
+- **Filter affordance** — `frontend/src/lib/components/library/SearchFilters.svelte` +
+  `LibraryBrowser.svelte` host the existing filter chips (energy_zone, rating_min) and call
+  `searchTracks`. Add a set-role filter control there, feeding `set_role` into `SearchParams`.
+
+### Tests
+
+- **API tests** — `tests/api/test_tracks_api.py` with fixtures in `tests/api/conftest.py` (in-memory
+  SQLite via `Base.metadata.create_all`, seeds tracks 1-20, provides `client` + `db_session`).
+  `test_track_features_includes_vibe` (L8-19) is the response-field regression pattern to copy.
+  New tests: PATCH set-roles persists + returns them; unknown role → 422; empty list clears;
+  `_track_to_response` includes `set_roles`; `search?set_role=opener` filters correctly.
+- **Migration** — `Base.metadata.create_all` (used by tests) builds schema from models, so the new
+  column is picked up automatically; migration is verified separately by `alembic upgrade head` on a
+  scratch DB.
+- **Frontend** — no frontend test infra exists (per project memory: "zero frontend tests"); validate
+  via `npx svelte-check` + manual E2E.
+
+### Strategy
+
+**Build order (backend-first, each layer independently verifiable):**
+
+1. **Constant + model + migration** — add `SET_ROLES`, `Track.set_roles` column, Alembic migration
+   off head `d0e1f2a3b4c5`. Verify: `alembic upgrade head` on a scratch DB; model round-trips a list.
+2. **Schemas** — `TrackSetRolesRequest` (validate against `SET_ROLES`), `set_roles` on
+   `TrackResponse`. Verify: unit test rejects unknown role, accepts empty.
+3. **Route + response builder** — `PATCH /{id}/set-roles`; parse+emit `set_roles` in
+   `_track_to_response`. Verify: API test round-trips and 404s/422s correctly.
+4. **Filter** — `set_role` in `search_tracks` + search route + `other_filters` tuple. Verify: API
+   test `search?set_role=opener` returns only tagged tracks; JSON-token match doesn't false-positive
+   on substrings (test "open" vs "opener" — the quoted-token match `%"opener"%` guards this).
+5. **Frontend type + API client** — `set_roles` on `Track`, `updateTrackSetRoles`, `set_role` on
+   `SearchParams`. Verify: `svelte-check` clean.
+6. **Picker + context menu** — `SetRolePicker.svelte` (multi-toggle) wired into `TrackContextMenu`
+   with optimistic update + rollback. Verify: `svelte-check`; manual toggle in browser.
+7. **Badge + filter UI** — role chip on track cards; filter control in `SearchFilters`. Verify:
+   manual E2E (tag a track → badge appears → filter surfaces it → clear → gone).
+
+**Testing strategy:** unit + API tests co-located in `tests/api/test_tracks_api.py` (extend, don't
+create new file) using the existing `client`/`db_session` fixtures. Cover: persist, clear, unknown-role
+rejection, response inclusion, filter correctness incl. the substring false-positive guard. Frontend
+validated by `svelte-check` + a manual end-to-end pass (no test infra to hook into).
+
+**Voice/principle checks:** picker + badge copy read as the DJ's own judgement (P5/P6); the filter is
+additive, never removes a track from any other pool (non-restrictive constraint, spec Details L…).
+
+**Explicit non-goals (guard against scope creep):** do NOT touch `planner._pick_seed`,
+`scoring.track_quality`, `filler`, or `set_analyzer`. The auto-builder wiring is the deferred
+follow-up spec.
 
 ## Plan
 <!-- Filled by /spec PLAN -->
