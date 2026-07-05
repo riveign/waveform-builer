@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { SuggestNextItem } from '$lib/types';
 	import { suggestNext, getTrackAffinities, type TrackAffinity } from '$lib/api/tracks';
-	import SimilarTrackCard from '../library/SimilarTrackCard.svelte';
+	import RelatedTrackCard from '../library/RelatedTrackCard.svelte';
 	import Spinner from '../Spinner.svelte';
 	import { rovingFocus } from '$lib/actions/rovingFocus';
 
@@ -24,7 +24,7 @@
 	let showAll = $state(false);
 	let affinityMap = $state<Record<number, string>>({});
 	let dismissing = $state<Set<number>>(new Set());
-	const VISIBLE_COUNT = 12;
+	const VISIBLE_COUNT = 8; // 2 rows × 4 columns at full content width
 	const FETCH_COUNT = 30;
 
 	// Filter out rejected tracks from the pool
@@ -106,7 +106,7 @@
 		<div class="cards-grid grid-12 grid-12--content" use:rovingFocus>
 			{#each visibleSuggestions as item (item.track.id)}
 				<div class="card-slot" class:dismissing={dismissing.has(item.track.id)}>
-					<SimilarTrackCard
+					<RelatedTrackCard
 						{item}
 						parentTrackId={trackId}
 						{parentBpm}
@@ -149,35 +149,34 @@
 		margin: 0;
 	}
 
-	/* 12-col content grid: every card is an equal column-multiple. Cards span 2
-	   (6-up) at full content width — each card lands ≈150px wide, which is the
-	   SimilarTrackCard's COMPACT pill tier (<200px): colored-icon row + bold N★.
-	   Reflow steps down sensibly so the card never crams: 6-up → 4-up → 3-up →
-	   2-up via container queries (the card's own container queries pick the right
-	   internal tier at each width). */
+	/* 12-col content grid: every card is an equal column-multiple. Cards span 3
+	   (4-up) at full content width — with VISIBLE_COUNT 8 that reads as a tidy
+	   2-rows-×-4-columns block. Each card lands ≈230px wide, where the taller
+	   RelatedTrackCard relaxes into its compact-artwork tier. Reflow steps down so
+	   the card never crams: 4-up → 3-up → 2-up → 1-up via container queries. */
 	.cards-grid {
 		grid-auto-rows: 1fr; /* every row the same height → all cards equal */
 	}
 
 	.cards-grid > :global(.card-slot) {
-		grid-column: span 2; /* 6-up at full content width (compact pill tier) */
+		grid-column: span 3; /* 4-up at full content width */
 	}
 
-	@container (max-width: 860px) {
-		.cards-grid > :global(.card-slot) {
-			grid-column: span 3; /* 4-up */
-		}
-	}
-
-	@container (max-width: 620px) {
+	@container (max-width: 880px) {
 		.cards-grid > :global(.card-slot) {
 			grid-column: span 4; /* 3-up */
 		}
 	}
 
-	@container (max-width: 440px) {
+	@container (max-width: 640px) {
 		.cards-grid > :global(.card-slot) {
 			grid-column: span 6; /* 2-up */
+		}
+	}
+
+	@container (max-width: 440px) {
+		.cards-grid > :global(.card-slot) {
+			grid-column: span 12; /* 1-up */
 		}
 	}
 

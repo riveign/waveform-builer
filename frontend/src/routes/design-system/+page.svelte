@@ -5,7 +5,7 @@
 	} from '$lib/components/primitives/SegmentedControl.svelte';
 	import Stack from '$lib/components/primitives/Stack.svelte';
 	import Grid from '$lib/components/primitives/Grid.svelte';
-	import SimilarTrackCard from '$lib/components/library/SimilarTrackCard.svelte';
+	import RelatedTrackCard from '$lib/components/library/RelatedTrackCard.svelte';
 	import StandaloneTrackCard from '$lib/components/library/StandaloneTrackCard.svelte';
 	import StarRating from '$lib/components/primitives/StarRating.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
@@ -892,46 +892,36 @@
 	<section class="ds__section">
 		<h2>Related tracks card</h2>
 		<p class="ds__note">
-			The card shown under the "Related tracks" header on the track view — each entry is a candidate
-			to mix into next, built entirely from the design-system primitives (<code>Chip</code>,
-			<code>StarRating</code>, <code>HarmonyIcon</code>, <code>Menu</code>). It stacks three tiers:
-			<strong>identity</strong> (first-letter-capped title, with artist · genre on a subtitle line —
-			the genre is rendered as <strong>genre-family-colored text</strong> (no box), the color carrying
-			the signal, while the artist stays muted plain text and ellipsizes first); the
+			The taller, <strong>horizontal</strong> card shown under the "Related tracks" header on the track
+			view — each entry is a candidate to mix into next, built entirely from the design-system primitives
+			(<code>Chip</code>, <code>StarRating</code>, <code>HarmonyIcon</code>, <code>Menu</code>). A
+			<strong>prominent 72px artwork</strong> anchors the left; the body stacks three rows on the right:
+			<strong>identity</strong> (first-letter-capped title, with artist · genre on a subtitle line — the
+			genre is <strong>genre-family-colored text</strong>, the color carrying the signal, while the artist
+			stays muted plain text and ellipsizes first) plus the <code>+</code> / <code>⋮</code> actions; the
 			<strong>attribute chips</strong> in priority order key → BPM → energy, the key chip carrying its
 			harmony-move icon and the BPM chip carrying its metronome glyph + a <strong>signed delta colored
 			green / orange / red by magnitude</strong> (seamless / moderate / tension); and the
-			<strong>Track signals</strong> block — <strong>three balanced columns</strong> (each an equal third)
-			reading left → center → right: the match score <code>NN/100</code> (lead, <strong>left</strong>),
-			the DJ's rating as a compact <code>N★</code> (<strong>center</strong>), and affinity rendered as a
-			labelled qualitative strength bar (Great / Likely / Weak, <strong>right</strong>) rather than a
-			second raw number.
+			<strong>signals</strong> row — the match score <code>NN/100</code> (lead), the DJ's rating as a
+			compact <code>N★</code>, and affinity rendered as a labelled qualitative strength bar (Great /
+			Likely / Weak, trailing edge) rather than a second raw number.
 		</p>
 		<p class="ds__note">
-			The card is a <strong>size container</strong>: it renders across grid densities (4-up, 6-up, the
-			expanded "Show more" grid) and adapts to its real column width through three container-query
-			tiers rather than one shrinking design. <strong>Regular (≥240px)</strong> shows everything:
-			identity with artist + genre-colored text, chips key → BPM → energy, and the three-balanced-column
-			signals grid (NN/100 left · N★ center · match right). <strong>Intermediate (200–240px)</strong>
-			tightens only — smaller artwork and reduced padding — but <strong>all three chips (key + BPM +
-			energy) stay</strong> (the compact metronome glyph makes the BPM chip short enough that no chip
-			drops and no <code>+1</code> overflow is needed), and the genre text and three-column signals both
-			stay too. <strong>Compact (&lt;200px)</strong> becomes a dense <strong>pill</strong> (rounder,
-			badge-like): artwork + title (+ ⋮), then a single row of <strong>color-coded icons only</strong>,
-			<strong>evenly distributed</strong> across the pill — harmony glyph · metronome · match-strength
-			bars · a <strong>larger, bold</strong> N★ — where icon shape + color + the star count carry the signal. The numeric score, key
-			text, BPM number, genre and energy all drop there; every icon keeps its real value in its
-			<code>title</code>/aria-label. Chips never clip mid-word at any width. The visible match verdict is
-			a single terse word (<strong>Great / Likely / Weak / Not for me</strong>), with the fuller phrasing
-			on hover.
+			The grid runs <strong>~3-up</strong> so each card lands ≈300px wide — enough room for the big
+			artwork and roomy three-row body, a deliberate replacement for the old 6-up layout that crushed the
+			card into a dense pill. The card is a <strong>size container</strong>: it fills its equal-height grid
+			cell and, if it ever lands under ~260px, a single container-query tier relaxes the padding and
+			shrinks the artwork so it stays graceful rather than restructuring. The visible match verdict is a
+			single terse word (<strong>Great / Likely / Weak / Not for me</strong>), with the fuller phrasing on
+			hover.
 		</p>
 
-		<p class="related-density-label">Regular — ~250px columns (everything visible; genre as colored text)</p>
-		<div class="related-grid related-grid--regular">
+		<p class="related-density-label">Track-view width — ~230px columns (the 4-up × 2-row deployment; compact-artwork tier)</p>
+		<div class="related-grid related-grid--tall-narrow">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">
 					<span class="related-cell__label">{s.label}</span>
-					<SimilarTrackCard
+					<RelatedTrackCard
 						item={s.item}
 						parentTrackId={1}
 						parentBpm={parentBpm}
@@ -943,27 +933,11 @@
 			{/each}
 		</div>
 
-		<p class="related-density-label">Intermediate — ~220px columns (tighter, but all three chips key + BPM + energy stay; no +1)</p>
-		<div class="related-grid related-grid--intermediate">
+		<p class="related-density-label">Wider columns — ~320px (the 2-up / 1-up reflow, full 72px artwork)</p>
+		<div class="related-grid related-grid--tall">
 			{#each relatedStates as s (s.item.track.id)}
 				<div class="related-cell">
-					<SimilarTrackCard
-						item={s.item}
-						parentTrackId={1}
-						parentBpm={parentBpm}
-						parentKey={parentKey}
-						affinity={s.affinity}
-						onaffinitychange={noop}
-					/>
-				</div>
-			{/each}
-		</div>
-
-		<p class="related-density-label">Compact — ~190px columns (dense pill: artwork + title / evenly-distributed color-coded icons only — harmony · metronome · match bars · larger bold N★)</p>
-		<div class="related-grid related-grid--compact">
-			{#each relatedStates as s (s.item.track.id)}
-				<div class="related-cell">
-					<SimilarTrackCard
+					<RelatedTrackCard
 						item={s.item}
 						parentTrackId={1}
 						parentBpm={parentBpm}
@@ -1475,6 +1449,17 @@
 		gap: var(--space-md);
 		margin-bottom: var(--space-lg);
 	}
+	/* Tall — 320px columns: the RelatedTrackCard's real 3-up width on the track view
+	 * (horizontal card, full artwork + roomy three-row body). */
+	.related-grid--tall {
+		grid-template-columns: repeat(auto-fill, 320px);
+	}
+	/* Tall narrow — 240px columns: exercises the card's <260px container-query
+	 * fallback (relaxed padding, smaller artwork). */
+	.related-grid--tall-narrow {
+		grid-template-columns: repeat(auto-fill, 240px);
+		margin-bottom: var(--space-lg);
+	}
 	.related-density-label {
 		font-size: var(--text-xs);
 		color: var(--text-3);
@@ -1497,5 +1482,7 @@
 		.related-grid--regular { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 		.related-grid--intermediate { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 		.related-grid--compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+		.related-grid--tall { grid-template-columns: minmax(0, 1fr); }
+		.related-grid--tall-narrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	}
 </style>

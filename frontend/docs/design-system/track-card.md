@@ -6,14 +6,25 @@ shell** so the DJ learns one card and reads it everywhere:
 
 | Mode | Component | Asks | Lives where |
 |------|-----------|------|-------------|
-| **Related** | `library/SimilarTrackCard.svelte` | "What mixes well from *here*, and *why*?" | the **Related tracks** section (`waveform/SimilarTracks.svelte`) on the track view |
+| **Related** | `library/TrackCard.svelte` (mode `related`) | "What mixes well from *here*, and *why*?" | the shared comparative shell — the same three-tier vocabulary reused elsewhere |
 | **Standalone** | `library/StandaloneTrackCard.svelte` | "What *is* this track?" | anywhere a single track stands on its own — a library card grid, a search result, a header |
 
-Both wrappers are thin: they bind their props into a discriminated `mode` union
-and delegate to the shared base **`library/TrackCard.svelte`**, which owns the
-3-tier shell, artwork + fallback, `capFirst` capitalization, the container-query
-tiers and every token. The shell is **identical** in both modes; only **Tier 2
-and Tier 3 swap** (see [Mode differences](#mode-differences)).
+The Standalone wrapper is thin: it binds its props into a discriminated `mode`
+union and delegates to the shared base **`library/TrackCard.svelte`**, which owns
+the 3-tier shell, artwork + fallback, `capFirst` capitalization, the
+container-query tiers and every token. The shell is **identical** in both modes;
+only **Tier 2 and Tier 3 swap** (see [Mode differences](#mode-differences)).
+
+> **The track view's Related section uses a different card now.** As of the track
+> view redesign, the **Related tracks** grid (`waveform/SimilarTracks.svelte`)
+> renders the taller, horizontal **`library/RelatedTrackCard.svelte`** at 4-up × 2
+> rows instead of this card's compact-pill tier — see
+> [`related-track-card.md`](./related-track-card.md). That card reuses this shell's
+> comparative *vocabulary* (harmony move, BPM delta, match score, affinity
+> strength, and the exported `capFirst` / `scoreStrength` helpers) but lays it out
+> horizontally with a prominent 72px artwork. This doc still governs the shared
+> shell and the Standalone mode; the compact-pill tier below is retained on the
+> shell but is no longer the track view's Related presentation.
 
 > **Why two modes, not two cards.** A related card is *comparative* — every
 > number on it (harmony move, BPM delta, match score, affinity) is measured

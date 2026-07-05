@@ -12,7 +12,7 @@
 	import SimilarTracks from './SimilarTracks.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import StarRating from '../primitives/StarRating.svelte';
-	import { capFirst } from '../library/SimilarTrackCard.svelte';
+	import { capFirst } from '../library/TrackCard.svelte';
 	import Spinner from '../Spinner.svelte';
 	import EnergyZonePicker from '../library/EnergyZonePicker.svelte';
 	import { ZONE_COLORS } from '../library/EnergyZonePicker.svelte';
@@ -385,13 +385,16 @@
 		</dl>
 	{/if}
 
-	<!-- ── Waveform + What Kiku Hears: one row — player ~3/4 (span 9), analysis
-	     cards stacked in the ~1/4 column (span 3). Container query reflows to a
-	     single stacked column on narrow content widths so the waveform keeps a
-	     usable width and the cards don't get crushed. ── -->
+	<!-- ── Waveform + What Kiku Hears + Sets featuring: one row — waveform keeps
+	     priority (~2.2fr), then two analysis columns (What Kiku Hears · Sets
+	     featuring). Container queries reflow to waveform-full + two columns, then a
+	     single stacked column, so the waveform keeps a usable width and the panels
+	     don't get crushed. ── -->
 	<div class="sound-row" class:sound-row--with-cards={features}>
-		<!-- ── Waveform Player ── -->
-		<div class="player-section">
+		<!-- ── Waveform column ── -->
+		<div class="sr-col sr-col--wave">
+			<p class="sr-eyebrow">Waveform</p>
+			<div class="player-section">
 			{#if error}
 				<div class="error-msg" role="alert">
 					<p class="error-headline">Couldn't draw this waveform.</p>
@@ -415,12 +418,13 @@
 					No waveform yet — run <code>kiku analyze</code> to unlock it
 				</div>
 			{/if}
+			</div>
 		</div>
 
-		<!-- ── What Kiku Hears (always visible) ── -->
+		<!-- ── What Kiku Hears column (always visible) ── -->
 		{#if features}
-			<div class="kiku-hears">
-				<h3 class="section-title">What Kiku hears</h3>
+			<div class="sr-col sr-col--hears">
+				<p class="sr-eyebrow">What Kiku hears</p>
 				<div class="feature-cards">
 				<!-- Energy card -->
 				<div class="feature-card">
@@ -489,14 +493,17 @@
 			</div>
 		</div>
 	{/if}
+
+		<!-- ── Sets column — third column of the sound row (top-aligned, natural
+		     height: it's collapsed by default, so it must not stretch). ── -->
+		<div class="sr-col sr-col--sets">
+			<p class="sr-eyebrow">In your sets</p>
+			<SetAppearances trackId={track.id} trackTitle={track.title ?? 'track'} />
+		</div>
 	</div>
 
-	<!-- ── Sounds Like (always visible, auto-loads) ── -->
-
+	<!-- ── Related tracks (always visible, auto-loads) — full width below ── -->
 	<SimilarTracks trackId={track.id} trackKey={track.key} parentBpm={track.bpm} />
-
-	<!-- ── Sets (at the bottom) ── -->
-	<SetAppearances trackId={track.id} />
 	</div>
 </div>
 
@@ -814,17 +821,38 @@
 		border-left: 2px solid var(--border);
 	}
 
-	/* ── Sound row: waveform ~3/4 + analysis cards ~1/4 in one row ──
-	 * Container-query driven (context lives on the ancestor .track-view) so the
-	 * split only applies when the content pane is wide enough to keep the waveform
-	 * usable; below that it reflows to a single stacked column (waveform
-	 * full-width, cards beneath). NOTE: .sound-row must NOT carry `container-type`
-	 * itself — it is the element the query styles, and a container can't be the
-	 * target of its own query. */
+	/* ── Sound row: waveform + What Kiku Hears + Sets featuring ──
+	 * Container-query driven (context lives on the ancestor .track-view). Three
+	 * tiers: stacked (narrow) → waveform full-width + two panels below (mid) →
+	 * three side-by-side columns (wide). NOTE: .sound-row must NOT carry
+	 * `container-type` itself — it is the element the queries style, and a container
+	 * can't be the target of its own query. */
 	.sound-row {
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-lg);
+	}
+
+	/* Each column is [eyebrow][body]. A shared eyebrow treatment + equal height
+	   means the three bodies below all begin on one baseline. */
+	.sr-col {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	/* Shared section eyebrow — one uppercase label across all three columns,
+	   matching the page's other section labels (the old .section-title and the
+	   "Related tracks" eyebrow: uppercase, ~12px, muted, medium weight). The
+	   margin-bottom sets the single baseline the three bodies share. */
+	.sr-eyebrow {
+		margin: 0 0 var(--space-md);
+		font-size: var(--text-sm);
+		line-height: var(--lh-sm);
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		font-weight: var(--font-weight-medium);
+		color: var(--text-3);
 	}
 
 	.player-section {
@@ -832,80 +860,89 @@
 		min-width: 0;
 	}
 
+	/* ── Mid tier (≥720px): waveform full-width on top, then What Kiku Hears · Sets
+	 * featuring as two columns below. Each panel keeps its natural height. ── */
 	@container (min-width: 720px) {
 		.sound-row--with-cards {
 			display: grid;
-			grid-template-columns: 3fr 1fr;
+			grid-template-columns: 1fr 1fr;
+			grid-template-areas:
+				"wave wave"
+				"hears sets";
 			gap: var(--space-xl);
-			/* DEFINITE equal height, not `stretch`. `stretch` resolves the row to
-			   MAX(waveform, cards-min-content); because two natural-height cards are
-			   TALLER than the waveform, the row grew to the cards and the waveform
-			   top-aligned with dead space below. Instead we pin a known waveform-block
-			   height (--waveform-block-h: canvas 128 + container bottom-pad 10 +
-			   controls ≈ 28 ≈ 166px) and give BOTH columns exactly that height, so
-			   the cards can never out-grow the waveform — they fill it and stop. */
 			align-items: start;
 		}
+		.sound-row--with-cards .sr-col--wave { grid-area: wave; }
+		.sound-row--with-cards .sr-col--hears { grid-area: hears; }
+		.sound-row--with-cards .sr-col--sets { grid-area: sets; }
+	}
 
-		/* --waveform-block-h: the player's intrinsic height, made definite so the
-		   cards column can borrow it. Kept equal to the waveform's natural size so
-		   the waveform looks unchanged (canvas 128 + 10 bottom-pad + ~28 controls). */
+	/* ── Wide tier (≥900px): three side-by-side columns. The waveform keeps
+	 * priority (~2.2fr); its intrinsic block height (--waveform-block-h: canvas 128
+	 * + bottom-pad 10 + controls ≈ 28 ≈ 166px) is pinned and lent to What Kiku
+	 * Hears so its stacked feature cards split it evenly. Sets featuring stays
+	 * top-aligned at its natural collapsed height (no forced stretch, no empty
+	 * pinned box). ── */
+	@container (min-width: 900px) {
 		.sound-row--with-cards {
+			grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr);
+			grid-template-areas: "wave hears sets";
 			--waveform-block-h: 166px;
 		}
 
-		.sound-row--with-cards .player-section {
+		.sound-row--with-cards .sr-col--wave .player-section {
 			height: var(--waveform-block-h);
 		}
 
-		/* The cards column is pinned to the SAME definite height as the waveform.
-		   Not min-height:100% / not stretch — an explicit height the cards split. */
-		.sound-row--with-cards .kiku-hears {
+		/* The feature-cards body is pinned to the SAME definite height as the
+		   waveform body, so the two bodies bottom-align and the stacked cards split
+		   the height evenly rather than out-growing the waveform. */
+		.sound-row--with-cards .sr-col--hears .feature-cards {
 			height: var(--waveform-block-h);
 			min-height: 0;
-		}
-
-		.sound-row--with-cards .feature-cards {
 			/* Switch from the default responsive grid to a single flex column so the
 			   two cards can `flex: 1 1 0` and split the column height evenly. */
 			display: flex;
 			flex-direction: column;
-			/* Fill the column height below the section title and split it evenly
-			   across the stacked cards. */
-			flex: 1 1 0;
-			min-height: 0;
 			gap: var(--space-md);
 		}
 
-		.sound-row--with-cards .feature-card {
+		.sound-row--with-cards .sr-col--hears .feature-card {
 			/* Each card shares the column height equally and shrinks to fit; content
 			   vertically centred. Vertical padding trimmed so the compressed cards
-			   (~one waveform-height split in two ≈ 64px) read clean, not cramped. */
+			   read clean, not cramped. */
 			flex: 1 1 0;
 			min-height: 0;
 			overflow: hidden;
 			align-items: center;
-			padding: var(--space-xs) 18px;
+			padding: var(--space-xs) var(--space-xl);
 		}
 
 		/* Tighten the card-body stack so the tallest card (Energy: label + value +
-		   bar + In/Body/Out detail) fits the ~64px split without clipping. The
-		   value font and bar shrink minimally; gaps collapse to the 2px step. */
-		.sound-row--with-cards .feature-card .card-body {
+		   bar + In/Body/Out detail) fits the split without clipping. */
+		.sound-row--with-cards .sr-col--hears .feature-card .card-body {
 			gap: var(--space-2xs);
 		}
 
-		.sound-row--with-cards .feature-card .card-value {
+		.sound-row--with-cards .sr-col--hears .feature-card .card-value {
 			font-size: var(--text-lg);
 		}
 
-		.sound-row--with-cards .feature-card .card-bar {
-			height: 4px;
+		.sound-row--with-cards .sr-col--hears .feature-card .card-bar {
+			height: var(--space-xs);
 			margin-top: 0;
 		}
 
-		.sound-row--with-cards .feature-card .card-detail {
+		.sound-row--with-cards .sr-col--hears .feature-card .card-detail {
 			margin-top: var(--space-2xs);
+		}
+
+		/* Sets panel fills to the SAME block height as the waveform + stat cards, so
+		   the row reads as three balanced, equal-height panels (rather than a short
+		   card marooned at the top with dead space below). It still grows past this
+		   if the track is in many sets. */
+		.sound-row--with-cards .sr-col--sets :global(.sets-card) {
+			min-height: var(--waveform-block-h);
 		}
 	}
 
@@ -913,7 +950,7 @@
 		padding: var(--space-2xl);
 		text-align: center;
 		font-size: var(--text-base);
-		color: var(--text-secondary);
+		color: var(--text-2);
 	}
 
 	/* Error state (content-conventions §5): a calm "what happened" headline plus a
@@ -934,31 +971,17 @@
 	.error-detail {
 		margin: 0;
 		font-size: var(--text-sm);
-		color: var(--text-dim);
+		color: var(--text-4);
 	}
 
 	.no-data code {
-		background: var(--bg-tertiary);
+		background: var(--surface-3);
 		padding: var(--space-2xs) var(--space-sm);
 		border-radius: var(--radius-xs);
 		font-size: var(--text-sm);
 	}
 
-	/* ── What Kiku Hears ── */
-
-	.kiku-hears {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-lg);
-	}
-
-	.section-title {
-		font-size: var(--text-sm);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		color: var(--text-secondary);
-		margin: 0;
-	}
+	/* ── What Kiku Hears — the stat cards (the eyebrow now lives in the .sr-col). ── */
 
 	.feature-cards {
 		display: grid;
@@ -968,16 +991,16 @@
 
 	.feature-card {
 		display: flex;
-		gap: 14px;
-		padding: var(--space-xl) 18px;
-		background: var(--bg-secondary);
-		border-radius: 10px;
-		border: 1px solid var(--border);
+		gap: var(--space-lg);
+		padding: var(--space-xl);
+		background: var(--surface-2);
+		border-radius: var(--radius-lg);
+		border: var(--space-px) solid var(--border-subtle);
 		transition: border-color var(--dur-fast) var(--ease-standard);
 	}
 
 	.feature-card:hover {
-		border-color: var(--text-dim);
+		border-color: var(--text-4);
 	}
 
 	.card-icon {
@@ -1004,35 +1027,37 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-sm);
+		gap: var(--space-xs);
 	}
 
 	.card-label {
 		font-size: var(--text-xs);
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
-		color: var(--text-dim);
+		color: var(--text-4);
 		font-weight: var(--font-weight-medium);
 	}
 
+	/* The big % is the focal point: large, tabular, primary-text. */
 	.card-value {
-		font-size: 22px;
-		font-weight: 700;
+		font-size: var(--text-2xl);
+		font-weight: var(--font-weight-semibold);
 		font-variant-numeric: tabular-nums;
-		color: var(--text-primary);
+		color: var(--text-1);
 		line-height: 1;
 	}
 
 	.card-unit {
 		font-size: var(--text-base);
-		font-weight: 400;
-		color: var(--text-dim);
-		margin-left: 1px;
+		font-weight: var(--font-weight-regular);
+		color: var(--text-4);
+		margin-left: var(--space-px);
 	}
 
+	/* Thin full-width meter — subordinate to the value. */
 	.card-bar {
-		height: 5px;
-		background: var(--bg-tertiary);
+		height: var(--space-xs);
+		background: var(--surface-3);
 		border-radius: var(--radius-xs);
 		overflow: hidden;
 		margin-top: var(--space-xs);
@@ -1049,9 +1074,9 @@
 
 	.card-detail {
 		display: flex;
-		gap: 10px;
+		gap: var(--space-md);
 		font-size: var(--text-xs);
-		color: var(--text-dim);
+		color: var(--text-4);
 		font-variant-numeric: tabular-nums;
 		margin-top: var(--space-xs);
 	}
