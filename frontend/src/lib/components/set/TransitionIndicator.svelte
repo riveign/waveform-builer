@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TransitionScoreBreakdown } from '$lib/types';
 	import { getTransition } from '$lib/api/sets';
+	import { harmonicMove } from '$lib/utils/camelot';
 
 	interface Props {
 		fromTrackId: number;
@@ -12,15 +13,41 @@
 		transitionIndex: number;
 		active?: boolean;
 		onclick?: (index: number) => void;
+		keyA?: string | null;
+		keyB?: string | null;
+		bpmA?: number | null;
+		bpmB?: number | null;
+		energyA?: number | null;
+		energyB?: number | null;
+		prevEnergyDelta?: number | null;
 	}
 
-	let { fromTrackId, toTrackId, score, analysisScore, teachingMoment, setId, transitionIndex, active = false, onclick }: Props = $props();
+	let {
+		fromTrackId,
+		toTrackId,
+		score,
+		analysisScore,
+		teachingMoment,
+		setId,
+		transitionIndex,
+		active = false,
+		onclick,
+		keyA = null,
+		keyB = null,
+		bpmA = null,
+		bpmB = null,
+		energyA = null,
+		energyB = null,
+		prevEnergyDelta = null,
+	}: Props = $props();
 
 	let loading = $state(false);
 	let breakdown = $state<TransitionScoreBreakdown | null>(null);
 	let error = $state<string | null>(null);
+	let expanded = $state(false);
+
 	let builderScore = $derived(breakdown?.total ?? score ?? null);
-	let displayScore = $derived(analysisScore ?? builderScore);
+	let ctxScore = $derived(analysisScore ?? builderScore);
 	let hasDualScores = $derived(analysisScore != null && builderScore != null);
 
 	function scoreColor(s: number): string {
@@ -36,6 +63,37 @@
 		if (s >= 0.4) return 'Fair';
 		return 'Poor';
 	}
+
+	// ── Mechanics ──
+	let move = $derived(harmonicMove(keyA, keyB));
+	let bpmDelta = $derived(bpmA != null && bpmB != null ? Math.round(bpmB - bpmA) : null);
+	let energyDelta = $derived(energyA != null && energyB != null ? energyB - energyA : null);
+	let energyArrow = $derived(
+		energyDelta == null ? '→' : energyDelta > 0.05 ? '↑' : energyDelta < -0.05 ? '↓' : '→',
+	);
+
+	// Two-score copy — narrowed inside the closure so no non-null assertions are needed.
+	let dualCopy = $derived.by(() => {
+		if (analysisScore != null && builderScore != null) {
+			return `On their own ${builderScore.toFixed(2)} · In your arc ${analysisScore.toFixed(2)}`;
+		}
+		return null;
+	});
+
+	// ── Noteworthy gate (Research Q4) ──
+	let divergence = $derived(
+		analysisScore != null && builderScore != null ? Math.abs(analysisScore - builderScore) : 0,
+	);
+	let energyInflection = $derived(
+		energyDelta != null &&
+			(Math.abs(energyDelta) >= 0.15 ||
+				(prevEnergyDelta != null &&
+					prevEnergyDelta !== 0 &&
+					energyDelta !== 0 &&
+					Math.sign(energyDelta) !== Math.sign(prevEnergyDelta))),
+	);
+	let noteworthy = $derived(move !== 'hold' || divergence >= 0.15 || energyInflection);
+	let showNote = $derived(noteworthy && !!teachingMoment);
 
 	async function fetchBreakdown() {
 		if (breakdown || loading) return;
@@ -55,58 +113,91 @@
 		onclick?.(transitionIndex);
 	}
 
-	// Lazy-fetch breakdown if no pre-computed score is provided
+	function toggleExpanded(e: MouseEvent) {
+		e.stopPropagation();
+		expanded = !expanded;
+		if (expanded) fetchBreakdown();
+	}
+
+	// Preserve prior behavior: lazy-fetch the breakdown when no pre-computed score exists.
 	$effect(() => {
 		if (score == null && !breakdown && !loading && !error) {
 			fetchBreakdown();
 		}
 	});
 
-	let tooltipDimensions = $derived(
-		breakdown
-			? [
-					`Harmonic: ${breakdown.harmonic.toFixed(2)}`,
-					`Energy: ${breakdown.energy_fit.toFixed(2)}`,
-					`BPM: ${breakdown.bpm_compat.toFixed(2)}`,
-					`Genre: ${breakdown.genre_coherence.toFixed(2)}`,
-					`Quality: ${breakdown.track_quality.toFixed(2)}`,
-				].join(' | ')
-			: null
-	);
+	type NumDim = 'harmonic' | 'energy_fit' | 'bpm_compat' | 'genre_coherence' | 'track_quality';
+	const DIMS: { key: NumDim; label: string; weight: string }[] = [
+		{ key: 'harmonic', label: 'Harmonic', weight: '25%' },
+		{ key: 'energy_fit', label: 'Energy fit', weight: '20%' },
+		{ key: 'bpm_compat', label: 'BPM', weight: '20%' },
+		{ key: 'genre_coherence', label: 'Genre', weight: '15%' },
+		{ key: 'track_quality', label: 'Quality', weight: '20%' },
+	];
 </script>
 
 <div class="transition-indicator" class:active>
-	<button
-		class="indicator-bar"
-		style="--score-color: {displayScore != null ? scoreColor(displayScore) : 'var(--border)'}"
-		onclick={handleClick}
-		title={tooltipDimensions ?? (loading ? 'Loading...' : 'Click to inspect transition')}
-	>
-		<div class="score-fill"></div>
-		<span class="score-text">
-			{#if loading && displayScore == null}
-				...
-			{:else if displayScore != null}
-				{#if hasDualScores}
-					<span class="builder-score" style="color: {scoreColor(builderScore!)}">
-						<span class="score-label">build</span>{builderScore!.toFixed(2)}
-					</span>
-					<span class="score-separator">/</span>
-					<span class="analysis-score" style="color: {scoreColor(analysisScore!)}">
-						{analysisScore!.toFixed(2)}<span class="score-label">ctx</span>
-					</span>
-				{:else}
-					<span>{displayScore.toFixed(2)}</span>
-				{/if}
-				<span class="score-quality">{scoreLabel(displayScore)}</span>
-				{#if teachingMoment}
-					<span class="teaching-moment">{teachingMoment}</span>
-				{/if}
-			{:else if error}
-				--
+	<div class="strip-row">
+		<button
+			class="strip"
+			style="--score-color: {ctxScore != null ? scoreColor(ctxScore) : 'var(--border)'}"
+			onclick={handleClick}
+		>
+			<span class="score-fill"></span>
+			{#if ctxScore != null}
+				<span class="verdict" style="color: {scoreColor(ctxScore)}; border-color: {scoreColor(ctxScore)}">
+					{scoreLabel(ctxScore)}
+				</span>
+				<span class="scores">
+					{#if dualCopy}{dualCopy}{:else}{ctxScore.toFixed(2)}{/if}
+				</span>
+			{:else if loading}
+				<span class="scores">...</span>
+			{:else}
+				<span class="scores">--</span>
 			{/if}
-		</span>
-	</button>
+
+			<span class="mechanics">
+				<span class="mech mech-move" data-move={move}>{move}</span>
+				{#if bpmDelta != null}
+					<span class="mech mech-bpm">{bpmDelta > 0 ? '+' : bpmDelta < 0 ? '−' : ''}{Math.abs(bpmDelta)} BPM</span>
+				{/if}
+				<span class="mech mech-energy">{energyArrow}</span>
+			</span>
+		</button>
+		<button
+			class="expand-btn"
+			onclick={toggleExpanded}
+			aria-expanded={expanded}
+			aria-label={expanded ? 'Hide the math' : 'Show the math'}
+		>
+			{expanded ? '▴' : '▾'}
+		</button>
+	</div>
+
+	{#if showNote}
+		<div class="note">{teachingMoment}</div>
+	{/if}
+
+	{#if expanded}
+		<div class="breakdown">
+			{#if loading}
+				<span class="breakdown-status">Reading the math...</span>
+			{:else if error}
+				<span class="breakdown-status">Couldn't load the breakdown — try again.</span>
+			{:else if breakdown}
+				{#each DIMS as dim (dim.key)}
+					{@const v = breakdown[dim.key]}
+					<div class="dim-row">
+						<span class="dim-label">{dim.label}</span>
+						<span class="dim-weight">{dim.weight}</span>
+						<span class="dim-bar"><span class="dim-fill" style="width: {v * 100}%; background: {scoreColor(v)}"></span></span>
+						<span class="dim-val">{v.toFixed(2)}</span>
+					</div>
+				{/each}
+			{/if}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -115,28 +206,36 @@
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
+		gap: 3px;
 	}
 
-	.indicator-bar {
+	.strip-row {
+		display: flex;
+		align-items: stretch;
+		gap: 4px;
+	}
+
+	.strip {
+		flex: 1;
 		display: flex;
 		align-items: center;
-		justify-content: center;
+		gap: 8px;
 		position: relative;
-		height: 24px;
+		height: 26px;
+		padding: 0 10px;
 		border: none;
-		border-radius: 12px;
+		border-radius: 13px;
 		background: var(--bg-tertiary);
 		cursor: pointer;
 		overflow: hidden;
 		transition: box-shadow 0.15s;
-		padding: 0;
 	}
 
-	.indicator-bar:hover {
+	.strip:hover {
 		box-shadow: 0 0 0 1px var(--score-color);
 	}
 
-	.active .indicator-bar {
+	.active .strip {
 		box-shadow: 0 0 0 2px var(--accent, var(--score-color));
 	}
 
@@ -144,62 +243,138 @@
 		position: absolute;
 		inset: 0;
 		background: var(--score-color);
-		opacity: 0.2;
+		opacity: 0.12;
+		pointer-events: none;
 	}
 
-	.score-text {
+	.verdict {
+		position: relative;
+		z-index: 1;
+		font-size: 9px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.4px;
+		padding: 1px 6px;
+		border: 1px solid;
+		border-radius: 8px;
+		flex-shrink: 0;
+	}
+
+	.scores {
 		position: relative;
 		z-index: 1;
 		font-size: 11px;
-		font-weight: 600;
+		font-weight: 500;
+		color: var(--text-secondary);
 		font-variant-numeric: tabular-nums;
-		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.mechanics {
+		position: relative;
+		z-index: 1;
+		margin-left: auto;
 		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+
+	.mech {
+		font-size: 10px;
+		font-weight: 600;
+		color: var(--text-secondary);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.mech-move {
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+	}
+
+	.mech-move[data-move='lift'] { color: var(--energy-mid); }
+	.mech-move[data-move='switch'] { color: var(--energy-high); }
+	.mech-move[data-move='clash'] { color: var(--score-poor); }
+
+	.mech-energy {
+		font-size: 12px;
+	}
+
+	.expand-btn {
+		flex-shrink: 0;
+		width: 22px;
+		border: none;
+		background: var(--bg-tertiary);
+		color: var(--text-dim);
+		border-radius: 11px;
+		cursor: pointer;
+		font-size: 10px;
+	}
+
+	.expand-btn:hover {
+		color: var(--text-primary);
+		background: var(--bg-hover);
+	}
+
+	.note {
+		font-size: 11px;
+		line-height: 1.35;
+		color: var(--text-secondary);
+		padding: 2px 10px;
+	}
+
+	.breakdown {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 6px 10px;
+		background: var(--bg-secondary);
+		border-radius: 8px;
+	}
+
+	.breakdown-status {
+		font-size: 11px;
+		color: var(--text-dim);
+	}
+
+	.dim-row {
+		display: grid;
+		grid-template-columns: 72px 34px 1fr 34px;
 		align-items: center;
 		gap: 6px;
 	}
 
-	.builder-score,
-	.analysis-score {
-		display: flex;
-		align-items: center;
-		gap: 3px;
+	.dim-label {
 		font-size: 11px;
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
+		color: var(--text-secondary);
 	}
 
-	.score-label {
-		font-size: 8px;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
-		opacity: 0.6;
-	}
-
-	.score-separator {
+	.dim-weight {
 		font-size: 9px;
 		color: var(--text-dim);
-		opacity: 0.3;
-		margin: 0 1px;
+		text-align: right;
 	}
 
-	.score-quality {
-		font-size: 10px;
-		font-weight: 400;
-		color: var(--text-secondary);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.teaching-moment {
-		font-size: 10px;
-		font-weight: 400;
-		color: var(--text-dim);
-		margin-left: 4px;
-		white-space: nowrap;
+	.dim-bar {
+		height: 5px;
+		background: var(--bg-tertiary);
+		border-radius: 3px;
 		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 300px;
+	}
+
+	.dim-fill {
+		display: block;
+		height: 100%;
+		border-radius: 3px;
+	}
+
+	.dim-val {
+		font-size: 11px;
+		font-weight: 600;
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+		color: var(--text-primary);
 	}
 </style>

@@ -15,11 +15,18 @@
 	import Menu from '$lib/components/primitives/Menu.svelte';
 	import MenuItem from '$lib/components/primitives/MenuItem.svelte';
 	import MenuSeparator from '$lib/components/primitives/MenuSeparator.svelte';
+	import SegmentedControl, { type SegmentOption } from '$lib/components/primitives/SegmentedControl.svelte';
+	import type { SetViewMode } from '$lib/stores/ui.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
 
 	const ui = getUiStore();
+
+	const viewOptions: SegmentOption<SetViewMode>[] = [
+		{ value: 'list', label: 'List' },
+		{ value: 'grid', label: 'Grid' },
+	];
 	const pb = getPlaybackStore();
 	const player = getPlayerStore();
 
@@ -422,6 +429,20 @@
 						<Button variant="secondary" size="sm" onclick={() => pb.startExpress(selectedSet!.id, waveformTracks)} disabled={pb.isActive}>
 							Express
 						</Button>
+					</div>
+				{/if}
+
+				<!-- View: list vs grid — scan the whole set's key/energy field at a glance -->
+				{#if waveformTracks.length >= 1}
+					<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
+					<div class="tool-group">
+						<SegmentedControl
+							options={viewOptions}
+							value={ui.setViewMode}
+							onchange={(v) => (ui.setViewMode = v)}
+							ariaLabel="Set view"
+							dense
+						/>
 					</div>
 				{/if}
 

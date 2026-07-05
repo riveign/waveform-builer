@@ -208,6 +208,26 @@ export function keyMoveLabel(
 	return { label: 'distant keys', score: 0.3 };
 }
 
+/**
+ * Classify the harmonic move between two keys in the strip/grid vocabulary:
+ * hold (same key), lift (±1 on the wheel, same mode), switch (relative
+ * major/minor), clash (distant or unparseable). Pure — classified client-side
+ * because the backend only gives a numeric harmonic score. Reuses parseCamelot.
+ */
+export function harmonicMove(
+	a: string | null | undefined,
+	b: string | null | undefined,
+): 'hold' | 'lift' | 'switch' | 'clash' {
+	const ka = parseCamelot(a);
+	const kb = parseCamelot(b);
+	if (!ka || !kb) return 'clash';
+	if (ka.number === kb.number && ka.letter === kb.letter) return 'hold';
+	const wrap = (n: number) => ((n - 1 + 12) % 12) + 1;
+	if (ka.letter === kb.letter && (kb.number === wrap(ka.number + 1) || kb.number === wrap(ka.number - 1))) return 'lift';
+	if (ka.number === kb.number && ka.letter !== kb.letter) return 'switch';
+	return 'clash';
+}
+
 export interface HarmonicRelationship {
 	type: 'same' | 'adjacent' | 'modeSwitch' | 'adjacentMode' | 'twoAway' | 'clash' | 'unknown';
 	score: number;

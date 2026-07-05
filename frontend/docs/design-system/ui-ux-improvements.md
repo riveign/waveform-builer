@@ -63,6 +63,30 @@ ui-ux-pro-max UX pass PASS, Playwright visual LOOKS GOOD.
   svelte-check 336 files / 0 errors / 0 warnings, production build clean; sentinel review
   caught one BLOCKER (roving selector matched nested card buttons) — fixed before commit.
 
+- **Track view redesign — taller Related card + three-column top region.** The Related
+  tracks grid dropped from 6-up (which crushed the card into its compact-pill tier) to
+  **4-up × 2 rows** (8 visible), rendering a new taller, horizontal
+  **`library/RelatedTrackCard.svelte`** with a prominent artwork and roomy three-row body
+  (identity · comparative chips · signals).
+  It reuses the shared shell's vocabulary (`capFirst` / `scoreStrength` + the same
+  primitives/camelot utils) rather than duplicating scoring. The top of the track view became
+  **three columns** — waveform (priority ~2.2fr) · What Kiku Hears · **Sets featuring this
+  track** (moved up from the page bottom, top-aligned at natural height) — reflowing to
+  waveform-full + two panels, then fully stacked, as the pane narrows. **Sets featuring** was
+  also reworked (`SetAppearances.svelte`): it no longer collapses — it loads on track change
+  and is **always visible**, rendering the appearances as an always-on list (set name · position)
+  when populated, and an **inviting empty state** ("Not in a set yet" + an **Add to a set** CTA
+  that opens `AddToSetPicker`, which offers both existing sets and **+ New set**) when the track
+  is in none. Migrated off the last pre-design-system tokens onto the semantic layer. **Title
+  hierarchy:** the three top-region columns now share one consistent section eyebrow
+  (`WAVEFORM` · `WHAT KIKU HEARS` · `IN YOUR SETS`) on a single baseline — the Sets title moved
+  out of its card to match the others — and the stat cards were tightened (prominent value,
+  thin meter, muted In/Body/Out). The old
+  `library/SimilarTrackCard.svelte` wrapper was deleted (no callers); `TrackCard`'s `related`
+  arm is retained but no longer wired here. Design system: `/design-system` showcase updated
+  and a new [`related-track-card.md`](./related-track-card.md) spec added. Validation:
+  svelte-check 336 files / 0 errors / 0 warnings.
+
 ---
 
 ## 1. Hygiene / cleanup
