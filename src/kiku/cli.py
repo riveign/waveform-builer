@@ -492,6 +492,7 @@ def artist_picks_cmd(set_name_or_id: str, artist: str, num: int):
 )
 @click.option(
     "--keys",
+    "--allowed-keys",
     "allowed_keys",
     default=None,
     help="Comma-separated Camelot keys to hard-filter candidates (advanced override)",

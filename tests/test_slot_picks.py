@@ -103,6 +103,19 @@ def test_allowed_keys_hard_filter():
     assert {p.track.id for p in picks} == {10, 12}
 
 
+def test_all_invalid_allowed_keys_returns_empty_not_unfiltered():
+    # Explicit keys that don't parse must NOT silently disable the filter — the
+    # DJ gets a warm empty result, never the whole library dressed up as filtered.
+    in_set = [_track(1, key="8A"), _track(2, key="8A"), _track(3, key="8A")]
+    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
+    pool = [_track(10, key="9A"), _track(11, key="8B")]
+    session = _make_session(s, pool)
+    picks = rank_slot_picks(
+        session, 1, 1, "replace", "hold", allowed_keys={"Hmm", "xyz"}
+    )
+    assert picks == []
+
+
 def test_energy_shift_reranks():
     # Two candidates identical but for energy zone; the shift decides the order.
     in_set = [_track(1, key="8A"), _track(2, key="8A"), _track(3, key="8A")]
