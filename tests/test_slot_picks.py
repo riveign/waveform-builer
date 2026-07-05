@@ -144,6 +144,55 @@ def test_no_caveat_when_both_sides_clean():
     assert picks[0].caveat is None
 
 
+def test_move_string_never_calls_a_clash_clean():
+    # `hold` suppresses the caveat, but the move copy must stay honest: prev 8A,
+    # next 5A is an 8A→5A clash (0.2). A candidate 8A must NOT be described as
+    # mixing "clean" into 5A — the exact dishonesty the feature forbids.
+    in_set = [_track(1, key="8A"), _track(2, key="8A"), _track(3, key="5A")]
+    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
+    pool = [_track(10, key="8A")]
+    session = _make_session(s, pool)
+    picks = rank_slot_picks(session, 1, 1, "replace", "hold")
+    assert len(picks) == 1
+    assert picks[0].caveat is None  # hold never trips the caveat
+    assert "clean" not in picks[0].move
+    assert "5A" in picks[0].move
+
+
+def test_move_string_reports_clean_when_outgoing_holds():
+    # prev 8A, next 8A; candidate 8A mixes into 8A at 1.0 — genuinely clean.
+    in_set = [_track(1, key="8A"), _track(2, key="8A"), _track(3, key="8A")]
+    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
+    pool = [_track(10, key="8A")]
+    session = _make_session(s, pool)
+    picks = rank_slot_picks(session, 1, 1, "replace", "hold")
+    assert len(picks) == 1
+    assert "mixes into 8A clean" in picks[0].move
+
+
+def test_keyless_successor_never_reported_clean():
+    # A keyless successor scores 0.5 neutral (< clean) — the move copy must not
+    # promise "clean" over an unknown blend, and nothing may crash.
+    in_set = [_track(1, key="8A"), _track(2, key="8A"), _track(3, key=None)]
+    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
+    pool = [_track(10, key="8A")]
+    session = _make_session(s, pool)
+    picks = rank_slot_picks(session, 1, 1, "replace", "hold")
+    assert len(picks) == 1
+    assert "clean" not in picks[0].move
+
+
+def test_keyless_candidate_dropped_under_key_filter():
+    # With an active allowed_keys filter, a candidate with no parseable key
+    # can't be proven compatible and must be dropped.
+    in_set = [_track(1, key="8A"), _track(2, key="8A"), _track(3, key="8A")]
+    s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
+    pool = [_track(10, key=None), _track(11, key="9A")]
+    session = _make_session(s, pool)
+    picks = rank_slot_picks(session, 1, 1, "replace", "hold", allowed_keys={"9A"})
+    assert {p.track.id for p in picks} == {11}
+
+
 def test_end_slot_single_neighbor():
     # Insert at the last slot → prev = last track, next = None (one neighbor).
     in_set = [_track(1, key="8A"), _track(2, key="8A")]

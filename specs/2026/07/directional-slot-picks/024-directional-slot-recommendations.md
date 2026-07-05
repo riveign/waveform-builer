@@ -1806,3 +1806,11 @@ Adversarial post-hoc review (branch `spec-024-review`, code already on `main`). 
 - **`allowed_keys` normalization + override** (`slot_picks.py:193-197, :218-221`): `parse_camelot`→`camelot_str` round-trip makes `"8a"`, `"Am"` and `"8A"` all match; explicit keys override (not intersect) the intent-derived set, per spec.
 - **Energy shift** (`slot_picks.py:187-188`): explicit `energy_delta` overrides the intent's shift and the shifted target is clamped to `[0,1]`; `test_energy_shift_reranks` covers direction.
 - **DB access pattern**: raw SQLAlchemy (no `handlePromise`) matches the existing `get_replacements`/`artist_picks` Python convention — the handlePromise guidance is the TS/backend rule, not applicable here. Frontend `AddSlotPicksPanel.svelte` uses no `as`/`!`, warm never-blame copy, no banned words.
+
+### Resolution (applied post-review, branch `spec-024-review`)
+
+- **#1 (must-fix) — FIXED.** `_build_move` (`slot_picks.py:132-140`) now recomputes `h_out = harmonic_score(cand.key, nxt.key)` and only emits "mixes into {next} clean" when `h_out >= CLEAN_THRESHOLD`; otherwise it says "the blend into {next} is a stretch." The `hold` default and explicit-key paths can no longer label a clash clean.
+- **#2 (should-fix) — CLOSED.** Added `test_move_string_never_calls_a_clash_clean` (8A→5A `hold` clash asserts no "clean") and `test_move_string_reports_clean_when_outgoing_holds` (8A→8A asserts "clean") in `tests/test_slot_picks.py`.
+- **#3 (should-fix) — CLOSED.** Added `test_keyless_successor_never_reported_clean` and `test_keyless_candidate_dropped_under_key_filter` — locks the keyless-neighbour honesty guard and the keyless-candidate drop under an active filter.
+- **#4–#7 (nits) — ACCEPTED / backlogged.** Not fixed here: #4 all-invalid `allowed_keys` silent no-op (echo raw vs resolved keys), #5 alt names a move the pool may lack a track for (teaching-acceptable per spec), #6 "pulls back toward it" dangling referent (voice), #7 `--keys` naming drift + endpoint double-loads the set (minor duplicate query). Candidates for a follow-up polish pass, none behaviour-critical.
+- Full backend suite **410 passed** (was 406; +2 move-string, +2 keyless), svelte-check unaffected.

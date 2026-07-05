@@ -132,7 +132,13 @@ def _build_move(prev, cand, nxt, intent: str, energy_shift: float, caveat: str |
     if caveat:
         return f"{head} ({shift} energy) — see the caveat below."
     if nxt is not None:
-        return f"{head}, {shift} energy, mixes into {nxt.key} clean."
+        # Only promise a clean blend when the outgoing side actually holds up.
+        # The caveat is suppressed for `hold` and for already-unclean incoming
+        # sides, so this claim must be checked here — never call a clash clean.
+        h_out = harmonic_score(cand.key, nxt.key)
+        if h_out >= CLEAN_THRESHOLD:
+            return f"{head}, {shift} energy, mixes into {nxt.key} clean."
+        return f"{head}, {shift} energy — the blend into {nxt.key} is a stretch."
     return f"{head}, {shift} energy."
 
 
