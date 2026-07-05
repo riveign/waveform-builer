@@ -2,9 +2,11 @@
 	import { dndzone } from 'svelte-dnd-action';
 	import type { SetTrack, SetWaveformTrack, SetAnalysis } from '$lib/types';
 	import { getUiStore } from '$lib/stores/ui.svelte';
+	import { parseCamelot } from '$lib/utils/camelot';
 	import { reorderSetTracks, removeTrackFromSet, addTrackToSet } from '$lib/api/sets';
 	import SetTrackCard from './SetTrackCard.svelte';
 	import TransitionIndicator from './TransitionIndicator.svelte';
+	import SetCardGrid from './SetCardGrid.svelte';
 	import ReplaceTrackModal from './ReplaceTrackModal.svelte';
 	import InSetTrackSearch from './InSetTrackSearch.svelte';
 
@@ -75,6 +77,29 @@
 	}
 
 	let energyTargets = $derived(computeEnergyTargets(energyProfile, items.length));
+
+	// Normalized energy per position — feeds the transition energy arrow + inflection gate.
+	let energyNorms = $derived(items.map((it) => getTrackEnergyNumeric(it.energy_value, it.energy)));
+
+	function deltaOf(a: number | null, b: number | null): number | null {
+		return a != null && b != null ? a - b : null;
+	}
+
+	/** Start indices of maximal runs of ≥3 consecutive tracks sharing a Camelot key. */
+	let runStartIndices = $derived.by(() => {
+		const starts = new Set<number>();
+		let start = 0;
+		for (let i = 1; i <= items.length; i++) {
+			const a = parseCamelot(items[i - 1]?.key);
+			const b = i < items.length ? parseCamelot(items[i]?.key) : null;
+			const same = !!a && !!b && a.number === b.number && a.letter === b.letter;
+			if (!same) {
+				if (i - start >= 3) starts.add(start);
+				start = i;
+			}
+		}
+		return starts;
+	});
 
 	/** Map transition position → analysis data (from set analysis) */
 	let analysisMap = $derived.by(() => {
@@ -179,6 +204,9 @@
 			{/if}
 		</div>
 	{:else}
+		{#if ui.setViewMode === 'grid'}
+			<SetCardGrid tracks={items} {energyTargets} {analysis} />
+		{:else}
 		<div class="timeline-content">
 			<!-- Energy sidebar -->
 			<div class="energy-sidebar" aria-label="Energy profile">
@@ -215,6 +243,9 @@
 				onfinalize={handleFinalize}
 			>
 				{#each items as item, i (item.id)}
+					{#if runStartIndices.has(i)}
+						<div class="run-banner">The story here is energy, not key</div>
+					{/if}
 					<div class="track-slot">
 						<div class="card-row">
 							<div class="drag-handle" aria-label="Drag to reorder">
@@ -288,6 +319,13 @@
 									score={items[i + 1].transition_score ?? undefined}
 									analysisScore={analysisMap.get(i)?.score}
 									teachingMoment={analysisMap.get(i)?.teaching}
+									keyA={item.key}
+									keyB={items[i + 1].key}
+									bpmA={item.bpm}
+									bpmB={items[i + 1].bpm}
+									energyA={energyNorms[i]}
+									energyB={energyNorms[i + 1]}
+									prevEnergyDelta={i > 0 ? deltaOf(energyNorms[i], energyNorms[i - 1]) : null}
 									{setId}
 									transitionIndex={i}
 								active={activeTransitionIndex === i}
@@ -299,6 +337,7 @@
 				{/each}
 			</div>
 		</div>
+		{/if}
 
 		{#if dropActive || dropAdding}
 			<div class="drop-indicator">
@@ -440,6 +479,32 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
+		position: relative;
+	}
+
+	/* Faint energy-ramp spine down the row gutter — the set as one continuous flow. */
+	.track-list::before {
+		content: '';
+		position: absolute;
+		left: -11px;
+		top: 4px;
+		bottom: 4px;
+		width: 2px;
+		border-radius: 1px;
+		background: linear-gradient(var(--energy-low), var(--energy-mid), var(--energy-high));
+		opacity: 0.18;
+		pointer-events: none;
+	}
+
+	.run-banner {
+		margin: 4px 0 6px;
+		padding: 4px 10px;
+		font-size: 11px;
+		font-weight: 500;
+		color: var(--text-secondary);
+		background: color-mix(in srgb, var(--energy-mid) 10%, transparent);
+		border-left: 2px solid var(--energy-mid);
+		border-radius: 3px;
 	}
 
 	.track-slot {

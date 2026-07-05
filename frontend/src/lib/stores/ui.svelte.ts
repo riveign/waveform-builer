@@ -1,13 +1,13 @@
 import type { Track, SetAnalysis } from '$lib/types';
 
 export type Tab = 'track' | 'set' | 'dna' | 'tinder' | 'hunt' | 'albums';
-export type TimelineViewMode = 'linear' | 'staircase';
+export type SetViewMode = 'list' | 'grid';
 
 let activeTab = $state<Tab>('track');
 let selectedTrack = $state<Track | null>(null);
 let selectedSetId = $state<number | null>(null);
 let selectedTrackInSet = $state<number | null>(null);
-let timelineViewMode = $state<TimelineViewMode>('linear');
+let setViewMode = $state<SetViewMode>('list');
 let playingTrackId = $state<number | null>(null);
 let pendingAnalysis = $state<SetAnalysis | null>(null);
 /** Bumped to ask the page to open the Build a Set dialog (decouples the trigger from the dialog owner). */
@@ -23,8 +23,8 @@ export function getUiStore() {
 		set selectedSetId(v: number | null) { selectedSetId = v; },
 		get selectedTrackInSet() { return selectedTrackInSet; },
 		set selectedTrackInSet(v: number | null) { selectedTrackInSet = v; },
-		get timelineViewMode() { return timelineViewMode; },
-		set timelineViewMode(v: TimelineViewMode) { timelineViewMode = v; },
+		get setViewMode() { return setViewMode; },
+		set setViewMode(v: SetViewMode) { setViewMode = v; },
 		get playingTrackId() { return playingTrackId; },
 		set playingTrackId(v: number | null) { playingTrackId = v; },
 		get pendingAnalysis() { return pendingAnalysis; },

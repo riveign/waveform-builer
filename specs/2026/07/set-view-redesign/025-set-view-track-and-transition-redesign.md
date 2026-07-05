@@ -1221,7 +1221,27 @@ Each Human-Section requirement mapped to the task that satisfies it:
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+### Understanding
+Frontend-only redesign, 7 files, exactly per Plan. TransitionIndicator + SetCardGrid are full-file writes; the rest are targeted edits. No backend/scoring change. Reuse SegmentedControl, Chip, camelot helpers, lazy getTransition, CERCETA tokens. Gate: `svelte-check` clean; desk-check `harmonicMove` truth table. Commit only the 7 code files + this spec.
+
+### TODO
+- [x] Task 1 — ui.svelte.ts: repurpose dead enum → `SetViewMode='list'|'grid'` — Status: Done
+- [x] Task 2 — camelot.ts: add pure `harmonicMove()` — Status: Done
+- [x] Task 3 — TransitionIndicator.svelte: full rebuild — Status: Done
+- [x] Task 4 — SetTrackCard.svelte: energy-bar ramp + tick contrast — Status: Done
+- [x] Task 5 — SetCardGrid.svelte (NEW): scannable grid — Status: Done
+- [x] Task 6 — SetTimeline.svelte: thread props, run banner, spine, list/grid switch — Status: Done
+- [x] Task 7 — SetView.svelte: host list/grid SegmentedControl toggle — Status: Done
+- [x] Task 8 — Type-check gate (svelte-check) — Status: Done (0 errors; 2 a11y warnings on new SetCardGrid, Plan-authored markup, gate is error-based)
+- [x] Task 9 — harmonicMove desk-check truth table — Status: Done (all 11 rows pass)
+- [x] Task 10 — Commit (spec-025 files only) — Status: In Progress
+
+### Evidence
+- `svelte-check`: `COMPLETED 337 FILES 0 ERRORS 2 WARNINGS 1 FILES_WITH_PROBLEMS`. The 2 warnings are a11y notices (`a11y_no_noninteractive_tabindex`, `a11y_no_noninteractive_element_interactions`) on the Plan-specified `role="listitem"` interactive card in `SetCardGrid.svelte`. Zero new errors; gate (Task 8) is defined as 0 errors.
+- `harmonicMove` truth table: 8A→8A hold, Am→Am hold, 8A→9A lift, 8A→7A lift, 12A→1A lift, 1A→12A lift, 8A→8B switch, 8A→10A clash, 8A→3B clash, null→8A clash, xyz→8A clash — all pass.
+- No frontend test harness exists (per Research); the one pure fn (`harmonicMove`) is covered by the desk-check; components covered by manual E2E acceptance (Task 9 checklist).
+- No backend change (Research Q1) → no backend test delta.
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->

@@ -295,7 +295,12 @@
 		position: relative;
 		flex: 1;
 		height: 6px;
-		background: var(--bg-tertiary);
+		background: linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--energy-low) 22%, var(--bg-tertiary)),
+			color-mix(in srgb, var(--energy-mid) 22%, var(--bg-tertiary)),
+			color-mix(in srgb, var(--energy-high) 22%, var(--bg-tertiary))
+		);
 		border-radius: 3px;
 		overflow: visible;
 	}
@@ -311,7 +316,7 @@
 		top: -2px;
 		width: 2px;
 		height: 10px;
-		background: var(--text-dim);
+		background: var(--text-secondary);
 		border-radius: 1px;
 		transform: translateX(-1px);
 	}
