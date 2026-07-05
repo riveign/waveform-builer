@@ -1814,3 +1814,12 @@ Adversarial post-hoc review (branch `spec-024-review`, code already on `main`). 
 - **#3 (should-fix) — CLOSED.** Added `test_keyless_successor_never_reported_clean` and `test_keyless_candidate_dropped_under_key_filter` — locks the keyless-neighbour honesty guard and the keyless-candidate drop under an active filter.
 - **#4–#7 (nits) — ACCEPTED / backlogged.** Not fixed here: #4 all-invalid `allowed_keys` silent no-op (echo raw vs resolved keys), #5 alt names a move the pool may lack a track for (teaching-acceptable per spec), #6 "pulls back toward it" dangling referent (voice), #7 `--keys` naming drift + endpoint double-loads the set (minor duplicate query). Candidates for a follow-up polish pass, none behaviour-critical.
 - Full backend suite **410 passed** (was 406; +2 move-string, +2 keyless), svelte-check unaffected.
+
+### Polish pass (applied, branch `spec-024-polish`)
+
+- **#4 — FIXED.** All-invalid explicit `allowed_keys` no longer silently disables the filter. `rank_slot_picks` drops the `or None` collapse so an empty-after-parse filter matches nothing (`slot_picks.py:199-205`); the endpoint canonicalizes keys and echoes the *resolved* set, never raw invalid input (`routes/sets.py`). New `test_all_invalid_allowed_keys_returns_empty_not_unfiltered`.
+- **#5 — FIXED (copy hedge).** The caveat now hedges "the cleanest move here **(if you own one)**…" since `_achievable_alt` names a move, not a guaranteed-owned track (`slot_picks.py:114-118`).
+- **#6 — FIXED.** "pulls back toward **it**" → "pulls back toward **its own key**" (dangling referent).
+- **#7 (naming) — FIXED.** CLI now accepts `--allowed-keys` as an alias of `--keys` (`cli.py:493-499`).
+- **#7 (double-load) — NOT changed (intentional).** The endpoint's `db.get(Set, id)` and the ranker's are the same SQLAlchemy session → the second is an identity-map hit, not a second query; the only duplication is an in-memory sort of a few dozen rows. Adding a pass-through param to dedupe it wasn't worth the complexity (DO NOT OVERCOMPLICATE).
+- Full backend suite **411 passed**; svelte-check 0/0.

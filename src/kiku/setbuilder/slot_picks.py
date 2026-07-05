@@ -112,9 +112,9 @@ def _build_caveat(prev, cand, nxt, intent: str) -> str | None:
         alt_intent, alt_to = alt
         alt_name = _MOVE_NAMES.get(alt_intent, alt_intent)
         return (
-            f"The next track ({nxt.key}) pulls back toward it, so the cleanest "
-            f"move here is a {alt_name} ({prev.key}→{alt_to}), not a full "
-            f"{requested_name}."
+            f"The next track ({nxt.key}) pulls back toward its own key, so the "
+            f"cleanest move here (if you own one) is a {alt_name} "
+            f"({prev.key}→{alt_to}), not a full {requested_name}."
         )
     return (
         f"The next track ({nxt.key}) resists a clean {requested_name} here — "
@@ -197,8 +197,11 @@ def rank_slot_picks(
     # against the PREVIOUS neighbor (mixing OUT of the predecessor is the move).
     prev_key = prev.key if prev else None
     if allowed_keys is not None:
+        # Explicit override, normalized to canonical Camelot. If keys were given
+        # but none parse, keep an EMPTY filter (matches nothing) rather than
+        # silently disabling it — the DJ gets a warm empty result, not the whole
+        # unfiltered library dressed up as if the filter were honoured.
         key_filter = {camelot_str(pc) for k in allowed_keys if (pc := parse_camelot(k))}
-        key_filter = key_filter or None
     else:
         key_filter = intent_allowed_keys(prev_key, intent)
 

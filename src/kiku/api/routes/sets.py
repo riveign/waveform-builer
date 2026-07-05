@@ -1271,7 +1271,7 @@ def get_slot_suggestions(
     owns, each reporting the harmonic move and any caveat when the slot resists
     it. Library excavation only.
     """
-    from kiku.setbuilder.camelot import intent_energy_delta
+    from kiku.setbuilder.camelot import camelot_str, intent_energy_delta, parse_camelot
     from kiku.setbuilder.slot_picks import rank_slot_picks
 
     s = db.get(Set, set_id)
@@ -1290,9 +1290,14 @@ def get_slot_suggestions(
     if position < 0 or position >= len(ordered):
         raise HTTPException(status_code=404, detail="Invalid position")
 
-    keys = None
+    keys: set[str] | None = None
     if allowed_keys:
-        keys = {k.strip() for k in allowed_keys.split(",") if k.strip()} or None
+        raw = [k.strip() for k in allowed_keys.split(",") if k.strip()]
+        if raw:
+            # Canonicalize to Camelot; an all-invalid list stays an empty set
+            # (matches nothing) so the response never echoes a filter it didn't
+            # actually apply.
+            keys = {camelot_str(pc) for k in raw if (pc := parse_camelot(k))}
 
     ranked = rank_slot_picks(
         db, set_id, position, mode, intent,
