@@ -195,7 +195,1027 @@ _All claims below verified by reading the actual code. Type-check gate: `cd fron
 **Expected coverage:** `harmonicMove` fully unit-covered; components covered by manual acceptance (or Vitest component tests if PLAN elects the harness); type-check green. No backend change → no backend test delta.
 
 ## Plan
-<!-- Filled by /spec PLAN -->
+
+_All diffs are anchored to the verified current-state line numbers in Research. Whitespace inside Svelte `{#if}`/`{#each}` control blocks is illustrative (Svelte is whitespace-insensitive there); indentation inside `<script>`/`<style>` uses tabs to match each file. Two files (TransitionIndicator, SetCardGrid) are given as COMPLETE file contents because the change is a rewrite / new file — write the whole file. The rest are targeted diffs. No `as`/`!` assertions anywhere (TypeScript guideline). Type-check gate: `cd frontend && npx svelte-check --tsconfig ./tsconfig.json`._
+
+### Files
+- `frontend/src/lib/stores/ui.svelte.ts`
+  - l.4: rename type `TimelineViewMode`→`SetViewMode`, values `'list'|'grid'`.
+  - l.10: rename state `timelineViewMode`→`setViewMode`, default `'list'`.
+  - l.26-27: rename getter/setter to `setViewMode`.
+- `frontend/src/lib/utils/camelot.ts`
+  - after l.209 (`keyMoveLabel`): add pure `harmonicMove(a,b)` reusing `parseCamelot` + `wrap`.
+- `frontend/src/lib/components/set/TransitionIndicator.svelte`
+  - Full rewrite: add adjacent-track props; two-score copy; CTX-driven verdict pill; mechanics row (`harmonicMove` word + BPM delta + energy arrow); Q4-gated note; expandable 5-dim breakdown from the existing lazy `getTransition`.
+- `frontend/src/lib/components/set/SetTrackCard.svelte`
+  - l.294-317 styles: restyle `.energy-bar-bg` to the `--energy-low→mid→high` ramp; keep `.energy-target-marker` (bump contrast). Markup unchanged.
+- `frontend/src/lib/components/set/SetCardGrid.svelte` (NEW)
+  - Compact card grid: LEFT position badge, incoming-transition color stripe, "from {key} · {relation}" + ctx score, title/artist, Camelot-colored key, BPM, genre `Chip`, energy mini-bar with tick.
+- `frontend/src/lib/components/set/SetTimeline.svelte`
+  - l.4 area: import `parseCamelot`; l.7 area: import `SetCardGrid`.
+  - after l.77: add `energyNorms`, `deltaOf()`, `runStartIndices` derived.
+  - l.181-301 markup: wrap in list/grid switch on `ui.setViewMode`; render run banner; thread adjacent-track props into `TransitionIndicator`.
+  - styles: `.track-list` gutter spine + `.run-banner`.
+- `frontend/src/lib/components/set/SetView.svelte`
+  - l.17 area: import `SegmentedControl` + `SetViewMode`; after l.22: add `viewOptions`.
+  - after l.426: add the list/grid `SegmentedControl` tool-group.
+
+### Tasks
+
+#### Task 1 — ui.svelte.ts: repurpose dead enum to SetViewMode
+File: `frontend/src/lib/stores/ui.svelte.ts`
+Tools: editor
+Description: Rename the unused `TimelineViewMode` enum + state + accessor to `SetViewMode='list'|'grid'`, default `'list'`, in-memory (no localStorage). Nothing reads the old names (Research Q2).
+Diff:
+````diff
+--- a/frontend/src/lib/stores/ui.svelte.ts
++++ b/frontend/src/lib/stores/ui.svelte.ts
+@@
+ export type Tab = 'track' | 'set' | 'dna' | 'tinder' | 'hunt' | 'albums';
+-export type TimelineViewMode = 'linear' | 'staircase';
++export type SetViewMode = 'list' | 'grid';
+@@
+ let selectedTrackInSet = $state<number | null>(null);
+-let timelineViewMode = $state<TimelineViewMode>('linear');
++let setViewMode = $state<SetViewMode>('list');
+ let playingTrackId = $state<number | null>(null);
+@@
+ 		get selectedTrackInSet() { return selectedTrackInSet; },
+ 		set selectedTrackInSet(v: number | null) { selectedTrackInSet = v; },
+-		get timelineViewMode() { return timelineViewMode; },
+-		set timelineViewMode(v: TimelineViewMode) { timelineViewMode = v; },
++		get setViewMode() { return setViewMode; },
++		set setViewMode(v: SetViewMode) { setViewMode = v; },
+ 		get playingTrackId() { return playingTrackId; },
+````
+Verification: `grep -rn "timelineViewMode\|TimelineViewMode" frontend/src` returns nothing; `grep -rn "setViewMode" frontend/src/lib/stores/ui.svelte.ts` shows the new names.
+
+#### Task 2 — camelot.ts: add pure harmonicMove() helper
+File: `frontend/src/lib/utils/camelot.ts`
+Tools: editor
+Description: Add a ~12-line pure classifier reusing `parseCamelot` + the `wrap` idiom. Classification table:
+| Condition (a→b) | Result |
+|---|---|
+| same number AND same letter | `hold` |
+| same letter AND b is ±1 wheel hour of a (12↔1 wraps) | `lift` |
+| same number AND different letter (relative major/minor) | `switch` |
+| either key unparseable, OR anything else | `clash` |
+Diff (insert immediately after `keyMoveLabel` closes at l.209):
+````diff
+--- a/frontend/src/lib/utils/camelot.ts
++++ b/frontend/src/lib/utils/camelot.ts
+@@
+ 	if (a.number === b.number) return { label: 'mood switch', score: 0.8 };
+ 	return { label: 'distant keys', score: 0.3 };
+ }
++
++/**
++ * Classify the harmonic move between two keys in the strip/grid vocabulary:
++ * hold (same key), lift (±1 on the wheel, same mode), switch (relative
++ * major/minor), clash (distant or unparseable). Pure — classified client-side
++ * because the backend only gives a numeric harmonic score. Reuses parseCamelot.
++ */
++export function harmonicMove(
++	a: string | null | undefined,
++	b: string | null | undefined,
++): 'hold' | 'lift' | 'switch' | 'clash' {
++	const ka = parseCamelot(a);
++	const kb = parseCamelot(b);
++	if (!ka || !kb) return 'clash';
++	if (ka.number === kb.number && ka.letter === kb.letter) return 'hold';
++	const wrap = (n: number) => ((n - 1 + 12) % 12) + 1;
++	if (ka.letter === kb.letter && (kb.number === wrap(ka.number + 1) || kb.number === wrap(ka.number - 1))) return 'lift';
++	if (ka.number === kb.number && ka.letter !== kb.letter) return 'switch';
++	return 'clash';
++}
+````
+Verification: desk-check against Task 9 truth table; type-check passes.
+
+#### Task 3 — TransitionIndicator.svelte: full rebuild
+File: `frontend/src/lib/components/set/TransitionIndicator.svelte`
+Tools: editor (Write — replace ENTIRE file)
+Description: Replace the cryptic `BUILD x / y CTX` line. New surface: CTX-driven verdict pill (`scoreLabel`/`scoreColor` on `analysisScore ?? builderScore`), plain-language two-score copy ("On their own {build} · In your arc {ctx}"), a mechanics row (`harmonicMove` word + signed BPM delta + energy arrow ↑/→/↓ with ±0.05 deadband), a Q4-gated teaching note, and an expandable 5-dimension weighted breakdown reusing the existing lazy `getTransition`. New props threaded from `SetTimeline`: `keyA/keyB`, `bpmA/bpmB`, `energyA/energyB` (normalized 0..1), `prevEnergyDelta`. Verdict falls back to `builderScore` when `analysisScore` is null. No `as`/`!`.
+Replace the whole file with:
+````svelte
+<script lang="ts">
+	import type { TransitionScoreBreakdown } from '$lib/types';
+	import { getTransition } from '$lib/api/sets';
+	import { harmonicMove } from '$lib/utils/camelot';
+
+	interface Props {
+		fromTrackId: number;
+		toTrackId: number;
+		score?: number;
+		analysisScore?: number;
+		teachingMoment?: string;
+		setId: number;
+		transitionIndex: number;
+		active?: boolean;
+		onclick?: (index: number) => void;
+		keyA?: string | null;
+		keyB?: string | null;
+		bpmA?: number | null;
+		bpmB?: number | null;
+		energyA?: number | null;
+		energyB?: number | null;
+		prevEnergyDelta?: number | null;
+	}
+
+	let {
+		fromTrackId,
+		toTrackId,
+		score,
+		analysisScore,
+		teachingMoment,
+		setId,
+		transitionIndex,
+		active = false,
+		onclick,
+		keyA = null,
+		keyB = null,
+		bpmA = null,
+		bpmB = null,
+		energyA = null,
+		energyB = null,
+		prevEnergyDelta = null,
+	}: Props = $props();
+
+	let loading = $state(false);
+	let breakdown = $state<TransitionScoreBreakdown | null>(null);
+	let error = $state<string | null>(null);
+	let expanded = $state(false);
+
+	let builderScore = $derived(breakdown?.total ?? score ?? null);
+	let ctxScore = $derived(analysisScore ?? builderScore);
+	let hasDualScores = $derived(analysisScore != null && builderScore != null);
+
+	function scoreColor(s: number): string {
+		if (s >= 0.8) return 'var(--score-excellent)';
+		if (s >= 0.6) return 'var(--score-good)';
+		if (s >= 0.4) return 'var(--score-fair)';
+		return 'var(--score-poor)';
+	}
+
+	function scoreLabel(s: number): string {
+		if (s >= 0.8) return 'Excellent';
+		if (s >= 0.6) return 'Good';
+		if (s >= 0.4) return 'Fair';
+		return 'Poor';
+	}
+
+	// ── Mechanics ──
+	let move = $derived(harmonicMove(keyA, keyB));
+	let bpmDelta = $derived(bpmA != null && bpmB != null ? Math.round(bpmB - bpmA) : null);
+	let energyDelta = $derived(energyA != null && energyB != null ? energyB - energyA : null);
+	let energyArrow = $derived(
+		energyDelta == null ? '→' : energyDelta > 0.05 ? '↑' : energyDelta < -0.05 ? '↓' : '→',
+	);
+
+	// Two-score copy — narrowed inside the closure so no non-null assertions are needed.
+	let dualCopy = $derived.by(() => {
+		if (analysisScore != null && builderScore != null) {
+			return `On their own ${builderScore.toFixed(2)} · In your arc ${analysisScore.toFixed(2)}`;
+		}
+		return null;
+	});
+
+	// ── Noteworthy gate (Research Q4) ──
+	let divergence = $derived(
+		analysisScore != null && builderScore != null ? Math.abs(analysisScore - builderScore) : 0,
+	);
+	let energyInflection = $derived(
+		energyDelta != null &&
+			(Math.abs(energyDelta) >= 0.15 ||
+				(prevEnergyDelta != null &&
+					prevEnergyDelta !== 0 &&
+					energyDelta !== 0 &&
+					Math.sign(energyDelta) !== Math.sign(prevEnergyDelta))),
+	);
+	let noteworthy = $derived(move !== 'hold' || divergence >= 0.15 || energyInflection);
+	let showNote = $derived(noteworthy && !!teachingMoment);
+
+	async function fetchBreakdown() {
+		if (breakdown || loading) return;
+		loading = true;
+		error = null;
+		try {
+			const detail = await getTransition(setId, transitionIndex);
+			breakdown = detail.score_breakdown;
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load transition';
+		} finally {
+			loading = false;
+		}
+	}
+
+	function handleClick() {
+		onclick?.(transitionIndex);
+	}
+
+	function toggleExpanded(e: MouseEvent) {
+		e.stopPropagation();
+		expanded = !expanded;
+		if (expanded) fetchBreakdown();
+	}
+
+	// Preserve prior behavior: lazy-fetch the breakdown when no pre-computed score exists.
+	$effect(() => {
+		if (score == null && !breakdown && !loading && !error) {
+			fetchBreakdown();
+		}
+	});
+
+	type NumDim = 'harmonic' | 'energy_fit' | 'bpm_compat' | 'genre_coherence' | 'track_quality';
+	const DIMS: { key: NumDim; label: string; weight: string }[] = [
+		{ key: 'harmonic', label: 'Harmonic', weight: '25%' },
+		{ key: 'energy_fit', label: 'Energy fit', weight: '20%' },
+		{ key: 'bpm_compat', label: 'BPM', weight: '20%' },
+		{ key: 'genre_coherence', label: 'Genre', weight: '15%' },
+		{ key: 'track_quality', label: 'Quality', weight: '20%' },
+	];
+</script>
+
+<div class="transition-indicator" class:active>
+	<div class="strip-row">
+		<button
+			class="strip"
+			style="--score-color: {ctxScore != null ? scoreColor(ctxScore) : 'var(--border)'}"
+			onclick={handleClick}
+		>
+			<span class="score-fill"></span>
+			{#if ctxScore != null}
+				<span class="verdict" style="color: {scoreColor(ctxScore)}; border-color: {scoreColor(ctxScore)}">
+					{scoreLabel(ctxScore)}
+				</span>
+				<span class="scores">
+					{#if dualCopy}{dualCopy}{:else}{ctxScore.toFixed(2)}{/if}
+				</span>
+			{:else if loading}
+				<span class="scores">...</span>
+			{:else}
+				<span class="scores">--</span>
+			{/if}
+
+			<span class="mechanics">
+				<span class="mech mech-move" data-move={move}>{move}</span>
+				{#if bpmDelta != null}
+					<span class="mech mech-bpm">{bpmDelta > 0 ? '+' : bpmDelta < 0 ? '−' : ''}{Math.abs(bpmDelta)} BPM</span>
+				{/if}
+				<span class="mech mech-energy">{energyArrow}</span>
+			</span>
+		</button>
+		<button
+			class="expand-btn"
+			onclick={toggleExpanded}
+			aria-expanded={expanded}
+			aria-label={expanded ? 'Hide the math' : 'Show the math'}
+		>
+			{expanded ? '▴' : '▾'}
+		</button>
+	</div>
+
+	{#if showNote}
+		<div class="note">{teachingMoment}</div>
+	{/if}
+
+	{#if expanded}
+		<div class="breakdown">
+			{#if loading}
+				<span class="breakdown-status">Reading the math...</span>
+			{:else if error}
+				<span class="breakdown-status">Couldn't load the breakdown — try again.</span>
+			{:else if breakdown}
+				{#each DIMS as dim (dim.key)}
+					{@const v = breakdown[dim.key]}
+					<div class="dim-row">
+						<span class="dim-label">{dim.label}</span>
+						<span class="dim-weight">{dim.weight}</span>
+						<span class="dim-bar"><span class="dim-fill" style="width: {v * 100}%; background: {scoreColor(v)}"></span></span>
+						<span class="dim-val">{v.toFixed(2)}</span>
+					</div>
+				{/each}
+			{/if}
+		</div>
+	{/if}
+</div>
+
+<style>
+	.transition-indicator {
+		padding: 2px 0;
+		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 3px;
+	}
+
+	.strip-row {
+		display: flex;
+		align-items: stretch;
+		gap: 4px;
+	}
+
+	.strip {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		position: relative;
+		height: 26px;
+		padding: 0 10px;
+		border: none;
+		border-radius: 13px;
+		background: var(--bg-tertiary);
+		cursor: pointer;
+		overflow: hidden;
+		transition: box-shadow 0.15s;
+	}
+
+	.strip:hover {
+		box-shadow: 0 0 0 1px var(--score-color);
+	}
+
+	.active .strip {
+		box-shadow: 0 0 0 2px var(--accent, var(--score-color));
+	}
+
+	.score-fill {
+		position: absolute;
+		inset: 0;
+		background: var(--score-color);
+		opacity: 0.12;
+		pointer-events: none;
+	}
+
+	.verdict {
+		position: relative;
+		z-index: 1;
+		font-size: 9px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.4px;
+		padding: 1px 6px;
+		border: 1px solid;
+		border-radius: 8px;
+		flex-shrink: 0;
+	}
+
+	.scores {
+		position: relative;
+		z-index: 1;
+		font-size: 11px;
+		font-weight: 500;
+		color: var(--text-secondary);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.mechanics {
+		position: relative;
+		z-index: 1;
+		margin-left: auto;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-shrink: 0;
+	}
+
+	.mech {
+		font-size: 10px;
+		font-weight: 600;
+		color: var(--text-secondary);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.mech-move {
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+	}
+
+	.mech-move[data-move='lift'] { color: var(--energy-mid); }
+	.mech-move[data-move='switch'] { color: var(--energy-high); }
+	.mech-move[data-move='clash'] { color: var(--score-poor); }
+
+	.mech-energy {
+		font-size: 12px;
+	}
+
+	.expand-btn {
+		flex-shrink: 0;
+		width: 22px;
+		border: none;
+		background: var(--bg-tertiary);
+		color: var(--text-dim);
+		border-radius: 11px;
+		cursor: pointer;
+		font-size: 10px;
+	}
+
+	.expand-btn:hover {
+		color: var(--text-primary);
+		background: var(--bg-hover);
+	}
+
+	.note {
+		font-size: 11px;
+		line-height: 1.35;
+		color: var(--text-secondary);
+		padding: 2px 10px;
+	}
+
+	.breakdown {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 6px 10px;
+		background: var(--bg-secondary);
+		border-radius: 8px;
+	}
+
+	.breakdown-status {
+		font-size: 11px;
+		color: var(--text-dim);
+	}
+
+	.dim-row {
+		display: grid;
+		grid-template-columns: 72px 34px 1fr 34px;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.dim-label {
+		font-size: 11px;
+		color: var(--text-secondary);
+	}
+
+	.dim-weight {
+		font-size: 9px;
+		color: var(--text-dim);
+		text-align: right;
+	}
+
+	.dim-bar {
+		height: 5px;
+		background: var(--bg-tertiary);
+		border-radius: 3px;
+		overflow: hidden;
+	}
+
+	.dim-fill {
+		display: block;
+		height: 100%;
+		border-radius: 3px;
+	}
+
+	.dim-val {
+		font-size: 11px;
+		font-weight: 600;
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+		color: var(--text-primary);
+	}
+</style>
+````
+Verification: type-check clean; visually a key-locked run shows the mechanics row with `hold`/`→` and NO note; a lift/switch/clash or a ≥0.15 build-vs-ctx gap shows the note; the ▾ toggle reveals five weighted dimension rows.
+
+#### Task 4 — SetTrackCard.svelte: restyle energy bar to the CERCETA ramp
+File: `frontend/src/lib/components/set/SetTrackCard.svelte`
+Tools: editor
+Description: Show fit-to-arc not just loudness — paint the bar track with the faint `--energy-low→mid→high` ramp and bump the existing target tick to `--text-secondary` for legibility. Markup and the `.energy-target-marker` element are unchanged (Research Q5: keep the tick as-is).
+Diff:
+````diff
+--- a/frontend/src/lib/components/set/SetTrackCard.svelte
++++ b/frontend/src/lib/components/set/SetTrackCard.svelte
+@@
+ 	.energy-bar-bg {
+ 		position: relative;
+ 		flex: 1;
+ 		height: 6px;
+-		background: var(--bg-tertiary);
++		background: linear-gradient(
++			90deg,
++			color-mix(in srgb, var(--energy-low) 22%, var(--bg-tertiary)),
++			color-mix(in srgb, var(--energy-mid) 22%, var(--bg-tertiary)),
++			color-mix(in srgb, var(--energy-high) 22%, var(--bg-tertiary))
++		);
+ 		border-radius: 3px;
+ 		overflow: visible;
+ 	}
+@@
+ 	.energy-target-marker {
+ 		position: absolute;
+ 		top: -2px;
+ 		width: 2px;
+ 		height: 10px;
+-		background: var(--text-dim);
++		background: var(--text-secondary);
+ 		border-radius: 1px;
+ 		transform: translateX(-1px);
+ 	}
+````
+Verification: the row energy bar shows the navy→lilac→magenta ramp behind the fill; the target tick renders and is clearly visible.
+
+#### Task 5 — SetCardGrid.svelte: NEW scannable grid view
+File: `frontend/src/lib/components/set/SetCardGrid.svelte`
+Tools: editor (Write — new file)
+Description: A compact card grid for scanning the whole set's key/energy field at a glance. Each card: position badge on the LEFT of the header (designs out the top-right/score collision), an incoming-transition color stripe (top), a "from {key} · {relation}" caption (via `harmonicMove`) + ctx score, title/artist, Camelot-colored key, BPM, a genre `Chip variant="genre"`, and an energy mini-bar with the target tick. Read-only (click selects the track in the set; no DnD). No `setId` needed (breakdown is not fetched here). No `as`/`!`.
+Prop contract:
+| Prop | Type | Purpose |
+|---|---|---|
+| `tracks` | `SetWaveformTrack[]` | ordered set tracks (pass `items` from SetTimeline) |
+| `energyTargets` | `(number \| undefined)[]` | per-slot arc targets (from `computeEnergyTargets`), default `[]` |
+| `analysis` | `SetAnalysis \| null` | source of the CTX score per incoming transition, default `null` |
+Create the file with:
+````svelte
+<script lang="ts">
+	import type { SetWaveformTrack, SetAnalysis } from '$lib/types';
+	import { formatKey, getCamelotColor, harmonicMove } from '$lib/utils/camelot';
+	import { getTrackEnergyNumeric, energyColor } from '$lib/utils/energy';
+	import { getUiStore } from '$lib/stores/ui.svelte';
+	import Chip from '$lib/components/primitives/Chip.svelte';
+
+	let {
+		tracks,
+		energyTargets = [],
+		analysis = null,
+	}: {
+		tracks: SetWaveformTrack[];
+		energyTargets?: (number | undefined)[];
+		analysis?: SetAnalysis | null;
+	} = $props();
+
+	const ui = getUiStore();
+
+	// Incoming-transition CTX score keyed by transition position (i-1 lands on card i).
+	let ctxMap = $derived.by(() => {
+		const map = new Map<number, number>();
+		if (analysis) for (const t of analysis.transitions) map.set(t.position, t.scores.total);
+		return map;
+	});
+
+	function scoreColor(s: number): string {
+		if (s >= 0.8) return 'var(--score-excellent)';
+		if (s >= 0.6) return 'var(--score-good)';
+		if (s >= 0.4) return 'var(--score-fair)';
+		return 'var(--score-poor)';
+	}
+
+	function selectTrack(trackId: number) {
+		ui.selectedTrackInSet = trackId;
+	}
+</script>
+
+<div class="card-grid" role="list" aria-label="Set at a glance">
+	{#each tracks as track, i (track.position ?? i)}
+		{@const prevKey = i > 0 ? tracks[i - 1].key : null}
+		{@const move = i > 0 ? harmonicMove(prevKey, track.key) : null}
+		{@const ctx = ctxMap.get(i - 1)}
+		{@const stripe = ctx != null ? scoreColor(ctx) : getCamelotColor(track.key)}
+		{@const energyNorm = getTrackEnergyNumeric(track.energy_value, track.energy)}
+		{@const target = energyTargets[i]}
+		<div
+			class="grid-card"
+			class:selected={ui.selectedTrackInSet === track.track_id}
+			role="listitem"
+			tabindex="0"
+			onclick={() => selectTrack(track.track_id)}
+			onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTrack(track.track_id); } }}
+		>
+			<div class="stripe" style="background: {stripe}" aria-hidden="true"></div>
+			<div class="card-header">
+				<span class="pos-badge">{i + 1}</span>
+				{#if move}
+					<span class="from-caption">from {formatKey(prevKey) || '?'} · {move}</span>
+				{:else}
+					<span class="from-caption from-start">set opener</span>
+				{/if}
+				{#if ctx != null}
+					<span class="ctx" style="color: {scoreColor(ctx)}">{ctx.toFixed(2)}</span>
+				{/if}
+			</div>
+			<span class="title" title={track.title ?? ''}>{track.title ?? 'Untitled'}</span>
+			<span class="artist" title={track.artist ?? ''}>{track.artist ?? 'Unknown'}</span>
+			<div class="meta">
+				<span class="key-badge" style="color: {getCamelotColor(track.key)}">{formatKey(track.key) || '?'}</span>
+				<span class="bpm">{track.bpm ? Math.round(track.bpm) : '?'}</span>
+				{#if track.genre}
+					<Chip variant="genre" value={track.genre} size="sm" title={track.genre} />
+				{/if}
+			</div>
+			<div class="energy-bar-bg">
+				<div
+					class="energy-bar-fill"
+					style="width: {energyNorm !== null ? energyNorm * 100 : 0}%; background: {energyNorm !== null ? energyColor(energyNorm) : 'transparent'}"
+				></div>
+				{#if target !== undefined}
+					<div class="energy-target-marker" style="left: {target * 100}%"></div>
+				{/if}
+			</div>
+		</div>
+	{/each}
+</div>
+
+<style>
+	.card-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+		gap: 8px;
+		padding: 8px 12px;
+	}
+
+	.grid-card {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		padding: 8px 10px 10px;
+		background: var(--bg-secondary);
+		border: 1px solid transparent;
+		border-radius: 6px;
+		cursor: pointer;
+		overflow: hidden;
+		transition: background 0.1s, border-color 0.15s;
+	}
+
+	.grid-card:hover {
+		background: var(--bg-hover);
+	}
+
+	.grid-card.selected {
+		background: var(--bg-active);
+		border-color: var(--accent);
+	}
+
+	.stripe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 3px;
+	}
+
+	.card-header {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: 2px;
+	}
+
+	.pos-badge {
+		flex-shrink: 0;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 5px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 10px;
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		color: var(--text-secondary);
+		background: var(--bg-tertiary);
+		border-radius: 9px;
+	}
+
+	.from-caption {
+		font-size: 10px;
+		color: var(--text-dim);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.from-start {
+		font-style: italic;
+	}
+
+	.ctx {
+		margin-left: auto;
+		font-size: 11px;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.title {
+		font-size: 12px;
+		font-weight: 500;
+		color: var(--text-primary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.artist {
+		font-size: 11px;
+		color: var(--text-secondary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.meta {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin-top: 2px;
+	}
+
+	.key-badge {
+		font-weight: 600;
+		font-size: 11px;
+	}
+
+	.bpm {
+		font-size: 11px;
+		color: var(--text-secondary);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.energy-bar-bg {
+		position: relative;
+		height: 6px;
+		margin-top: 4px;
+		background: linear-gradient(
+			90deg,
+			color-mix(in srgb, var(--energy-low) 22%, var(--bg-tertiary)),
+			color-mix(in srgb, var(--energy-mid) 22%, var(--bg-tertiary)),
+			color-mix(in srgb, var(--energy-high) 22%, var(--bg-tertiary))
+		);
+		border-radius: 3px;
+		overflow: visible;
+	}
+
+	.energy-bar-fill {
+		height: 100%;
+		border-radius: 3px;
+	}
+
+	.energy-target-marker {
+		position: absolute;
+		top: -2px;
+		width: 2px;
+		height: 10px;
+		background: var(--text-secondary);
+		border-radius: 1px;
+		transform: translateX(-1px);
+	}
+</style>
+````
+Verification: type-check clean; in grid mode each card shows the LEFT position badge with no overlap on the ctx score, the top stripe, the "from {key} · {relation}" caption, and the energy mini-bar with tick.
+
+#### Task 6 — SetTimeline.svelte: thread props, run banner, spine, list/grid switch
+File: `frontend/src/lib/components/set/SetTimeline.svelte`
+Tools: editor
+Description: (a) import `parseCamelot` + `SetCardGrid`; (b) add `energyNorms`, `deltaOf()`, and `runStartIndices` (maximal runs of ≥3 consecutive same-Camelot-key tracks); (c) switch the rendered body on `ui.setViewMode` — grid renders `SetCardGrid`, list keeps the existing DnD timeline; (d) render one run banner ("The story here is energy, not key") above the first track of each qualifying run; (e) thread adjacent-track key/bpm/energy + `prevEnergyDelta` into `TransitionIndicator`; (f) add the faint energy-ramp gutter spine + `.run-banner` styles.
+Diff (imports):
+````diff
+--- a/frontend/src/lib/components/set/SetTimeline.svelte
++++ b/frontend/src/lib/components/set/SetTimeline.svelte
+@@
+ 	import { getUiStore } from '$lib/stores/ui.svelte';
++	import { parseCamelot } from '$lib/utils/camelot';
+ 	import { reorderSetTracks, removeTrackFromSet, addTrackToSet } from '$lib/api/sets';
+ 	import SetTrackCard from './SetTrackCard.svelte';
+ 	import TransitionIndicator from './TransitionIndicator.svelte';
++	import SetCardGrid from './SetCardGrid.svelte';
+ 	import ReplaceTrackModal from './ReplaceTrackModal.svelte';
+ 	import InSetTrackSearch from './InSetTrackSearch.svelte';
+````
+Diff (derived helpers — insert after the `energyTargets` derived at l.77):
+````diff
+--- a/frontend/src/lib/components/set/SetTimeline.svelte
++++ b/frontend/src/lib/components/set/SetTimeline.svelte
+@@
+ 	let energyTargets = $derived(computeEnergyTargets(energyProfile, items.length));
++
++	// Normalized energy per position — feeds the transition energy arrow + inflection gate.
++	let energyNorms = $derived(items.map((it) => getTrackEnergyNumeric(it.energy_value, it.energy)));
++
++	function deltaOf(a: number | null, b: number | null): number | null {
++		return a != null && b != null ? a - b : null;
++	}
++
++	/** Start indices of maximal runs of ≥3 consecutive tracks sharing a Camelot key. */
++	let runStartIndices = $derived.by(() => {
++		const starts = new Set<number>();
++		let start = 0;
++		for (let i = 1; i <= items.length; i++) {
++			const a = parseCamelot(items[i - 1]?.key);
++			const b = i < items.length ? parseCamelot(items[i]?.key) : null;
++			const same = !!a && !!b && a.number === b.number && a.letter === b.letter;
++			if (!same) {
++				if (i - start >= 3) starts.add(start);
++				start = i;
++			}
++		}
++		return starts;
++	});
+````
+Note: `getTrackEnergyNumeric` is already imported at the existing mid-`<script>` line (`import { getTrackEnergyNumeric } from '$lib/utils/energy';`); ESM imports hoist, so using it above is valid — do NOT add a duplicate import.
+Diff (list/grid switch open — wrap the existing `.timeline-content`):
+````diff
+--- a/frontend/src/lib/components/set/SetTimeline.svelte
++++ b/frontend/src/lib/components/set/SetTimeline.svelte
+@@
+ 		{:else}
++			{#if ui.setViewMode === 'grid'}
++				<SetCardGrid tracks={items} {energyTargets} {analysis} />
++			{:else}
+ 			<div class="timeline-content">
+````
+Diff (run banner + threaded props — inside the `{#each items ...}` list loop):
+````diff
+--- a/frontend/src/lib/components/set/SetTimeline.svelte
++++ b/frontend/src/lib/components/set/SetTimeline.svelte
+@@
+ 				{#each items as item, i (item.id)}
++					{#if runStartIndices.has(i)}
++						<div class="run-banner">The story here is energy, not key</div>
++					{/if}
+ 					<div class="track-slot">
+@@
+ 								<TransitionIndicator
+ 									fromTrackId={item.track_id}
+ 									toTrackId={items[i + 1].track_id}
+ 									score={items[i + 1].transition_score ?? undefined}
+ 									analysisScore={analysisMap.get(i)?.score}
+ 									teachingMoment={analysisMap.get(i)?.teaching}
++									keyA={item.key}
++									keyB={items[i + 1].key}
++									bpmA={item.bpm}
++									bpmB={items[i + 1].bpm}
++									energyA={energyNorms[i]}
++									energyB={energyNorms[i + 1]}
++									prevEnergyDelta={i > 0 ? deltaOf(energyNorms[i], energyNorms[i - 1]) : null}
+ 									{setId}
+ 									transitionIndex={i}
+ 								active={activeTransitionIndex === i}
+ 									onclick={handleTransitionClickInternal}
+ 								/>
+````
+Diff (list/grid switch close — after the `.timeline-content` closing `</div>` at l.301):
+````diff
+--- a/frontend/src/lib/components/set/SetTimeline.svelte
++++ b/frontend/src/lib/components/set/SetTimeline.svelte
+@@
+ 				</div>
+ 			</div>
++			{/if}
+ 
+ 		{#if dropActive || dropAdding}
+````
+Diff (styles — spine + run banner; extend the existing `.track-list` rule):
+````diff
+--- a/frontend/src/lib/components/set/SetTimeline.svelte
++++ b/frontend/src/lib/components/set/SetTimeline.svelte
+@@
+ 	.track-list {
+ 		flex: 1;
+ 		min-width: 0;
+ 		display: flex;
+ 		flex-direction: column;
++		position: relative;
+ 	}
++
++	/* Faint energy-ramp spine down the row gutter — the set as one continuous flow. */
++	.track-list::before {
++		content: '';
++		position: absolute;
++		left: -11px;
++		top: 4px;
++		bottom: 4px;
++		width: 2px;
++		border-radius: 1px;
++		background: linear-gradient(var(--energy-low), var(--energy-mid), var(--energy-high));
++		opacity: 0.18;
++		pointer-events: none;
++	}
++
++	.run-banner {
++		margin: 4px 0 6px;
++		padding: 4px 10px;
++		font-size: 11px;
++		font-weight: 500;
++		color: var(--text-secondary);
++		background: color-mix(in srgb, var(--energy-mid) 10%, transparent);
++		border-left: 2px solid var(--energy-mid);
++		border-radius: 3px;
++	}
+````
+Verification: list view unchanged except the gutter spine + one banner per key-locked run of ≥3; toggling to grid renders `SetCardGrid`; transitions now receive keys/bpm/energy (mechanics + gated note populate).
+
+#### Task 7 — SetView.svelte: host the list/grid SegmentedControl toggle
+File: `frontend/src/lib/components/set/SetView.svelte`
+Tools: editor
+Description: Add a `SegmentedControl` (list default) in the toolbar, bound to the global `ui.setViewMode`, shown once the set has tracks. `getUiStore()`/`ui` already exist (l.4, l.22).
+Diff (imports — after the `MenuSeparator` import at l.17):
+````diff
+--- a/frontend/src/lib/components/set/SetView.svelte
++++ b/frontend/src/lib/components/set/SetView.svelte
+@@
+ 	import MenuSeparator from '$lib/components/primitives/MenuSeparator.svelte';
++	import SegmentedControl, { type SegmentOption } from '$lib/components/primitives/SegmentedControl.svelte';
++	import type { SetViewMode } from '$lib/stores/ui.svelte';
+````
+Diff (view options — after `const ui = getUiStore();` at l.22):
+````diff
+--- a/frontend/src/lib/components/set/SetView.svelte
++++ b/frontend/src/lib/components/set/SetView.svelte
+@@
+ 	const ui = getUiStore();
++
++	const viewOptions: SegmentOption<SetViewMode>[] = [
++		{ value: 'list', label: 'List' },
++		{ value: 'grid', label: 'Grid' },
++	];
+````
+Diff (toolbar control — after the Build/arrange group `{/if}` at l.426):
+````diff
+--- a/frontend/src/lib/components/set/SetView.svelte
++++ b/frontend/src/lib/components/set/SetView.svelte
+@@
+ 						</Button>
+ 					</div>
+ 				{/if}
++
++				<!-- View: list vs grid — scan the whole set's key/energy field at a glance -->
++				{#if waveformTracks.length >= 1}
++					<div class="tool-divider" role="separator" aria-orientation="vertical"></div>
++					<div class="tool-group">
++						<SegmentedControl
++							options={viewOptions}
++							value={ui.setViewMode}
++							onchange={(v) => (ui.setViewMode = v)}
++							ariaLabel="Set view"
++							dense
++						/>
++					</div>
++				{/if}
+ 
+ 				<!-- 3 · Analyze — keep the energy-review count CTA prominent -->
+````
+Verification: a List/Grid toggle appears in the set toolbar; switching to Grid re-renders the timeline body as the card grid, back to List restores the row list; default is List.
+
+#### Task 8 — Type-check gate (svelte-check)
+Tools: shell
+Description: Project norm is svelte-check as the only frontend static gate (zero test infra — Research). Must be clean (no `as`/`!` per TypeScript guideline).
+Commands:
+- `cd /home/mantis/Development/mantis-dev/waveform-builer/frontend && npx svelte-check --tsconfig ./tsconfig.json`
+Expectation: 0 errors. Resolve any error before proceeding (common risks: a stray non-null assertion, a mistyped prop, an unused import).
+
+#### Task 9 — Testing: harmonicMove desk-check + manual E2E acceptance
+Tools: manual / shell
+Description: Per Research (zero frontend test harness) and DO NOT OVERCOMPLICATE, do not stand up Vitest. Cover the one pure function by desk-checking `harmonicMove` against the truth table below, and cover the components by the manual browser acceptance checklist.
+harmonicMove truth table (verify each by reading Task 2's logic; each row must hold):
+| a | b | expected | why |
+|---|---|---|---|
+| `8A` | `8A` | `hold` | same number+letter |
+| `Am` | `Am` | `hold` | parses to 8A both sides |
+| `8A` | `9A` | `lift` | +1 wheel, same letter |
+| `8A` | `7A` | `lift` | −1 wheel, same letter |
+| `12A` | `1A` | `lift` | wheel wrap 12→1 |
+| `1A` | `12A` | `lift` | wheel wrap 1→12 |
+| `8A` | `8B` | `switch` | same number, relative major/minor |
+| `8A` | `10A` | `clash` | two steps apart |
+| `8A` | `3B` | `clash` | distant |
+| `null` | `8A` | `clash` | unparseable input |
+| `xyz` | `8A` | `clash` | unparseable input |
+Manual E2E acceptance (run the app: `source .venv/bin/activate && kiku api` + `cd frontend && npm run dev`; open a set with ≥3 tracks and a Cm-locked run):
+1. Each transition strip reads in plain language — a verdict pill (CTX-driven) + "On their own {build} · In your arc {ctx}" — not the old `BUILD x / y CTX`.
+2. The mechanics row shows the correct `hold`/`lift`/`switch`/`clash` word, a signed BPM delta, and an energy arrow ↑/→/↓.
+3. On a flat key-locked run the written note is ABSENT (every move is `hold`, no divergence, no inflection); it APPEARS on a key/mode change, a ≥0.15 build-vs-ctx gap, or an energy inflection.
+4. Expanding a transition (▾) reveals the five weighted dimensions (Harmonic 25 / Energy 20 / BPM 20 / Genre 15 / Quality 20) fetched via `getTransition`.
+5. A key-locked run of ≥3 shows ONE banner ("The story here is energy, not key"), not a repeated sentence per row.
+6. The energy bar shows the navy→lilac→magenta ramp with a visible target tick; the row gutter shows the faint spine.
+7. The List/Grid toggle switches views; in Grid each card has the position badge on the LEFT (no overlap with the ctx score), the incoming stripe, the "from {key} · {relation}" caption, key/BPM/genre, and an energy mini-bar with tick.
+
+#### Task 10 — Commit (code files only)
+Tools: git
+Description: Stage ONLY the seven files this spec touches. DO NOT stage the unrelated `SimilarTrackCard→RelatedTrackCard` rename or any other working-tree change. Never `git add -A`/`git add .`.
+Commands:
+- `cd /home/mantis/Development/mantis-dev/waveform-builer && git branch --show-current` → must print `set-view-redesign`
+- `git add -- frontend/src/lib/stores/ui.svelte.ts frontend/src/lib/utils/camelot.ts frontend/src/lib/components/set/TransitionIndicator.svelte frontend/src/lib/components/set/SetTrackCard.svelte frontend/src/lib/components/set/SetCardGrid.svelte frontend/src/lib/components/set/SetTimeline.svelte frontend/src/lib/components/set/SetView.svelte`
+- `git commit -m "spec(025): IMPLEMENT - set-view track and transition redesign"`
+
+### Validate
+
+Each Human-Section requirement mapped to the task that satisfies it:
+- **MLO — Redesign `TransitionIndicator`: two-score copy, CTX verdict pill, expandable 5-dim breakdown (L10).** → Task 3 (dualCopy, `scoreLabel`/`scoreColor` on `analysisScore ?? builderScore`, breakdown via lazy `getTransition`).
+- **MLO — Compact mechanics (hold/lift/switch, BPM delta, energy ↑/→/↓) replacing the repeated sentence; note only when noteworthy (L11).** → Task 3 (mechanics row + `showNote` gate) using Task 2's helper.
+- **MLO — Camelot relationship helper hold/lift/switch/clash (L12).** → Task 2 (`harmonicMove`), reusing `parseCamelot` + `wrap`.
+- **MLO — Run-level insight banner once per key-locked run (L13).** → Task 6 (`runStartIndices` + `.run-banner`, copy "The story here is energy, not key").
+- **MLO — Energy bar fit-to-arc on the `--energy-*` ramp with target tick + gutter spine (L14).** → Task 4 (ramp + tick) and Task 6 (spine).
+- **MLO — Grid view + list/grid `SegmentedControl` toggle (list default); LEFT position badge (L15).** → Task 5 (grid, LEFT badge), Task 6 (switch on `ui.setViewMode`), Task 7 (toggle), Task 1 (store).
+- **MLO — Copy per BRANDING.md; approved mockup strings (L16).** → Tasks 3/6 use exactly "On their own · In your arc" and "The story here is energy, not key"; no banned words introduced.
+- **MLO — Type-check passes (L17).** → Task 8.
+- **DT — Reuse `SegmentedControl`, `Chip`, `energy-target-marker`, `scoreLabel/scoreColor` + `--score-*`, `getTransition`, camelot helpers; no scoring/analysis fork (L62).** → Tasks 3/5/7 reuse primitives + lazy fetch; Task 2 reuses `parseCamelot`; no backend change (Research Q1).
+- **DT — Stay in-palette (energy + score ramps), no new colors (L63).** → Tasks 3/4/5/6 use only `--energy-*`/`--score-*` tokens + `color-mix`.
+- **DT — Position badge on the LEFT of the grid card (L65).** → Task 5 (`.pos-badge` first in `.card-header`).
+- **DT — Efficiency: breakdown stays lazily fetched; grid renders from analysis in hand (L66).** → Task 3 (unchanged lazy `getTransition`), Task 5 (renders from `analysis`/`items`, no fetch).
+- **Testing — component behaviors, Camelot unit cases, banner, energy tick, grid badge, type-check, manual E2E (L79-85).** → Task 9 (truth table + acceptance checklist) + Task 8 (type-check).
+- **Scope — `SetGrid` untouched, no scoring-math change (L69-70).** → No task touches `SetGrid` or scoring; unrelated working-tree files explicitly excluded in Task 10.
 
 ## Plan Review
 <!-- Filled if required to validate plan -->
