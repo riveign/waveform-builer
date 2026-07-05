@@ -1748,4 +1748,69 @@ Each Human Section requirement → compliance note with task/line refs.
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
 
 ## Post-Implement Review
-<!-- Filled by /spec REVIEW -->
+
+Adversarial post-hoc review (branch `spec-024-review`, code already on `main`). Every finding traced against the committed lines; areas that verified clean are stated as such rather than padded with invented issues.
+
+### Verdict
+
+**Ship-quality, with one must-fix honesty defect in the `move` copy.** The core machinery is correct and well-tested where it counts: the Camelot wheel-wrap math, the mode-flip direction, insert/replace neighbour indexing + self-exclusion, `allowed_keys` normalization/override, the energy-shift override + clamp, and the caveat *detection* logic (which side resists) are all right. The one real problem is that the human-readable `move` string asserts a mix is "clean" without ever checking the harmonic — and it does so on the **default** `intent=hold` path, so it is trivially reachable and directly contradicts the feature's stated soul ("Never silently return a bad transition… Show the why, don't hide the math," Human §39-40, §53-54). That is a must-fix. Everything else is should-fix/nit polish.
+
+### Findings (ranked)
+
+#### 1. [must-fix] `move` string claims "mixes into {next} clean" without verifying the harmonic — false on the default `hold` path
+- **File**: `src/kiku/setbuilder/slot_picks.py:125-136` (`_build_move`), reached for every non-caveat pick from `rank_slot_picks` (`:227`).
+- **Defect**: `_build_move` appends `", mixes into {nxt.key} clean."` whenever `caveat is None and nxt is not None`. But `caveat` is `None` in three distinct cases, and only one of them is actually clean:
+  1. both sides genuinely `>= 0.8` (legit),
+  2. `intent == "hold"` — `_build_caveat` returns `None` unconditionally at `:103` regardless of harmonics,
+  3. explicit `allowed_keys` override where the incoming side is unclean (`h_in < CLEAN_THRESHOLD` → early `return None` at `:107`).
+  In cases (2) and (3) the word "clean" is asserted over a harsh clash. The harmonic is never recomputed in `_build_move`, so the claim is decoupled from reality.
+- **Failure scenario (default flow, no overrides)**: a set whose fixed neighbours are `8A` and `5A`; DJ runs `kiku slot-suggest <set> <slot> --intent hold` (or the UI "Hold" button, or `GET …?intent=hold`, the API default). A candidate keyed `8A` mixes out of `8A` at 1.0 but into `5A` at `harmonic_score("8A","5A") = 0.2` (three steps → clash). The pick renders: `"8A → 8A hold, +0.00 energy, mixes into 5A clean."` Kiku labels a key clash a clean mix — the exact thing the honesty constraint forbids. (The score/ranking itself is honest; only the teaching copy lies.) Secondary smell: `hold` still prints `from → to` with a key change and the label "hold," which reads contradictorily.
+- **Suggested fix**: in `_build_move`, compute `h_out = harmonic_score(cand.key, nxt.key)` (and optionally `h_in`) and only emit the "clean" clause when `h_out >= CLEAN_THRESHOLD`; otherwise state the mix honestly (e.g. `"…, mixes into {nxt.key} (tighter than ideal)"`), or drop the adjective. This keeps the copy truthful on `hold` and on explicit-key overrides without touching the ranking.
+
+#### 2. [should-fix] The `move`-string honesty is entirely untested — nothing asserts the "clean" claim, so finding #1 slipped through
+- **File**: `tests/test_slot_picks.py` (whole file) and `tests/api/test_slot_suggestions_api.py:26` (only asserts `sg["move"]` is truthy, never its content).
+- **Defect**: caveat *presence/absence* is tested (`test_caveat_names_achievable_alt`, `test_no_caveat_when_both_sides_clean`), but no test asserts the actual `move` text for a candidate that clashes into the fixed successor on a `hold` (or explicit-keys) suggestion. So the false-"clean" copy is uncovered.
+- **Failure scenario**: the bug in #1 is green across 406 tests because no assertion ever inspects the move string of a harmonically-clashing pick.
+- **Suggested fix**: add a `hold` case with neighbours `8A`/`5A` and a `5A`-clashing candidate asserting the `move` string does NOT contain "clean" (after the #1 fix), plus a keyless-neighbour case (below).
+
+#### 3. [should-fix] Keyless / unparseable-key neighbour and candidate behaviour is unverified
+- **File**: `src/kiku/setbuilder/slot_picks.py:105-107` (caveat uses `harmonic_score`, which returns `0.5` neutral for a `None`/unparseable key), `:218-221` (candidate key filter).
+- **Defect**: the logic *handles* keyless data correctly by design — a `0.5` neutral score is `< 0.8`, so a keyless successor can't spuriously report "clean," and `parse_camelot(cand.key) is None` drops keyless candidates when a filter is active — but none of this is exercised by a test. The Human Section §55 explicitly calls out keyless/edge handling as in-scope.
+- **Failure scenario**: a future refactor that, say, made `harmonic_score` raise or return `1.0` on `None` would break the honesty guard silently, with no test to catch it.
+- **Suggested fix**: add a ranker test where `nxt.key = None` (assert no false "clean", no crash) and one where a candidate has `key=None` under an active `allowed_keys`/intent filter (assert it is dropped).
+
+#### 4. [nit] An all-invalid explicit `allowed_keys` silently degrades to "no filter" while the response still echoes the requested keys
+- **File**: `src/kiku/setbuilder/slot_picks.py:193-195` (`key_filter = {…} or None`) and `src/kiku/api/routes/sets.py:1332` (`allowed_keys=sorted(keys)` echoed regardless).
+- **Defect**: if every supplied key is unparseable (e.g. `--keys "Hmm"`), the set-comprehension yields `{}`, `or None` collapses it to `None`, and the hard filter is skipped — the DJ gets the full unfiltered candidate list, yet the API context reports `allowed_keys: ["Hmm"]` as if honoured.
+- **Failure scenario**: `GET …?allowed_keys=xyz&intent=hold` returns unrelated tracks with `allowed_keys:["xyz"]` in the context — a silent no-op filter that looks applied.
+- **Suggested fix**: distinguish "no keys given" from "keys given but none parsed"; in the latter case return an empty result (or surface a warm note), or echo the resolved (parsed) key set rather than the raw input.
+
+#### 5. [nit] `_achievable_alt` names a move the DJ may own no track for
+- **File**: `src/kiku/setbuilder/slot_picks.py:73-92`, used by `_build_caveat:110`.
+- **Defect**: the achievable-alt search enumerates theoretical `move_targets` and picks the best-harmonic one without checking the candidate pool contains a track in that key. The caveat can therefore recommend, e.g., a `brighten (8A→8B)` when the library has no clean `8B` in the BPM window.
+- **Failure scenario**: caveat says "the cleanest move here is a brighten (8A→8B)" but a follow-up `brighten` search returns empty. This is teaching-acceptable per the spec (it names the *move*, not a specific track), so only a nit — worth a doc note or a "if you own one" hedge.
+
+#### 6. [nit] Caveat copy "pulls back toward it" has a dangling referent; spec pattern named the key
+- **File**: `src/kiku/setbuilder/slot_picks.py:115` — `f"The next track ({nxt.key}) pulls back toward it, …"`.
+- **Defect**: "toward **it**" has no antecedent (the Research §159 pattern was "Track {N+1} pulls back toward {next.key}"). Reads slightly off for a feature whose caveat *is* the teaching. Voice-only; no behavioural impact.
+- **Suggested fix**: e.g. `"The next track ({nxt.key}) pulls back toward its own key, …"` or restore the spec's phrasing.
+
+#### 7. [nit] CLI flag is `--keys`, Human §MLO wrote `--allowed-keys`; and the endpoint double-loads the set
+- **Files**: `src/kiku/cli.py:493-498` (`--keys` vs the Human Section's `--allowed-keys`; Plan Task 5 chose `--keys`, so this is a spec-wording drift, not a bug); `src/kiku/api/routes/sets.py:1277-1291` loads + sorts the set, then `rank_slot_picks:158-162` re-loads + re-sorts it. Minor duplicate DB work per request (mild vs the "EFFICIENCY in every implementation" principle). Neither is worth a code change on its own; noting for completeness.
+
+### Verified clean (no action)
+- **Wheel-wrap math** (`camelot.py:131-138`): `((num-1+delta)%12)+1` — `12A` push_higher → `1A`, `1A` cool_down → `12A` both correct (Python's `-1 % 12 == 11`); covered by `test_step_wheel_wrap` and `test_move_targets_push_higher`.
+- **Mode-flip direction** (`camelot.py:141-144`, `:160-168`): `brighten` A→B and `cool_down` B-key adds B→A, not inverted; covered.
+- **Insert vs replace indexing** (`slot_picks.py:57-70`): insert → `(N, N+1)`, replace → `(N-1, N+1)` with the track at N excluded via `set_track_ids` (`:164, :201`) plus the explicit `:215-216` guard; tail/single-neighbour handled (`test_end_slot_single_neighbour`, `test_replace_excludes_in_set_track`).
+- **Caveat resisting-anchor labelling** (`slot_picks.py:107`): because intent-derived candidates always satisfy `h_in >= T`, the caveat can only fire when the *successor* is the resister — so "the next track pulls back" is never mislabelled on the intent path; the explicit-keys unclean-incoming case correctly suppresses the caveat.
+- **`allowed_keys` normalization + override** (`slot_picks.py:193-197, :218-221`): `parse_camelot`→`camelot_str` round-trip makes `"8a"`, `"Am"` and `"8A"` all match; explicit keys override (not intersect) the intent-derived set, per spec.
+- **Energy shift** (`slot_picks.py:187-188`): explicit `energy_delta` overrides the intent's shift and the shifted target is clamped to `[0,1]`; `test_energy_shift_reranks` covers direction.
+- **DB access pattern**: raw SQLAlchemy (no `handlePromise`) matches the existing `get_replacements`/`artist_picks` Python convention — the handlePromise guidance is the TS/backend rule, not applicable here. Frontend `AddSlotPicksPanel.svelte` uses no `as`/`!`, warm never-blame copy, no banned words.
+
+### Resolution (applied post-review, branch `spec-024-review`)
+
+- **#1 (must-fix) — FIXED.** `_build_move` (`slot_picks.py:132-140`) now recomputes `h_out = harmonic_score(cand.key, nxt.key)` and only emits "mixes into {next} clean" when `h_out >= CLEAN_THRESHOLD`; otherwise it says "the blend into {next} is a stretch." The `hold` default and explicit-key paths can no longer label a clash clean.
+- **#2 (should-fix) — CLOSED.** Added `test_move_string_never_calls_a_clash_clean` (8A→5A `hold` clash asserts no "clean") and `test_move_string_reports_clean_when_outgoing_holds` (8A→8A asserts "clean") in `tests/test_slot_picks.py`.
+- **#3 (should-fix) — CLOSED.** Added `test_keyless_successor_never_reported_clean` and `test_keyless_candidate_dropped_under_key_filter` — locks the keyless-neighbour honesty guard and the keyless-candidate drop under an active filter.
+- **#4–#7 (nits) — ACCEPTED / backlogged.** Not fixed here: #4 all-invalid `allowed_keys` silent no-op (echo raw vs resolved keys), #5 alt names a move the pool may lack a track for (teaching-acceptable per spec), #6 "pulls back toward it" dangling referent (voice), #7 `--keys` naming drift + endpoint double-loads the set (minor duplicate query). Candidates for a follow-up polish pass, none behaviour-critical.
+- Full backend suite **410 passed** (was 406; +2 move-string, +2 keyless), svelte-check unaffected.
