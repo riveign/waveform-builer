@@ -552,6 +552,28 @@ class ReplaceTrackRequest(BaseModel):
     new_track_id: int
 
 
+class SlotSuggestionItem(BaseModel):
+    track: TrackResponse
+    from_key: str | None = None
+    to_key: str | None = None
+    move: str
+    energy_shift: float
+    score: float
+    incoming_breakdown: ReplacementBreakdown | None = None
+    outgoing_breakdown: ReplacementBreakdown | None = None
+    caveat: str | None = None
+
+
+class SlotSuggestionsResponse(BaseModel):
+    set_id: int
+    position: int
+    mode: str
+    intent: str
+    allowed_keys: list[str] | None = None
+    energy_delta: float
+    suggestions: list[SlotSuggestionItem]
+
+
 # ── Import playlist models ──
 
 

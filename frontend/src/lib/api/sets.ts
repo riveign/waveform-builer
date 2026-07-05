@@ -13,6 +13,7 @@ import type {
 	SetTrack,
 	SetUpdateParams,
 	SetWaveformTrack,
+	SlotSuggestionsResponse,
 	TransitionDetail,
 } from '$lib/types';
 import { API_BASE, fetchJson } from './client';
@@ -207,6 +208,20 @@ export async function getArtistPicks(
 ): Promise<ArtistPicksResponse> {
 	const qs = new URLSearchParams({ artist, n: String(n) });
 	return fetchJson<ArtistPicksResponse>(`/api/sets/${setId}/artist-picks?${qs}`);
+}
+
+export async function getSlotSuggestions(
+	setId: number,
+	position: number,
+	opts: { mode: string; intent: string; allowedKeys?: string; energyDelta?: number; n?: number }
+): Promise<SlotSuggestionsResponse> {
+	const qs = new URLSearchParams({ mode: opts.mode, intent: opts.intent });
+	if (opts.allowedKeys) qs.set('allowed_keys', opts.allowedKeys);
+	if (opts.energyDelta !== undefined) qs.set('energy_delta', String(opts.energyDelta));
+	if (opts.n !== undefined) qs.set('n', String(opts.n));
+	return fetchJson<SlotSuggestionsResponse>(
+		`/api/sets/${setId}/slots/${position}/suggestions?${qs}`
+	);
 }
 
 export async function replaceTrackInSet(

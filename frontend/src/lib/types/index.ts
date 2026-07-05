@@ -560,6 +560,28 @@ export interface ArtistPicksResponse {
 	picks: ArtistPick[];
 }
 
+export interface SlotSuggestion {
+	track: Track;
+	from_key: string | null;
+	to_key: string | null;
+	move: string;
+	energy_shift: number;
+	score: number;
+	incoming_breakdown: ReplacementBreakdown | null;
+	outgoing_breakdown: ReplacementBreakdown | null;
+	caveat: string | null;
+}
+
+export interface SlotSuggestionsResponse {
+	set_id: number;
+	position: number;
+	mode: string;
+	intent: string;
+	allowed_keys: string[] | null;
+	energy_delta: number;
+	suggestions: SlotSuggestion[];
+}
+
 // ── Import Playlist types ──
 
 export interface UnmatchedTrack {
