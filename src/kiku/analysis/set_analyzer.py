@@ -104,12 +104,14 @@ def analyze_set(db: Session, set_id: int) -> SetAnalysisResult:
     # tracks' role tags (no build-time provenance needed).
     from kiku.set_roles import has_role
     if has_role(tracks[0], "opener"):
+        opener_name = tracks[0].title or "the first track"
         set_patterns.append(
-            f"Opened with “{tracks[0].title}” — you marked it a great opener."
+            f"Opened with “{opener_name}” — you marked it a great opener."
         )
     if has_role(tracks[-1], "closer"):
+        closer_name = tracks[-1].title or "the last track"
         set_patterns.append(
-            f"Closed on “{tracks[-1].title}” — one of your go-to closers."
+            f"Closed on “{closer_name}” — one of your go-to closers."
         )
 
     # 5. Overall score
