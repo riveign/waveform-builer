@@ -921,4 +921,45 @@ menu, so it needed its own role control: a chip-button that opens the same `SetR
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
 
 ## Post-Implement Review
-<!-- Filled by /spec REVIEW -->
+
+**Verdict: GOAL ACHIEVED — Yes.** The opener/closer/break curation axis ships end to end (storage →
+API → picker → badge → filter) as a non-exclusive, non-restrictive tag, with no auto-builder change.
+
+### Plan vs. implementation (all tasks Done, verified against committed code)
+- **Backend T1–T6** implemented exactly as planned: `set_roles.py`, `Track.set_roles`, migration
+  `e1f2a3b4c5d6`, `TrackSetRolesRequest`+response field, `PATCH /set-roles`, `search_tracks` filter.
+- **Frontend T7–T14** implemented, with the DESIGN-section deltas applied (gold tokens; badge via Chip
+  `mode="tone"`; multi→single icon-cluster; chip-toggle filter, single-active scalar v1).
+- **Beyond plan (approved additions):** inline set-role control in the **track view header**
+  (`TrackView.svelte`, commit `9f0df15`) — the detail view edits inline, not via the context menu, so
+  it needed its own control; and a designer pass replaced the bare "+ Set role" text with a dashed
+  gold ghost tile (`4a5f14c`, mockup v3).
+- **Drive-by fix (unrelated, pre-existing on main):** `SetAppearances.svelte` empty-state icon
+  ballooning (`c0af858`) — an inline `<span>` ignoring width; fixed with `display: inline-flex`.
+
+### Non-restrictive / non-exclusive guarantee (the core constraint) — HOLDS
+- `git diff --name-only main...HEAD` touches **no** `scoring` / `planner` / `filler` / `reorder` /
+  `set_analyzer` / `setbuilder` file. The tag only *adds* a search filter; it removes a track from
+  nothing. Confirmed mechanically, not just by intent.
+- Multiple roles per track supported (JSON list + multi-toggle picker); empty list clears.
+
+### Test coverage
+- **Backend:** 5 new API tests (persist+canonical-order, clear, unknown→422, 404, `search?set_role`);
+  full suite **416 passed**. Migration verified upgrade+downgrade on a scratch DB.
+- **E2E smoke (real DB):** PATCH→GET→search→reject→clear all pass; no residual test data.
+- **Frontend:** `svelte-check` 0/0. No component tests — the project has **zero** frontend test infra
+  (known gap, not introduced here); validated by svelte-check + manual/E2E. Not a blocker for v1.
+
+### Deviations from the written PLAN — all justified, none harm the GOAL
+- Filter is chip-toggles (single-active), not a `<select>` — user-approved in DESIGN; scalar `set_role`
+  matches the backend. Multi-role OR-filtering explicitly deferred.
+- Badge reuses the Chip `tone` recipe rather than a bespoke style — more consistent, cerceta-safe.
+
+### Next steps
+1. **PR to main** (branch `set-role-tags`).
+2. **Later spec:** auto-builder wiring (opener→`_pick_seed`, closer→tail, break→energy dips) +
+   multi-role OR-filter — the deliberately-deferred v2.
+3. Optional backlog: light-theme `--role` values when a light theme lands; frontend test harness.
+
+### Feedback
+- [ ] (none — no blocking deviations)
