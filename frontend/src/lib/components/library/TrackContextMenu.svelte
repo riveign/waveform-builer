@@ -1,10 +1,12 @@
 <script lang="ts">
 	import type { Track } from '$lib/types';
 	import { submitDecision } from '$lib/api/tinder';
-	import { updateTrackRating } from '$lib/api/tracks';
+	import { updateTrackRating, updateTrackSetRoles } from '$lib/api/tracks';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import EnergyZonePicker from './EnergyZonePicker.svelte';
 	import { ZONE_COLORS } from './EnergyZonePicker.svelte';
+	import SetRolePicker from './SetRolePicker.svelte';
+	import { ROLE_LABEL } from './SetRoleIcon.svelte';
 	import StarRating from '../primitives/StarRating.svelte';
 	import MenuItem from '../primitives/MenuItem.svelte';
 	import MenuSeparator from '../primitives/MenuSeparator.svelte';
@@ -38,6 +40,21 @@
 		}
 	}
 
+	async function handleRoleToggle(role: string) {
+		const previous = track.set_roles ?? [];
+		const next = previous.includes(role)
+			? previous.filter((r) => r !== role)
+			: [...previous, role];
+		// Keep the menu open — the DJ may mark several roles at once.
+		ontrackupdated?.({ set_roles: next });
+
+		try {
+			await updateTrackSetRoles(track.id, next);
+		} catch {
+			ontrackupdated?.({ set_roles: previous });
+		}
+	}
+
 	async function handleRatingChange(rating: number) {
 		const previousRating = track.rating;
 		ontrackupdated?.({ rating });
@@ -60,6 +77,16 @@
 </MenuItem>
 {#snippet energySub()}
 	<EnergyZonePicker current={track.resolved_energy} onselect={handleZoneSelect} />
+{/snippet}
+
+<MenuSeparator />
+
+<span class="menu-label" id="ctx-role-label">Set role</span>
+<MenuItem submenu={roleSub} submenuLabel="Set role">
+	{track.set_roles?.length ? track.set_roles.map((r) => ROLE_LABEL[r] ?? r).join(' · ') : 'not set'}
+</MenuItem>
+{#snippet roleSub()}
+	<SetRolePicker current={track.set_roles ?? []} ontoggle={handleRoleToggle} />
 {/snippet}
 
 <MenuSeparator />

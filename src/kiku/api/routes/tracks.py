@@ -19,6 +19,7 @@ from kiku.api.schemas import (
     TrackRatingRequest,
     TrackResponse,
     TrackSetAppearance,
+    TrackSetRolesRequest,
     TransitionScoreBreakdown,
 )
 from kiku.db.models import Track
@@ -46,6 +47,14 @@ def _track_to_response(t: Track) -> TrackResponse:
     if t.playlist_tags:
         try:
             tags = _json.loads(t.playlist_tags)
+        except (ValueError, TypeError):
+            pass
+
+    # Parse set_roles JSON (DJ curation tags — spec 027)
+    roles: list[str] = []
+    if t.set_roles:
+        try:
+            roles = _json.loads(t.set_roles)
         except (ValueError, TypeError):
             pass
 
@@ -80,6 +89,7 @@ def _track_to_response(t: Track) -> TrackResponse:
         disc_number=t.disc_number,
         comment=t.comment,
         playlist_tags=tags,
+        set_roles=roles,
         genre_family=family,
     )
 
@@ -99,6 +109,7 @@ def track_search(
     rating_min: int | None = None,
     plays_min: int | None = None,
     plays_max: int | None = None,
+    set_role: str | None = None,
     sort: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -119,6 +130,7 @@ def track_search(
         rating_min=rating_min,
         plays_min=plays_min,
         plays_max=plays_max,
+        set_role=set_role,
         sort=sort,
         limit=limit,
         offset=offset,
@@ -130,7 +142,8 @@ def track_search(
     fuzzy = False
     other_filters = any(
         f is not None for f in (title, artist, genre, key, label, bpm_min, bpm_max,
-                                energy, energy_zone, rating_min, plays_min, plays_max)
+                                energy, energy_zone, rating_min, plays_min, plays_max,
+                                set_role)
     )
     if search and total == 0 and not other_filters:
         from kiku.db.store import fuzzy_search_tracks
@@ -184,6 +197,28 @@ def update_track_rating(
         raise HTTPException(status_code=404, detail="Track not found")
     track.rating = body.rating if body.rating > 0 else None
     track.rating_source = "kiku"
+    db.commit()
+    db.refresh(track)
+    return _track_to_response(track)
+
+
+@router.patch("/{track_id}/set-roles", response_model=TrackResponse)
+def update_track_set_roles(
+    track_id: int,
+    body: TrackSetRolesRequest,
+    db: Session = Depends(get_db),
+) -> TrackResponse:
+    """Set a track's set-role tags (opener/closer/break). Empty list clears them.
+
+    Roles are a DJ curation signal, non-exclusive and non-restrictive — a track can
+    hold several and a role never stops it being used elsewhere in a set (spec 027).
+    """
+    import json as _json
+
+    track = db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    track.set_roles = _json.dumps(body.roles) if body.roles else None
     db.commit()
     db.refresh(track)
     return _track_to_response(track)

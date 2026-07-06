@@ -62,6 +62,7 @@ class Track(Base):
     disc_number = Column(Integer)
     acquired_month = Column(String)
     playlist_tags = Column(Text)  # JSON list of playlist names this track belongs to
+    set_roles = Column(Text)  # JSON list of DJ set-role tags: opener/closer/break (spec 027)
     last_synced = Column(String)
     energy_predicted = Column(String)   # Predicted energy tag from autotag classifier
     energy_confidence = Column(Float)   # Prediction confidence 0-1

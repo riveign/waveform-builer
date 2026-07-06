@@ -72,6 +72,7 @@
 	import { getTrackArtworkUrl, setTrackAffinity, removeTrackAffinity } from '$lib/api/tracks';
 	import StarRating from '../primitives/StarRating.svelte';
 	import Chip from '../primitives/Chip.svelte';
+	import SetRoleBadge from './SetRoleBadge.svelte';
 	import Menu from '../primitives/Menu.svelte';
 	import MenuItem from '../primitives/MenuItem.svelte';
 	import MenuSeparator from '../primitives/MenuSeparator.svelte';
@@ -355,6 +356,9 @@
 		     color-by-harmony, and the BPM delta are all relative to the reference
 		     track. Whole-chip priority hiding via the card's container query. ── -->
 		<div class="zone-chips">
+			<!-- Role outranks the tool-computed energy chip in retention (spec 027):
+			     it's the DJ's own mark, so it leads the row. -->
+			<SetRoleBadge roles={track.set_roles} variant="full" />
 			{#if track.key}
 				<Chip
 					variant="key"
@@ -408,6 +412,8 @@
 		     star count. Every icon keeps its real value in aria-label/title so nothing
 		     is lost (a11y), and the distinct shapes mean color is never the only cue. -->
 		<div class="compact-icons">
+			<!-- Role pip survives into the compact icon row, where the energy chip drops. -->
+			<SetRoleBadge roles={track.set_roles} variant="pip" />
 			{#if track.key && harmonyRelation}
 				<span
 					class="cicon"
@@ -487,6 +493,7 @@
 		     `plain` Chip mode (bare colored text, no box) for a lighter read since
 		     these are descriptive facts, not transition deltas. ── -->
 		<div class="zone-chips">
+			<SetRoleBadge roles={track.set_roles} variant="full" />
 			{#if track.key}
 				<Chip
 					variant="key"
@@ -510,6 +517,7 @@
 		     metronome · N★. No harmony move, no match-strength bars — there is no
 		     reference track, so those signals must NOT render. -->
 		<div class="compact-icons compact-icons--standalone">
+			<SetRoleBadge roles={track.set_roles} variant="pip" />
 			{#if track.key}
 				<span class="cicon" style="color: {getCamelotColor(track.key)}" title="Camelot key {formatKey(track.key)}">
 					<span class="key-dot" aria-hidden="true"></span>

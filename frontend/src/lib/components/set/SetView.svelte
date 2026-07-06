@@ -61,6 +61,7 @@
 			disc_number: null,
 			comment: null,
 			playlist_tags: [],
+			set_roles: [],
 			genre_family: null,
 		};
 	}

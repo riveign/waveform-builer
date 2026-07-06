@@ -6,6 +6,7 @@
 	import Typeahead from './Typeahead.svelte';
 	import Button from '../primitives/Button.svelte';
 	import Chip from '../primitives/Chip.svelte';
+	import SetRoleIcon from './SetRoleIcon.svelte';
 
 	interface GenreFamily {
 		family_name: string;
@@ -26,6 +27,7 @@
 	let energy = $state('');
 	let energyZone = $state('');
 	let ratingMin = $state('');
+	let setRole = $state('');
 	let playsFilter = $state('');
 	let sortRecent = $state(false);
 	let sortPlays = $state<'' | 'plays' | 'plays_asc'>('');
@@ -66,6 +68,7 @@
 		if (energy) params.energy = energy;
 		if (energyZone) params.energy_zone = energyZone;
 		if (ratingMin) params.rating_min = Number(ratingMin);
+		if (setRole) params.set_role = setRole;
 		if (playsFilter === 'unplayed') params.plays_max = 0;
 		else if (playsFilter === 'played') params.plays_min = 1;
 		if (sortRecent) params.sort = 'recent';
@@ -136,6 +139,7 @@
 		energy !== '' ||
 		energyZone !== '' ||
 		ratingMin !== '' ||
+		setRole !== '' ||
 		playsFilter !== '' ||
 		sortRecent ||
 		sortPlays !== ''
@@ -172,6 +176,7 @@
 		energy = '';
 		energyZone = '';
 		ratingMin = '';
+		setRole = '';
 		playsFilter = '';
 		sortRecent = false;
 		sortPlays = '';
@@ -222,6 +227,11 @@
 	function onEnergyChange() { searchNow(); }
 	function onEnergyZoneChange() { searchNow(); }
 	function onRatingChange() { searchNow(); }
+	function toggleSetRole(role: string) {
+		setRole = setRole === role ? '' : role;
+		searchNow();
+	}
+	const SET_ROLE_LABELS: Record<string, string> = { opener: 'Openers', closer: 'Closers', break: 'Break tracks' };
 	function onBpmChange() {
 		clearTimeout(textTimer);
 		textTimer = setTimeout(() => searchNow(), 300);
@@ -358,6 +368,9 @@
 			{/if}
 			{#if ratingMin}
 				<Chip value="{ratingMin}+ stars" size="sm" removable removeLabel="Clear rating filter" onremove={() => { ratingMin = ''; searchNow(); }} />
+			{/if}
+			{#if setRole}
+				<Chip value={SET_ROLE_LABELS[setRole]} size="sm" removable removeLabel="Clear set-role filter" onremove={() => { setRole = ''; searchNow(); }} />
 			{/if}
 			{#if playsFilter}
 				<Chip
@@ -550,6 +563,14 @@
 						<option value="4">4+</option>
 						<option value="5">5</option>
 					</select>
+				</div>
+				<div class="field-group field-group--role">
+					<span class="section-label">Set role</span>
+					<div class="role-toggles">
+						<button type="button" class="role-toggle" class:on={setRole === 'opener'} onclick={() => toggleSetRole('opener')} title="Tracks you'd open a set with"><SetRoleIcon role="opener" /> Openers</button>
+						<button type="button" class="role-toggle" class:on={setRole === 'closer'} onclick={() => toggleSetRole('closer')} title="Tracks that send people home"><SetRoleIcon role="closer" /> Closers</button>
+						<button type="button" class="role-toggle" class:on={setRole === 'break'} onclick={() => toggleSetRole('break')} title="Breather tracks for mid-set"><SetRoleIcon role="break" /> Break tracks</button>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -890,5 +911,42 @@
 	.small-select:focus {
 		outline: none;
 		border-color: var(--accent);
+	}
+	.role-toggles {
+		display: flex;
+		gap: var(--space-xs);
+		flex-wrap: wrap;
+	}
+	.role-toggle {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2xs);
+		height: 28px;
+		padding: 0 var(--space-md);
+		background: var(--surface-3);
+		border: 1px solid transparent;
+		border-radius: var(--radius-full, 999px);
+		color: var(--text-3);
+		font: inherit;
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-medium);
+		cursor: pointer;
+	}
+	.role-toggle :global(.set-role-icon) {
+		width: 13px;
+		height: 13px;
+	}
+	.role-toggle:hover {
+		color: var(--text-1);
+		border-color: var(--role);
+	}
+	.role-toggle.on {
+		--chip-color: var(--role);
+		background: var(--chip-tone-bg);
+		color: var(--chip-tone-fg);
+		border-color: var(--role);
+	}
+	.role-toggle.on :global(.set-role-icon) {
+		color: var(--role);
 	}
 </style>

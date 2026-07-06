@@ -99,6 +99,7 @@ def search_tracks(
     rating_min: int | None = None,
     plays_min: int | None = None,
     plays_max: int | None = None,
+    set_role: str | None = None,
     sort: str | None = None,
     search: str | None = None,
     limit: int = 50,
@@ -157,6 +158,10 @@ def search_tracks(
         q = q.filter(or_(*key_conditions))
     if rating_min is not None:
         q = q.filter(Track.rating >= rating_min)
+    if set_role:
+        # set_roles is a JSON string list, e.g. '["opener", "break"]'. Match the
+        # quoted token so "open" never false-positives on "opener" (spec 027).
+        q = q.filter(Track.set_roles.ilike(f'%"{set_role}"%'))
     if plays_min is not None:
         combined = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
         q = q.filter(combined >= plays_min)

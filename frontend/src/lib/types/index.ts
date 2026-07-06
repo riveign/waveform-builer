@@ -32,6 +32,7 @@ export interface Track {
 	disc_number: number | null;
 	comment: string | null;
 	playlist_tags: string[];
+	set_roles: string[];
 	genre_family: string | null;
 }
 

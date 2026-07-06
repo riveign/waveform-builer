@@ -18,6 +18,7 @@
 	import { capFirst, scoreStrength } from './TrackCard.svelte';
 	import StarRating from '../primitives/StarRating.svelte';
 	import Chip from '../primitives/Chip.svelte';
+	import SetRoleBadge from './SetRoleBadge.svelte';
 	import Menu from '../primitives/Menu.svelte';
 	import MenuItem from '../primitives/MenuItem.svelte';
 	import MenuSeparator from '../primitives/MenuSeparator.svelte';
@@ -269,6 +270,7 @@
 		<!-- Row 2: comparative attribute chips — key + harmony move, BPM + signed
 		     delta, energy zone. All measured against the reference track. -->
 		<div class="chips">
+			<SetRoleBadge roles={track.set_roles} variant="full" />
 			{#if track.key}
 				<Chip
 					variant="key"

@@ -16,6 +16,16 @@ class TrackRatingRequest(BaseModel):
         return v
 
 
+class TrackSetRolesRequest(BaseModel):
+    roles: list[str] = []
+
+    @field_validator('roles')
+    @classmethod
+    def validate_roles(cls, v: list[str]) -> list[str]:
+        from kiku.set_roles import normalize_roles
+        return normalize_roles(v)
+
+
 class EnergyConflictResponse(BaseModel):
     dir_energy: str
     predicted: str
@@ -50,6 +60,7 @@ class TrackResponse(BaseModel):
     disc_number: int | None = None
     comment: str | None = None
     playlist_tags: list[str] = []
+    set_roles: list[str] = []
     genre_family: str | None = None
 
     model_config = {"from_attributes": True}
