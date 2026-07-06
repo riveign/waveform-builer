@@ -801,6 +801,82 @@ Tools: git.
 ## Plan Review
 <!-- Filled if required to validate plan -->
 
+## Design
+
+**Status:** approved by the DJ (user) on interactive mockup **v2** (design-and-approve step, run
+between PLAN and IMPLEMENT because this feature changes UI/UX). Mockup source:
+`scratchpad/set-role-design-mockup.html`. Product-designer pass grounded in the real CERCETA tokens.
+
+### Role identity — a new `--role-*` gold family
+All three roles share ONE warm-gold hue; the **icon** distinguishes them. Gold sits entirely OFF the
+cerceta cool→hot energy ramp (`--zone-*`: navy→teal→lilac→magenta) + accent teal + star magenta, so a
+role can never be misread as an energy chip. Roles read as one curatorial family; gold connotes a
+hand-picked "gold-star" placement — the DJ's own mark.
+
+Plumbing (follow the existing 3-tier token pattern): add a `--gold-*` ramp in
+`frontend/src/lib/styles/tokens.primitives.css` (anchor `#E4B34D`), point `--role*` at it in
+`tokens.semantic.css`, derive the badge via the same `color-mix` tone recipe used for genre/`--chip-tone`
+chips (so cerceta re-points cleanly; nothing hardcodes hex). Values:
+
+```
+Dark (app default):
+  --role:              #E4B34D   /* text-safe gold on #0D0D0D (~9:1) — icons, pips, filter-active */
+  --role-strong:       #D69A2E   /* solid fill / active icon */
+  --role-badge-bg:     color-mix(in srgb, var(--role) 16%, var(--surface-2))
+  --role-badge-fg:     color-mix(in srgb, var(--role) 62%, var(--text-1))
+  --role-badge-border: color-mix(in srgb, var(--role) 42%, transparent)
+Light (author when a light theme lands; app ships dark-only today):
+  --role: #9A6E12; --role-strong: #7A5610;  (badge derivations use the same color-mix recipe)
+```
+
+### Icons (inline SVG, `currentColor`)
+- **opener = sunrise** (doors open) · **closer = moon** (last word) · **break = pause bars** (a breather).
+- Text label always present at full width — color/icon are never the only cue (matches design-system §4).
+
+### Badge behavior — role count NEVER changes layout footprint
+A role is the DJ's own mark (curation, like rating), so it **outranks the tool-computed energy chip**
+in retention across TrackCard's container-query tiers. It is ALWAYS a **single element** in the existing
+chip/icon row:
+- **1 role:** icon + label (e.g. "Opener").
+- **2–3 roles:** collapse into **ONE gold badge holding the icon cluster** (🌅🌙⏸ together) — never
+  several chips. Tooltip lists them ("You marked this: opener · closer · break").
+- **Tier survival:** regular = icon+label · intermediate = icon-only gold pip · compact pill = gold pip
+  joins the icon row (survives where the energy chip drops) · minimal = one gold pip = "has role marks."
+- **Uniform height (v2 fix):** because the badge is always exactly one element that cannot wrap, a
+  0-role and a 3-role card at the same width are **identical height**. Pill tiers share one `min-height`.
+- **0 roles:** nothing rendered (no empty slot); table shows the canonical muted em dash.
+
+### Picker (context menu submenu)
+Multi-toggle. Active row = trailing **✓** + faint gold row tint + the leading icon goes full-gold, so
+all marked roles read at a glance. Toggling **does not close the menu**. Parent "Set role" row shows a
+muted summary of marked roles ("Opener · Break"), or "not set" when none. No nagging — absence is normal
+for a non-restrictive additive tag.
+
+### Filter (library) — SUPERSEDES Plan Task 13
+**Chip-toggles, not a `<select>`** (three round toggles: Openers / Closers / Break tracks), mirroring
+the existing genre/key toggle pattern; a removable gold active-filter chip appears when one is on.
+**v1 backend stays scalar:** the API `set_role` param filters by ONE role at a time — the three toggles
+behave as single-select (activating one clears the others; clicking the active one clears it). Multi-role
+OR-filtering is a later nicety, out of v1 scope.
+
+### Copy (Kiku voice)
+Badge tooltip: "You marked this a great {role}". Picker submenu hint: "Mark where this track earns its
+place. Pick as many as fit." Filter labels: Openers / Closers / Break tracks. Empty/none: "not set".
+
+### Reconciliation with the committed Plan (deltas IMPLEMENT must honor)
+- **NEW token task** (do FIRST in frontend): add `--gold-*` primitives + `--role-*` semantic tokens
+  (dark now; light when a light theme lands) to the two token files above.
+- **Task 10 (`SetRoleBadge.svelte`)** — supersede the plain-text stub: it takes `roles: string[]` + a
+  `variant` (`'full' | 'icononly' | 'pip'`), renders inline SVG icons, and applies the multi-role
+  single-cluster + uniform-height rules above; styled via `--role-*` tokens.
+- **Task 12 (badge in cards)** — placement is **tier-aware** per this section (regular icon+label →
+  intermediate icononly → compact/minimal pip); ensure it does not change card height.
+- **Task 13 (filter)** — chip-toggles per above, not a select; the active-filter gold chip; scalar
+  `set_role` (single active role) for v1.
+- **Task 9 (`SetRolePicker.svelte`)** — add the gold active state (✓ + tint + gold icon) and the
+  role icons; keep multi-toggle + menu-stays-open.
+- Backend Tasks 1–8 unchanged.
+
 ## Implement
 <!-- Filled by /spec IMPLEMENT -->
 
