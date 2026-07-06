@@ -899,6 +899,10 @@ TODOs (execution order; backend first, then tokens, then frontend):
 - [x] T17 E2E smoke — Status: Done
 
 **Implementation commit:** `86752f4` — spec(027): IMPLEMENT - set-role-tags (20 files).
+**Follow-up commit:** `9f0df15` — set-role picker in the **track view** header (`TrackView.svelte`). The
+detail view edits attributes inline (its own `EnergyZonePicker` + `StarRating`), not via the context
+menu, so it needed its own role control: a chip-button that opens the same `SetRolePicker` dropdown
+(multi-toggle, optimistic + rollback), showing the gold badge when set or "+ Set role" when not.
 
 ### Results
 - **Backend:** full suite **416 passed** (5 new set-role tests). Migration `e1f2a3b4c5d6` upgrades AND downgrades
