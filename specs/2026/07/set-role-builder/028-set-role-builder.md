@@ -605,7 +605,7 @@ TODOs (backend first, then frontend):
 **Implementation commit:** `ec2f900` — spec(028): IMPLEMENT - set-role-builder (9 files).
 
 ### Results
-- **Backend:** full suite **421 passed** (was 416; +5 new in `test_set_role_builder.py`, +1 api multi-role).
+- **Backend:** full suite **421 passed** (was 416; +4 new in `test_set_role_builder.py`, +1 api multi-role).
   Seed bias proven both ways: `test_seed_prefers_opener_when_energy_close` (opener wins a close call)
   and `test_seed_does_not_force_opener_on_clear_loss` (the 0.15 bonus does NOT beat a clear energy win
   — the soft-bias contract, enforced). Teaching notes asserted present for tagged first/last.
@@ -625,4 +625,50 @@ TODOs (backend first, then frontend):
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
 
 ## Post-Implement Review
-<!-- Filled by /spec REVIEW -->
+
+**Verdict: GOAL ACHIEVED — Yes.** DJ curation now shapes generated sets (opener→seed, closer→tail),
+with multi-role OR-filtering and plain-language "why", all as a SOFT bias that never forces a weak
+transition or filters the pool.
+
+### Plan vs. implementation (re-read each file; all tasks Done)
+- **T1 helpers** — `track_roles()`/`has_role()` in `set_roles.py`, tolerant JSON parse, drops unknowns.
+- **T2 opener seed** — `_pick_seed` `seed_rank` subtracts `_ROLE_SPAN` (0.15) for openers; for a
+  non-opener `seed_rank == energy_diff`, so a no-opener pool sorts identically (regression-safe).
+  Guarded by the explicit-seed short-circuit.
+- **T3 closer tail** — `end_ramp = _end_pull(progress)` computed independently of the ending anchor;
+  `if end_ramp > 0 and has_role(cand,"closer")` short-circuits so `has_role` (a JSON parse) only runs
+  in the final 20%. Adds 0 when no closers → regression-safe.
+- **T4 teaching** — appended to `set_patterns` in `analyze_set`; `build_set_sse` auto-analyzes after a
+  build (`sets.py:420`), so the note surfaces with no extra call, and renders via the existing
+  `SetView.svelte:599` path. **Fix applied during review** (`ec2f900`→ below): guard a null title so it
+  reads "the first/last track" instead of `“None”`.
+- **T5/T6 multi-role filter** — `search_tracks` scalar→list OR-match; route `Query(None)` list;
+  `other_filters` `f is not None` still valid for an empty→None param.
+- **T7/T8 frontend** — `SearchParams.set_role: string[]` (searchTracks already serializes arrays);
+  `SearchFilters` toggles now a `Set<string>`, one removable chip per active role.
+
+### Test coverage
+- 4 units (`test_set_role_builder.py`) + 1 API (multi-role OR). Full suite **421 passed**. The soft
+  contract is enforced by `test_seed_does_not_force_opener_on_clear_loss`. Real-DB smoke on the filter.
+- Regression: no existing test broke; bonus = 0 for untagged; no-opener seed sort is byte-identical.
+
+### Deviations from PLAN — none. Non-goals honored (no `transition_score`/`suggest_next`/
+`SetBuildRequest`/`score_replacement` change; no break→dips).
+
+### Review fix (applied)
+- **Null-title teaching note** — `analyze_set` now falls back to "the first/last track" when a
+  role-tagged edge track has no title (avoids `Opened with “None”`). Cosmetic; re-tested (4/4).
+
+### Backlog nits (non-blocking, not fixed)
+- `_pick_seed` calls `has_role` (JSON parse) once per candidate while sorting the full pool — a few ms
+  on a ~4k library. Optimize only if seed selection ever shows up in a profile.
+- Closer is a final-stretch *preference*, not a guaranteed last slot (documented soft semantics), and
+  the search filter does not validate role strings against `SET_ROLES` (an unknown role harmlessly
+  matches nothing).
+
+### Next steps
+1. **PR to main** (branch `set-role-builder`).
+2. **Spec 029 (deferred):** break → energy dips + break in the multi-role filter surfacing.
+
+### Feedback
+- [ ] (none blocking — the one review fix is applied above)
