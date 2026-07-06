@@ -586,7 +586,37 @@ Tools: git.
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+TODOs (backend first, then frontend):
+- [x] T1 set_roles.py: track_roles() + has_role() — Done
+- [x] T2 planner.py: _ROLE_SPAN + opener seed bias — Done
+- [x] T3 planner.py: closer tail bias (end_ramp reused, anchor-independent) — Done
+- [x] T4 set_analyzer.py: teaching notes appended to set_patterns — Done
+- [x] T5 store.py: multi-role OR-filter — Done
+- [x] T6 routes/tracks.py: repeatable set_role Query(None) — Done
+- [x] T7 tracks.ts: SearchParams.set_role → string[] — Done
+- [x] T8 SearchFilters.svelte: single→multi (Set) — Done
+- [x] T9 tests/test_set_role_builder.py (5 units) — Done
+- [x] T10 api multi-role OR test — Done
+- [x] T11 pytest + svelte-check — Done
+- [x] T12 E2E smoke (real-DB multi-role filter) — Done
+- [x] T13 commit — Done (see hash below)
+
+**Implementation commit:** `ec2f900` — spec(028): IMPLEMENT - set-role-builder (9 files).
+
+### Results
+- **Backend:** full suite **421 passed** (was 416; +5 new in `test_set_role_builder.py`, +1 api multi-role).
+  Seed bias proven both ways: `test_seed_prefers_opener_when_energy_close` (opener wins a close call)
+  and `test_seed_does_not_force_opener_on_clear_loss` (the 0.15 bonus does NOT beat a clear energy win
+  — the soft-bias contract, enforced). Teaching notes asserted present for tagged first/last.
+- **Regression guard:** full suite green; role bonus is `0` for untagged tracks, so a no-role library
+  builds identically.
+- **Real-DB E2E smoke:** multi-role OR filter returns the union (opener+closer), excludes unselected
+  (break); single still works; test data cleaned up.
+- **Frontend:** `svelte-check` **0/0**. Filter chip-toggles now multi-active (a `Set`), each active role
+  shows a removable chip.
+- **Deviations:** none from PLAN. No `transition_score`/`suggest_next`/`SetBuildRequest` touched.
+  Closer is a final-stretch preference, not a guaranteed last slot (documented soft semantics).
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
