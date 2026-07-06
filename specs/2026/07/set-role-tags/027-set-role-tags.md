@@ -878,7 +878,37 @@ place. Pick as many as fit." Filter labels: Openers / Closers / Break tracks. Em
 - Backend Tasks 1–8 unchanged.
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+TODOs (execution order; backend first, then tokens, then frontend):
+- [x] T1 `src/kiku/set_roles.py` — SET_ROLES + normalize_roles — Status: Done
+- [x] T2 `Track.set_roles` column — Status: Done
+- [x] T3 Alembic migration `e1f2a3b4c5d6` (off head `d0e1f2a3b4c5`) — Status: Done
+- [x] T4 schemas: TrackSetRolesRequest + response field — Status: Done
+- [x] T5 routes/tracks.py: import + response builder + PATCH + search param — Status: Done
+- [x] T6 store.py: set_role filter (quoted-token ilike) — Status: Done
+- [x] T7 gold `--gold-*` primitives + `--role*` semantic tokens — Status: Done
+- [x] T8 types/index.ts: set_roles — Status: Done
+- [x] T9 tracks.ts: updateTrackSetRoles + SearchParams.set_role — Status: Done
+- [x] T10 SetRoleIcon.svelte + SetRolePicker.svelte (icons + gold active, multi-toggle, menu stays open) — Status: Done
+- [x] T11 SetRoleBadge.svelte (icons, multi→single cluster, full/icononly/pip variants; tone recipe) — Status: Done
+- [x] T12 TrackContextMenu wiring (optimistic + rollback) — Status: Done
+- [x] T13 Badge in TrackCard (zone-chips + compact-icons pip) / RelatedTrackCard / TrackTable (new Role column, drops with energy <320px) — Status: Done
+- [x] T14 SearchFilters chip-toggle filter (single-active v1) + active gold chip — Status: Done
+- [x] T15 API tests (persist/clear/reject/404/filter) — Status: Done
+- [x] T16 pytest + svelte-check — Status: Done (ruff not installed in venv)
+- [x] T17 E2E smoke — Status: Done
+
+**Implementation commit:** `86752f4` — spec(027): IMPLEMENT - set-role-tags (20 files).
+
+### Results
+- **Backend:** full suite **416 passed** (5 new set-role tests). Migration `e1f2a3b4c5d6` upgrades AND downgrades
+  cleanly; applied to the dev DB (`data/dj_library.db` now at head, column present).
+- **Frontend:** `svelte-check` **0 errors / 0 warnings** (341 files). Fixed two pre-existing Track literals
+  (`SetView.svelte`, `design-system/+page.svelte`) that now need `set_roles: []`.
+- **E2E smoke (real DB, in-process TestClient):** PATCH `["opener","break"]` → persists + canonical order on GET;
+  `search?set_role=opener` returns the tagged track only; unknown role → 422; clear → `[]`. No test data left behind.
+- **Deviation (recorded in Design):** filter is chip-toggles (single active for v1 scalar `set_role`), not a `<select>`;
+  badge reuses the Chip `mode="tone"` recipe via a gold `--role`/`--chip-color`; multi-role collapses to one icon cluster.
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
