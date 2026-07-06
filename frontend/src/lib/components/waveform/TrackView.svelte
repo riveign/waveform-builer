@@ -744,30 +744,52 @@
 	.role-badge-wrapper {
 		position: relative;
 	}
+	/* Bare wrapper — the tile (empty) or the SetRoleBadge (set) owns its own box. */
 	.role-chip-btn {
 		display: inline-flex;
 		align-items: center;
-		min-height: var(--chip-height-md);
-		padding: 0 var(--space-2xs);
-		border: 1px solid transparent;
-		border-radius: var(--chip-radius);
+		padding: 0;
+		border: none;
 		background: none;
+		border-radius: var(--chip-radius);
 		font: inherit;
 		cursor: pointer;
-		transition: background var(--dur-fast) var(--ease-standard);
 	}
-	.role-chip-btn:hover {
-		background: var(--surface-hover);
-	}
+	/* EMPTY state — a quiet dashed gold ghost tile: an invitation, not a value.
+	   Dashed + transparent + muted gold reads as "add", and stays quieter than the
+	   solid gold set badge so a tagged track still pops. */
 	.role-add {
 		display: inline-flex;
 		align-items: center;
+		gap: var(--space-xs);
 		height: var(--chip-height-md);
 		padding: 0 var(--chip-pad-x-md);
-		color: var(--role);
+		border: 1px dashed color-mix(in srgb, var(--role) 45%, transparent);
+		border-radius: var(--chip-radius);
+		background: transparent;
+		color: color-mix(in srgb, var(--role) 78%, var(--text-2));
 		font-size: var(--chip-font-md);
 		font-weight: var(--font-weight-medium);
 		line-height: 1;
+		transition:
+			background var(--dur-fast) var(--ease-standard),
+			border-color var(--dur-fast) var(--ease-standard),
+			color var(--dur-fast) var(--ease-standard);
+	}
+	/* Hover / keyboard-focus — the invitation "arms" to full gold with a faint fill. */
+	.role-chip-btn:hover .role-add,
+	.role-chip-btn:focus-visible .role-add {
+		background: color-mix(in srgb, var(--role) 12%, transparent);
+		border-color: var(--role);
+		color: var(--role);
+	}
+	.role-chip-btn:active .role-add {
+		background: color-mix(in srgb, var(--role) 18%, transparent);
+	}
+	/* SET state — brighten the badge's soft border on hover to signal it's editable. */
+	.role-chip-btn:hover :global(.set-role-badge),
+	.role-chip-btn:focus-visible :global(.set-role-badge) {
+		border-color: var(--role);
 	}
 	.role-dropdown {
 		position: absolute;
