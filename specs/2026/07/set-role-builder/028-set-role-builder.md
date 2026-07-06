@@ -194,7 +194,393 @@ the whole-set narrative (P3 "The Arc Over the Moment").
 change; no `SetBuildRequest` field; no break→dips.
 
 ## Plan
-<!-- Filled by /spec PLAN -->
+
+### Files
+- `src/kiku/set_roles.py` — add `track_roles()` + `has_role()`.
+- `src/kiku/setbuilder/planner.py` — `_ROLE_SPAN` const + `has_role` import; opener bias in
+  `_pick_seed` (L114-122); closer bias in the `build_set` scoring loop (L244-276).
+- `src/kiku/analysis/set_analyzer.py` — append opener/closer teaching notes in `analyze_set` (after L100).
+- `src/kiku/db/store.py` — `search_tracks` `set_role` scalar→list OR-match (L102, L161-164).
+- `src/kiku/api/routes/tracks.py` — search route `set_role` → `list[str] | None = Query(None)` (L112).
+- `frontend/src/lib/api/tracks.ts` — `SearchParams.set_role: string` → `string[]` (L18).
+- `frontend/src/lib/components/library/SearchFilters.svelte` — role filter single→multi
+  (L30, L71, L142, L179, L230-234, L372-373, L570-572).
+- `tests/test_set_role_builder.py` *(new)* — planner + helper + teaching units.
+- `tests/api/test_tracks_api.py` — multi-role OR-filter test.
+
+### Tasks
+
+#### Task 1 — set_roles.py: track_roles() + has_role()
+Tools: editor.
+````diff
+--- a/src/kiku/set_roles.py
++++ b/src/kiku/set_roles.py
+@@
+ from __future__ import annotations
+ 
++from typing import Any
++
+ SET_ROLES: tuple[str, ...] = ("opener", "closer", "break")
+@@
+     present = set(roles)
+     return [r for r in SET_ROLES if r in present]
++
++
++def track_roles(track: Any) -> list[str]:
++    """Parse a Track's stored ``set_roles`` (JSON Text) into a clean role list.
++
++    Tolerant: returns [] on missing/blank/malformed data, and drops any value
++    not in SET_ROLES.
++    """
++    import json
++
++    raw = getattr(track, "set_roles", None)
++    if not raw:
++        return []
++    try:
++        roles = json.loads(raw)
++    except (ValueError, TypeError):
++        return []
++    if not isinstance(roles, list):
++        return []
++    return [r for r in roles if r in SET_ROLES]
++
++
++def has_role(track: Any, role: str) -> bool:
++    """True if the track carries the given set-role tag."""
++    return role in track_roles(track)
+````
+Verification: `python -c "from kiku.set_roles import has_role, track_roles; print(track_roles(type('T',(),{'set_roles':'[\"opener\",\"x\"]'})()))"` → `['opener']`.
+
+#### Task 2 — planner.py: _ROLE_SPAN + opener seed bias
+Tools: editor. Two edits.
+
+2a. Import + constant (after the existing scoring import at L18):
+````diff
+--- a/src/kiku/setbuilder/planner.py
++++ b/src/kiku/setbuilder/planner.py
+@@
+ from kiku.setbuilder.scoring import bpm_compatibility, transition_score, vibe_continuity
++from kiku.set_roles import has_role
+ from kiku.vibe import resolve_vibe
+ 
+ console = Console()
++
++# Set-role soft bias (spec 028): a small, bounded, positive-only nudge — smaller
++# than _VIBE_SPAN (0.3) / _ARTIST_SPAN (0.2) in scoring.py, so key/energy/BPM fit
++# still dominate. An opener/closer only breaks close calls; it never forces a weak
++# transition and never removes a non-tagged track from the pool.
++_ROLE_SPAN = 0.15
+````
+2b. Opener bias in `_pick_seed` (replace the energy-only sort):
+````diff
+--- a/src/kiku/setbuilder/planner.py
++++ b/src/kiku/setbuilder/planner.py
+@@
+-    # Pick track closest to first segment's target energy
+-    target = energy_profile.segments[0].target_energy if energy_profile.segments else 0.3
+-
+-    def energy_diff(t: Track) -> float:
+-        te = get_track_energy(t)
+-        return abs(te.numeric - target)
+-
+-    candidates_sorted = sorted(candidates, key=energy_diff)
+-    return candidates_sorted[0]
++    # Pick the track closest to the first segment's target energy, softly favouring
++    # opener-tagged tracks (spec 028): an opener within ~_ROLE_SPAN energy of the best
++    # non-opener wins the seed, but a clearly better energy fit still wins. Only when
++    # the DJ did NOT pin an explicit seed (handled by the short-circuit above).
++    target = energy_profile.segments[0].target_energy if energy_profile.segments else 0.3
++
++    def seed_rank(t: Track) -> float:
++        te = get_track_energy(t)
++        diff = abs(te.numeric - target)
++        if has_role(t, "opener"):
++            diff -= _ROLE_SPAN
++        return diff
++
++    candidates_sorted = sorted(candidates, key=seed_rank)
++    return candidates_sorted[0]
+````
+Verification: Task 9 unit test.
+
+#### Task 3 — planner.py: closer tail bias in build_set scoring loop
+Tools: editor. Two edits in `build_set`.
+
+3a. Compute the end-ramp independently of the ending anchor (L244-245):
+````diff
+--- a/src/kiku/setbuilder/planner.py
++++ b/src/kiku/setbuilder/planner.py
+@@
+-            # Soft pull toward the ending anchor in the final stretch
+-            pull = _end_pull(progress) if end_track else 0.0
++            # Final-stretch ramp (0 until 80% through). Drives BOTH the optional
++            # ending-anchor pull and the closer-role nudge below.
++            end_ramp = _end_pull(progress)
++            pull = end_ramp if end_track else 0.0
+````
+3b. Add the closer nudge alongside the ending-anchor bias (L272-276):
+````diff
+--- a/src/kiku/setbuilder/planner.py
++++ b/src/kiku/setbuilder/planner.py
+@@
+                 # Soft landing: bias the tail toward the ending anchor
+                 if pull > 0 and end_track is not None and cand.id != end_track.id:
+                     score += pull * _end_affinity(cand, end_track)
+ 
++                # Closer role: favour closer-tagged tracks in the final stretch so one
++                # is likely to land last (soft, spec 028). Independent of any ending
++                # anchor; reuses the same end-ramp. A preference, not a guarantee.
++                if end_ramp > 0 and has_role(cand, "closer"):
++                    score += end_ramp * _ROLE_SPAN
++
+                 scored_candidates.append((cand, score))
+````
+Verification: Task 9 unit test.
+
+#### Task 4 — set_analyzer.py: opener/closer "why" teaching notes
+Tools: editor. Append to `set_patterns` after it is computed (between L100 and L102):
+````diff
+--- a/src/kiku/analysis/set_analyzer.py
++++ b/src/kiku/analysis/set_analyzer.py
+@@
+     set_patterns = detect_set_patterns(
+         score_dicts,
+         arc.energy_curve,
+         arc.key_journey,
+         [t.bpm for t in tracks],
+     )
+ 
++    # Role-driven "why" (spec 028): if the DJ's own opener led the set or their
++    # closer ended it, say so — teaching, in their voice. Derived from the final
++    # tracks' role tags (no build-time provenance needed).
++    from kiku.set_roles import has_role
++    if has_role(tracks[0], "opener"):
++        set_patterns.append(
++            f"Opened with “{tracks[0].title}” — you marked it a great opener."
++        )
++    if has_role(tracks[-1], "closer"):
++        set_patterns.append(
++            f"Closed on “{tracks[-1].title}” — one of your go-to closers."
++        )
++
+     # 5. Overall score
+````
+Verification: Task 9 unit test; renders via existing `SetView.svelte:599`.
+
+#### Task 5 — store.py: multi-role OR-filter
+Tools: editor. Two edits in `search_tracks`.
+````diff
+--- a/src/kiku/db/store.py
++++ b/src/kiku/db/store.py
+@@
+-    set_role: str | None = None,
++    set_role: str | list[str] | None = None,
+     sort: str | None = None,
+````
+````diff
+--- a/src/kiku/db/store.py
++++ b/src/kiku/db/store.py
+@@
+     if set_role:
+         # set_roles is a JSON string list, e.g. '["opener", "break"]'. Match the
+         # quoted token so "open" never false-positives on "opener" (spec 027).
+-        q = q.filter(Track.set_roles.ilike(f'%"{set_role}"%'))
++        # A list OR-matches — a track with ANY selected role qualifies (spec 028).
++        roles = [set_role] if isinstance(set_role, str) else set_role
++        q = q.filter(or_(*[Track.set_roles.ilike(f'%"{r}"%') for r in roles]))
+````
+Verification: Task 10 API test. (`or_` already imported in store.py.)
+
+#### Task 6 — routes/tracks.py: search route accepts repeatable set_role
+Tools: editor.
+````diff
+--- a/src/kiku/api/routes/tracks.py
++++ b/src/kiku/api/routes/tracks.py
+@@
+-    set_role: str | None = None,
++    set_role: list[str] | None = Query(None),
+     sort: str | None = None,
+````
+(pass-through `set_role=set_role` and the `other_filters` tuple entry are unchanged; `Query` already
+imported.) Verification: Task 10.
+
+#### Task 7 — tracks.ts: SearchParams.set_role → string[]
+Tools: editor.
+````diff
+--- a/frontend/src/lib/api/tracks.ts
++++ b/frontend/src/lib/api/tracks.ts
+@@
+-	set_role?: string;
++	set_role?: string[];
+````
+(`searchTracks` already appends array params as repeatable query keys — no client change.)
+Verification: svelte-check.
+
+#### Task 8 — SearchFilters.svelte: role filter single-active → multi-active
+Tools: editor (tab-sensitive — apply via a script if needed). Seven edits:
+1. State (L30): `let setRole = $state('');` → `let setRoles = $state<Set<string>>(new Set());`
+2. buildParams (L71): `if (setRole) params.set_role = setRole;` →
+   `if (setRoles.size > 0) params.set_role = [...setRoles];`
+3. hasActiveFilters (L142): `setRole !== '' ||` → `setRoles.size > 0 ||`
+4. clearAllFilters (L179): `setRole = '';` → `setRoles = new Set();`
+5. toggleSetRole (L230-232):
+````diff
+-	function toggleSetRole(role: string) {
+-		setRole = setRole === role ? '' : role;
+-		searchNow();
+-	}
++	function toggleSetRole(role: string) {
++		const next = new Set(setRoles);
++		if (next.has(role)) next.delete(role);
++		else next.add(role);
++		setRoles = next;
++		searchNow();
++	}
+````
+6. Active chips (L372-373) — one removable chip per selected role:
+````diff
+-			{#if setRole}
+-				<Chip value={SET_ROLE_LABELS[setRole]} size="sm" removable removeLabel="Clear set-role filter" onremove={() => { setRole = ''; searchNow(); }} />
+-			{/if}
++			{#each [...setRoles] as role (role)}
++				<Chip value={SET_ROLE_LABELS[role]} size="sm" removable removeLabel="Clear {SET_ROLE_LABELS[role]} filter" onremove={() => toggleSetRole(role)} />
++			{/each}
+````
+7. Toggle buttons (L570-572): `class:on={setRole === 'opener'}` → `class:on={setRoles.has('opener')}`
+   (and `'closer'`, `'break'` likewise).
+Verification: svelte-check; selecting Openers + Closers returns the union; each shows a removable chip.
+
+#### Task 9 — tests/test_set_role_builder.py (new)
+Tools: editor. Create with in-memory session + seeded tracks:
+````python
+"""Spec 028 — set roles shaping the auto-builder (soft bias) + teaching."""
+from __future__ import annotations
+
+import json
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
+
+from kiku.db.models import Base, Set, SetTrack, Track
+from kiku.set_roles import has_role, track_roles
+from kiku.setbuilder.constraints import parse_energy_string
+from kiku.setbuilder.planner import _pick_seed
+
+
+@pytest.fixture()
+def session(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path/'t.db'}", poolclass=NullPool)
+    Base.metadata.create_all(engine)
+    s = sessionmaker(bind=engine)()
+    yield s
+    s.close()
+
+
+def _t(session, tid, energy, roles=None, bpm=124.0, key="8A"):
+    tr = Track(id=tid, title=f"T{tid}", artist=f"A{tid}", bpm=bpm, key=key,
+               dir_energy=energy, set_roles=json.dumps(roles) if roles else None)
+    session.add(tr)
+    return tr
+
+
+def test_track_roles_parse(session):
+    tr = _t(session, 1, "warmup", roles=["opener", "bogus"])
+    assert track_roles(tr) == ["opener"]           # unknown dropped
+    assert has_role(tr, "opener") and not has_role(tr, "closer")
+    assert track_roles(_t(session, 2, "warmup")) == []  # untagged
+
+
+def test_seed_prefers_opener_when_energy_close(session):
+    prof = parse_energy_string("warmup:30:0.3,peak:30:0.9")
+    # both near the 0.3 warmup target; #2 is the marked opener
+    a = _t(session, 1, "warmup")                    # ~low energy, no role
+    b = _t(session, 2, "warmup", roles=["opener"])  # ~low energy, opener
+    session.commit()
+    assert _pick_seed([a, b], prof).id == 2
+
+
+def test_seed_does_not_force_opener_on_clear_loss(session):
+    prof = parse_energy_string("warmup:30:0.3,peak:30:0.9")
+    # #1 sits ON the warmup target; #2 is a peak-energy opener (far from target)
+    a = _t(session, 1, "warmup")                    # great energy fit, no role
+    b = _t(session, 2, "peak", roles=["opener"])    # opener but wrong energy
+    session.commit()
+    # the ~0.15 bonus must NOT overcome a large energy gap
+    assert _pick_seed([a, b], prof).id == 1
+
+
+def test_teaching_notes_for_tagged_first_and_last(session):
+    from kiku.analysis.set_analyzer import analyze_set
+    o = _t(session, 1, "warmup", roles=["opener"])
+    m = _t(session, 2, "build")
+    c = _t(session, 3, "close", roles=["closer"])
+    st = Set(id=1, name="S", duration_min=30)
+    session.add(st); session.flush()
+    for pos, tr in enumerate([o, m, c]):
+        session.add(SetTrack(set_id=1, position=pos, track_id=tr.id))
+    session.commit()
+    res = analyze_set(session, 1)
+    joined = " ".join(res.set_patterns)
+    assert "great opener" in joined and "go-to closers" in joined
+````
+Verification: `pytest tests/test_set_role_builder.py -q`.
+
+#### Task 10 — tests/api/test_tracks_api.py: multi-role OR-filter
+Tools: editor. Append:
+````python
+def test_search_filter_set_roles_multi_or(client):
+    client.patch("/api/tracks/3/set-roles", json={"roles": ["opener"]})
+    client.patch("/api/tracks/4/set-roles", json={"roles": ["closer"]})
+    client.patch("/api/tracks/5/set-roles", json={"roles": ["break"]})
+    resp = client.get("/api/tracks/search?set_role=opener&set_role=closer")
+    ids = {t["id"] for t in resp.json()["items"]}
+    assert 3 in ids and 4 in ids       # union of both roles
+    assert 5 not in ids                # break not selected
+````
+Verification: Task 11.
+
+#### Task 11 — Lint + type-check + tests
+Tools: shell.
+- `source .venv/bin/activate && python -m pytest tests/test_set_role_builder.py tests/api/test_tracks_api.py -q`
+- `source .venv/bin/activate && python -m pytest tests/ -q`  (full suite — regression guard)
+- `cd frontend && npx svelte-check --tsconfig ./tsconfig.json`
+Expectation: all green; svelte-check 0 errors.
+
+#### Task 12 — E2E (manual)
+Tools: browser. Start API + frontend:
+1. Tag a low-energy track "opener" and a track "closer". Build a set (no explicit seed) from that
+   library → the opener leads; a closer trails when musically reasonable; the set view shows the
+   "Opened with … / Closed on …" notes.
+2. Build with NO role-tagged tracks → set is unchanged vs. before (no regression).
+3. Library filter: enable Openers + Closers → union returned, two removable chips; clear both → full list.
+Expectation: all pass; a role never forces an obviously bad transition.
+
+#### Task 13 — Commit
+Tools: git.
+- `git add -- src/kiku/set_roles.py src/kiku/setbuilder/planner.py src/kiku/analysis/set_analyzer.py src/kiku/db/store.py src/kiku/api/routes/tracks.py frontend/src/lib/api/tracks.ts frontend/src/lib/components/library/SearchFilters.svelte tests/test_set_role_builder.py tests/api/test_tracks_api.py`
+- `BRANCH=$(git rev-parse --abbrev-ref HEAD); [ "$BRANCH" != "main" ] || { echo 'ERROR: on main' >&2; exit 2; }`
+- `git commit -m "spec(028): IMPLEMENT - set-role-builder"`
+
+### Validate
+- **HLO/MLO opener→seed** (L… MLO): Task 2 — soft bias in `_pick_seed`, guarded by explicit-seed
+  short-circuit. Satisfied.
+- **MLO closer→tail** (L… MLO): Task 3 — final-stretch nudge reusing `_end_pull`. Soft (preference,
+  not guaranteed last). Satisfied.
+- **MLO multi-role OR-filter** (L… MLO): Tasks 5-8. Satisfied.
+- **MLO Show the Why** (L… MLO): Task 4 — appended to `set_patterns`, renders via existing SetView
+  path. Kiku voice. Satisfied.
+- **DT soft, non-restrictive** (L… Details): `_ROLE_SPAN=0.15` bounded positive nudge; pool never
+  filtered; test `test_seed_does_not_force_opener_on_clear_loss` proves it doesn't override a clear
+  energy win. Satisfied.
+- **DT no-regression when no roles** (L… Testing): full-suite run (Task 11) + bonus is 0 for untagged.
+  Satisfied.
+- **DT reuse existing hooks, no new subsystem** (L… Details): all changes fold into `_pick_seed`, the
+  scoring loop, `analyze_set`, and the existing filter. No `transition_score`/`suggest_next`/
+  `SetBuildRequest` change. Satisfied.
+- **Scope OUT break→dips** (L… Scope): no task touches break placement; documented spec 029. Satisfied.
 
 ## Plan Review
 <!-- Filled if required to validate plan -->
