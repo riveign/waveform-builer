@@ -15,7 +15,7 @@ export interface SearchParams {
 	rating_min?: number;
 	plays_min?: number;
 	plays_max?: number;
-	set_role?: string;
+	set_role?: string[];
 	sort?: string;
 	limit?: number;
 	offset?: number;

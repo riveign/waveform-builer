@@ -16,9 +16,16 @@ from kiku.energy import get_track_energy
 from kiku.setbuilder.camelot import harmonic_score
 from kiku.setbuilder.constraints import EnergyProfile
 from kiku.setbuilder.scoring import bpm_compatibility, transition_score, vibe_continuity
+from kiku.set_roles import has_role
 from kiku.vibe import resolve_vibe
 
 console = Console()
+
+# Set-role soft bias (spec 028): a small, bounded, positive-only nudge — smaller
+# than _VIBE_SPAN (0.3) / _ARTIST_SPAN (0.2) in scoring.py, so key/energy/BPM fit
+# still dominate. An opener/closer only breaks close calls; it never forces a weak
+# transition and never removes a non-tagged track from the pool.
+_ROLE_SPAN = 0.15
 
 
 def _lerp_vibe(
@@ -111,14 +118,20 @@ def _pick_seed(
     if not candidates:
         return None
 
-    # Pick track closest to first segment's target energy
+    # Pick the track closest to the first segment's target energy, softly favouring
+    # opener-tagged tracks (spec 028): an opener within ~_ROLE_SPAN energy of the best
+    # non-opener wins the seed, but a clearly better energy fit still wins. Only when
+    # the DJ did NOT pin an explicit seed (handled by the short-circuit above).
     target = energy_profile.segments[0].target_energy if energy_profile.segments else 0.3
 
-    def energy_diff(t: Track) -> float:
+    def seed_rank(t: Track) -> float:
         te = get_track_energy(t)
-        return abs(te.numeric - target)
+        diff = abs(te.numeric - target)
+        if has_role(t, "opener"):
+            diff -= _ROLE_SPAN
+        return diff
 
-    candidates_sorted = sorted(candidates, key=energy_diff)
+    candidates_sorted = sorted(candidates, key=seed_rank)
     return candidates_sorted[0]
 
 
@@ -241,8 +254,10 @@ def build_set(
             if bpm_range:
                 target_bpm = bpm_range[0] + (bpm_range[1] - bpm_range[0]) * progress
 
-            # Soft pull toward the ending anchor in the final stretch
-            pull = _end_pull(progress) if end_track else 0.0
+            # Final-stretch ramp (0 until 80% through). Drives BOTH the optional
+            # ending-anchor pull and the closer-role nudge below.
+            end_ramp = _end_pull(progress)
+            pull = end_ramp if end_track else 0.0
 
             # Score all candidates not yet in sequence
             scored_candidates = []
@@ -272,6 +287,12 @@ def build_set(
                 # Soft landing: bias the tail toward the ending anchor
                 if pull > 0 and end_track is not None and cand.id != end_track.id:
                     score += pull * _end_affinity(cand, end_track)
+
+                # Closer role: favour closer-tagged tracks in the final stretch so one
+                # is likely to land last (soft, spec 028). Independent of any ending
+                # anchor; reuses the same end-ramp. A preference, not a guarantee.
+                if end_ramp > 0 and has_role(cand, "closer"):
+                    score += end_ramp * _ROLE_SPAN
 
                 scored_candidates.append((cand, score))
 
