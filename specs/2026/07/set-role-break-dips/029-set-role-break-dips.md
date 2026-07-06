@@ -183,7 +183,257 @@ Kiku storytelling voice ("released the tension, then built back up"); soft/non-r
 `SetBuildRequest` change, no hard placement.
 
 ## Plan
-<!-- Filled by /spec PLAN -->
+
+### Files
+- `src/kiku/setbuilder/constraints.py` — `EnergyProfile.segment_index_at()` + `valley_segment_indices()`
+  (after `target_energy_at`, ~L46); `"story"` in `DEFAULT_ENERGY_PRESETS` (L104-109).
+- `src/kiku/setbuilder/planner.py` — `valley_idxs` before the beam loop (~L232); `in_valley` per beam
+  (~L260); break bonus in the candidate loop (~L295).
+- `src/kiku/analysis/set_analyzer.py` — break teaching note after the closer note (~L115).
+- `frontend/src/lib/components/set/EnergyPresetPicker.svelte` — add the `story` card (~L33).
+- `tests/test_set_role_builder.py` — valley/segment/preset/teaching + build tests.
+
+### Tasks
+
+#### Task 1 — constraints.py: valley helpers + "story" preset
+Tools: editor. Two edits.
+
+1a. `EnergyProfile` methods (after `target_energy_at`):
+````diff
+--- a/src/kiku/setbuilder/constraints.py
++++ b/src/kiku/setbuilder/constraints.py
+@@
+         # Past end — return last segment energy
+         return self.segments[-1].target_energy if self.segments else 0.5
+ 
++    def segment_index_at(self, elapsed_min: float) -> int:
++        """Index of the segment covering elapsed_min (clamped to the last segment)."""
++        cumulative = 0.0
++        for i, seg in enumerate(self.segments):
++            cumulative += seg.duration_min
++            if elapsed_min <= cumulative:
++                return i
++        return len(self.segments) - 1 if self.segments else 0
++
++    def valley_segment_indices(self) -> set[int]:
++        """Interior local-minimum segments — chapter-boundary 'breather' valleys.
++
++        A segment qualifies when its target energy is lower than BOTH neighbours:
++        a release after a high, before the next build. The first and last segments
++        are never valleys, so a final cooldown/outro is excluded (spec 029).
++        """
++        segs = self.segments
++        return {
++            i
++            for i in range(1, len(segs) - 1)
++            if segs[i].target_energy < segs[i - 1].target_energy
++            and segs[i].target_energy < segs[i + 1].target_energy
++        }
+ 
+ 
+ def parse_energy_string(s: str) -> EnergyProfile:
+````
+1b. Register the preset:
+````diff
+--- a/src/kiku/setbuilder/constraints.py
++++ b/src/kiku/setbuilder/constraints.py
+@@ DEFAULT_ENERGY_PRESETS: dict[str, str] = {
+     "afterhours": "deep:30:0.3,hypno:40:0.4,drift:30:0.25",
++    # Multi-chapter arc (spec 029): a release VALLEY between two builds gives
++    # break-tagged tracks a home — the culmination of a chapter, then a rebuild.
++    "story": "build:20:0.6,peak:30:0.9,release:12:0.4,rebuild:20:0.7,summit:30:0.95,close:12:0.4",
+ }
+````
+Verification: Task 6 units.
+
+#### Task 2 — planner.py: valley set + in_valley + break bonus
+Tools: editor. Three edits in `build_set`.
+
+2a. Compute the valley set once, before the beam loop:
+````diff
+--- a/src/kiku/setbuilder/planner.py
++++ b/src/kiku/setbuilder/planner.py
+@@
+     candidate_set = {t.id: t for t in candidates}
+ 
++    # Chapter-boundary energy valleys — break-tagged tracks are softly favoured here
++    # (spec 029). Empty for the default single-peak arcs, so break is a no-op there.
++    valley_idxs = energy_profile.valley_segment_indices()
++
+     iteration = 0
+````
+2b. Per-beam: is this slot in a valley?
+````diff
+--- a/src/kiku/setbuilder/planner.py
++++ b/src/kiku/setbuilder/planner.py
+@@
+             end_ramp = _end_pull(progress)
+             pull = end_ramp if end_track else 0.0
+ 
++            # Is this slot inside a chapter-boundary valley? (break-role bias below)
++            in_valley = energy_profile.segment_index_at(elapsed) in valley_idxs
++
+             # Score all candidates not yet in sequence
+````
+2c. Break bonus in the candidate loop (after the closer nudge):
+````diff
+--- a/src/kiku/setbuilder/planner.py
++++ b/src/kiku/setbuilder/planner.py
+@@
+                 if end_ramp > 0 and has_role(cand, "closer"):
+                     score += end_ramp * _ROLE_SPAN
+ 
++                # Break role: favour break-tagged tracks in a chapter-boundary energy
++                # valley — the release after a high, before the next build (spec 029).
++                # Flat (not ramped): a valley is a discrete region. Soft, never forced.
++                if in_valley and has_role(cand, "break"):
++                    score += _ROLE_SPAN
++
+                 scored_candidates.append((cand, score))
+````
+Verification: Task 6.
+
+#### Task 3 — set_analyzer.py: break teaching note
+Tools: editor. After the closer note:
+````diff
+--- a/src/kiku/analysis/set_analyzer.py
++++ b/src/kiku/analysis/set_analyzer.py
+@@
+     if has_role(tracks[-1], "closer"):
+         closer_name = tracks[-1].title or "the last track"
+         set_patterns.append(
+             f"Closed on “{closer_name}” — one of your go-to closers."
+         )
+ 
++    # Break role: a break-tagged track sitting in an energy VALLEY (a local minimum
++    # of the curve) is the release between chapters — say so (spec 029). First only.
++    curve = arc.energy_curve
++    for i in range(1, len(tracks) - 1):
++        if has_role(tracks[i], "break") and curve[i] < curve[i - 1] and curve[i] < curve[i + 1]:
++            break_name = tracks[i].title or "a track"
++            set_patterns.append(
++                f"Gave the room a breather with “{break_name}” before building back up."
++            )
++            break
++
+     # 5. Overall score
+````
+Verification: Task 6 teaching test.
+
+#### Task 4 — EnergyPresetPicker.svelte: add the "story" card
+Tools: editor. Add a fifth preset (its sparkline shows the double-peak + release valley):
+````diff
+--- a/frontend/src/lib/components/set/EnergyPresetPicker.svelte
++++ b/frontend/src/lib/components/set/EnergyPresetPicker.svelte
+@@
+ 		{
+ 			name: 'afterhours',
+ 			label: 'After Hours',
+ 			description: 'Late night vibes',
+ 			points: [0, 0.5, 0.25, 0.5, 0.5, 0.45, 0.75, 0.4, 1, 0.3],
+ 		},
++		{
++			name: 'story',
++			label: 'Story',
++			description: 'Two chapters, one breather',
++			points: [0, 0.6, 0.2, 0.9, 0.4, 0.4, 0.6, 0.7, 0.8, 0.95, 1, 0.4],
++		},
+ 	];
+````
+Verification: svelte-check; the card renders with a W-shaped sparkline and is selectable.
+
+#### Task 5 — (no other frontend change) — the preset flows via `energy_preset` already.
+
+#### Task 6 — tests/test_set_role_builder.py: extend
+Tools: editor. Append (reuses the existing `session` fixture + `_t` helper):
+````python
+from kiku.setbuilder.constraints import (
+    DEFAULT_ENERGY_PRESETS,
+    parse_energy_string,
+    resolve_energy,
+)
+
+
+def test_valley_segment_indices():
+    assert resolve_energy("story").valley_segment_indices() == {2}   # 'release'
+    assert resolve_energy("journey").valley_segment_indices() == set()  # cooldown is last
+    w = parse_energy_string("a:10:0.9,b:10:0.3,c:10:0.9,d:10:0.4,e:10:0.9")
+    assert w.valley_segment_indices() == {1, 3}                      # two valleys
+    ends = parse_energy_string("a:10:0.1,b:10:0.9,c:10:0.1")
+    assert ends.valley_segment_indices() == set()                   # first/last never
+
+
+def test_segment_index_at():
+    p = parse_energy_string("a:10:0.5,b:10:0.6,c:10:0.7")
+    assert [p.segment_index_at(x) for x in (5, 10, 15, 25, 999)] == [0, 0, 1, 2, 2]
+
+
+def test_story_preset_registered():
+    assert "story" in DEFAULT_ENERGY_PRESETS
+    assert resolve_energy("story").valley_segment_indices()          # has a breather
+
+
+def test_break_teaching_note_at_energy_valley(session):
+    from kiku.analysis.set_analyzer import analyze_set
+    hi = _t(session, 1, "peak")                       # high
+    br = _t(session, 2, "warmup", roles=["break"])    # low → curve valley + break tag
+    hi2 = _t(session, 3, "peak")                      # high again
+    st = Set(id=1, name="S", duration_min=30)
+    session.add(st)
+    session.flush()
+    for pos, tr in enumerate([hi, br, hi2]):
+        session.add(SetTrack(set_id=1, position=pos, track_id=tr.id))
+    session.commit()
+    assert any("breather" in p for p in analyze_set(session, 1).set_patterns)
+
+
+def test_break_placed_in_valley_on_story(session):
+    from kiku.setbuilder.planner import build_set
+    for i in range(1, 8):
+        _t(session, i, "peak", bpm=126.0, key="8A")           # high-energy pool
+    _t(session, 99, "warmup", roles=["break"], bpm=126.0, key="8A")  # the breather
+    session.commit()
+    s = build_set(session, duration_min=40, energy_profile=resolve_energy("story"), set_name="s")
+    ids = [st.track_id for st in sorted(s.tracks, key=lambda x: x.position)]
+    assert 99 in ids and 0 < ids.index(99) < len(ids) - 1   # placed, interior
+````
+Note: `test_break_placed_in_valley_on_story` is the one most likely to need value tuning if the beam
+ends early — keep the pool all-`peak` except the single `warmup` break track so the release valley
+strongly prefers it. Verification: Task 7.
+
+#### Task 7 — Lint + tests + type-check
+Tools: shell.
+- `source .venv/bin/activate && python -m pytest tests/test_set_role_builder.py -q`
+- `source .venv/bin/activate && python -m pytest tests/ -q`   (full suite — regression guard)
+- `cd frontend && npx svelte-check --tsconfig ./tsconfig.json`
+Expectation: all green; svelte-check 0 errors.
+
+#### Task 8 — E2E (manual)
+Tools: browser. Build a set on the **Story** preset with a couple of break-tagged mid/low-energy
+tracks → a break tends to land in the release valley; the set view shows "Gave the room a breather…".
+Build on **Journey** → no break placement (no interior valley), no breather note. Confirm a no-break
+library builds normally.
+
+#### Task 9 — Commit
+Tools: git.
+- `git add -- src/kiku/setbuilder/constraints.py src/kiku/setbuilder/planner.py src/kiku/analysis/set_analyzer.py frontend/src/lib/components/set/EnergyPresetPicker.svelte tests/test_set_role_builder.py`
+- `BRANCH=$(git rev-parse --abbrev-ref HEAD); [ "$BRANCH" != "main" ] || { echo 'ERROR: on main' >&2; exit 2; }`
+- `git commit -m "spec(029): IMPLEMENT - set-role-break-dips"`
+
+### Validate
+- **MLO break→valley** (L… MLO): Task 2 — flat `_ROLE_SPAN` when the slot is in an interior valley.
+  Satisfied.
+- **MLO Show the Why** (L… MLO): Task 3 — breather note derived from an energy-curve local min.
+  Satisfied.
+- **MLO "story" preset** (L… MLO): Tasks 1b, 4. Satisfied (flagged for user veto in Details).
+- **DT soft, non-restrictive** (L… Details): bounded +0.15 bonus, no filter, short-circuit behind
+  `in_valley and has_role`. Satisfied.
+- **DT no-regression when no break tags / no valley** (L… Testing): full suite + `journey` has no
+  valley + bonus 0 for untagged. Satisfied.
+- **DT valley excludes first/last** (L… Details): `range(1, len-2)`; `test_valley_segment_indices`
+  proves the outro is never a valley. Satisfied.
+- **DT reuse hooks, no new subsystem** (L… Details): two `EnergyProfile` methods + the existing bonus
+  pattern; no `transition_score`/`suggest_next`/`SetBuildRequest` change. Satisfied.
 
 ## Plan Review
 <!-- Filled if required to validate plan -->
