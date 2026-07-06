@@ -9,6 +9,7 @@
 	import Button from '../primitives/Button.svelte';
 	import TrackContextMenu from './TrackContextMenu.svelte';
 	import StarRating from '../primitives/StarRating.svelte';
+	import SetRoleBadge from './SetRoleBadge.svelte';
 
 	const player = getPlayerStore();
 
@@ -69,6 +70,7 @@
 				<th class="col-key">Key</th>
 				<th class="col-bpm">BPM</th>
 				<th class="col-energy">Energy</th>
+				<th class="col-role">Role</th>
 				<th class="col-plays">Plays</th>
 				<th class="col-rating">Rating</th>
 			</tr>
@@ -140,6 +142,13 @@
 							<span class="dim" title="Energy unknown">—</span>
 						{/if}
 					</td>
+					<td class="col-role">
+						{#if track.set_roles?.length}
+							<SetRoleBadge roles={track.set_roles} variant="pip" />
+						{:else}
+							<span class="dim" title="No set role">—</span>
+						{/if}
+					</td>
 					<td class="col-plays">
 						{#if totalPlays > 0}
 							<span class="plays-count" title="Rekordbox: {track.play_count ?? 0} · Kiku: {track.kiku_play_count ?? 0}">{totalPlays}</span>
@@ -204,6 +213,7 @@
 			var(--list-col-key)
 			var(--list-col-bpm)
 			var(--list-col-energy)
+			var(--list-col-role)
 			var(--list-col-plays)
 			var(--list-col-rating);
 		align-items: center;
@@ -286,6 +296,7 @@
 	.col-key { justify-content: flex-start; }
 	.col-bpm { justify-content: flex-end; }
 	.col-energy { justify-content: flex-start; }
+	.col-role { justify-content: flex-start; }
 	.col-plays { justify-content: flex-end; }
 	.col-rating { justify-content: flex-start; }
 
@@ -358,6 +369,7 @@
 				var(--list-col-key)
 				var(--list-col-bpm)
 				var(--list-col-energy)
+				var(--list-col-role)
 				var(--list-col-rating);
 		}
 		.col-plays { display: none; }
@@ -376,5 +388,6 @@
 				var(--list-col-rating);
 		}
 		.col-energy { display: none; }
+		.col-role { display: none; }
 	}
 </style>

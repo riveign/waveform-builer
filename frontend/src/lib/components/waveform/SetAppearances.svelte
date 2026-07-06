@@ -121,6 +121,9 @@
 		padding: var(--space-xl);
 	}
 	.empty-icon {
+		/* inline-flex so the fixed width/height actually constrain the icon — a bare
+		 * inline <span> ignores width/height, letting the SVG balloon to the panel. */
+		display: inline-flex;
 		width: var(--space-4xl);
 		height: var(--space-4xl);
 		color: var(--text-4);

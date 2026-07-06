@@ -15,6 +15,7 @@ export interface SearchParams {
 	rating_min?: number;
 	plays_min?: number;
 	plays_max?: number;
+	set_role?: string;
 	sort?: string;
 	limit?: number;
 	offset?: number;
@@ -58,6 +59,14 @@ export async function updateTrackRating(trackId: number, rating: number): Promis
 		method: 'PATCH',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ rating }),
+	});
+}
+
+export async function updateTrackSetRoles(trackId: number, roles: string[]): Promise<Track> {
+	return fetchJson<Track>(`/api/tracks/${trackId}/set-roles`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ roles }),
 	});
 }
 

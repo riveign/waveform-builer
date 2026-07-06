@@ -153,7 +153,7 @@
 			energy_source: null, energy_confidence: null, energy_value: null,
 			energy_label: null, energy_conflict: null, date_added: null,
 			release_year: null, track_number: null, disc_number: null,
-			comment: null, playlist_tags: [], genre_family: null,
+			comment: null, playlist_tags: [], set_roles: [], genre_family: null,
 			...overrides,
 		};
 	}

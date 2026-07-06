@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Track, TrackFeatures, WaveformDetailData } from '$lib/types';
 	import { getTrackFeatures } from '$lib/api/tracks';
-	import { updateTrackRating } from '$lib/api/tracks';
+	import { updateTrackRating, updateTrackSetRoles } from '$lib/api/tracks';
 	import { submitDecision } from '$lib/api/tinder';
 	import { getWaveformDetail } from '$lib/api/waveforms';
 	import { formatKey, getCamelotColor, compatibleKeys } from '$lib/utils/camelot';
@@ -16,6 +16,9 @@
 	import Spinner from '../Spinner.svelte';
 	import EnergyZonePicker from '../library/EnergyZonePicker.svelte';
 	import { ZONE_COLORS } from '../library/EnergyZonePicker.svelte';
+	import SetRolePicker from '../library/SetRolePicker.svelte';
+	import SetRoleBadge from '../library/SetRoleBadge.svelte';
+	import { ROLE_LABEL } from '../library/SetRoleIcon.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import Chip from '../primitives/Chip.svelte';
 	import Button from '../primitives/Button.svelte';
@@ -68,13 +71,17 @@
 	let localRating = $state(0);
 	let localZone = $state<string | null>(null);
 	let showZonePicker = $state(false);
+	let localRoles = $state<string[]>([]);
+	let showRolePicker = $state(false);
 	let teachingMoment = $state<string | null>(null);
 	let showAddToSet = $state(false);
 
 	$effect(() => {
 		localRating = track.rating ?? 0;
 		localZone = track.resolved_energy;
+		localRoles = track.set_roles ?? [];
 		showZonePicker = false;
+		showRolePicker = false;
 		teachingMoment = null;
 	});
 
@@ -98,6 +105,19 @@
 		function handleClick(e: MouseEvent) {
 			if (zoneWrapperEl && !zoneWrapperEl.contains(e.target as Node)) {
 				showZonePicker = false;
+			}
+		}
+		const timer = setTimeout(() => document.addEventListener('mousedown', handleClick), 0);
+		return () => { clearTimeout(timer); document.removeEventListener('mousedown', handleClick); };
+	});
+
+	// Close role picker on click outside
+	let roleWrapperEl = $state<HTMLDivElement | null>(null);
+	$effect(() => {
+		if (!showRolePicker) return;
+		function handleClick(e: MouseEvent) {
+			if (roleWrapperEl && !roleWrapperEl.contains(e.target as Node)) {
+				showRolePicker = false;
 			}
 		}
 		const timer = setTimeout(() => document.addEventListener('mousedown', handleClick), 0);
@@ -143,6 +163,21 @@
 			}
 		} catch {
 			localZone = prev;
+		}
+	}
+
+	async function handleRoleToggle(role: string) {
+		const prev = localRoles;
+		const next = prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role];
+		// Keep the picker open — the DJ may mark several roles at once. Mutate the
+		// shared track object too so the library sidebar/cards reflect the change.
+		localRoles = next;
+		track.set_roles = next;
+		try {
+			await updateTrackSetRoles(track.id, next);
+		} catch {
+			localRoles = prev;
+			track.set_roles = prev;
 		}
 	}
 
@@ -283,6 +318,25 @@
 								current={localZone}
 								onselect={handleZoneSelect}
 							/>
+						</div>
+					{/if}
+				</div>
+				<div class="role-badge-wrapper" bind:this={roleWrapperEl}>
+					<button
+						class="role-chip-btn"
+						onclick={() => showRolePicker = !showRolePicker}
+						title="Set role — mark this a great opener, closer or break"
+						aria-label="Set role: {localRoles.length ? localRoles.map((r) => ROLE_LABEL[r] ?? r).join(', ') : 'not set'}. Click to change."
+					>
+						{#if localRoles.length}
+							<SetRoleBadge roles={localRoles} variant="full" />
+						{:else}
+							<span class="role-add">+ Set role</span>
+						{/if}
+					</button>
+					{#if showRolePicker}
+						<div class="role-dropdown">
+							<SetRolePicker current={localRoles} ontoggle={handleRoleToggle} />
 						</div>
 					{/if}
 				</div>
@@ -682,6 +736,74 @@
 
 	.zone-badge-wrapper {
 		position: relative;
+	}
+
+	/* Set-role control — mirrors the zone control: a chip-button that opens the
+	   multi-toggle picker. Shows the gold role badge when set, else a "+ Set role"
+	   affordance in the role hue. */
+	.role-badge-wrapper {
+		position: relative;
+	}
+	/* Bare wrapper — the tile (empty) or the SetRoleBadge (set) owns its own box. */
+	.role-chip-btn {
+		display: inline-flex;
+		align-items: center;
+		padding: 0;
+		border: none;
+		background: none;
+		border-radius: var(--chip-radius);
+		font: inherit;
+		cursor: pointer;
+	}
+	/* EMPTY state — a quiet dashed gold ghost tile: an invitation, not a value.
+	   Dashed + transparent + muted gold reads as "add", and stays quieter than the
+	   solid gold set badge so a tagged track still pops. */
+	.role-add {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-xs);
+		height: var(--chip-height-md);
+		padding: 0 var(--chip-pad-x-md);
+		border: 1px dashed color-mix(in srgb, var(--role) 45%, transparent);
+		border-radius: var(--chip-radius);
+		background: transparent;
+		color: color-mix(in srgb, var(--role) 78%, var(--text-2));
+		font-size: var(--chip-font-md);
+		font-weight: var(--font-weight-medium);
+		line-height: 1;
+		transition:
+			background var(--dur-fast) var(--ease-standard),
+			border-color var(--dur-fast) var(--ease-standard),
+			color var(--dur-fast) var(--ease-standard);
+	}
+	/* Hover / keyboard-focus — the invitation "arms" to full gold with a faint fill. */
+	.role-chip-btn:hover .role-add,
+	.role-chip-btn:focus-visible .role-add {
+		background: color-mix(in srgb, var(--role) 12%, transparent);
+		border-color: var(--role);
+		color: var(--role);
+	}
+	.role-chip-btn:active .role-add {
+		background: color-mix(in srgb, var(--role) 18%, transparent);
+	}
+	/* SET state — brighten the badge's soft border on hover to signal it's editable. */
+	.role-chip-btn:hover :global(.set-role-badge),
+	.role-chip-btn:focus-visible :global(.set-role-badge) {
+		border-color: var(--role);
+	}
+	.role-dropdown {
+		position: absolute;
+		top: 100%;
+		right: 0;
+		margin-top: var(--space-xs);
+		background: var(--bg-primary);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		padding: var(--space-xs);
+		min-width: 220px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+		z-index: 50;
+		animation: menu-appear var(--dur-fast) var(--ease-standard);
 	}
 
 	.zone-dropdown {

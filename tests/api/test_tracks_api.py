@@ -171,3 +171,40 @@ def test_search_typo_with_filter_does_not_fuzzy(client):
     resp = client.get("/api/tracks/search?search=Trakc 7&genre=techno")
     assert resp.status_code == 200
     assert resp.json()["fuzzy"] is False
+
+
+def test_update_set_roles_persists_and_returns(client):
+    resp = client.patch("/api/tracks/1/set-roles", json={"roles": ["opener", "break"]})
+    assert resp.status_code == 200
+    assert set(resp.json()["set_roles"]) == {"opener", "break"}
+    # Persisted + canonical order (opener, closer, break) on read
+    resp2 = client.get("/api/tracks/1")
+    assert resp2.json()["set_roles"] == ["opener", "break"]
+
+
+def test_update_set_roles_clear(client):
+    client.patch("/api/tracks/1/set-roles", json={"roles": ["closer"]})
+    resp = client.patch("/api/tracks/1/set-roles", json={"roles": []})
+    assert resp.status_code == 200
+    assert resp.json()["set_roles"] == []
+
+
+def test_update_set_roles_rejects_unknown(client):
+    resp = client.patch("/api/tracks/1/set-roles", json={"roles": ["banger"]})
+    assert resp.status_code == 422
+
+
+def test_update_set_roles_404(client):
+    resp = client.patch("/api/tracks/999/set-roles", json={"roles": ["opener"]})
+    assert resp.status_code == 404
+
+
+def test_search_filter_set_role(client):
+    client.patch("/api/tracks/3/set-roles", json={"roles": ["opener"]})
+    client.patch("/api/tracks/4/set-roles", json={"roles": ["closer"]})
+    resp = client.get("/api/tracks/search?set_role=opener")
+    data = resp.json()
+    ids = {t["id"] for t in data["items"]}
+    assert 3 in ids
+    assert 4 not in ids
+    assert all("opener" in t["set_roles"] for t in data["items"])

@@ -53,6 +53,13 @@
 	 * palette's accent/highlight role). To revert, point back at --amber-500. */
 	--star-fill: var(--magenta-400);
 
+	/* set-role tags — a DJ curation axis (opener/closer/break, spec 027). Warm gold,
+	 * deliberately OFF the cerceta cool→hot energy ramp (navy→teal→lilac→magenta) so
+	 * a role mark can never be misread as an energy zone. The badge reuses the Chip
+	 * mode="tone" recipe by flowing --role into --chip-color, so it stays tokenized. */
+	--role:        var(--gold-400);
+	--role-strong: var(--gold-500);
+
 	/* energy zones — one source for the 6-zone journey, consumed by the Chip
 	 * `energy` variant and the zone-dot/zone-badge sites. Re-pointed onto the
 	 * cerceta book palette (navy→teal→lilac→magenta journey). To revert, point
@@ -230,6 +237,7 @@
 	--list-col-key:      34px;             /* full Camelot text e.g. "11A" / "Cm" */
 	--list-col-bpm:      36px;             /* 3-digit integer e.g. "144" */
 	--list-col-energy:   minmax(52px, max-content); /* zone word e.g. "warmup" */
+	--list-col-role:     40px;             /* set-role pip(s) — opener/closer/break */
 	--list-col-plays:    30px;
 	--list-col-rating:   84px;             /* all 5 sm stars (14px + pad/gap) fit */
 }
