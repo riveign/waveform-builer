@@ -27,7 +27,7 @@
 	let energy = $state('');
 	let energyZone = $state('');
 	let ratingMin = $state('');
-	let setRole = $state('');
+	let setRoles = $state<Set<string>>(new Set());
 	let playsFilter = $state('');
 	let sortRecent = $state(false);
 	let sortPlays = $state<'' | 'plays' | 'plays_asc'>('');
@@ -68,7 +68,7 @@
 		if (energy) params.energy = energy;
 		if (energyZone) params.energy_zone = energyZone;
 		if (ratingMin) params.rating_min = Number(ratingMin);
-		if (setRole) params.set_role = setRole;
+		if (setRoles.size > 0) params.set_role = [...setRoles];
 		if (playsFilter === 'unplayed') params.plays_max = 0;
 		else if (playsFilter === 'played') params.plays_min = 1;
 		if (sortRecent) params.sort = 'recent';
@@ -139,7 +139,7 @@
 		energy !== '' ||
 		energyZone !== '' ||
 		ratingMin !== '' ||
-		setRole !== '' ||
+		setRoles.size > 0 ||
 		playsFilter !== '' ||
 		sortRecent ||
 		sortPlays !== ''
@@ -176,7 +176,7 @@
 		energy = '';
 		energyZone = '';
 		ratingMin = '';
-		setRole = '';
+		setRoles = new Set();
 		playsFilter = '';
 		sortRecent = false;
 		sortPlays = '';
@@ -228,7 +228,10 @@
 	function onEnergyZoneChange() { searchNow(); }
 	function onRatingChange() { searchNow(); }
 	function toggleSetRole(role: string) {
-		setRole = setRole === role ? '' : role;
+		const next = new Set(setRoles);
+		if (next.has(role)) next.delete(role);
+		else next.add(role);
+		setRoles = next;
 		searchNow();
 	}
 	const SET_ROLE_LABELS: Record<string, string> = { opener: 'Openers', closer: 'Closers', break: 'Break tracks' };
@@ -369,9 +372,9 @@
 			{#if ratingMin}
 				<Chip value="{ratingMin}+ stars" size="sm" removable removeLabel="Clear rating filter" onremove={() => { ratingMin = ''; searchNow(); }} />
 			{/if}
-			{#if setRole}
-				<Chip value={SET_ROLE_LABELS[setRole]} size="sm" removable removeLabel="Clear set-role filter" onremove={() => { setRole = ''; searchNow(); }} />
-			{/if}
+			{#each [...setRoles] as role (role)}
+				<Chip value={SET_ROLE_LABELS[role]} size="sm" removable removeLabel="Clear {SET_ROLE_LABELS[role]} filter" onremove={() => toggleSetRole(role)} />
+			{/each}
 			{#if playsFilter}
 				<Chip
 					value={playsFilter === 'unplayed' ? 'Unplayed' : 'Played'}
@@ -567,9 +570,9 @@
 				<div class="field-group field-group--role">
 					<span class="section-label">Set role</span>
 					<div class="role-toggles">
-						<button type="button" class="role-toggle" class:on={setRole === 'opener'} onclick={() => toggleSetRole('opener')} title="Tracks you'd open a set with"><SetRoleIcon role="opener" /> Openers</button>
-						<button type="button" class="role-toggle" class:on={setRole === 'closer'} onclick={() => toggleSetRole('closer')} title="Tracks that send people home"><SetRoleIcon role="closer" /> Closers</button>
-						<button type="button" class="role-toggle" class:on={setRole === 'break'} onclick={() => toggleSetRole('break')} title="Breather tracks for mid-set"><SetRoleIcon role="break" /> Break tracks</button>
+						<button type="button" class="role-toggle" class:on={setRoles.has('opener')} onclick={() => toggleSetRole('opener')} title="Tracks you'd open a set with"><SetRoleIcon role="opener" /> Openers</button>
+						<button type="button" class="role-toggle" class:on={setRoles.has('closer')} onclick={() => toggleSetRole('closer')} title="Tracks that send people home"><SetRoleIcon role="closer" /> Closers</button>
+						<button type="button" class="role-toggle" class:on={setRoles.has('break')} onclick={() => toggleSetRole('break')} title="Breather tracks for mid-set"><SetRoleIcon role="break" /> Break tracks</button>
 					</div>
 				</div>
 			</div>

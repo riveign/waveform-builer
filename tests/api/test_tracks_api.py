@@ -208,3 +208,13 @@ def test_search_filter_set_role(client):
     assert 3 in ids
     assert 4 not in ids
     assert all("opener" in t["set_roles"] for t in data["items"])
+
+
+def test_search_filter_set_roles_multi_or(client):
+    client.patch("/api/tracks/3/set-roles", json={"roles": ["opener"]})
+    client.patch("/api/tracks/4/set-roles", json={"roles": ["closer"]})
+    client.patch("/api/tracks/5/set-roles", json={"roles": ["break"]})
+    resp = client.get("/api/tracks/search?set_role=opener&set_role=closer")
+    ids = {t["id"] for t in resp.json()["items"]}
+    assert 3 in ids and 4 in ids       # union of both roles
+    assert 5 not in ids                # break not selected

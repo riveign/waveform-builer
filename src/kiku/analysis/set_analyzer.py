@@ -99,6 +99,19 @@ def analyze_set(db: Session, set_id: int) -> SetAnalysisResult:
         [t.bpm for t in tracks],
     )
 
+    # Role-driven "why" (spec 028): if the DJ's own opener led the set or their
+    # closer ended it, say so — teaching, in their voice. Derived from the final
+    # tracks' role tags (no build-time provenance needed).
+    from kiku.set_roles import has_role
+    if has_role(tracks[0], "opener"):
+        set_patterns.append(
+            f"Opened with “{tracks[0].title}” — you marked it a great opener."
+        )
+    if has_role(tracks[-1], "closer"):
+        set_patterns.append(
+            f"Closed on “{tracks[-1].title}” — one of your go-to closers."
+        )
+
     # 5. Overall score
     totals = [t.scores["total"] for t in transitions]
     overall_score = round(sum(totals) / len(totals), 3) if totals else 0.0

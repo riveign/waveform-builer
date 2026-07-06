@@ -109,7 +109,7 @@ def track_search(
     rating_min: int | None = None,
     plays_min: int | None = None,
     plays_max: int | None = None,
-    set_role: str | None = None,
+    set_role: list[str] | None = Query(None),
     sort: str | None = None,
     limit: int = 50,
     offset: int = 0,
