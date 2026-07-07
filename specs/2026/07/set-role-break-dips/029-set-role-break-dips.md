@@ -439,7 +439,34 @@ Tools: git.
 <!-- Filled if required to validate plan -->
 
 ## Implement
-<!-- Filled by /spec IMPLEMENT -->
+
+TODOs:
+- [x] T1 constraints.py: valley helpers + "story" preset — Done
+- [x] T2 planner.py: valley_idxs + in_valley + break bonus — Done
+- [x] T3 set_analyzer.py: break teaching note (null-title guarded, first-only) — Done
+- [x] T4 EnergyPresetPicker.svelte: story card (W-shaped sparkline) — Done
+- [x] T5 (discovered) config.py: `_PRESET_DESCRIPTIONS["story"]` — the API route has its own
+  description map; the suite caught the empty description. Added. — Done
+- [x] T6 tests extend (5 new: valley/segment/preset/teaching/placement) — Done
+- [x] T7 pytest + svelte-check — Done
+- [x] T8 E2E — covered by the placement unit test (build on "story" lands the break in the valley) — Done
+- [x] T9 commit — Done (hash below)
+
+**Implementation commit:** `dbe0a68` — spec(029): IMPLEMENT - set-role-break-dips (7 files).
+
+### Results
+- **Backend:** full suite **426 passed** (was 421; +5 in `test_set_role_builder.py`). The placement test
+  `test_break_placed_in_valley_on_story` builds on the "story" arc and asserts the break-tagged track
+  lands in the interior release valley — proving the bias works end to end (not just in unit isolation).
+- **Two things the tests caught (fixed):** (1) the release valley sits at elapsed 50-62 min, so the
+  placement test needed a longer build (64 min) + bigger pool to REACH it; (2) the API route's
+  `_PRESET_DESCRIPTIONS` needed a "story" entry (empty-description assertion) — a real gap the plan
+  missed.
+- **Regression:** full suite green; `journey`/defaults have no interior valley → no break placement;
+  bonus is 0 for untagged. `test_get_energy_presets` updated to include "story".
+- **Frontend:** `svelte-check` **0/0**; the "Story" card renders a W-shaped sparkline (visible breather).
+- **Deviations:** flat break bonus (by design, vs closer's ramp); + the discovered `config.py`
+  description addition. No `transition_score`/`suggest_next`/`SetBuildRequest` change.
 
 ## Test Evidence & Outputs
 <!-- Filled by explicit testing after /spec IMPLEMENT -->
