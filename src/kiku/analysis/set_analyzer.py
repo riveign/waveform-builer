@@ -114,6 +114,17 @@ def analyze_set(db: Session, set_id: int) -> SetAnalysisResult:
             f"Closed on “{closer_name}” — one of your go-to closers."
         )
 
+    # Break role: a break-tagged track sitting in an energy VALLEY (a local minimum
+    # of the curve) is the release between chapters — say so (spec 029). First only.
+    curve = arc.energy_curve
+    for i in range(1, len(tracks) - 1):
+        if has_role(tracks[i], "break") and curve[i] < curve[i - 1] and curve[i] < curve[i + 1]:
+            break_name = tracks[i].title or "a track"
+            set_patterns.append(
+                f"Gave the room a breather with “{break_name}” before building back up."
+            )
+            break
+
     # 5. Overall score
     totals = [t.scores["total"] for t in transitions]
     overall_score = round(sum(totals) / len(totals), 3) if totals else 0.0

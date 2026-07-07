@@ -9,7 +9,7 @@ def test_get_energy_presets(client):
     data = resp.json()
     assert isinstance(data, list)
     names = {p["name"] for p in data}
-    assert names == {"warmup", "peak-time", "journey", "afterhours"}
+    assert names == {"warmup", "peak-time", "journey", "afterhours", "story"}
     for preset in data:
         assert "name" in preset
         assert "description" in preset

@@ -70,3 +70,55 @@ def test_teaching_notes_for_tagged_first_and_last(session):
     res = analyze_set(session, 1)
     joined = " ".join(res.set_patterns)
     assert "great opener" in joined and "go-to closers" in joined
+
+
+from kiku.setbuilder.constraints import (
+    DEFAULT_ENERGY_PRESETS,
+    resolve_energy,
+)
+
+
+def test_valley_segment_indices():
+    assert resolve_energy("story").valley_segment_indices() == {2}   # 'release'
+    assert resolve_energy("journey").valley_segment_indices() == set()  # cooldown is last
+    w = parse_energy_string("a:10:0.9,b:10:0.3,c:10:0.9,d:10:0.4,e:10:0.9")
+    assert w.valley_segment_indices() == {1, 3}                      # two valleys
+    ends = parse_energy_string("a:10:0.1,b:10:0.9,c:10:0.1")
+    assert ends.valley_segment_indices() == set()                   # first/last never
+
+
+def test_segment_index_at():
+    p = parse_energy_string("a:10:0.5,b:10:0.6,c:10:0.7")
+    assert [p.segment_index_at(x) for x in (5, 10, 15, 25, 999)] == [0, 0, 1, 2, 2]
+
+
+def test_story_preset_registered():
+    assert "story" in DEFAULT_ENERGY_PRESETS
+    assert resolve_energy("story").valley_segment_indices()          # has a breather
+
+
+def test_break_teaching_note_at_energy_valley(session):
+    from kiku.analysis.set_analyzer import analyze_set
+    hi = _t(session, 1, "peak")                       # high
+    br = _t(session, 2, "warmup", roles=["break"])    # low -> curve valley + break tag
+    hi2 = _t(session, 3, "peak")                      # high again
+    st = Set(id=1, name="S", duration_min=30)
+    session.add(st)
+    session.flush()
+    for pos, tr in enumerate([hi, br, hi2]):
+        session.add(SetTrack(set_id=1, position=pos, track_id=tr.id))
+    session.commit()
+    assert any("breather" in p for p in analyze_set(session, 1).set_patterns)
+
+
+def test_break_placed_in_valley_on_story(session):
+    from kiku.setbuilder.planner import build_set
+    # Pool must be large enough (and the build long enough) to REACH the release
+    # valley, which sits at elapsed 50-62 min in the "story" arc (~6 min/track).
+    for i in range(1, 16):
+        _t(session, i, "peak", bpm=126.0, key="8A")           # high-energy pool
+    _t(session, 99, "warmup", roles=["break"], bpm=126.0, key="8A")  # the breather
+    session.commit()
+    s = build_set(session, duration_min=64, energy_profile=resolve_energy("story"), set_name="s")
+    ids = [st.track_id for st in sorted(s.tracks, key=lambda x: x.position)]
+    assert 99 in ids and 0 < ids.index(99) < len(ids) - 1   # placed, interior
