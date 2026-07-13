@@ -231,6 +231,10 @@ def build_set(
 
     candidate_set = {t.id: t for t in candidates}
 
+    # Chapter-boundary energy valleys — break-tagged tracks are softly favoured here
+    # (spec 029). Empty for the default single-peak arcs, so break is a no-op there.
+    valley_idxs = energy_profile.valley_segment_indices()
+
     iteration = 0
     while True:
         iteration += 1
@@ -258,6 +262,9 @@ def build_set(
             # ending-anchor pull and the closer-role nudge below.
             end_ramp = _end_pull(progress)
             pull = end_ramp if end_track else 0.0
+
+            # Is this slot inside a chapter-boundary valley? (break-role bias below)
+            in_valley = energy_profile.segment_index_at(elapsed) in valley_idxs
 
             # Score all candidates not yet in sequence
             scored_candidates = []
@@ -293,6 +300,12 @@ def build_set(
                 # anchor; reuses the same end-ramp. A preference, not a guarantee.
                 if end_ramp > 0 and has_role(cand, "closer"):
                     score += end_ramp * _ROLE_SPAN
+
+                # Break role: favour break-tagged tracks in a chapter-boundary energy
+                # valley — the release after a high, before the next build (spec 029).
+                # Flat (not ramped): a valley is a discrete region. Soft, never forced.
+                if in_valley and has_role(cand, "break"):
+                    score += _ROLE_SPAN
 
                 scored_candidates.append((cand, score))
 

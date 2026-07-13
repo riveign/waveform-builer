@@ -22,6 +22,7 @@ _PRESET_DESCRIPTIONS: dict[str, str] = {
     "peak-time": "Straight to the top. High energy throughout for peak hour domination.",
     "journey": "The full arc. Build up, peak, wind down — a complete story in one set.",
     "afterhours": "Late night vibes. Steady mid-energy with a gentle descent.",
+    "story": "Two chapters, one breather. Build to a peak, release the tension, then build back up — where your break tracks shine.",
 }
 
 

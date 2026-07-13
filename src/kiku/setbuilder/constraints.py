@@ -45,6 +45,30 @@ class EnergyProfile:
         # Past end — return last segment energy
         return self.segments[-1].target_energy if self.segments else 0.5
 
+    def segment_index_at(self, elapsed_min: float) -> int:
+        """Index of the segment covering elapsed_min (clamped to the last segment)."""
+        cumulative = 0.0
+        for i, seg in enumerate(self.segments):
+            cumulative += seg.duration_min
+            if elapsed_min <= cumulative:
+                return i
+        return len(self.segments) - 1 if self.segments else 0
+
+    def valley_segment_indices(self) -> set[int]:
+        """Interior local-minimum segments — chapter-boundary 'breather' valleys.
+
+        A segment qualifies when its target energy is lower than BOTH neighbours:
+        a release after a high, before the next build. The first and last segments
+        are never valleys, so a final cooldown/outro is excluded (spec 029).
+        """
+        segs = self.segments
+        return {
+            i
+            for i in range(1, len(segs) - 1)
+            if segs[i].target_energy < segs[i - 1].target_energy
+            and segs[i].target_energy < segs[i + 1].target_energy
+        }
+
 
 def parse_energy_string(s: str) -> EnergyProfile:
     """Parse energy string like 'warmup:30:0.3,build:20:0.6,peak:40:0.9,cooldown:20:0.4'."""
@@ -106,6 +130,9 @@ DEFAULT_ENERGY_PRESETS: dict[str, str] = {
     "peak-time": "hype:20:0.7,peak:50:0.9,sustain:30:0.8",
     "journey": "warmup:30:0.3,build:20:0.6,peak:40:0.9,cooldown:20:0.4",
     "afterhours": "deep:30:0.3,hypno:40:0.4,drift:30:0.25",
+    # Multi-chapter arc (spec 029): a release VALLEY between two builds gives
+    # break-tagged tracks a home — the culmination of a chapter, then a rebuild.
+    "story": "build:20:0.6,peak:30:0.9,release:12:0.4,rebuild:20:0.7,summit:30:0.95,close:12:0.4",
 }
 
 
