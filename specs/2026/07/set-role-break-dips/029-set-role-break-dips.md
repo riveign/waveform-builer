@@ -475,4 +475,47 @@ TODOs:
 <!-- Filled by explicit documentation udpates after /spec IMPLEMENT -->
 
 ## Post-Implement Review
-<!-- Filled by /spec REVIEW -->
+
+**Verdict: GOAL ACHIEVED — Yes.** Break-tagged tracks are now softly favoured at chapter-boundary
+energy valleys, with a teaching note and a "story" preset that gives the behaviour a home. This
+completes the set-role family (027 tags → 028 opener/closer → 029 break).
+
+### Plan vs. implementation (re-read each file; all tasks Done)
+- **T1 valley helpers** — `EnergyProfile.valley_segment_indices()` (interior local-min, `range(1,len-1)`
+  excludes first/last) + `segment_index_at()`, both in `constraints.py`. "story" preset registered.
+- **T2 break bias** — `valley_idxs` computed once (planner.py:236), `in_valley` per beam (L267), flat
+  `+_ROLE_SPAN` guarded by `in_valley and has_role(cand,"break")` (L307). Short-circuits so `has_role`
+  runs only inside a valley; empty valley set → zero effect (default arcs).
+- **T3 teaching** — break-at-curve-local-min note in `analyze_set`, null-title-guarded, first-only.
+- **T4 "story" card** — `EnergyPresetPicker.svelte`, W-shaped sparkline.
+- **T5 (discovered) description** — `config.py` `_PRESET_DESCRIPTIONS["story"]`; the suite caught the
+  empty-description assertion. Correct addition, not just a test patch.
+
+### Edge cases audited (all safe — no fix needed)
+- Valley detector on empty / 1-seg / 2-seg profiles → `set()` (verified). `segment_index_at` on an
+  empty profile → 0. The teaching loop `range(1, len(tracks)-1)` is empty for a 2-track set, and
+  `analyze_set` already rejects `<2` tracks (L78-79). No IndexError path.
+
+### Test coverage
+- 5 new units incl. `test_break_placed_in_valley_on_story` — a real `build_set` on the story arc that
+  asserts the break track lands in the interior valley (end-to-end proof, not just isolation). Full
+  suite **426 passed**.
+- Regression: `journey`/defaults have no interior valley → no break placement; bonus 0 for untagged;
+  `test_get_energy_presets` updated for "story".
+
+### Deviations from PLAN — flat break bonus (documented, by design, vs closer's ramp) + the discovered
+`config.py` description. No `transition_score`/`suggest_next`/`SetBuildRequest` change.
+
+### Backlog nits (non-blocking)
+- The break bonus and the teaching note derive "valley" independently (profile segments vs. analyzed
+  energy curve), so a break track biased into a profile valley won't always trigger the note if its
+  actual energy doesn't form a curve local-min. Acceptable — the bias is about the target arc, the
+  note is about what actually happened; both are honest. Revisit only if it reads oddly in practice.
+- `_ROLE_SPAN` is shared by opener/closer/break; if one role later needs independent tuning, split it.
+
+### Next steps
+1. **PR + merge to main** (branch `set-role-break-dips`).
+2. Set-role family is complete — nothing deferred.
+
+### Feedback
+- [ ] (none blocking)
