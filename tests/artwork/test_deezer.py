@@ -34,9 +34,12 @@ def _handler(data, captured=None):
 def test_search_cover_prefers_cover_xl_and_matches_nested_artist():
     captured: dict = {}
     data = [
-        {"title": "Bite The Hand That Feeds You", "artist": {"name": "Hadone"},
-         "cover_big": "https://e-cdn/cover/big.jpg",
-         "cover_xl": "https://e-cdn/cover/xl.jpg"},
+        {
+            "title": "Bite The Hand That Feeds You",
+            "artist": {"name": "Hadone"},
+            "cover_big": "https://e-cdn/cover/big.jpg",
+            "cover_xl": "https://e-cdn/cover/xl.jpg",
+        },
     ]
     client = DeezerClient(transport=httpx.MockTransport(_handler(data, captured)))
     out = client.search_cover("Hadone", "Bite The Hand That Feeds You")
@@ -48,8 +51,11 @@ def test_search_cover_prefers_cover_xl_and_matches_nested_artist():
 
 def test_search_cover_falls_back_to_cover_big_then_cover():
     data = [
-        {"title": "Bite The Hand That Feeds You", "artist": {"name": "Hadone"},
-         "cover": "https://e-cdn/cover/small.jpg"},
+        {
+            "title": "Bite The Hand That Feeds You",
+            "artist": {"name": "Hadone"},
+            "cover": "https://e-cdn/cover/small.jpg",
+        },
     ]
     captured: dict = {}
     client = DeezerClient(transport=httpx.MockTransport(_handler(data, captured)))
@@ -59,8 +65,11 @@ def test_search_cover_falls_back_to_cover_big_then_cover():
 
 def test_search_cover_rejects_below_threshold():
     data = [
-        {"title": "Completely Unrelated", "artist": {"name": "Nobody"},
-         "cover_xl": "https://e-cdn/cover/xl.jpg"},
+        {
+            "title": "Completely Unrelated",
+            "artist": {"name": "Nobody"},
+            "cover_xl": "https://e-cdn/cover/xl.jpg",
+        },
     ]
     client = DeezerClient(transport=httpx.MockTransport(_handler(data)))
     assert client.search_cover("Hadone", "Bite The Hand That Feeds You") is None

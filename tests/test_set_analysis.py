@@ -20,8 +20,14 @@ from kiku.analysis.teaching import (
 
 def test_strong_transition_no_suggestion():
     """Strong transitions (>= 0.8) should celebrate and have no suggestion."""
-    scores = {"harmonic": 0.85, "energy_fit": 0.9, "bpm_compat": 0.95,
-              "genre_coherence": 0.8, "track_quality": 0.7, "total": 0.85}
+    scores = {
+        "harmonic": 0.85,
+        "energy_fit": 0.9,
+        "bpm_compat": 0.95,
+        "genre_coherence": 0.8,
+        "track_quality": 0.7,
+        "total": 0.85,
+    }
     moment, suggestion = transition_teaching_moment(
         scores, "8A", "8A", 128.0, 128.0, "Techno", "Techno"
     )
@@ -31,18 +37,28 @@ def test_strong_transition_no_suggestion():
 
 def test_strong_same_key():
     """Same key should mention the key in the teaching moment."""
-    scores = {"harmonic": 1.0, "energy_fit": 0.8, "bpm_compat": 0.9,
-              "genre_coherence": 0.8, "track_quality": 0.7, "total": 0.88}
-    moment, _ = transition_teaching_moment(
-        scores, "8A", "8A", 128.0, 130.0, "Techno", "Techno"
-    )
+    scores = {
+        "harmonic": 1.0,
+        "energy_fit": 0.8,
+        "bpm_compat": 0.9,
+        "genre_coherence": 0.8,
+        "track_quality": 0.7,
+        "total": 0.88,
+    }
+    moment, _ = transition_teaching_moment(scores, "8A", "8A", 128.0, 130.0, "Techno", "Techno")
     assert "8A" in moment
 
 
 def test_good_transition_may_suggest():
     """Good transitions (0.6-0.8) may get a suggestion if a dimension is weak."""
-    scores = {"harmonic": 0.3, "energy_fit": 0.8, "bpm_compat": 0.9,
-              "genre_coherence": 0.8, "track_quality": 0.7, "total": 0.68}
+    scores = {
+        "harmonic": 0.3,
+        "energy_fit": 0.8,
+        "bpm_compat": 0.9,
+        "genre_coherence": 0.8,
+        "track_quality": 0.7,
+        "total": 0.68,
+    }
     moment, suggestion = transition_teaching_moment(
         scores, "1A", "6B", 128.0, 130.0, "Techno", "Techno"
     )
@@ -52,8 +68,14 @@ def test_good_transition_may_suggest():
 
 def test_weak_transition_has_suggestion():
     """Weak transitions (< 0.6) should always get a suggestion."""
-    scores = {"harmonic": 0.2, "energy_fit": 0.3, "bpm_compat": 0.4,
-              "genre_coherence": 0.3, "track_quality": 0.5, "total": 0.32}
+    scores = {
+        "harmonic": 0.2,
+        "energy_fit": 0.3,
+        "bpm_compat": 0.4,
+        "genre_coherence": 0.3,
+        "track_quality": 0.5,
+        "total": 0.32,
+    }
     moment, suggestion = transition_teaching_moment(
         scores, "1A", "6B", 100.0, 140.0, "Techno", "Trance"
     )
@@ -63,18 +85,28 @@ def test_weak_transition_has_suggestion():
 
 def test_weak_bpm_mentions_percentage():
     """When BPM is the weakest dimension, the moment should mention the jump."""
-    scores = {"harmonic": 0.8, "energy_fit": 0.7, "bpm_compat": 0.1,
-              "genre_coherence": 0.6, "track_quality": 0.5, "total": 0.45}
-    moment, _ = transition_teaching_moment(
-        scores, "8A", "8A", 100.0, 140.0, "Techno", "Techno"
-    )
+    scores = {
+        "harmonic": 0.8,
+        "energy_fit": 0.7,
+        "bpm_compat": 0.1,
+        "genre_coherence": 0.6,
+        "track_quality": 0.5,
+        "total": 0.45,
+    }
+    moment, _ = transition_teaching_moment(scores, "8A", "8A", 100.0, 140.0, "Techno", "Techno")
     assert "%" in moment
 
 
 def test_weak_genre_mentions_families():
     """When genre is weakest, the moment should mention genre families."""
-    scores = {"harmonic": 0.8, "energy_fit": 0.7, "bpm_compat": 0.8,
-              "genre_coherence": 0.1, "track_quality": 0.5, "total": 0.45}
+    scores = {
+        "harmonic": 0.8,
+        "energy_fit": 0.7,
+        "bpm_compat": 0.8,
+        "genre_coherence": 0.1,
+        "track_quality": 0.5,
+        "total": 0.45,
+    }
     moment, _ = transition_teaching_moment(
         scores, "8A", "8A", 128.0, 128.0, "Techno", "Indie Dance"
     )
@@ -128,7 +160,9 @@ def test_energy_shape_ramp_up():
 
 def test_energy_shape_wind_down():
     # Peak at index 4 (>= 40%) so peak-valley check doesn't trigger
-    assert _classify_energy_shape([0.5, 0.55, 0.5, 0.7, 0.75, 0.7, 0.5, 0.4, 0.35, 0.3]) == "wind-down"
+    assert (
+        _classify_energy_shape([0.5, 0.55, 0.5, 0.7, 0.75, 0.7, 0.5, 0.4, 0.35, 0.3]) == "wind-down"
+    )
 
 
 def test_energy_shape_too_short():
@@ -191,7 +225,12 @@ def test_genre_segments_single():
 
 
 def test_genre_segments_transition():
-    tracks = [_mock_track("Techno"), _mock_track("Techno"), _mock_track("Deep House"), _mock_track("House")]
+    tracks = [
+        _mock_track("Techno"),
+        _mock_track("Techno"),
+        _mock_track("Deep House"),
+        _mock_track("House"),
+    ]
     segs = _detect_genre_segments(tracks)
     assert len(segs) == 2
     assert segs[0]["genre_family"] == "techno"

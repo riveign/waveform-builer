@@ -88,7 +88,9 @@ def start_hunt(body: HuntRequest, db: Session = Depends(get_db)):
     # Detect platform
     platform = detect_platform(body.url)
     if not platform:
-        raise HTTPException(status_code=400, detail="Unsupported URL — try YouTube, SoundCloud, or Mixcloud")
+        raise HTTPException(
+            status_code=400, detail="Unsupported URL — try YouTube, SoundCloud, or Mixcloud"
+        )
 
     # Create session
     hunt = create_hunt_session(db, url=body.url, platform=platform)

@@ -60,9 +60,7 @@ def test_fetch_front_cover_404_marks_missing() -> None:
 
 def test_fetch_front_cover_png_extension() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200, content=b"\x89PNGfake", headers={"content-type": "image/png"}
-        )
+        return httpx.Response(200, content=b"\x89PNGfake", headers={"content-type": "image/png"})
 
     path = cover_art.fetch_front_cover(
         "mb-png", "pngpngpngpng", transport=httpx.MockTransport(handler)
@@ -75,9 +73,7 @@ def test_fetch_front_cover_oversize_rejected() -> None:
     huge = b"x" * (cover_art.MAX_BYTES + 1)
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200, content=huge, headers={"content-type": "image/jpeg"}
-        )
+        return httpx.Response(200, content=huge, headers={"content-type": "image/jpeg"})
 
     path = cover_art.fetch_front_cover(
         "mb-huge", "hugeghugeghu", transport=httpx.MockTransport(handler)

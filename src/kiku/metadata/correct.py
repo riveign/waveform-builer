@@ -57,10 +57,7 @@ def build_correction(
 
     mapping = match_tracklist(
         [{"id": t.id, "title": t.title or ""} for t in db_tracks],
-        [
-            {"position": r.position, "disc": r.disc, "title": r.title}
-            for r in recordings
-        ],
+        [{"position": r.position, "disc": r.disc, "title": r.title} for r in recordings],
     )
     track_by_id = {t.id: t for t in db_tracks}
 
@@ -71,12 +68,14 @@ def build_correction(
             continue
         rec = by_norm_title.get(normalize_title(m.get("mb_title")))
         changes = _changes_for(track, candidate, rec, fields)
-        corrections.append(TrackCorrection(
-            track_id=track.id,
-            matched_title=m.get("mb_title"),
-            confidence=float(m.get("confidence", 0.0)),
-            changes=changes,
-        ))
+        corrections.append(
+            TrackCorrection(
+                track_id=track.id,
+                matched_title=m.get("mb_title"),
+                confidence=float(m.get("confidence", 0.0)),
+                changes=changes,
+            )
+        )
     return corrections
 
 
@@ -105,11 +104,13 @@ def _changes_for(
     for f in fields:
         if f not in proposed:
             continue
-        changes.append(FieldChange(
-            field=f,
-            old=getattr(track, _TRACK_ATTR[f], None),
-            new=proposed.get(f),
-        ))
+        changes.append(
+            FieldChange(
+                field=f,
+                old=getattr(track, _TRACK_ATTR[f], None),
+                new=proposed.get(f),
+            )
+        )
     return changes
 
 

@@ -16,6 +16,7 @@ from kiku.hunting.parsers.common import (
 @dataclass
 class ParsedTrack:
     """A single track extracted from text."""
+
     position: int
     artist: str
     title: str
@@ -66,17 +67,19 @@ def parse_description(text: str | None) -> list[ParsedTrack]:
             parsed = _parse_track_text(track_text)
             if parsed:
                 artist, title, remix = parsed
-                tracks.append(ParsedTrack(
-                    position=position,
-                    artist=artist,
-                    title=title,
-                    remix_info=remix,
-                    original_title=title if remix else None,
-                    timestamp_sec=timestamp,
-                    raw_text=line,
-                    source="description",
-                    confidence=0.9,
-                ))
+                tracks.append(
+                    ParsedTrack(
+                        position=position,
+                        artist=artist,
+                        title=title,
+                        remix_info=remix,
+                        original_title=title if remix else None,
+                        timestamp_sec=timestamp,
+                        raw_text=line,
+                        source="description",
+                        confidence=0.9,
+                    )
+                )
                 position += 1
                 continue
 
@@ -87,16 +90,18 @@ def parse_description(text: str | None) -> list[ParsedTrack]:
             parsed = _parse_track_text(track_text)
             if parsed:
                 artist, title, remix = parsed
-                tracks.append(ParsedTrack(
-                    position=position,
-                    artist=artist,
-                    title=title,
-                    remix_info=remix,
-                    original_title=title if remix else None,
-                    raw_text=line,
-                    source="description",
-                    confidence=0.85,
-                ))
+                tracks.append(
+                    ParsedTrack(
+                        position=position,
+                        artist=artist,
+                        title=title,
+                        remix_info=remix,
+                        original_title=title if remix else None,
+                        raw_text=line,
+                        source="description",
+                        confidence=0.85,
+                    )
+                )
                 position += 1
                 continue
 
@@ -104,16 +109,18 @@ def parse_description(text: str | None) -> list[ParsedTrack]:
         parsed = _parse_track_text(line)
         if parsed and (in_tracklist_section or _looks_like_tracklist_line(line)):
             artist, title, remix = parsed
-            tracks.append(ParsedTrack(
-                position=position,
-                artist=artist,
-                title=title,
-                remix_info=remix,
-                original_title=title if remix else None,
-                raw_text=line,
-                source="description",
-                confidence=0.7,
-            ))
+            tracks.append(
+                ParsedTrack(
+                    position=position,
+                    artist=artist,
+                    title=title,
+                    remix_info=remix,
+                    original_title=title if remix else None,
+                    raw_text=line,
+                    source="description",
+                    confidence=0.7,
+                )
+            )
             position += 1
 
     return tracks
@@ -133,17 +140,19 @@ def parse_chapters(chapters: list[dict] | None) -> list[ParsedTrack]:
         parsed = _parse_track_text(title_text)
         if parsed:
             artist, title, remix = parsed
-            tracks.append(ParsedTrack(
-                position=i,
-                artist=artist,
-                title=title,
-                remix_info=remix,
-                original_title=title if remix else None,
-                timestamp_sec=ch.get("start_time"),
-                raw_text=title_text,
-                source="chapter",
-                confidence=0.95,
-            ))
+            tracks.append(
+                ParsedTrack(
+                    position=i,
+                    artist=artist,
+                    title=title,
+                    remix_info=remix,
+                    original_title=title if remix else None,
+                    timestamp_sec=ch.get("start_time"),
+                    raw_text=title_text,
+                    source="chapter",
+                    confidence=0.95,
+                )
+            )
 
     return tracks
 
@@ -189,17 +198,19 @@ def parse_comments(comments: list[dict] | None) -> list[ParsedTrack]:
                     key = (artist.lower(), title.lower())
                     if key not in seen:
                         seen.add(key)
-                        tracks.append(ParsedTrack(
-                            position=position,
-                            artist=artist,
-                            title=title,
-                            remix_info=remix,
-                            original_title=title if remix else None,
-                            timestamp_sec=timestamp,
-                            raw_text=line,
-                            source="comment",
-                            confidence=0.6,
-                        ))
+                        tracks.append(
+                            ParsedTrack(
+                                position=position,
+                                artist=artist,
+                                title=title,
+                                remix_info=remix,
+                                original_title=title if remix else None,
+                                timestamp_sec=timestamp,
+                                raw_text=line,
+                                source="comment",
+                                confidence=0.6,
+                            )
+                        )
                         position += 1
 
     return tracks
@@ -222,16 +233,18 @@ def parse_music_credits(credits: list[dict] | None) -> list[ParsedTrack]:
             continue
 
         title, remix = parse_remix(title_raw)
-        tracks.append(ParsedTrack(
-            position=i,
-            artist=artist,
-            title=title,
-            remix_info=remix,
-            original_title=title if remix else None,
-            raw_text=f"{artist} - {title_raw}",
-            source="content_id",
-            confidence=0.95,
-        ))
+        tracks.append(
+            ParsedTrack(
+                position=i,
+                artist=artist,
+                title=title,
+                remix_info=remix,
+                original_title=title if remix else None,
+                raw_text=f"{artist} - {title_raw}",
+                source="content_id",
+                confidence=0.95,
+            )
+        )
 
     return tracks
 
@@ -282,7 +295,10 @@ def merge_tracklists(*tracklists: list[ParsedTrack]) -> list[ParsedTrack]:
 
     # Sort by timestamp if available, otherwise by original position
     merged_tracks.sort(
-        key=lambda t: (t.timestamp_sec if t.timestamp_sec is not None else float("inf"), t.position),
+        key=lambda t: (
+            t.timestamp_sec if t.timestamp_sec is not None else float("inf"),
+            t.position,
+        ),
     )
 
     # Renumber

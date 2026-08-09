@@ -39,7 +39,9 @@ def get_discogs_token() -> str | None:
 class DiscogsSource:
     name = "discogs"
 
-    def __init__(self, token: str | None = None, transport: httpx.BaseTransport | None = None) -> None:
+    def __init__(
+        self, token: str | None = None, transport: httpx.BaseTransport | None = None
+    ) -> None:
         self._token = token if token is not None else get_discogs_token()
         self._transport = transport
 
@@ -97,12 +99,14 @@ class DiscogsSource:
             if not title:
                 continue
             pos += 1
-            recordings.append(RecordingCandidate(
-                title=title,
-                position=pos,
-                disc=1,
-                length_ms=_duration_to_ms(tr.get("duration")),
-            ))
+            recordings.append(
+                RecordingCandidate(
+                    title=title,
+                    position=pos,
+                    disc=1,
+                    length_ms=_duration_to_ms(tr.get("duration")),
+                )
+            )
 
         labels = full.get("labels") or []
         label = labels[0].get("name") if labels and labels[0].get("name") else None

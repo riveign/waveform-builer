@@ -97,9 +97,7 @@ def test_allowed_keys_hard_filter():
     s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
     pool = [_track(10, key="9A"), _track(11, key="8B"), _track(12, key="9A")]
     session = _make_session(s, pool)
-    picks = rank_slot_picks(
-        session, 1, 1, "replace", "hold", allowed_keys={"9A"}
-    )
+    picks = rank_slot_picks(session, 1, 1, "replace", "hold", allowed_keys={"9A"})
     assert {p.track.id for p in picks} == {10, 12}
 
 
@@ -110,9 +108,7 @@ def test_all_invalid_allowed_keys_returns_empty_not_unfiltered():
     s = _make_set([_set_track(t, i) for i, t in enumerate(in_set)])
     pool = [_track(10, key="9A"), _track(11, key="8B")]
     session = _make_session(s, pool)
-    picks = rank_slot_picks(
-        session, 1, 1, "replace", "hold", allowed_keys={"Hmm", "xyz"}
-    )
+    picks = rank_slot_picks(session, 1, 1, "replace", "hold", allowed_keys={"Hmm", "xyz"})
     assert picks == []
 
 

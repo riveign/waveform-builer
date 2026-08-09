@@ -313,9 +313,7 @@ def sync_rekordbox(
 
     # --- Dry-run / preview pass ---
     if not yes:
-        stats = _process_tracks(
-            db, session, compute_hashes=compute_hashes, dry_run=True
-        )
+        stats = _process_tracks(db, session, compute_hashes=compute_hashes, dry_run=True)
         _print_preview(stats)
 
         if dry_run:
@@ -329,15 +327,12 @@ def sync_rekordbox(
             return {**stats, "cancelled": True}
 
     # --- Write pass ---
-    stats = _process_tracks(
-        db, session, compute_hashes=compute_hashes, dry_run=False
-    )
+    stats = _process_tracks(db, session, compute_hashes=compute_hashes, dry_run=False)
     db.close()
 
     console.print(f"\n[green]Sync complete![/] {stats['total']:,} tracks processed")
     console.print(
-        f"  Added: {stats['added']:,}, Updated: {stats['updated']:,}, "
-        f"Skipped: {stats['skipped']:,}"
+        f"  Added: {stats['added']:,}, Updated: {stats['updated']:,}, Skipped: {stats['skipped']:,}"
     )
 
     return stats

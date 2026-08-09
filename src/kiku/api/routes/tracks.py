@@ -40,6 +40,7 @@ def _track_to_response(t: Track) -> TrackResponse:
     conflict_resp = None
     if conflict:
         from kiku.api.schemas import EnergyConflictResponse
+
         conflict_resp = EnergyConflictResponse(**conflict)
 
     # Parse playlist_tags JSON
@@ -141,12 +142,26 @@ def track_search(
     # override active filters.
     fuzzy = False
     other_filters = any(
-        f is not None for f in (title, artist, genre, key, label, bpm_min, bpm_max,
-                                energy, energy_zone, rating_min, plays_min, plays_max,
-                                set_role)
+        f is not None
+        for f in (
+            title,
+            artist,
+            genre,
+            key,
+            label,
+            bpm_min,
+            bpm_max,
+            energy,
+            energy_zone,
+            rating_min,
+            plays_min,
+            plays_max,
+            set_role,
+        )
     )
     if search and total == 0 and not other_filters:
         from kiku.db.store import fuzzy_search_tracks
+
         tracks, total = fuzzy_search_tracks(db, search, limit=limit)
         fuzzy = bool(tracks)
 
@@ -325,12 +340,24 @@ def suggest_next(
     genre_filter: str | None = Query(default=None, description="Comma-separated genre filter"),
     w_harmonic: float | None = Query(default=None, description="Harmonic weight override"),
     w_energy_fit: float | None = Query(default=None, description="Energy fit weight override"),
-    w_bpm_compat: float | None = Query(default=None, description="BPM compatibility weight override"),
-    w_genre_coherence: float | None = Query(default=None, description="Genre coherence weight override"),
-    w_track_quality: float | None = Query(default=None, description="Track quality weight override"),
-    discovery_density: float = Query(default=0.0, ge=-1.0, le=1.0, description="Discovery/density bias (-1=fresh, +1=proven)"),
-    position_min: float | None = Query(default=None, description="Elapsed minutes at this position in the set"),
-    energy_profile: str | None = Query(default=None, description="Energy profile string for position-aware energy target"),
+    w_bpm_compat: float | None = Query(
+        default=None, description="BPM compatibility weight override"
+    ),
+    w_genre_coherence: float | None = Query(
+        default=None, description="Genre coherence weight override"
+    ),
+    w_track_quality: float | None = Query(
+        default=None, description="Track quality weight override"
+    ),
+    discovery_density: float = Query(
+        default=0.0, ge=-1.0, le=1.0, description="Discovery/density bias (-1=fresh, +1=proven)"
+    ),
+    position_min: float | None = Query(
+        default=None, description="Elapsed minutes at this position in the set"
+    ),
+    energy_profile: str | None = Query(
+        default=None, description="Energy profile string for position-aware energy target"
+    ),
     db: Session = Depends(get_db),
 ):
     """Suggest best next tracks based on transition scoring."""
@@ -367,7 +394,9 @@ def suggest_next(
     }
     weights_dict = None
     if any(v is not None for v in weight_overrides.values()):
-        weights_dict = {k: (v if v is not None else SCORING_WEIGHTS[k]) for k, v in weight_overrides.items()}
+        weights_dict = {
+            k: (v if v is not None else SCORING_WEIGHTS[k]) for k, v in weight_overrides.items()
+        }
         try:
             validate_scoring_weights(weights_dict)
         except ValueError as exc:
@@ -386,7 +415,16 @@ def suggest_next(
         except Exception:
             pass  # Fall back to neutral
 
-    scored = score_transitions(db, track, n=n, genre_filter=genres, weights=weights_dict, exclude_ids=exclude_ids, discovery_density=discovery_density, target_energy=target_energy)
+    scored = score_transitions(
+        db,
+        track,
+        n=n,
+        genre_filter=genres,
+        weights=weights_dict,
+        exclude_ids=exclude_ids,
+        discovery_density=discovery_density,
+        target_energy=target_energy,
+    )
 
     suggestions = []
     for cand, total_score in scored:
@@ -399,20 +437,22 @@ def suggest_next(
         )
         q, label = track_quality(cand, discovery_density=discovery_density)
 
-        suggestions.append(SuggestNextItem(
-            track=_track_to_response(cand),
-            score=round(total_score, 3),
-            breakdown=TransitionScoreBreakdown(
-                harmonic=round(h, 3),
-                energy_fit=round(e, 3),
-                bpm_compat=round(b, 3),
-                genre_coherence=round(g, 3),
-                track_quality=round(q, 3),
-                total=round(total_score, 3),
-                discovery_label=label,
-                set_appearances=None,
-            ),
-        ))
+        suggestions.append(
+            SuggestNextItem(
+                track=_track_to_response(cand),
+                score=round(total_score, 3),
+                breakdown=TransitionScoreBreakdown(
+                    harmonic=round(h, 3),
+                    energy_fit=round(e, 3),
+                    bpm_compat=round(b, 3),
+                    genre_coherence=round(g, 3),
+                    track_quality=round(q, 3),
+                    total=round(total_score, 3),
+                    discovery_label=label,
+                    set_appearances=None,
+                ),
+            )
+        )
 
     return SuggestNextResponse(source_track_id=track_id, suggestions=suggestions)
 
@@ -474,7 +514,9 @@ def set_affinity(
         raise HTTPException(status_code=404, detail="Other track not found")
 
     if track_id == body.other_track_id:
-        raise HTTPException(status_code=422, detail="Cannot create affinity between a track and itself")
+        raise HTTPException(
+            status_code=422, detail="Cannot create affinity between a track and itself"
+        )
 
     a_id, b_id = _canonical_pair(track_id, body.other_track_id)
 

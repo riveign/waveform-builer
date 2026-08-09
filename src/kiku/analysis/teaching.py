@@ -45,8 +45,11 @@ def transition_teaching_moment(
 
 
 def _explain_strength(
-    scores: dict, key_a: str | None, key_b: str | None,
-    bpm_a: float | None, bpm_b: float | None,
+    scores: dict,
+    key_a: str | None,
+    key_b: str | None,
+    bpm_a: float | None,
+    bpm_b: float | None,
 ) -> str:
     """Celebrate a strong transition."""
     h = scores.get("harmonic", 0)
@@ -67,9 +70,13 @@ def _explain_strength(
 
 
 def _explain_good(
-    scores: dict, key_a: str | None, key_b: str | None,
-    bpm_a: float | None, bpm_b: float | None,
-    genre_a: str | None, genre_b: str | None,
+    scores: dict,
+    key_a: str | None,
+    key_b: str | None,
+    bpm_a: float | None,
+    bpm_b: float | None,
+    genre_a: str | None,
+    genre_b: str | None,
 ) -> str:
     """Acknowledge a solid transition."""
     h = scores.get("harmonic", 0)
@@ -90,9 +97,13 @@ def _explain_good(
 
 
 def _explain_weakness(
-    scores: dict, key_a: str | None, key_b: str | None,
-    bpm_a: float | None, bpm_b: float | None,
-    genre_a: str | None, genre_b: str | None,
+    scores: dict,
+    key_a: str | None,
+    key_b: str | None,
+    bpm_a: float | None,
+    bpm_b: float | None,
+    genre_a: str | None,
+    genre_b: str | None,
 ) -> str:
     """Constructive feedback for a weak transition."""
     weakest = _weakest_dimension(scores)
@@ -122,9 +133,12 @@ def _weakest_dimension(scores: dict) -> str | None:
 
 
 def _suggest_improvement(
-    weakest: str, scores: dict,
-    bpm_a: float | None, bpm_b: float | None,
-    key_a: str | None, key_b: str | None,
+    weakest: str,
+    scores: dict,
+    bpm_a: float | None,
+    bpm_b: float | None,
+    key_a: str | None,
+    key_b: str | None,
 ) -> str:
     """Suggest how to improve based on the weakest dimension."""
     if weakest == "harmonic":
@@ -302,8 +316,7 @@ def detect_deviation_patterns(
     # Heavy cuts — plans longer than the room wants
     if planned_total > 0 and kinds.count("cut") / planned_total > 0.3:
         patterns.append(
-            "You cut over a third of the plan — your plans may be longer "
-            "than your rooms want."
+            "You cut over a third of the plan — your plans may be longer than your rooms want."
         )
 
     # Running hotter/cooler than the plan
@@ -316,8 +329,7 @@ def detect_deviation_patterns(
             )
         elif avg_delta < -0.15:
             patterns.append(
-                "You ran cooler than the plan — the room wanted depth, not lift. "
-                "Trust that read."
+                "You ran cooler than the plan — the room wanted depth, not lift. Trust that read."
             )
 
     return patterns

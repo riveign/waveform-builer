@@ -74,9 +74,7 @@ class ItunesClient:
         for r in data.get("results", []) or []:
             if r.get("collectionType") not in (None, "Album"):
                 continue
-            score = score_candidate(
-                artist, album, r.get("artistName"), r.get("collectionName")
-            )
+            score = score_candidate(artist, album, r.get("artistName"), r.get("collectionName"))
             if accept(score) and score > best_score and r.get("artworkUrl100"):
                 best_score = score
                 best_url = _upscale(r["artworkUrl100"])

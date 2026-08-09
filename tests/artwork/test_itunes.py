@@ -35,9 +35,12 @@ def _handler(results, captured=None):
 def test_search_cover_picks_match_and_upscales():
     captured: dict = {}
     results = [
-        {"collectionType": "Album", "artistName": "Hadone",
-         "collectionName": "Bite The Hand That Feeds You",
-         "artworkUrl100": "https://is1.mzstatic.com/image/.../100x100bb.jpg"},
+        {
+            "collectionType": "Album",
+            "artistName": "Hadone",
+            "collectionName": "Bite The Hand That Feeds You",
+            "artworkUrl100": "https://is1.mzstatic.com/image/.../100x100bb.jpg",
+        },
     ]
     client = ItunesClient(transport=httpx.MockTransport(_handler(results, captured)))
     out = client.search_cover("Hadone", "Bite The Hand That Feeds You")
@@ -51,9 +54,12 @@ def test_search_cover_picks_match_and_upscales():
 
 def test_search_cover_rejects_wrong_artist():
     results = [
-        {"collectionType": "Album", "artistName": "Someone Else",
-         "collectionName": "A Totally Different Record",
-         "artworkUrl100": "https://x/100x100bb.jpg"},
+        {
+            "collectionType": "Album",
+            "artistName": "Someone Else",
+            "collectionName": "A Totally Different Record",
+            "artworkUrl100": "https://x/100x100bb.jpg",
+        },
     ]
     client = ItunesClient(transport=httpx.MockTransport(_handler(results)))
     assert client.search_cover("Hadone", "Bite The Hand That Feeds You") is None
@@ -61,9 +67,12 @@ def test_search_cover_rejects_wrong_artist():
 
 def test_search_cover_various_artists_matches_album_only():
     results = [
-        {"collectionType": "Album", "artistName": "VA / Compilation Crew",
-         "collectionName": "Summer Sampler 2026",
-         "artworkUrl100": "https://x/100x100bb.jpg"},
+        {
+            "collectionType": "Album",
+            "artistName": "VA / Compilation Crew",
+            "collectionName": "Summer Sampler 2026",
+            "artworkUrl100": "https://x/100x100bb.jpg",
+        },
     ]
     client = ItunesClient(transport=httpx.MockTransport(_handler(results)))
     # Album title matches; artist is "Various Artists" so artist mismatch is ignored.

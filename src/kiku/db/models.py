@@ -64,9 +64,9 @@ class Track(Base):
     playlist_tags = Column(Text)  # JSON list of playlist names this track belongs to
     set_roles = Column(Text)  # JSON list of DJ set-role tags: opener/closer/break (spec 027)
     last_synced = Column(String)
-    energy_predicted = Column(String)   # Predicted energy tag from autotag classifier
-    energy_confidence = Column(Float)   # Prediction confidence 0-1
-    energy_source = Column(String)      # "manual", "auto", or "approved"
+    energy_predicted = Column(String)  # Predicted energy tag from autotag classifier
+    energy_confidence = Column(Float)  # Prediction confidence 0-1
+    energy_source = Column(String)  # "manual", "auto", or "approved"
 
     audio_features = relationship(
         "AudioFeatures", back_populates="track", uselist=False, cascade="all, delete-orphan"
@@ -76,12 +76,14 @@ class Track(Base):
     def resolved_energy_zone(self) -> tuple[str | None, str, float]:
         """Resolved energy as (zone, source, confidence) via cascading trust."""
         from kiku.analysis.autotag import resolve_energy
+
         return resolve_energy(self)
 
     @property
     def energy_conflict(self) -> dict | None:
         """Conflict between dir_energy and predicted energy, or None if they agree."""
         from kiku.analysis.autotag import detect_energy_conflict
+
         return detect_energy_conflict(self)
 
 
@@ -99,7 +101,7 @@ class AudioFeatures(Base):
     mood_aggressive = Column(Float)
     mood_relaxed = Column(Float)
     vibe_brightness = Column(Float)  # 0 (dark) .. 1 (bright) — derived, see kiku.vibe
-    vibe_density = Column(Float)     # 0 (spacious) .. 1 (busy) — derived, see kiku.vibe
+    vibe_density = Column(Float)  # 0 (spacious) .. 1 (busy) — derived, see kiku.vibe
     ml_genre = Column(String)
     ml_genre_confidence = Column(Float)
     energy_intro = Column(Float)
@@ -111,20 +113,20 @@ class AudioFeatures(Base):
     verified_key = Column(String)
     analyzed_at = Column(String)
     # Waveform data for visualization
-    waveform_overview = Column(LargeBinary)   # ~1000 float32 peak-downsampled RMS
-    waveform_detail = Column(LargeBinary)     # ~10K float32 full RMS envelope
-    waveform_sr = Column(Integer)             # Sample rate used (22050)
-    waveform_hop = Column(Integer)            # Hop length used (512)
-    beat_positions = Column(LargeBinary)      # float32 array of beat timestamps in seconds
+    waveform_overview = Column(LargeBinary)  # ~1000 float32 peak-downsampled RMS
+    waveform_detail = Column(LargeBinary)  # ~10K float32 full RMS envelope
+    waveform_sr = Column(Integer)  # Sample rate used (22050)
+    waveform_hop = Column(Integer)  # Hop length used (512)
+    beat_positions = Column(LargeBinary)  # float32 array of beat timestamps in seconds
     # Frequency band envelopes (4 bands × detail + overview)
-    band_low = Column(LargeBinary)              # 20–250 Hz RMS detail
-    band_midlow = Column(LargeBinary)           # 250–1000 Hz RMS detail
-    band_midhigh = Column(LargeBinary)          # 1000–4000 Hz RMS detail
-    band_high = Column(LargeBinary)             # 4000–11025 Hz RMS detail
-    band_low_overview = Column(LargeBinary)     # 20–250 Hz RMS overview
+    band_low = Column(LargeBinary)  # 20–250 Hz RMS detail
+    band_midlow = Column(LargeBinary)  # 250–1000 Hz RMS detail
+    band_midhigh = Column(LargeBinary)  # 1000–4000 Hz RMS detail
+    band_high = Column(LargeBinary)  # 4000–11025 Hz RMS detail
+    band_low_overview = Column(LargeBinary)  # 20–250 Hz RMS overview
     band_midlow_overview = Column(LargeBinary)  # 250–1000 Hz RMS overview
-    band_midhigh_overview = Column(LargeBinary) # 1000–4000 Hz RMS overview
-    band_high_overview = Column(LargeBinary)    # 4000–11025 Hz RMS overview
+    band_midhigh_overview = Column(LargeBinary)  # 1000–4000 Hz RMS overview
+    band_high_overview = Column(LargeBinary)  # 4000–11025 Hz RMS overview
 
     track = relationship("Track", back_populates="audio_features")
 
@@ -142,9 +144,13 @@ class Set(Base):
     source_ref = Column(Text)  # Original filename or playlist name
     is_analyzed = Column(Integer, default=0)  # Whether analysis has been run
     analysis_cache = Column(Text)  # JSON blob for cached analysis (Phase 2)
-    planned_set_id = Column(Integer, ForeignKey("sets.id"), nullable=True)  # Played set -> the plan it came from
+    planned_set_id = Column(
+        Integer, ForeignKey("sets.id"), nullable=True
+    )  # Played set -> the plan it came from
     comparison_cache = Column(Text)  # JSON blob for cached played-vs-planned comparison
-    deleted_at = Column(String, nullable=True)  # Soft delete: NULL = active, ISO timestamp = in trash
+    deleted_at = Column(
+        String, nullable=True
+    )  # Soft delete: NULL = active, ISO timestamp = in trash
 
     tracks = relationship("SetTrack", back_populates="set_", cascade="all, delete-orphan")
 
@@ -190,14 +196,20 @@ class HuntSession(Base):
     platform = Column(String)  # "youtube", "soundcloud", "mixcloud", "1001tracklists"
     title = Column(String)  # Set/mix title from metadata
     uploader = Column(String)  # DJ / channel name
-    status = Column(String, default="pending")  # "pending", "extracting", "matching", "complete", "error"
+    status = Column(
+        String, default="pending"
+    )  # "pending", "extracting", "matching", "complete", "error"
     error_message = Column(Text)
     track_count = Column(Integer, default=0)
     owned_count = Column(Integer, default=0)
     created_at = Column(String, default=lambda: datetime.now().isoformat())
 
-    tracks = relationship("HuntTrack", back_populates="session", cascade="all, delete-orphan",
-                          order_by="HuntTrack.position")
+    tracks = relationship(
+        "HuntTrack",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="HuntTrack.position",
+    )
 
 
 class HuntTrack(Base):
@@ -213,7 +225,9 @@ class HuntTrack(Base):
     original_artist = Column(String)  # Original artist if this is a remix
     original_title = Column(String)  # Original title if this is a remix
     confidence = Column(Float, default=0.0)  # 0-1 extraction confidence
-    source = Column(String)  # "description", "comment", "chapter", "1001tracklists", "copyright", "soundcloud_playlist", "soundcloud_likes"
+    source = Column(
+        String
+    )  # "description", "comment", "chapter", "1001tracklists", "copyright", "soundcloud_playlist", "soundcloud_likes"
     timestamp_sec = Column(Float)  # Position in the mix where this track appears
     matched_track_id = Column(Integer, ForeignKey("tracks.id"))  # Link to owned track
     match_score = Column(Float)  # Fuzzy match score 0-1
@@ -232,6 +246,7 @@ class TrackAffinity(Base):
     Always stored with track_a_id < track_b_id (canonical ordering)
     so (A,B) and (B,A) resolve to the same row.
     """
+
     __tablename__ = "track_affinities"
 
     id = Column(Integer, primary_key=True)
@@ -265,6 +280,7 @@ class OAuthToken(Base):
 
 class AlbumMetadata(Base):
     """Per-album cache for metadata-correction state. Keyed by stable album_key hash."""
+
     __tablename__ = "album_metadata"
 
     album_key = Column(String, primary_key=True)
@@ -290,6 +306,7 @@ def get_engine():
     global _engine
     if _engine is None:
         from sqlalchemy import event
+
         _engine = create_engine(get_db_url(), poolclass=NullPool)
         event.listen(_engine, "connect", _set_wal_mode)
     return _engine

@@ -35,6 +35,7 @@ def _track_to_response(t: Track) -> TrackResponse:
     conflict_resp = None
     if conflict:
         from kiku.api.schemas import EnergyConflictResponse
+
         conflict_resp = EnergyConflictResponse(**conflict)
     return TrackResponse(
         id=t.id,
@@ -82,23 +83,30 @@ def tinder_queue(
         except ValueError:
             pass
     tracks, total = get_tinder_queue(
-        db, genre_family=genre_family, bpm_min=bpm_min, bpm_max=bpm_max,
-        include_conflicts=include_conflicts, track_ids=parsed_ids,
-        limit=limit, offset=offset,
+        db,
+        genre_family=genre_family,
+        bpm_min=bpm_min,
+        bpm_max=bpm_max,
+        include_conflicts=include_conflicts,
+        track_ids=parsed_ids,
+        limit=limit,
+        offset=offset,
     )
     items = []
     for t in tracks:
         af = t.audio_features
-        items.append(TinderQueueItem(
-            track=_track_to_response(t),
-            energy_predicted=t.energy_predicted,
-            energy_confidence=t.energy_confidence,
-            mood_happy=af.mood_happy if af else None,
-            mood_sad=af.mood_sad if af else None,
-            mood_aggressive=af.mood_aggressive if af else None,
-            mood_relaxed=af.mood_relaxed if af else None,
-            has_waveform=af is not None and af.waveform_detail is not None,
-        ))
+        items.append(
+            TinderQueueItem(
+                track=_track_to_response(t),
+                energy_predicted=t.energy_predicted,
+                energy_confidence=t.energy_confidence,
+                mood_happy=af.mood_happy if af else None,
+                mood_sad=af.mood_sad if af else None,
+                mood_aggressive=af.mood_aggressive if af else None,
+                mood_relaxed=af.mood_relaxed if af else None,
+                has_waveform=af is not None and af.waveform_detail is not None,
+            )
+        )
     return TinderQueueResponse(items=items, total=total, offset=offset, limit=limit)
 
 
@@ -108,9 +116,12 @@ def tinder_decide(body: TinderDecideRequest, db: Session = Depends(get_db)):
     if body.decision not in ("confirm", "override", "skip"):
         raise HTTPException(status_code=400, detail="decision must be confirm, override, or skip")
     if body.decision == "override" and not body.override_zone:
-        raise HTTPException(status_code=400, detail="override_zone required when decision is override")
+        raise HTTPException(
+            status_code=400, detail="override_zone required when decision is override"
+        )
     if body.override_zone:
         from kiku.analysis.autotag import ENERGY_ZONES
+
         if body.override_zone not in ENERGY_ZONES:
             raise HTTPException(
                 status_code=400,
@@ -142,11 +153,19 @@ def tinder_decide_batch(body: TinderBatchDecideRequest, db: Session = Depends(ge
     results = []
     for item in body.decisions:
         if item.decision not in ("confirm", "override", "skip"):
-            raise HTTPException(status_code=400, detail=f"decision must be confirm, override, or skip (track {item.track_id})")
+            raise HTTPException(
+                status_code=400,
+                detail=f"decision must be confirm, override, or skip (track {item.track_id})",
+            )
         if item.decision == "override" and not item.override_zone:
-            raise HTTPException(status_code=400, detail=f"override_zone required for override (track {item.track_id})")
+            raise HTTPException(
+                status_code=400,
+                detail=f"override_zone required for override (track {item.track_id})",
+            )
         if item.override_zone and item.override_zone not in ENERGY_ZONES:
-            raise HTTPException(status_code=400, detail=f"override_zone must be one of: {ENERGY_ZONES}")
+            raise HTTPException(
+                status_code=400, detail=f"override_zone must be one of: {ENERGY_ZONES}"
+            )
 
         track = save_tinder_decision(db, item.track_id, item.decision, item.override_zone)
         if not track:
@@ -156,12 +175,16 @@ def tinder_decide_batch(body: TinderBatchDecideRequest, db: Session = Depends(ge
         if item.decision == "override":
             teaching = _generate_teaching_moment(track, item.override_zone)
 
-        results.append(TinderDecideResponse(
-            track_id=item.track_id,
-            decision=item.decision,
-            applied_zone=item.override_zone if item.decision == "override" else track.energy_predicted,
-            teaching_moment=teaching,
-        ))
+        results.append(
+            TinderDecideResponse(
+                track_id=item.track_id,
+                decision=item.decision,
+                applied_zone=item.override_zone
+                if item.decision == "override"
+                else track.energy_predicted,
+                teaching_moment=teaching,
+            )
+        )
 
     return TinderBatchDecideResponse(results=results)
 
@@ -236,6 +259,7 @@ def tinder_retrain(db: Session = Depends(get_db)):
         # Run calibration and include in result for save_model
         try:
             from kiku.analysis.autotag import calibrate_energy
+
             result["calibration"] = calibrate_energy(db)
         except (ValueError, Exception) as cal_err:
             logger.warning("Calibration skipped: %s", cal_err)
@@ -244,6 +268,7 @@ def tinder_retrain(db: Session = Depends(get_db)):
 
         # Reset calibration cache so new boundaries take effect
         from kiku.energy import reset_calibration_cache
+
         reset_calibration_cache()
 
         return TinderRetrainResponse(

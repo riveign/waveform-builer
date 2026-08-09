@@ -51,12 +51,14 @@ class MusicBrainzSource:
                 if not (pos and title):
                     continue
                 length = tr.get("length")
-                recordings.append(RecordingCandidate(
-                    title=title,
-                    position=int(pos),
-                    disc=disc_no,
-                    length_ms=int(length) if length else None,
-                ))
+                recordings.append(
+                    RecordingCandidate(
+                        title=title,
+                        position=int(pos),
+                        disc=disc_no,
+                        length_ms=int(length) if length else None,
+                    )
+                )
 
         label_info = full.get("label-info") or []
         label = None

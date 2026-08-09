@@ -50,11 +50,21 @@ def test_push_higher_warm_empty_on_default_seed(client):
 
 def test_push_higher_with_seeded_key(client, db_session):
     # Add a purpose-keyed 9A track in the neighbours' BPM window.
-    db_session.add(Track(
-        id=99, title="Lift", artist="Purpose", bpm=123.0, key="9A",
-        dir_genre="techno", dir_energy="high", duration_sec=320.0,
-        rating=4, play_count=5, kiku_play_count=1,
-    ))
+    db_session.add(
+        Track(
+            id=99,
+            title="Lift",
+            artist="Purpose",
+            bpm=123.0,
+            key="9A",
+            dir_genre="techno",
+            dir_energy="high",
+            duration_sec=320.0,
+            rating=4,
+            play_count=5,
+            kiku_play_count=1,
+        )
+    )
     db_session.commit()
     resp = client.get(
         "/api/sets/1/slots/1/suggestions",

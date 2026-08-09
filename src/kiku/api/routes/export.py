@@ -27,7 +27,9 @@ def export_m3u8(
     from kiku.export.m3u8 import export_set_to_m3u8
 
     output_path = export_set_to_m3u8(
-        s, target_platform=platform, with_metadata=with_metadata,
+        s,
+        target_platform=platform,
+        with_metadata=with_metadata,
     )
     return FileResponse(
         path=output_path,
@@ -53,13 +55,15 @@ def export_rekordbox(set_id: int, db: Session = Depends(get_db)):
     if cues:
         transition_cues: dict[int, list[dict]] = {}
         for c in cues:
-            transition_cues.setdefault(c.track_id, []).append({
-                "name": c.name,
-                "type": c.cue_type,
-                "start": c.start_sec,
-                "end": c.end_sec,
-                "num": c.hot_cue_num,
-            })
+            transition_cues.setdefault(c.track_id, []).append(
+                {
+                    "name": c.name,
+                    "type": c.cue_type,
+                    "start": c.start_sec,
+                    "end": c.end_sec,
+                    "num": c.hot_cue_num,
+                }
+            )
 
     output_path = export_set_to_xml(s, transition_cues=transition_cues)
     return FileResponse(

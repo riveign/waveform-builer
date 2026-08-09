@@ -75,6 +75,7 @@ def _set_track_response(st) -> SetTrackResponse:
     conflict_resp = None
     if conflict:
         from kiku.api.schemas import EnergyConflictResponse
+
         conflict_resp = EnergyConflictResponse(**conflict)
 
     te = get_track_energy(t) if t else None
@@ -126,6 +127,7 @@ async def import_m3u8_playlist(
         source_path = file.filename or "upload.m3u8"
     elif file_path:
         from pathlib import Path
+
         p = Path(file_path)
         if not p.exists():
             raise HTTPException(status_code=400, detail=f"File not found: {file_path}")
@@ -161,7 +163,9 @@ async def import_m3u8_playlist(
             unmatched_count=0,
             unmatched_paths=[],
             match_methods={},
-            warnings=[f"Already imported as set {result.duplicate_set_id}. Use force=true to re-import."],
+            warnings=[
+                f"Already imported as set {result.duplicate_set_id}. Use force=true to re-import."
+            ],
             duplicate_set_id=result.duplicate_set_id,
         )
 
@@ -307,11 +311,16 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
     from kiku.setbuilder.planner import build_set
 
     def generate():
-        yield _sse_event("started", json.dumps({
-            "name": body.name,
-            "total_duration_min": body.duration_min,
-            "energy_preset": body.energy_preset,
-        }))
+        yield _sse_event(
+            "started",
+            json.dumps(
+                {
+                    "name": body.name,
+                    "total_duration_min": body.duration_min,
+                    "energy_preset": body.energy_preset,
+                }
+            ),
+        )
 
         try:
             energy_profile = resolve_energy(body.energy_preset)
@@ -337,15 +346,19 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
 
             # Resolve the optional vibe preset to a (brightness, density) target
             from kiku.vibe import resolve_preset
+
             preset_vibe = resolve_preset(body.vibe_preset)
             if body.vibe_preset and preset_vibe is None:
-                yield _sse_event("error", json.dumps({"detail": f"Unknown vibe '{body.vibe_preset}'"}))
+                yield _sse_event(
+                    "error", json.dumps({"detail": f"Unknown vibe '{body.vibe_preset}'"})
+                )
                 return
 
             # Convert per-request weight overrides if provided
             weights_dict = body.weights.model_dump() if body.weights else None
             if weights_dict:
                 from kiku.config import validate_scoring_weights
+
                 validate_scoring_weights(weights_dict)
 
             result = build_set(
@@ -368,7 +381,10 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
             )
 
             if result is None:
-                yield _sse_event("error", json.dumps({"detail": "Could not build set — no matching tracks or seed"}))
+                yield _sse_event(
+                    "error",
+                    json.dumps({"detail": "Could not build set — no matching tracks or seed"}),
+                )
                 return
 
             # Emit per-track progress events so the frontend can
@@ -378,36 +394,47 @@ def build_set_sse(body: SetBuildRequest, db: Session = Depends(get_db)):
             ordered_tracks = sorted(result.tracks, key=lambda st: st.position)
             total_tracks = len(ordered_tracks)
             from kiku.vibe import resolve_vibe
+
             for st in ordered_tracks:
                 t = st.track
                 te = get_track_energy(t) if t else None
                 tv = resolve_vibe(t) if t else None
-                yield _sse_event("track_added", json.dumps({
-                    "track_id": st.track_id,
-                    "title": t.title if t else None,
-                    "artist": t.artist if t else None,
-                    "position": st.position,
-                    "bpm": t.bpm if t else None,
-                    "key": t.key if t else None,
-                    "energy": t.dir_energy if t else None,
-                    "resolved_energy": te.zone if te else None,
-                    "energy_value": te.numeric if te else None,
-                    "energy_source": te.source if te else None,
-                    "vibe_brightness": round(tv.brightness, 3) if tv else None,
-                    "vibe_density": round(tv.density, 3) if tv else None,
-                    "vibe_label": tv.label if tv else None,
-                    "score": round(st.transition_score, 3) if st.transition_score else None,
-                    "total_tracks_so_far": st.position,
-                    "total_tracks": total_tracks,
-                }))
+                yield _sse_event(
+                    "track_added",
+                    json.dumps(
+                        {
+                            "track_id": st.track_id,
+                            "title": t.title if t else None,
+                            "artist": t.artist if t else None,
+                            "position": st.position,
+                            "bpm": t.bpm if t else None,
+                            "key": t.key if t else None,
+                            "energy": t.dir_energy if t else None,
+                            "resolved_energy": te.zone if te else None,
+                            "energy_value": te.numeric if te else None,
+                            "energy_source": te.source if te else None,
+                            "vibe_brightness": round(tv.brightness, 3) if tv else None,
+                            "vibe_density": round(tv.density, 3) if tv else None,
+                            "vibe_label": tv.label if tv else None,
+                            "score": round(st.transition_score, 3) if st.transition_score else None,
+                            "total_tracks_so_far": st.position,
+                            "total_tracks": total_tracks,
+                        }
+                    ),
+                )
                 time.sleep(0.05)
 
-            yield _sse_event("complete", json.dumps({
-                "set_id": result.id,
-                "name": result.name,
-                "track_count": total_tracks,
-                "duration_min": result.duration_min,
-            }))
+            yield _sse_event(
+                "complete",
+                json.dumps(
+                    {
+                        "set_id": result.id,
+                        "name": result.name,
+                        "track_count": total_tracks,
+                        "duration_min": result.duration_min,
+                    }
+                ),
+            )
 
             # Auto-analyze the freshly built set
             try:
@@ -503,11 +530,7 @@ def _purge_expired_sets(db: Session) -> None:
     ISO timestamps sort chronologically as strings, so a string comparison is safe.
     """
     cutoff = (datetime.now() - timedelta(days=SOFT_DELETE_DAYS)).isoformat()
-    expired = (
-        db.query(Set)
-        .filter(Set.deleted_at.isnot(None), Set.deleted_at < cutoff)
-        .all()
-    )
+    expired = db.query(Set).filter(Set.deleted_at.isnot(None), Set.deleted_at < cutoff).all()
     if expired:
         for s in expired:
             db.delete(s)
@@ -564,15 +587,11 @@ def add_track(set_id: int, body: SetAddTrackRequest, db: Session = Depends(get_d
         if idx > 0:
             prev_st = sorted_tracks[idx - 1]
             if prev_st.track:
-                new_st.transition_score = round(
-                    compute_transition(prev_st.track, new_st.track), 3
-                )
+                new_st.transition_score = round(compute_transition(prev_st.track, new_st.track), 3)
         if idx < len(sorted_tracks) - 1:
             next_st = sorted_tracks[idx + 1]
             if next_st.track:
-                next_st.transition_score = round(
-                    compute_transition(new_st.track, next_st.track), 3
-                )
+                next_st.transition_score = round(compute_transition(new_st.track, next_st.track), 3)
 
     # Recompute duration_min
     total_sec = sum(st.track.duration_sec or 0 for st in sorted_tracks if st.track)
@@ -610,7 +629,9 @@ def remove_track(set_id: int, track_id: int, db: Session = Depends(get_db)):
 
         for i, st in enumerate(sorted_tracks):
             if i > 0 and sorted_tracks[i - 1].track and st.track:
-                st.transition_score = round(compute_transition(sorted_tracks[i - 1].track, st.track), 3)
+                st.transition_score = round(
+                    compute_transition(sorted_tracks[i - 1].track, st.track), 3
+                )
             elif i == 0:
                 st.transition_score = None
         set_.is_analyzed = 0
@@ -621,9 +642,7 @@ def remove_track(set_id: int, track_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{set_id}/tracks/reorder", response_model=list[SetTrackResponse])
-def reorder_tracks(
-    set_id: int, body: SetReorderTracksRequest, db: Session = Depends(get_db)
-):
+def reorder_tracks(set_id: int, body: SetReorderTracksRequest, db: Session = Depends(get_db)):
     """Reorder tracks within a set (for drag-and-drop)."""
     try:
         tracks = reorder_set_tracks(db, set_id, body.track_ids)
@@ -668,7 +687,8 @@ def fill_set_sse(set_id: int, body: SetFillRequest, db: Session = Depends(get_db
 
     def generate():
         for event in fill_set(
-            db, set_id,
+            db,
+            set_id,
             energy_profile=energy_profile,
             target_duration_min=body.target_duration_min,
             max_fill_tracks=body.max_fill_tracks,
@@ -745,7 +765,8 @@ def optimize_order(set_id: int, body: SetOptimizeOrderRequest, db: Session = Dep
                 from_position=c.from_position,
                 to_position=c.to_position,
                 explanation=c.explanation,
-            ) for c in changes
+            )
+            for c in changes
         ],
         current_energy_curve=[round(v, 3) for v in current_curve],
         proposed_energy_curve=[round(v, 3) for v in proposed_curve],
@@ -818,12 +839,7 @@ def list_sets(
 def list_deleted_sets(db: Session = Depends(get_db)):
     """List soft-deleted sets (the trash), most recently deleted first."""
     _purge_expired_sets(db)
-    sets = (
-        db.query(Set)
-        .filter(Set.deleted_at.isnot(None))
-        .order_by(Set.deleted_at.desc())
-        .all()
-    )
+    sets = db.query(Set).filter(Set.deleted_at.isnot(None)).order_by(Set.deleted_at.desc()).all()
     return [
         SetResponse(
             id=s.id,
@@ -877,27 +893,30 @@ def set_waveforms(set_id: int, db: Session = Depends(get_db)):
         conflict_resp = None
         if conflict:
             from kiku.api.schemas import EnergyConflictResponse
+
             conflict_resp = EnergyConflictResponse(**conflict)
         te = get_track_energy(t) if t else None
-        result.append(SetWaveformTrackResponse(
-            position=st.position,
-            track_id=st.track_id,
-            title=t.title if t else None,
-            artist=t.artist if t else None,
-            bpm=t.bpm if t else None,
-            key=t.key if t else None,
-            genre=(t.dir_genre or t.rb_genre) if t else None,
-            energy=(t.dir_energy or t.energy_predicted) if t else None,
-            duration_sec=t.duration_sec if t else None,
-            transition_score=st.transition_score,
-            waveform_overview=wf_b64,
-            resolved_energy=te.zone if te else None,
-            energy_source=te.source if te else None,
-            energy_confidence=te.confidence if te else None,
-            energy_value=te.numeric if te else None,
-            energy_label=te.label if te else None,
-            energy_conflict=conflict_resp,
-        ))
+        result.append(
+            SetWaveformTrackResponse(
+                position=st.position,
+                track_id=st.track_id,
+                title=t.title if t else None,
+                artist=t.artist if t else None,
+                bpm=t.bpm if t else None,
+                key=t.key if t else None,
+                genre=(t.dir_genre or t.rb_genre) if t else None,
+                energy=(t.dir_energy or t.energy_predicted) if t else None,
+                duration_sec=t.duration_sec if t else None,
+                transition_score=st.transition_score,
+                waveform_overview=wf_b64,
+                resolved_energy=te.zone if te else None,
+                energy_source=te.source if te else None,
+                energy_confidence=te.confidence if te else None,
+                energy_value=te.numeric if te else None,
+                energy_label=te.label if te else None,
+                energy_conflict=conflict_resp,
+            )
+        )
     return result
 
 
@@ -938,15 +957,38 @@ def set_transition(
     q, label = track_quality(t_b, discovery_density=discovery_density)
 
     from kiku.config import SCORING_WEIGHTS as w
-    total = w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b + w["genre_coherence"] * g + w["track_quality"] * q
+
+    total = (
+        w["harmonic"] * h
+        + w["energy_fit"] * e
+        + w["bpm_compat"] * b
+        + w["genre_coherence"] * g
+        + w["track_quality"] * q
+    )
 
     af_a = t_a.audio_features
     af_b = t_b.audio_features
 
-    wf_a = base64.b64encode(af_a.waveform_overview).decode("ascii") if af_a and af_a.waveform_overview else None
-    wf_b = base64.b64encode(af_b.waveform_overview).decode("ascii") if af_b and af_b.waveform_overview else None
-    bt_a = base64.b64encode(af_a.beat_positions).decode("ascii") if af_a and af_a.beat_positions else None
-    bt_b = base64.b64encode(af_b.beat_positions).decode("ascii") if af_b and af_b.beat_positions else None
+    wf_a = (
+        base64.b64encode(af_a.waveform_overview).decode("ascii")
+        if af_a and af_a.waveform_overview
+        else None
+    )
+    wf_b = (
+        base64.b64encode(af_b.waveform_overview).decode("ascii")
+        if af_b and af_b.waveform_overview
+        else None
+    )
+    bt_a = (
+        base64.b64encode(af_a.beat_positions).decode("ascii")
+        if af_a and af_a.beat_positions
+        else None
+    )
+    bt_b = (
+        base64.b64encode(af_b.beat_positions).decode("ascii")
+        if af_b and af_b.beat_positions
+        else None
+    )
 
     return TransitionResponse(
         position=index,
@@ -1088,7 +1130,9 @@ def _track_response(t: Track):
     )
 
 
-@router.get("/{set_id}/tracks/{position}/replacements", response_model=ReplacementSuggestionsResponse)
+@router.get(
+    "/{set_id}/tracks/{position}/replacements", response_model=ReplacementSuggestionsResponse
+)
 def get_replacements(
     set_id: int,
     position: int,
@@ -1124,6 +1168,7 @@ def get_replacements(
     if s.energy_profile:
         try:
             from kiku.setbuilder.constraints import parse_energy_json, parse_energy_string
+
             try:
                 profile = parse_energy_json(s.energy_profile)
             except (json.JSONDecodeError, KeyError):
@@ -1160,7 +1205,10 @@ def get_replacements(
     scored = []
     for cand in candidates:
         combined, incoming, outgoing = score_replacement(
-            cand, prev_track, next_track, target_energy=energy_target,
+            cand,
+            prev_track,
+            next_track,
+            target_energy=energy_target,
             discovery_density=discovery_density,
         )
         scored.append((cand, combined, incoming, outgoing))
@@ -1171,12 +1219,14 @@ def get_replacements(
     # Build response
     result_candidates = []
     for cand, combined, incoming, outgoing in top:
-        result_candidates.append(ReplacementCandidate(
-            track=_track_response(cand),
-            combined_score=combined,
-            incoming_breakdown=ReplacementBreakdown(**incoming) if incoming else None,
-            outgoing_breakdown=ReplacementBreakdown(**outgoing) if outgoing else None,
-        ))
+        result_candidates.append(
+            ReplacementCandidate(
+                track=_track_response(cand),
+                combined_score=combined,
+                incoming_breakdown=ReplacementBreakdown(**incoming) if incoming else None,
+                outgoing_breakdown=ReplacementBreakdown(**outgoing) if outgoing else None,
+            )
+        )
 
     context = ReplacementContext(
         prev_track=_track_summary(prev_track) if prev_track else None,
@@ -1225,12 +1275,22 @@ def get_artist_picks(
         raise HTTPException(status_code=404, detail="Set not found")
 
     ranked = rank_artist_picks(
-        db, set_id, artist, n=n, discovery_density=discovery_density,
+        db,
+        set_id,
+        artist,
+        n=n,
+        discovery_density=discovery_density,
     )
 
     _BD_FIELDS = {
-        "harmonic", "energy_fit", "bpm_compat", "genre_coherence",
-        "track_quality", "total", "discovery_label", "set_appearances",
+        "harmonic",
+        "energy_fit",
+        "bpm_compat",
+        "genre_coherence",
+        "track_quality",
+        "total",
+        "discovery_label",
+        "set_appearances",
     }
     picks = [
         ArtistPickItem(
@@ -1298,13 +1358,25 @@ def get_slot_suggestions(
             keys = {camelot_str(pc) for k in raw if (pc := parse_camelot(k))}
 
     ranked = rank_slot_picks(
-        db, set_id, position, mode, intent,
-        allowed_keys=keys, energy_delta=energy_delta, n=n,
+        db,
+        set_id,
+        position,
+        mode,
+        intent,
+        allowed_keys=keys,
+        energy_delta=energy_delta,
+        n=n,
     )
 
     _BD_FIELDS = {
-        "harmonic", "energy_fit", "bpm_compat", "genre_coherence",
-        "track_quality", "total", "discovery_label", "set_appearances",
+        "harmonic",
+        "energy_fit",
+        "bpm_compat",
+        "genre_coherence",
+        "track_quality",
+        "total",
+        "discovery_label",
+        "set_appearances",
     }
 
     def _bd(b: dict | None) -> ReplacementBreakdown | None:

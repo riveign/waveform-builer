@@ -34,6 +34,7 @@ def _get(section: str, key: str, default):
 
 # ── Paths ──────────────────────────────────────────────────────────────
 
+
 def _resolve_db_path() -> Path:
     # Env wins over TOML so a test, a container, or a second library can point
     # somewhere else without editing a file in $HOME.
@@ -67,11 +68,19 @@ MUSIC_ROOTS = _resolve_music_roots()
 
 # Known energy tags from directory names (order matters for regex alternation)
 ENERGY_TAGS = [
-    "Warmup", "Closing", "Dance",
-    "Peak", "High", "Up", "Mid", "Low", "Fast",
+    "Warmup",
+    "Closing",
+    "Dance",
+    "Peak",
+    "High",
+    "Up",
+    "Mid",
+    "Low",
+    "Fast",
 ]
 
 # ── Scoring weights ────────────────────────────────────────────────────
+
 
 def _resolve_scoring_weights() -> dict[str, float]:
     defaults = {
@@ -142,6 +151,7 @@ WAVEFORM_SR = 22050
 
 
 # ── Public API ─────────────────────────────────────────────────────────
+
 
 def get_db_url() -> str:
     db = _resolve_db_path()

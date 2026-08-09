@@ -142,19 +142,29 @@ class TestCompositeEnergyScore:
 
     def test_returns_float_with_calibration(self):
         from kiku.analysis.autotag import feature_names
+
         names = feature_names()
         # Ranges must encompass the mock values (e.g. spectral_centroid=3000)
         range_map = {
-            "energy": (0.0, 1.0), "loudness_lufs": (-30.0, 0.0),
-            "spectral_centroid": (0.0, 6000.0), "spectral_complexity": (0.0, 100.0),
-            "danceability": (0.0, 1.0), "energy_intro": (0.0, 1.0),
-            "energy_body": (0.0, 1.0), "energy_outro": (0.0, 1.0),
-            "build_shape": (-1.0, 1.0), "drop_shape": (-1.0, 1.0),
-            "intro_body_ratio": (0.0, 2.0), "outro_body_ratio": (0.0, 2.0),
+            "energy": (0.0, 1.0),
+            "loudness_lufs": (-30.0, 0.0),
+            "spectral_centroid": (0.0, 6000.0),
+            "spectral_complexity": (0.0, 100.0),
+            "danceability": (0.0, 1.0),
+            "energy_intro": (0.0, 1.0),
+            "energy_body": (0.0, 1.0),
+            "energy_outro": (0.0, 1.0),
+            "build_shape": (-1.0, 1.0),
+            "drop_shape": (-1.0, 1.0),
+            "intro_body_ratio": (0.0, 2.0),
+            "outro_body_ratio": (0.0, 2.0),
         }
         cal = {
             "composite_weights": {n: 1.0 / len(names) for n in names},
-            "feature_ranges": {n: {"min": range_map.get(n, (0.0, 1.0))[0], "max": range_map.get(n, (0.0, 1.0))[1]} for n in names},
+            "feature_ranges": {
+                n: {"min": range_map.get(n, (0.0, 1.0))[0], "max": range_map.get(n, (0.0, 1.0))[1]}
+                for n in names
+            },
         }
         af = _make_audio_features()
         with patch("kiku.energy._load_calibration", return_value=cal):
@@ -182,6 +192,7 @@ class TestCompositeEnergyScore:
     def test_handles_zero_range_features(self):
         """Features with min==max should normalize to 0.5."""
         from kiku.analysis.autotag import feature_names
+
         names = feature_names()
         cal = {
             "composite_weights": {n: 1.0 / len(names) for n in names},
@@ -332,7 +343,9 @@ class TestGetTrackEnergy:
 
     def test_frozen_dataclass(self):
         """TrackEnergy should be immutable."""
-        te = TrackEnergy(zone="build", numeric=0.55, source="dir_energy", confidence=1.0, label="build (folder)")
+        te = TrackEnergy(
+            zone="build", numeric=0.55, source="dir_energy", confidence=1.0, label="build (folder)"
+        )
         with pytest.raises(AttributeError):
             te.zone = "peak"  # type: ignore[misc]
 
@@ -345,5 +358,6 @@ class TestCalibrationCache:
         """After reset, calibration is reloaded on next access."""
         reset_calibration_cache()
         from kiku import energy
+
         assert energy._calibration_loaded is False
         assert energy._calibration is None

@@ -84,12 +84,14 @@ def parse_bandcamp_html(html: str, url: str) -> ReleaseCandidate | None:
             if not title:
                 continue
             dur = tr.get("duration")
-            recordings.append(RecordingCandidate(
-                title=title,
-                position=int(tr.get("track_num") or i),
-                disc=1,
-                length_ms=int(float(dur) * 1000) if dur else None,
-            ))
+            recordings.append(
+                RecordingCandidate(
+                    title=title,
+                    position=int(tr.get("track_num") or i),
+                    disc=1,
+                    length_ms=int(float(dur) * 1000) if dur else None,
+                )
+            )
 
     # ld+json fills album/artist when tralbum is absent, plus label + year.
     label = None

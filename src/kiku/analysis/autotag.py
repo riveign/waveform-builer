@@ -16,10 +16,14 @@ from kiku.db.models import AudioFeatures, Track
 # Zone mapping: granular tag → zone
 ZONE_MAP: dict[str, str] = {
     "intro": "intro",
-    "low": "warmup", "warmup": "warmup",
-    "mid": "build", "dance": "build",
-    "up": "drive", "high": "drive",
-    "fast": "peak", "peak": "peak",
+    "low": "warmup",
+    "warmup": "warmup",
+    "mid": "build",
+    "dance": "build",
+    "up": "drive",
+    "high": "drive",
+    "fast": "peak",
+    "peak": "peak",
     "closing": "close",
 }
 
@@ -31,8 +35,14 @@ ENERGY_TAGS = list(ZONE_MAP.keys())
 
 # Feature names (order matters — must match extraction)
 BASE_FEATURES = [
-    "energy", "loudness_lufs", "spectral_centroid", "spectral_complexity",
-    "danceability", "energy_intro", "energy_body", "energy_outro",
+    "energy",
+    "loudness_lufs",
+    "spectral_centroid",
+    "spectral_complexity",
+    "danceability",
+    "energy_intro",
+    "energy_body",
+    "energy_outro",
 ]
 # Mood features are dead weight — Essentia mood classifiers were never run,
 # so these columns are always null/0.0 across the entire library.
@@ -113,10 +123,10 @@ def extract_features(af: AudioFeatures) -> np.ndarray | None:
     # Derived from energy curve
     intro, body, outro = af.energy_intro, af.energy_body, af.energy_outro
     if intro is not None and body is not None and outro is not None:
-        base.append(body - intro)                    # build_shape
-        base.append(body - outro)                    # drop_shape
-        base.append(intro / (body + 0.001))          # intro_body_ratio
-        base.append(outro / (body + 0.001))          # outro_body_ratio
+        base.append(body - intro)  # build_shape
+        base.append(body - outro)  # drop_shape
+        base.append(intro / (body + 0.001))  # intro_body_ratio
+        base.append(outro / (body + 0.001))  # outro_body_ratio
     else:
         base.extend([0.0, 0.0, 0.0, 0.0])
 
@@ -239,7 +249,8 @@ def calibrate_energy(session: Session) -> dict:
 
 
 def _load_training_data(
-    session: Session, include_approved: bool = True,
+    session: Session,
+    include_approved: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     """Load feature matrix X, label array y, and tag list from DB.
 
@@ -298,7 +309,9 @@ def train_energy_model(session: Session, include_approved: bool = True) -> dict:
             warnings.append(f"Only {count} examples for '{zone}' — predictions will be unreliable")
 
     # Cross-validation with oversampling inside each fold
-    skf = StratifiedKFold(n_splits=min(5, min(class_counts.values())), shuffle=True, random_state=42)
+    skf = StratifiedKFold(
+        n_splits=min(5, min(class_counts.values())), shuffle=True, random_state=42
+    )
     all_true, all_pred = [], []
 
     for train_idx, test_idx in skf.split(X, y_zones):
@@ -323,7 +336,10 @@ def train_energy_model(session: Session, include_approved: bool = True) -> dict:
         y_bal = np.concatenate(y_bal)
 
         fold_clf = RandomForestClassifier(
-            n_estimators=200, class_weight="balanced", random_state=42, n_jobs=-1,
+            n_estimators=200,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
         )
         fold_clf.fit(X_bal, y_bal)
         all_true.extend(y_test)
@@ -349,7 +365,10 @@ def train_energy_model(session: Session, include_approved: bool = True) -> dict:
     y_final = np.concatenate(y_final)
 
     model = RandomForestClassifier(
-        n_estimators=200, class_weight="balanced", random_state=42, n_jobs=-1,
+        n_estimators=200,
+        class_weight="balanced",
+        random_state=42,
+        n_jobs=-1,
     )
     model.fit(X_final, y_final)
 
@@ -368,7 +387,9 @@ def train_energy_model(session: Session, include_approved: bool = True) -> dict:
 
 
 def predict_energy(
-    session: Session, model, threshold: float = 0.7,
+    session: Session,
+    model,
+    threshold: float = 0.7,
 ) -> list[dict]:
     """Predict energy zones for untagged tracks.
 
@@ -395,13 +416,15 @@ def predict_energy(
         predicted = model.classes_[best_idx]
 
         if confidence >= threshold:
-            results.append({
-                "track_id": track.id,
-                "title": track.title or "?",
-                "artist": track.artist or "?",
-                "predicted": predicted,
-                "confidence": confidence,
-            })
+            results.append(
+                {
+                    "track_id": track.id,
+                    "title": track.title or "?",
+                    "artist": track.artist or "?",
+                    "predicted": predicted,
+                    "confidence": confidence,
+                }
+            )
 
     results.sort(key=lambda r: r["confidence"], reverse=True)
     return results
@@ -470,7 +493,9 @@ def load_model(model_dir: Path = DEFAULT_MODEL_DIR):
     meta_path = model_dir / META_FILENAME
 
     if not model_path.exists():
-        raise FileNotFoundError(f"No trained model found at {model_path}. Run: kiku autotag energy --retrain")
+        raise FileNotFoundError(
+            f"No trained model found at {model_path}. Run: kiku autotag energy --retrain"
+        )
 
     model = joblib.load(model_path)
     meta = {}

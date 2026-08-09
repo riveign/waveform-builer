@@ -18,17 +18,33 @@ IMG = b"\xff\xd8\xff\xe0album-cover"
 
 @pytest.fixture()
 def db(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path/'c.db'}", poolclass=NullPool)
+    engine = create_engine(f"sqlite:///{tmp_path / 'c.db'}", poolclass=NullPool)
     Base.metadata.create_all(engine)
     s = sessionmaker(bind=engine)()
     # Track 1: file absent → no embedded art, must inherit album cover.
-    s.add(Track(id=1, title="Moonrise", artist="Luna", album="Night EP",
-                file_path="/nope/Luna/Night EP/01.flac", track_number=1))
+    s.add(
+        Track(
+            id=1,
+            title="Moonrise",
+            artist="Luna",
+            album="Night EP",
+            file_path="/nope/Luna/Night EP/01.flac",
+            track_number=1,
+        )
+    )
     # Track 2: a real but corrupt file → embedded extraction must soft-fail.
     bad = tmp_path / "broken.mp3"
     bad.write_bytes(b"not an mp3 at all")
-    s.add(Track(id=2, title="Eclipse", artist="Luna", album="Night EP",
-                file_path=str(bad), track_number=2))
+    s.add(
+        Track(
+            id=2,
+            title="Eclipse",
+            artist="Luna",
+            album="Night EP",
+            file_path=str(bad),
+            track_number=2,
+        )
+    )
     s.commit()
     yield s
     s.close()

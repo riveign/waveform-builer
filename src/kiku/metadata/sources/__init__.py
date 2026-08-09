@@ -43,11 +43,13 @@ def available_sources() -> list[dict]:
             avail = src.available()
         except Exception:
             avail = False
-        out.append({
-            "name": name,
-            "lookup_mode": SOURCE_LOOKUP_MODE[name],
-            "available": avail,
-        })
+        out.append(
+            {
+                "name": name,
+                "lookup_mode": SOURCE_LOOKUP_MODE[name],
+                "available": avail,
+            }
+        )
     return out
 
 

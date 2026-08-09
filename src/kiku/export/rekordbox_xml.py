@@ -28,7 +28,6 @@ _KIND_MAP: dict[str, str] = {
 }
 
 
-
 def _detect_kind(file_path: str) -> str:
     """Return the Rekordbox ``Kind`` string based on file extension."""
     ext = Path(file_path).suffix.lower()

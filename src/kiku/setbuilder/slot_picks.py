@@ -229,22 +229,28 @@ def rank_slot_picks(
             if pc is None or camelot_str(pc) not in key_filter:
                 continue
         combined, incoming, outgoing = score_replacement(
-            cand, prev, nxt, target_energy=shifted_target,
-            weights=weights, discovery_density=discovery_density,
+            cand,
+            prev,
+            nxt,
+            target_energy=shifted_target,
+            weights=weights,
+            discovery_density=discovery_density,
         )
         caveat = _build_caveat(prev, cand, nxt, intent)
         move = _build_move(prev, cand, nxt, intent, energy_shift, caveat)
-        picks.append(SlotPick(
-            track=cand,
-            from_key=prev.key if prev else None,
-            to_key=cand.key,
-            move=move,
-            energy_shift=round(energy_shift, 3),
-            score=combined,
-            incoming_breakdown=incoming,
-            outgoing_breakdown=outgoing,
-            caveat=caveat,
-        ))
+        picks.append(
+            SlotPick(
+                track=cand,
+                from_key=prev.key if prev else None,
+                to_key=cand.key,
+                move=move,
+                energy_shift=round(energy_shift, 3),
+                score=combined,
+                incoming_breakdown=incoming,
+                outgoing_breakdown=outgoing,
+                caveat=caveat,
+            )
+        )
 
     picks.sort(key=lambda p: p.score, reverse=True)
     return picks[:n]

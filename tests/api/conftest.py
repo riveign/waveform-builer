@@ -24,19 +24,21 @@ def db_session(tmp_path):
 
     # Seed tracks
     for i in range(1, 21):
-        session.add(Track(
-            id=i,
-            title=f"Track {i}",
-            artist=f"Artist {(i % 5) + 1}",
-            bpm=120.0 + i,
-            key="8A" if i % 2 == 0 else "8B",
-            dir_genre="techno" if i <= 10 else "house",
-            dir_energy="mid" if i <= 10 else "high",
-            duration_sec=300.0 + i * 10,
-            rating=3,
-            play_count=i,
-            kiku_play_count=i % 3,
-        ))
+        session.add(
+            Track(
+                id=i,
+                title=f"Track {i}",
+                artist=f"Artist {(i % 5) + 1}",
+                bpm=120.0 + i,
+                key="8A" if i % 2 == 0 else "8B",
+                dir_genre="techno" if i <= 10 else "house",
+                dir_energy="mid" if i <= 10 else "high",
+                duration_sec=300.0 + i * 10,
+                rating=3,
+                play_count=i,
+                kiku_play_count=i % 3,
+            )
+        )
 
     # Seed a set with tracks
     s = Set(id=1, name="Test Set", duration_min=60)
@@ -54,27 +56,55 @@ def db_session(tmp_path):
 
     # Seed a hunt session
     hs = HuntSession(
-        id=1, url="https://www.youtube.com/watch?v=test123",
-        platform="youtube", title="Test DJ Set", uploader="TestDJ",
-        status="complete", track_count=3, owned_count=1,
+        id=1,
+        url="https://www.youtube.com/watch?v=test123",
+        platform="youtube",
+        title="Test DJ Set",
+        uploader="TestDJ",
+        status="complete",
+        track_count=3,
+        owned_count=1,
     )
     session.add(hs)
     session.flush()
-    session.add(HuntTrack(
-        session_id=1, position=1, artist="Artist 1", title="Track 1",
-        confidence=0.9, source="description", acquisition_status="owned",
-        matched_track_id=1, match_score=0.95, purchase_links="{}",
-    ))
-    session.add(HuntTrack(
-        session_id=1, position=2, artist="Unknown Artist", title="Mystery Track",
-        confidence=0.7, source="description", acquisition_status="unowned",
-        purchase_links='{"beatport":"https://www.beatport.com/search?q=test"}',
-    ))
-    session.add(HuntTrack(
-        session_id=1, position=3, artist="Another One", title="Deep Cut",
-        confidence=0.6, source="comment", acquisition_status="wanted",
-        purchase_links='{"bandcamp":"https://bandcamp.com/search?q=test"}',
-    ))
+    session.add(
+        HuntTrack(
+            session_id=1,
+            position=1,
+            artist="Artist 1",
+            title="Track 1",
+            confidence=0.9,
+            source="description",
+            acquisition_status="owned",
+            matched_track_id=1,
+            match_score=0.95,
+            purchase_links="{}",
+        )
+    )
+    session.add(
+        HuntTrack(
+            session_id=1,
+            position=2,
+            artist="Unknown Artist",
+            title="Mystery Track",
+            confidence=0.7,
+            source="description",
+            acquisition_status="unowned",
+            purchase_links='{"beatport":"https://www.beatport.com/search?q=test"}',
+        )
+    )
+    session.add(
+        HuntTrack(
+            session_id=1,
+            position=3,
+            artist="Another One",
+            title="Deep Cut",
+            confidence=0.6,
+            source="comment",
+            acquisition_status="wanted",
+            purchase_links='{"bandcamp":"https://bandcamp.com/search?q=test"}',
+        )
+    )
 
     session.commit()
     yield session

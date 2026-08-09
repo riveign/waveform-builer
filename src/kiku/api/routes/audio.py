@@ -92,11 +92,15 @@ def _transcode_stream(path: Path) -> StreamingResponse:
     proc = subprocess.Popen(
         [
             "ffmpeg",
-            "-i", str(path),
-            "-f", "mp3",
-            "-ab", "192k",
-            "-vn",           # no video
-            "-loglevel", "error",
+            "-i",
+            str(path),
+            "-f",
+            "mp3",
+            "-ab",
+            "192k",
+            "-vn",  # no video
+            "-loglevel",
+            "error",
             "pipe:1",
         ],
         stdout=subprocess.PIPE,

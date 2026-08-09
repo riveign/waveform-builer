@@ -38,7 +38,9 @@ class EnergyProfile:
                 if i == 0:
                     return seg.target_energy
                 prev_energy = self.segments[i - 1].target_energy
-                progress = (elapsed_min - cumulative) / seg.duration_min if seg.duration_min > 0 else 1.0
+                progress = (
+                    (elapsed_min - cumulative) / seg.duration_min if seg.duration_min > 0 else 1.0
+                )
                 return prev_energy + (seg.target_energy - prev_energy) * progress
             cumulative = seg_end
 
@@ -78,11 +80,13 @@ def parse_energy_string(s: str) -> EnergyProfile:
         if len(parts) != 3:
             raise ValueError(f"Invalid energy segment: '{part}'. Expected 'name:minutes:energy'")
         name, minutes, energy = parts
-        segments.append(EnergySegment(
-            name=name.strip(),
-            duration_min=int(minutes),
-            target_energy=float(energy),
-        ))
+        segments.append(
+            EnergySegment(
+                name=name.strip(),
+                duration_min=int(minutes),
+                target_energy=float(energy),
+            )
+        )
     return EnergyProfile(segments=segments)
 
 

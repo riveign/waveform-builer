@@ -64,11 +64,14 @@ def fill_set(
     current_duration_sec = sum(t.duration_sec or 0 for t in tracks)
     current_duration_min = current_duration_sec / 60
 
-    yield FillEvent("fill_started", {
-        "set_id": set_id,
-        "current_tracks": len(tracks),
-        "current_duration_min": round(current_duration_min, 1),
-    })
+    yield FillEvent(
+        "fill_started",
+        {
+            "set_id": set_id,
+            "current_tracks": len(tracks),
+            "current_duration_min": round(current_duration_min, 1),
+        },
+    )
 
     # Score all transitions and find gaps
     elapsed_min = 0.0
@@ -78,27 +81,31 @@ def fill_set(
         target_e = energy_profile.target_energy_at(elapsed_min) if energy_profile else 0.5
         score = transition_score(tracks[i], tracks[i + 1], target_energy=target_e, weights=weights)
         if score < gap_threshold:
-            gaps.append({
-                "position": i + 1,
-                "from_track": tracks[i],
-                "to_track": tracks[i + 1],
-                "score": round(score, 3),
-                "target_energy": target_e,
-                "elapsed_min": elapsed_min,
-            })
+            gaps.append(
+                {
+                    "position": i + 1,
+                    "from_track": tracks[i],
+                    "to_track": tracks[i + 1],
+                    "score": round(score, 3),
+                    "target_energy": target_e,
+                    "elapsed_min": elapsed_min,
+                }
+            )
 
     # Check if we need to extend to reach target duration
     if target_duration_min and current_duration_min < target_duration_min:
         last_elapsed = sum((t.duration_sec or 360) / 60 for t in tracks)
         target_e = energy_profile.target_energy_at(last_elapsed) if energy_profile else 0.5
-        gaps.append({
-            "position": len(tracks),
-            "from_track": tracks[-1],
-            "to_track": None,
-            "score": 0.0,
-            "target_energy": target_e,
-            "elapsed_min": last_elapsed,
-        })
+        gaps.append(
+            {
+                "position": len(tracks),
+                "from_track": tracks[-1],
+                "to_track": None,
+                "score": 0.0,
+                "target_energy": target_e,
+                "elapsed_min": last_elapsed,
+            }
+        )
 
     # Sort by worst score first
     gaps.sort(key=lambda g: g["score"])
@@ -118,13 +125,16 @@ def fill_set(
         if proposals_count >= max_fill_tracks:
             break
 
-        yield FillEvent("gap_identified", {
-            "position": gap["position"],
-            "from_track_id": gap["from_track"].id,
-            "to_track_id": gap["to_track"].id if gap["to_track"] else None,
-            "current_score": gap["score"],
-            "target_energy": gap["target_energy"],
-        })
+        yield FillEvent(
+            "gap_identified",
+            {
+                "position": gap["position"],
+                "from_track_id": gap["from_track"].id,
+                "to_track_id": gap["to_track"].id if gap["to_track"] else None,
+                "current_score": gap["score"],
+                "target_energy": gap["target_energy"],
+            },
+        )
 
         # Score candidates for this gap
         prev_track = gap["from_track"]
@@ -142,8 +152,12 @@ def fill_set(
             if _violates_artist_cooldown(tracks, cand):
                 continue
             combined, incoming_bd, outgoing_bd = score_replacement(
-                cand, prev_track, next_track, target_energy=target_e,
-                weights=weights, discovery_density=discovery_density,
+                cand,
+                prev_track,
+                next_track,
+                target_energy=target_e,
+                weights=weights,
+                discovery_density=discovery_density,
             )
             # Genre momentum: reward candidates continuing the genre arc
             momentum = genre_momentum_bonus(preceding, cand, window=3)
@@ -154,26 +168,34 @@ def fill_set(
 
         if scored_candidates:
             best, best_score, best_in, best_out = scored_candidates[0]
-            explanation = _build_explanation(best, prev_track, next_track, best_score, best_in, best_out, target_e)
+            explanation = _build_explanation(
+                best, prev_track, next_track, best_score, best_in, best_out, target_e
+            )
 
-            yield FillEvent("fill_proposed", {
-                "position": gap["position"],
-                "track_id": best.id,
-                "track_title": best.title,
-                "track_artist": best.artist,
-                "track_bpm": best.bpm,
-                "track_key": best.key,
-                "score": round(best_score, 3),
-                "breakdown": best_in,
-                "explanation": explanation,
-            })
+            yield FillEvent(
+                "fill_proposed",
+                {
+                    "position": gap["position"],
+                    "track_id": best.id,
+                    "track_title": best.title,
+                    "track_artist": best.artist,
+                    "track_bpm": best.bpm,
+                    "track_key": best.key,
+                    "score": round(best_score, 3),
+                    "breakdown": best_in,
+                    "explanation": explanation,
+                },
+            )
             proposals_count += 1
             existing_ids.add(best.id)
 
-    yield FillEvent("fill_complete", {
-        "proposals_count": proposals_count,
-        "estimated_duration_min": round(current_duration_min + proposals_count * 5.5, 1),
-    })
+    yield FillEvent(
+        "fill_complete",
+        {
+            "proposals_count": proposals_count,
+            "estimated_duration_min": round(current_duration_min + proposals_count * 5.5, 1),
+        },
+    )
 
 
 def _build_explanation(

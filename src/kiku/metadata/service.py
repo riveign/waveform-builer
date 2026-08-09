@@ -46,9 +46,7 @@ def gather_candidates(
     if album:
         return source.search(album, artist or "", limit=limit)
 
-    raise LookupUnsupported(
-        f"Source {source_name!r} needs a URL or an album query"
-    )
+    raise LookupUnsupported(f"Source {source_name!r} needs a URL or an album query")
 
 
 def tracks_for_target(
@@ -106,9 +104,7 @@ def correct_from_source(
     album_key/track_ids. Returns (candidate, tracks, corrections) — no writes.
     """
     # Determine target tracks early when we need their paths (tags) or grouping.
-    pre_tracks, resolved_key = tracks_for_target(
-        session, album_key=album_key, track_ids=track_ids
-    )
+    pre_tracks, resolved_key = tracks_for_target(session, album_key=album_key, track_ids=track_ids)
 
     candidates = gather_candidates(
         source_name,
@@ -125,9 +121,7 @@ def correct_from_source(
     # If we didn't already have target tracks, discover them from the candidate.
     tracks = pre_tracks
     if not tracks:
-        tracks, resolved_key = tracks_for_target(
-            session, like=like, candidate=candidate
-        )
+        tracks, resolved_key = tracks_for_target(session, like=like, candidate=candidate)
 
     corrections = build_correction(tracks, candidate, fields=fields)
     return candidate, tracks, corrections

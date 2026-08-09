@@ -22,7 +22,7 @@ def normalize_path(path: str) -> str:
     """
     for mac_prefix, linux_prefix in _PATH_ALIASES:
         if path.startswith(mac_prefix):
-            return linux_prefix + path[len(mac_prefix):]
+            return linux_prefix + path[len(mac_prefix) :]
         if path.startswith(linux_prefix):
-            return linux_prefix + path[len(linux_prefix):]
+            return linux_prefix + path[len(linux_prefix) :]
     return path

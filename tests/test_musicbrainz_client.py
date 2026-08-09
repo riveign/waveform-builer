@@ -97,6 +97,8 @@ def test_http_error_propagates() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503, text="Service Unavailable")
 
-    with MusicBrainzClient(transport=_make_transport(handler)) as c, \
-            pytest.raises(httpx.HTTPStatusError):
+    with (
+        MusicBrainzClient(transport=_make_transport(handler)) as c,
+        pytest.raises(httpx.HTTPStatusError),
+    ):
         c.search_releases("A", "B")

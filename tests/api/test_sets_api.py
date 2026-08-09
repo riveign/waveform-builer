@@ -34,11 +34,14 @@ def test_create_set(client):
 
 
 def test_create_set_with_options(client):
-    resp = client.post("/api/sets", json={
-        "name": "Filtered Set",
-        "energy_profile": "warmup:30:0.3,peak:30:0.9",
-        "genre_filter": ["techno", "house"],
-    })
+    resp = client.post(
+        "/api/sets",
+        json={
+            "name": "Filtered Set",
+            "energy_profile": "warmup:30:0.3,peak:30:0.9",
+            "genre_filter": ["techno", "house"],
+        },
+    )
     assert resp.status_code == 201
     data = resp.json()
     assert data["name"] == "Filtered Set"
@@ -76,12 +79,15 @@ def test_delete_set_not_found(client):
 
 
 def test_build_set_sse(client):
-    resp = client.post("/api/sets/build", json={
-        "name": "Built Set",
-        "duration_min": 30,
-        "energy_preset": "journey",
-        "beam_width": 2,
-    })
+    resp = client.post(
+        "/api/sets/build",
+        json={
+            "name": "Built Set",
+            "duration_min": 30,
+            "energy_preset": "journey",
+            "beam_width": 2,
+        },
+    )
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/event-stream")
 
@@ -93,10 +99,13 @@ def test_build_set_sse(client):
 
 
 def test_build_set_sse_bad_seed(client):
-    resp = client.post("/api/sets/build", json={
-        "name": "Bad Seed",
-        "seed_track_id": 99999,
-    })
+    resp = client.post(
+        "/api/sets/build",
+        json={
+            "name": "Bad Seed",
+            "seed_track_id": 99999,
+        },
+    )
     assert resp.status_code == 200
     body = resp.text
     assert "event: error" in body
@@ -114,14 +123,17 @@ def test_vibe_presets_endpoint(client):
 
 
 def test_build_set_with_vibe(client):
-    resp = client.post("/api/sets/build", json={
-        "name": "Dark Set",
-        "duration_min": 30,
-        "energy_preset": "journey",
-        "beam_width": 2,
-        "vibe_preset": "dark & deep",
-        "vibe_intensity": 0.8,
-    })
+    resp = client.post(
+        "/api/sets/build",
+        json={
+            "name": "Dark Set",
+            "duration_min": 30,
+            "energy_preset": "journey",
+            "beam_width": 2,
+            "vibe_preset": "dark & deep",
+            "vibe_intensity": 0.8,
+        },
+    )
     assert resp.status_code == 200
     body = resp.text
     assert "event: complete" in body or "event: error" in body
@@ -131,14 +143,17 @@ def test_build_set_with_vibe(client):
 
 
 def test_build_set_with_preferred_artists(client):
-    resp = client.post("/api/sets/build", json={
-        "name": "Featured Set",
-        "duration_min": 30,
-        "energy_preset": "journey",
-        "beam_width": 2,
-        "preferred_artists": ["Artist 1"],
-        "artist_intensity": 0.8,
-    })
+    resp = client.post(
+        "/api/sets/build",
+        json={
+            "name": "Featured Set",
+            "duration_min": 30,
+            "energy_preset": "journey",
+            "beam_width": 2,
+            "preferred_artists": ["Artist 1"],
+            "artist_intensity": 0.8,
+        },
+    )
     assert resp.status_code == 200
     body = resp.text
     assert "event: started" in body
@@ -146,11 +161,14 @@ def test_build_set_with_preferred_artists(client):
 
 
 def test_build_set_unknown_vibe(client):
-    resp = client.post("/api/sets/build", json={
-        "name": "Bad Vibe",
-        "vibe_preset": "nonexistent vibe",
-        "vibe_intensity": 0.5,
-    })
+    resp = client.post(
+        "/api/sets/build",
+        json={
+            "name": "Bad Vibe",
+            "vibe_preset": "nonexistent vibe",
+            "vibe_intensity": 0.5,
+        },
+    )
     assert resp.status_code == 200
     body = resp.text
     assert "event: error" in body
@@ -158,10 +176,13 @@ def test_build_set_unknown_vibe(client):
 
 
 def test_build_set_bad_end_track(client):
-    resp = client.post("/api/sets/build", json={
-        "name": "Bad End",
-        "end_track_id": 99999,
-    })
+    resp = client.post(
+        "/api/sets/build",
+        json={
+            "name": "Bad End",
+            "end_track_id": 99999,
+        },
+    )
     assert resp.status_code == 200
     body = resp.text
     assert "event: error" in body

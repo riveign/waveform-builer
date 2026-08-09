@@ -18,9 +18,7 @@ def camelot_distribution(session: Session) -> dict[int, dict[str, int]]:
     Returns: {1: {"A": 45, "B": 32}, 2: {...}, ...}
     """
     tracks = session.query(Track.key).filter(Track.key.isnot(None)).all()
-    dist: dict[int, dict[str, int]] = {
-        n: {"A": 0, "B": 0} for n in range(1, 13)
-    }
+    dist: dict[int, dict[str, int]] = {n: {"A": 0, "B": 0} for n in range(1, 13)}
     for (key,) in tracks:
         parsed = parse_camelot(key)
         if parsed:
@@ -100,14 +98,16 @@ def mood_quadrant(session: Session) -> list[dict]:
     results = []
     for track, af in tracks:
         genre = track.dir_genre or track.rb_genre
-        results.append({
-            "title": track.title or "?",
-            "artist": track.artist or "?",
-            "x": af.mood_happy - af.mood_sad,
-            "y": af.mood_aggressive - af.mood_relaxed,
-            "energy": af.energy or 0.5,
-            "genre_family": genre_to_family(genre).capitalize(),
-        })
+        results.append(
+            {
+                "title": track.title or "?",
+                "artist": track.artist or "?",
+                "x": af.mood_happy - af.mood_sad,
+                "y": af.mood_aggressive - af.mood_relaxed,
+                "energy": af.energy or 0.5,
+                "genre_family": genre_to_family(genre).capitalize(),
+            }
+        )
 
     return results
 
@@ -157,12 +157,14 @@ def library_gaps(session: Session) -> dict[str, list[dict]]:
             f"{count} tracks in {pos}, but {adjacent_count} tracks in adjacent keys "
             f"({', '.join(_adjacent_keys(pos))}) would benefit from more {pos} options"
         )
-        camelot_gaps.append({
-            "position": pos,
-            "count": count,
-            "impact": impact,
-            "explanation": explanation,
-        })
+        camelot_gaps.append(
+            {
+                "position": pos,
+                "count": count,
+                "impact": impact,
+                "explanation": explanation,
+            }
+        )
 
     camelot_gaps.sort(key=lambda g: g["impact"], reverse=True)
 
@@ -184,10 +186,12 @@ def library_gaps(session: Session) -> dict[str, list[dict]]:
             end = start + int(bin_width)
             count = sum(1 for b in bpms if start <= b < end)
             if count < 5:
-                bpm_gaps.append({
-                    "range": f"{start}-{end}",
-                    "count": count,
-                })
+                bpm_gaps.append(
+                    {
+                        "range": f"{start}-{end}",
+                        "count": count,
+                    }
+                )
     bpm_gaps.sort(key=lambda g: g["count"])
 
     # ── Energy gaps (resolved zones from all sources) ──
@@ -271,8 +275,12 @@ def enhanced_stats(session: Session) -> dict:
         .all()
     )
     most_played_list = [
-        {"title": t.title, "artist": t.artist, "plays": t.play_count,
-         "genre": t.dir_genre or t.rb_genre or "?"}
+        {
+            "title": t.title,
+            "artist": t.artist,
+            "plays": t.play_count,
+            "genre": t.dir_genre or t.rb_genre or "?",
+        }
         for t in most_played
     ]
 
@@ -288,8 +296,12 @@ def enhanced_stats(session: Session) -> dict:
         .all()
     )
     hidden_gems_list = [
-        {"title": t.title, "artist": t.artist, "rating": t.rating,
-         "genre": t.dir_genre or t.rb_genre or "?"}
+        {
+            "title": t.title,
+            "artist": t.artist,
+            "rating": t.rating,
+            "genre": t.dir_genre or t.rb_genre or "?",
+        }
         for t in hidden_gems
     ]
 
@@ -297,8 +309,16 @@ def enhanced_stats(session: Session) -> dict:
     total = session.query(func.count(Track.id)).scalar() or 0
     if total > 0:
         has_key = session.query(func.count(Track.id)).filter(Track.key.isnot(None)).scalar()
-        has_bpm = session.query(func.count(Track.id)).filter(Track.bpm.isnot(None), Track.bpm > 0).scalar()
-        has_rating = session.query(func.count(Track.id)).filter(Track.rating.isnot(None), Track.rating > 0).scalar()
+        has_bpm = (
+            session.query(func.count(Track.id))
+            .filter(Track.bpm.isnot(None), Track.bpm > 0)
+            .scalar()
+        )
+        has_rating = (
+            session.query(func.count(Track.id))
+            .filter(Track.rating.isnot(None), Track.rating > 0)
+            .scalar()
+        )
         has_features = (
             session.query(func.count(AudioFeatures.track_id))
             .filter(AudioFeatures.energy.isnot(None))

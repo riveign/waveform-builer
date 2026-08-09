@@ -72,10 +72,10 @@ VIBE_PRESETS: dict[str, tuple[float, float]] = {
 class Vibe:
     """A track's resolved vibe."""
 
-    brightness: float   # 0 (dark) .. 1 (bright)
-    density: float       # 0 (spacious) .. 1 (busy)
-    source: str          # "stored", "derived", or "none"
-    label: str           # human-readable, e.g. "dark & spacious"
+    brightness: float  # 0 (dark) .. 1 (bright)
+    density: float  # 0 (spacious) .. 1 (busy)
+    source: str  # "stored", "derived", or "none"
+    label: str  # human-readable, e.g. "dark & spacious"
 
 
 # ── Calibration ──────────────────────────────────────────────────────────
@@ -190,8 +190,7 @@ def derive_vibe(track: Track) -> tuple[float, float] | None:
     if brightness is None and density is None:
         return None
     # Fill a missing axis with neutral so callers always get a usable point.
-    return (brightness if brightness is not None else 0.5,
-            density if density is not None else 0.5)
+    return (brightness if brightness is not None else 0.5, density if density is not None else 0.5)
 
 
 def _weighted_brightness(
@@ -199,8 +198,7 @@ def _weighted_brightness(
 ) -> float | None:
     if high_ratio is not None and mode is not None and centroid is not None:
         w = _BRIGHT_W
-        return _clamp(w["mode"] * mode + w["centroid"] * centroid
-                      + w["high_band"] * high_ratio)
+        return _clamp(w["mode"] * mode + w["centroid"] * centroid + w["high_band"] * high_ratio)
     # No band data — collapse to mode + centroid.
     parts = {"mode": mode, "centroid": centroid}
     available = {k: v for k, v in parts.items() if v is not None}
@@ -270,7 +268,7 @@ def vibe_distance(a: tuple[float, float], b: tuple[float, float]) -> float:
     """
     db = a[0] - b[0]
     dd = a[1] - b[1]
-    return _clamp((db * db + dd * dd) ** 0.5 / (2.0 ** 0.5))
+    return _clamp((db * db + dd * dd) ** 0.5 / (2.0**0.5))
 
 
 def resolve_preset(name: str | None) -> tuple[float, float] | None:
@@ -306,11 +304,7 @@ def calibrate_vibe(session) -> dict:
     sample_count = 0
     for feature in ("spectral_centroid", "spectral_complexity"):
         col = getattr(AudioFeatures, feature)
-        rows = (
-            session.query(col)
-            .filter(col.isnot(None))
-            .all()
-        )
+        rows = session.query(col).filter(col.isnot(None)).all()
         vals = sorted(float(r[0]) for r in rows if r[0] is not None)
         sample_count = max(sample_count, len(vals))
         if vals:
@@ -340,11 +334,7 @@ def backfill_vibe(session, recalibrate: bool = True) -> dict:
     if recalibrate:
         calibrate_vibe(session)
 
-    tracks = (
-        session.query(Track)
-        .join(Track.audio_features)
-        .all()
-    )
+    tracks = session.query(Track).join(Track.audio_features).all()
     updated = skipped = 0
     for track in tracks:
         derived = derive_vibe(track)

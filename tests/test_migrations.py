@@ -64,7 +64,6 @@ def test_migrated_schema_matches_the_orm(migrated_engine):
     # SQLite reports no server-side type detail for several of our columns, so
     # type-only differences are noise here. Structural drift is what matters.
     structural = [d for d in diff if not (isinstance(d, tuple) and d and d[0] == "modify_type")]
-    assert not structural, (
-        "Schema drift between Alembic and the ORM:\n"
-        + "\n".join(f"  {d}" for d in structural)
+    assert not structural, "Schema drift between Alembic and the ORM:\n" + "\n".join(
+        f"  {d}" for d in structural
     )

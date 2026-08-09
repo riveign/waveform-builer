@@ -21,12 +21,19 @@ class AudioBuffers:
 def _load_with_ffmpeg(path: str, sr: int) -> np.ndarray:
     """Decode audio via ffmpeg subprocess (handles M4A/AAC and any format)."""
     cmd = [
-        "ffmpeg", "-i", path,
-        "-f", "f32le",      # raw 32-bit float PCM
-        "-acodec", "pcm_f32le",
-        "-ac", "1",          # mono
-        "-ar", str(sr),      # target sample rate
-        "-v", "quiet",
+        "ffmpeg",
+        "-i",
+        path,
+        "-f",
+        "f32le",  # raw 32-bit float PCM
+        "-acodec",
+        "pcm_f32le",
+        "-ac",
+        "1",  # mono
+        "-ar",
+        str(sr),  # target sample rate
+        "-v",
+        "quiet",
         "pipe:1",
     ]
     result = subprocess.run(cmd, capture_output=True, check=False)

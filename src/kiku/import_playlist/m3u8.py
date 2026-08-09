@@ -78,19 +78,19 @@ def parse_m3u8(content: str, *, source_path: str = "") -> M3U8ParseResult:
 
         # #PLAYLIST tag — set name override
         if line.startswith("#PLAYLIST:"):
-            result.playlist_name = line[len("#PLAYLIST:"):].strip()
+            result.playlist_name = line[len("#PLAYLIST:") :].strip()
             continue
 
         # #EXTINF — parse duration and display title
         if line.startswith("#EXTINF:"):
-            info = line[len("#EXTINF:"):]
+            info = line[len("#EXTINF:") :]
             comma_idx = info.find(",")
             if comma_idx >= 0:
                 try:
                     duration = int(info[:comma_idx].strip())
                 except ValueError:
                     duration = -1
-                title = info[comma_idx + 1:].strip() or None
+                title = info[comma_idx + 1 :].strip() or None
             else:
                 # Malformed — try to parse just the number
                 try:
@@ -120,13 +120,15 @@ def parse_m3u8(content: str, *, source_path: str = "") -> M3U8ParseResult:
             ref_line = pending_line
             pending_extinf = None
 
-        result.tracks.append(M3U8Track(
-            path=raw_path,
-            normalized_path=norm_path,
-            title=title,
-            duration_sec=duration,
-            line_number=ref_line,
-        ))
+        result.tracks.append(
+            M3U8Track(
+                path=raw_path,
+                normalized_path=norm_path,
+                title=title,
+                duration_sec=duration,
+                line_number=ref_line,
+            )
+        )
 
     return result
 

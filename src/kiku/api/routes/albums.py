@@ -54,16 +54,20 @@ def _batch_cover_track_ids(session: Session, album_names: list[str]) -> dict[str
     """
     if not album_names:
         return {}
-    row_num = func.row_number().over(
-        partition_by=Track.album,
-        order_by=(
-            Track.disc_number.is_(None),
-            Track.disc_number.asc(),
-            Track.track_number.is_(None),
-            Track.track_number.asc(),
-            Track.file_path.asc(),
-        ),
-    ).label("rn")
+    row_num = (
+        func.row_number()
+        .over(
+            partition_by=Track.album,
+            order_by=(
+                Track.disc_number.is_(None),
+                Track.disc_number.asc(),
+                Track.track_number.is_(None),
+                Track.track_number.asc(),
+                Track.file_path.asc(),
+            ),
+        )
+        .label("rn")
+    )
     subq = (
         session.query(Track.id.label("tid"), Track.album.label("alb"), row_num)
         .filter(Track.album.in_(album_names))
@@ -117,7 +121,9 @@ def list_albums(
     # variants). The first variant wins for display; track counts sum; year takes
     # the earliest; latest_added takes the max. `names` holds every raw album
     # string in this group so cover/track lookups can span all variants.
-    merged: dict[str, list] = {}  # album_key → [names, artist, year, label, count, is_comp, latest_added]
+    merged: dict[
+        str, list
+    ] = {}  # album_key → [names, artist, year, label, count, is_comp, latest_added]
     for r in rows:
         a_artist, is_comp = _classify_artist(r.artist_count or 0, r.any_artist)
         if artist and a_artist not in artist:
@@ -136,11 +142,18 @@ def list_albums(
             existing[5] = existing[5] or is_comp
         else:
             merged[key] = [
-                [r.album], a_artist, r.year, r.label, r.track_count, is_comp, r.latest_added,
+                [r.album],
+                a_artist,
+                r.year,
+                r.label,
+                r.track_count,
+                is_comp,
+                r.latest_added,
             ]
     # Pack as (album_key, [names], artist, year, label, count, is_comp, latest_added)
     enriched: list[tuple[str, list[str], str, int | None, str | None, int, bool, str | None]] = [
-        (k, *v) for k, v in merged.items()  # type: ignore[misc]
+        (k, *v)
+        for k, v in merged.items()  # type: ignore[misc]
     ]
 
     if sort == "year":
@@ -151,7 +164,7 @@ def list_albums(
         enriched.sort(key=lambda x: (x[2].lower(), x[1][0].lower()))
 
     total = len(enriched)
-    page = enriched[offset:offset + limit]
+    page = enriched[offset : offset + limit]
 
     # Batch cover lookup across ALL name variants on the page, then re-key by album_key.
     all_page_names = [n for entry in page for n in entry[1]]
@@ -169,9 +182,7 @@ def list_albums(
     metadata_map: dict[str, AlbumMetadata] = (
         {
             md.album_key: md
-            for md in db.query(AlbumMetadata)
-            .filter(AlbumMetadata.album_key.in_(page_keys))
-            .all()
+            for md in db.query(AlbumMetadata).filter(AlbumMetadata.album_key.in_(page_keys)).all()
         }
         if page_keys
         else {}
@@ -180,18 +191,20 @@ def list_albums(
     items: list[AlbumResponse] = []
     for key, names, art, year, lbl, cnt, is_comp, _ in page:
         md = metadata_map.get(key)
-        items.append(AlbumResponse(
-            album_key=key,
-            album=names[0],
-            artist=art,
-            year=year,
-            label=lbl,
-            track_count=cnt,
-            cover_track_id=cover_by_key.get(key),
-            is_compilation=is_comp,
-            mb_release_id=md.mb_release_id if md else None,
-            match_status=md.match_status if md else None,
-        ))
+        items.append(
+            AlbumResponse(
+                album_key=key,
+                album=names[0],
+                artist=art,
+                year=year,
+                label=lbl,
+                track_count=cnt,
+                cover_track_id=cover_by_key.get(key),
+                is_compilation=is_comp,
+                mb_release_id=md.mb_release_id if md else None,
+                match_status=md.match_status if md else None,
+            )
+        )
     return PaginatedAlbumsResponse(items=items, total=total, offset=offset, limit=limit)
 
 
@@ -276,10 +289,7 @@ def match_musicbrainz(album_key: str, db: Session = Depends(get_db)) -> MBMatchR
     album_name = album_names[0]
 
     tracks = (
-        db.query(Track)
-        .filter(Track.album.in_(album_names))
-        .order_by(Track.file_path.asc())
-        .all()
+        db.query(Track).filter(Track.album.in_(album_names)).order_by(Track.file_path.asc()).all()
     )
 
     from kiku.musicbrainz.client import MusicBrainzClient
@@ -309,12 +319,14 @@ def match_musicbrainz(album_key: str, db: Session = Depends(get_db)) -> MBMatchR
                 title = (tr.get("title") or "").strip()
                 length = tr.get("length")
                 if pos and title:
-                    recordings_raw.append({
-                        "position": int(pos),
-                        "disc": int(disc_no),
-                        "title": title,
-                        "length_ms": int(length) if length else None,
-                    })
+                    recordings_raw.append(
+                        {
+                            "position": int(pos),
+                            "disc": int(disc_no),
+                            "title": title,
+                            "length_ms": int(length) if length else None,
+                        }
+                    )
 
         mapping = match_tracklist(
             [{"id": t.id, "title": t.title or ""} for t in tracks],
@@ -337,18 +349,20 @@ def match_musicbrainz(album_key: str, db: Session = Depends(get_db)) -> MBMatchR
         if label_info and label_info[0].get("label"):
             label_name = label_info[0]["label"].get("name")
 
-        candidates.append(MBCandidate(
-            mb_release_id=mb_release_id,
-            title=full.get("title", album_name),
-            artist=_format_mb_artist(full.get("artist-credit")),
-            year=_year_from_date(full.get("date")),
-            country=full.get("country"),
-            label=label_name,
-            track_count=sum(len(m.get("tracks") or []) for m in (full.get("media") or [])),
-            recordings=[MBCandidateRecording(**r) for r in recordings_raw],
-            score=float(cand.get("score", 0)) / 100.0 if cand.get("score") else 0.0,
-            mapping_preview=preview,
-        ))
+        candidates.append(
+            MBCandidate(
+                mb_release_id=mb_release_id,
+                title=full.get("title", album_name),
+                artist=_format_mb_artist(full.get("artist-credit")),
+                year=_year_from_date(full.get("date")),
+                country=full.get("country"),
+                label=label_name,
+                track_count=sum(len(m.get("tracks") or []) for m in (full.get("media") or [])),
+                recordings=[MBCandidateRecording(**r) for r in recordings_raw],
+                score=float(cand.get("score", 0)) / 100.0 if cand.get("score") else 0.0,
+                mapping_preview=preview,
+            )
+        )
 
     return MBMatchResponse(candidates=candidates)
 
@@ -459,10 +473,14 @@ def match_source(
 
     try:
         candidate, tracks, corrections = correct_from_source(
-            db, source,
-            album_key=album_key, url=body.url,
-            album=query, artist=body.artist or album_artist,
-            candidate_index=body.candidate_index, fields=fields,
+            db,
+            source,
+            album_key=album_key,
+            url=body.url,
+            album=query,
+            artist=body.artist or album_artist,
+            candidate_index=body.candidate_index,
+            fields=fields,
         )
     except SourceUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -484,7 +502,10 @@ def match_source(
             confidence=c.confidence,
             changes=[
                 CorrectionFieldChange(
-                    field=ch.field, old=ch.old, new=ch.new, changed=ch.changed,
+                    field=ch.field,
+                    old=ch.old,
+                    new=ch.new,
+                    changed=ch.changed,
                 )
                 for ch in c.changes
             ],
@@ -519,9 +540,7 @@ def apply_correction_endpoint(
     album_names, album_artist, _ = resolved
 
     allowed = set(body.fields) & set(CORRECTABLE_FIELDS)
-    valid_ids = {
-        tid for (tid,) in db.query(Track.id).filter(Track.album.in_(album_names)).all()
-    }
+    valid_ids = {tid for (tid,) in db.query(Track.id).filter(Track.album.in_(album_names)).all()}
 
     updated = 0
     for item in body.items:

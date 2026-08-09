@@ -43,13 +43,15 @@ class TagsSource:
             if tags is None:
                 continue
             title = tags.get("title") or Path(p).stem
-            recordings.append(RecordingCandidate(
-                title=title.strip(),
-                position=tags.get("track_number"),
-                disc=tags.get("disc_number") or 1,
-                artist=tags.get("artist"),
-                length_ms=tags.get("length_ms"),
-            ))
+            recordings.append(
+                RecordingCandidate(
+                    title=title.strip(),
+                    position=tags.get("track_number"),
+                    disc=tags.get("disc_number") or 1,
+                    artist=tags.get("artist"),
+                    length_ms=tags.get("length_ms"),
+                )
+            )
             if tags.get("album"):
                 albums[tags["album"]] += 1
             if tags.get("artist"):
@@ -142,7 +144,7 @@ def _parse_year(text: str | None) -> int | None:
     if not text:
         return None
     for i in range(len(text) - 3):
-        chunk = text[i:i + 4]
+        chunk = text[i : i + 4]
         if chunk.isdigit():
             return int(chunk)
     return None

@@ -130,18 +130,20 @@ def _seeded_session():
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     for i in range(1, 21):
-        session.add(Track(
-            id=i,
-            title=f"Track {i}",
-            artist="Bicep" if i <= 3 else f"Artist {i}",
-            bpm=126.0 + (i % 5),
-            key="8A" if i % 2 == 0 else "8B",
-            dir_genre="techno",
-            dir_energy="mid",
-            duration_sec=360.0,
-            rating=3,
-            play_count=i,
-        ))
+        session.add(
+            Track(
+                id=i,
+                title=f"Track {i}",
+                artist="Bicep" if i <= 3 else f"Artist {i}",
+                bpm=126.0 + (i % 5),
+                key="8A" if i % 2 == 0 else "8B",
+                dir_genre="techno",
+                dir_energy="mid",
+                duration_sec=360.0,
+                rating=3,
+                play_count=i,
+            )
+        )
     session.commit()
     return session
 

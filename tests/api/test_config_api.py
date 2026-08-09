@@ -56,9 +56,7 @@ def test_genre_family_has_genres(client):
     data = resp.json()
     for family in data:
         assert isinstance(family["genres"], list)
-        assert len(family["genres"]) >= 1, (
-            f"Family '{family['family_name']}' has no genres"
-        )
+        assert len(family["genres"]) >= 1, f"Family '{family['family_name']}' has no genres"
         for genre in family["genres"]:
             assert isinstance(genre, str)
             assert len(genre) > 0

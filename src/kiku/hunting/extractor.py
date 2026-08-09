@@ -24,6 +24,7 @@ PLATFORM_PATTERNS = {
 @dataclass
 class ExtractedMetadata:
     """Raw metadata extracted from a URL."""
+
     url: str
     platform: str
     title: str | None = None
@@ -68,9 +69,7 @@ def extract_youtube_music_credits(url: str) -> list[dict]:
         resp = requests.get(url, headers=headers, timeout=15)
         resp.raise_for_status()
 
-        match = re.search(
-            r"var ytInitialData\s*=\s*({.*?});</script>", resp.text, re.DOTALL
-        )
+        match = re.search(r"var ytInitialData\s*=\s*({.*?});</script>", resp.text, re.DOTALL)
         if not match:
             logger.debug("No ytInitialData found in page")
             return []
@@ -83,8 +82,7 @@ def extract_youtube_music_credits(url: str) -> list[dict]:
         panels = data.get("engagementPanels", [])
         for panel in panels:
             renderer = (
-                panel
-                .get("engagementPanelSectionListRenderer", {})
+                panel.get("engagementPanelSectionListRenderer", {})
                 .get("content", {})
                 .get("structuredDescriptionContentRenderer", {})
                 .get("items", [])
@@ -103,11 +101,13 @@ def extract_youtube_music_credits(url: str) -> list[dict]:
                         album = secondary
 
                     if title and artist:
-                        credits.append({
-                            "title": title,
-                            "artist": artist,
-                            "album": album,
-                        })
+                        credits.append(
+                            {
+                                "title": title,
+                                "artist": artist,
+                                "album": album,
+                            }
+                        )
 
         if credits:
             logger.info("Found %d music credits from Content ID", len(credits))
@@ -139,8 +139,9 @@ def extract_metadata(url: str, include_comments: bool = True) -> ExtractedMetada
         from yt_dlp import YoutubeDL
     except ImportError:
         return ExtractedMetadata(
-            url=url, platform=platform or "unknown",
-            error="yt-dlp not installed. Run: pip install 'kiku[hunting]'"
+            url=url,
+            platform=platform or "unknown",
+            error="yt-dlp not installed. Run: pip install 'kiku[hunting]'",
         )
 
     opts: dict = {
@@ -189,7 +190,4 @@ def extract_metadata(url: str, include_comments: bool = True) -> ExtractedMetada
 
     except Exception as e:
         logger.exception("yt-dlp extraction failed for %s", url)
-        return ExtractedMetadata(
-            url=url, platform=platform,
-            error=f"Extraction failed: {e}"
-        )
+        return ExtractedMetadata(url=url, platform=platform, error=f"Extraction failed: {e}")

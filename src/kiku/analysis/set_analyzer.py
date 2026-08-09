@@ -102,16 +102,13 @@ def analyze_set(db: Session, set_id: int) -> SetAnalysisResult:
     # closer ended it, say so — teaching, in their voice. Derived from the final
     # tracks' role tags (no build-time provenance needed).
     from kiku.set_roles import has_role
+
     if has_role(tracks[0], "opener"):
         opener_name = tracks[0].title or "the first track"
-        set_patterns.append(
-            f"Opened with “{opener_name}” — you marked it a great opener."
-        )
+        set_patterns.append(f"Opened with “{opener_name}” — you marked it a great opener.")
     if has_role(tracks[-1], "closer"):
         closer_name = tracks[-1].title or "the last track"
-        set_patterns.append(
-            f"Closed on “{closer_name}” — one of your go-to closers."
-        )
+        set_patterns.append(f"Closed on “{closer_name}” — one of your go-to closers.")
 
     # Break role: a break-tagged track sitting in an energy VALLEY (a local minimum
     # of the curve) is the release between chapters — say so (spec 029). First only.
@@ -264,8 +261,13 @@ def _score_transitions(
         )
         q, _ = track_quality(t_b)
 
-        total = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
-                 + w["genre_coherence"] * g + w["track_quality"] * q)
+        total = (
+            w["harmonic"] * h
+            + w["energy_fit"] * e
+            + w["bpm_compat"] * b
+            + w["genre_coherence"] * g
+            + w["track_quality"] * q
+        )
 
         scores = {
             "harmonic": round(h, 3),
@@ -278,20 +280,24 @@ def _score_transitions(
 
         teaching, suggestion = transition_teaching_moment(
             scores,
-            t_a.key, t_b.key,
-            t_a.bpm, t_b.bpm,
+            t_a.key,
+            t_b.key,
+            t_a.bpm,
+            t_b.bpm,
             t_a.dir_genre or t_a.rb_genre,
             t_b.dir_genre or t_b.rb_genre,
         )
 
-        results.append(TransitionAnalysis(
-            position=i,
-            track_a_id=t_a.id,
-            track_b_id=t_b.id,
-            scores=scores,
-            teaching_moment=teaching,
-            suggestion=suggestion,
-        ))
+        results.append(
+            TransitionAnalysis(
+                position=i,
+                track_a_id=t_a.id,
+                track_b_id=t_b.id,
+                scores=scores,
+                teaching_moment=teaching,
+                suggestion=suggestion,
+            )
+        )
 
     return results
 
@@ -353,8 +359,9 @@ def _classify_energy_shape(curve: list[float]) -> str:
     if first_half > second_half + 0.1:
         return "wind-down"
     # Check for multiple peaks
-    peaks = sum(1 for i in range(1, len(curve) - 1)
-                if curve[i] > curve[i - 1] and curve[i] > curve[i + 1])
+    peaks = sum(
+        1 for i in range(1, len(curve) - 1) if curve[i] > curve[i - 1] and curve[i] > curve[i + 1]
+    )
     if peaks >= 3:
         return "roller-coaster"
     return "journey"
@@ -397,11 +404,15 @@ def _detect_genre_segments(tracks: list[Track]) -> list[dict]:
         family = genre_to_family(t.dir_genre or t.rb_genre)
         if family != current_family:
             if current_family is not None:
-                segments.append({"genre_family": current_family, "start_pos": start_pos, "end_pos": i - 1})
+                segments.append(
+                    {"genre_family": current_family, "start_pos": start_pos, "end_pos": i - 1}
+                )
             current_family = family
             start_pos = i
 
     if current_family is not None:
-        segments.append({"genre_family": current_family, "start_pos": start_pos, "end_pos": len(tracks) - 1})
+        segments.append(
+            {"genre_family": current_family, "start_pos": start_pos, "end_pos": len(tracks) - 1}
+        )
 
     return segments

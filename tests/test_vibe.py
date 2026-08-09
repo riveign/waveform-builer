@@ -29,10 +29,15 @@ def force_fallback_ranges(monkeypatch):
 def _af(**kw):
     af = MagicMock()
     for field in (
-        "spectral_centroid", "spectral_complexity", "danceability",
-        "band_low_overview", "band_midlow_overview",
-        "band_midhigh_overview", "band_high_overview",
-        "vibe_brightness", "vibe_density",
+        "spectral_centroid",
+        "spectral_complexity",
+        "danceability",
+        "band_low_overview",
+        "band_midlow_overview",
+        "band_midhigh_overview",
+        "band_high_overview",
+        "vibe_brightness",
+        "vibe_density",
     ):
         setattr(af, field, kw.get(field))
     return af
@@ -88,12 +93,17 @@ def test_derive_returns_none_without_signal():
 
 def test_high_band_ratio_raises_brightness():
     """More energy in the upper bands → brighter."""
-    dark_bands = _af(spectral_centroid=2000.0, band_low_overview=b"x",
-                     band_midlow_overview=b"x", band_midhigh_overview=b"x",
-                     band_high_overview=b"x")
+    dark_bands = _af(
+        spectral_centroid=2000.0,
+        band_low_overview=b"x",
+        band_midlow_overview=b"x",
+        band_midhigh_overview=b"x",
+        band_high_overview=b"x",
+    )
     # Patch _band_mean to simulate bass-heavy vs treble-heavy spectra.
     bassy = _track(key="8A", af=dark_bands)
     import numpy as np
+
     dark_bands.band_low_overview = np.array([1.0, 1.0], dtype=np.float32).tobytes()
     dark_bands.band_midlow_overview = np.array([0.8, 0.8], dtype=np.float32).tobytes()
     dark_bands.band_midhigh_overview = np.array([0.1, 0.1], dtype=np.float32).tobytes()

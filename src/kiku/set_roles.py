@@ -3,6 +3,7 @@
 A track can carry any combination of these roles, and a role never restricts where
 the track may be placed in a set (non-exclusive, non-restrictive). See spec 027.
 """
+
 from __future__ import annotations
 
 from typing import Any

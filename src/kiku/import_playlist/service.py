@@ -32,7 +32,9 @@ class ImportResult:
     match_methods: dict[str, int]
     warnings: list[str]
     duplicate_set_id: int | None = None  # Set if source_ref already exists
-    planned_candidates: list[dict] = field(default_factory=list)  # [{set_id, name, overlap, shared_tracks}]
+    planned_candidates: list[dict] = field(
+        default_factory=list
+    )  # [{set_id, name, overlap, shared_tracks}]
 
 
 def _build_path_index(
@@ -139,12 +141,14 @@ def suggest_planned_sets(
         union = len(played | planned)
         overlap = shared / union if union else 0.0
         if overlap >= threshold:
-            candidates.append({
-                "set_id": s.id,
-                "name": s.name,
-                "overlap": round(overlap, 3),
-                "shared_tracks": shared,
-            })
+            candidates.append(
+                {
+                    "set_id": s.id,
+                    "name": s.name,
+                    "overlap": round(overlap, 3),
+                    "shared_tracks": shared,
+                }
+            )
 
     candidates.sort(key=lambda c: c["overlap"], reverse=True)
     return candidates[:top_n]
@@ -204,7 +208,11 @@ def import_playlist(
             matched_count=0,
             unmatched_count=len(unmatched),
             unmatched=[
-                {"path": m.m3u8_track.path, "title": m.m3u8_track.title, "line": m.m3u8_track.line_number}
+                {
+                    "path": m.m3u8_track.path,
+                    "title": m.m3u8_track.title,
+                    "line": m.m3u8_track.line_number,
+                }
                 for m in unmatched
             ],
             match_methods={},
@@ -213,7 +221,8 @@ def import_playlist(
 
     # Compute total duration from matched tracks
     total_dur_sec = sum(
-        m.matched_track.duration_sec for m in matched
+        m.matched_track.duration_sec
+        for m in matched
         if m.matched_track and m.matched_track.duration_sec
     )
     duration_min = int(total_dur_sec / 60) if total_dur_sec else None
@@ -230,11 +239,13 @@ def import_playlist(
 
     # Add tracks at 0-based positions
     for position, m in enumerate(matched):
-        session.add(SetTrack(
-            set_id=new_set.id,
-            position=position,
-            track_id=m.matched_track.id,
-        ))
+        session.add(
+            SetTrack(
+                set_id=new_set.id,
+                position=position,
+                track_id=m.matched_track.id,
+            )
+        )
 
     session.commit()
 
@@ -258,7 +269,11 @@ def import_playlist(
         matched_count=len(matched),
         unmatched_count=len(unmatched),
         unmatched=[
-            {"path": m.m3u8_track.path, "title": m.m3u8_track.title, "line": m.m3u8_track.line_number}
+            {
+                "path": m.m3u8_track.path,
+                "title": m.m3u8_track.title,
+                "line": m.m3u8_track.line_number,
+            }
             for m in unmatched
         ],
         match_methods=method_counts,

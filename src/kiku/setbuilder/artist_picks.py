@@ -104,9 +104,7 @@ def rank_artist_picks(
         .all()
     )
     candidates = [
-        t
-        for t in prefilter
-        if t.id not in set_track_ids and artist_matches(artist, t.artist)
+        t for t in prefilter if t.id not in set_track_ids and artist_matches(artist, t.artist)
     ]
 
     picks: list[ArtistPick] = []
@@ -120,21 +118,27 @@ def rank_artist_picks(
             next_track = ordered_tracks[gap] if gap < gap_count else None
             target_energy = _energy_target_at_gap(profile, gap, gap_count, duration_min)
             combined, incoming, outgoing = score_replacement(
-                cand, prev_track, next_track, target_energy=target_energy,
-                weights=weights, discovery_density=discovery_density,
+                cand,
+                prev_track,
+                next_track,
+                target_energy=target_energy,
+                weights=weights,
+                discovery_density=discovery_density,
             )
             if combined > best_score:
                 best_score = combined
                 best_gap = gap
                 # Prefer the incoming (prev→cand) breakdown; fall back to outgoing.
                 best_breakdown = incoming or outgoing or {}
-        picks.append(ArtistPick(
-            track=cand,
-            position=best_gap,
-            score=round(best_score, 3),
-            breakdown=best_breakdown,
-            reason=_reason_for(best_breakdown, best_gap),
-        ))
+        picks.append(
+            ArtistPick(
+                track=cand,
+                position=best_gap,
+                score=round(best_score, 3),
+                breakdown=best_breakdown,
+                reason=_reason_for(best_breakdown, best_gap),
+            )
+        )
 
     picks.sort(key=lambda p: p.score, reverse=True)
     return picks[:n]
