@@ -190,7 +190,7 @@ def soundcloud_chase(body: SCChaseRequest, db: Session = Depends(get_db)):
 
     Creates a HuntSession, matches against library, generates purchase links.
     """
-    from kiku.db.store import create_hunt_session, save_hunt_tracks
+    from kiku.db.store import create_hunt_session
     from kiku.hunting.matcher import match_tracks
     from kiku.hunting.sources import generate_purchase_links
 

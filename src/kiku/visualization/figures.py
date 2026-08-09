@@ -274,7 +274,6 @@ def build_set_timeline_figure(
         try:
             from kiku.setbuilder.constraints import EnergyProfile
             if isinstance(energy_profile, EnergyProfile):
-                total_min = cumulative_time / 60
                 x_pts = np.linspace(0, cumulative_time, 200)
                 y_pts = [energy_profile.target_energy_at(t / 60) for t in x_pts]
                 fig.add_trace(go.Scatter(
@@ -543,7 +542,6 @@ def _add_band_lane_trace(
     from plotly.graph_objects import Scattergl
 
     section = "outro" if label == "A" else "intro"
-    is_first_band_trace = label == "A"
 
     fig.add_trace(
         Scattergl(

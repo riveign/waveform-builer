@@ -1,15 +1,14 @@
 """Tests for the energy autotag classifier."""
 
-import json
 from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 
 from kiku.analysis.autotag import (
-    ZONE_MAP,
-    _DEAD_MOOD_FEATURES,
     _DEAD_MOOD_DERIVED,
+    _DEAD_MOOD_FEATURES,
+    ZONE_MAP,
     extract_features,
     feature_names,
 )
@@ -76,10 +75,10 @@ class TestZoneMapping:
 
 class TestModelPersistence:
     def test_save_load_roundtrip(self, tmp_path):
-        from kiku.analysis.autotag import load_model, save_model
-
         # Create a minimal mock model
         from sklearn.ensemble import RandomForestClassifier
+
+        from kiku.analysis.autotag import load_model, save_model
         X = np.random.rand(30, 12)
         y = np.array(["warmup"] * 10 + ["build"] * 10 + ["peak"] * 10)
         model = RandomForestClassifier(n_estimators=10, random_state=42)

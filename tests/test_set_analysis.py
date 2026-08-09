@@ -1,9 +1,7 @@
 """Tests for set analysis — teaching moments, arc classification, energy inference."""
 
-from kiku.analysis.teaching import (
-    detect_set_patterns,
-    transition_teaching_moment,
-)
+from unittest.mock import MagicMock
+
 from kiku.analysis.set_analyzer import (
     _classify_bpm_style,
     _classify_energy_shape,
@@ -12,8 +10,10 @@ from kiku.analysis.set_analyzer import (
     _energy_targets,
     _score_transitions,
 )
-from unittest.mock import MagicMock
-
+from kiku.analysis.teaching import (
+    detect_set_patterns,
+    transition_teaching_moment,
+)
 
 # ── Teaching Moments ───────────────────────────────────────────────────
 

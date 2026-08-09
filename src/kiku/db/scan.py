@@ -11,7 +11,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from sqlalchemy.orm import Session
 
 from kiku.config import MUSIC_ROOTS
@@ -326,7 +326,7 @@ def scan_filesystem(
     if roots is None:
         roots = MUSIC_ROOTS
 
-    console.print(f"[bold]Exploring your music folders...[/]")
+    console.print("[bold]Exploring your music folders...[/]")
     for root in roots:
         console.print(f"  [dim]{root}[/]")
 

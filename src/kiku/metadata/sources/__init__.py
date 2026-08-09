@@ -41,7 +41,7 @@ def available_sources() -> list[dict]:
         try:
             src = get_source(name)
             avail = src.available()
-        except Exception:  # noqa: BLE001
+        except Exception:
             avail = False
         out.append({
             "name": name,
@@ -51,4 +51,4 @@ def available_sources() -> list[dict]:
     return out
 
 
-__all__ = ["get_source", "available_sources", "SOURCE_NAMES", "SOURCE_LOOKUP_MODE"]
+__all__ = ["SOURCE_LOOKUP_MODE", "SOURCE_NAMES", "available_sources", "get_source"]

@@ -10,7 +10,7 @@ from kiku.artists import artist_matches
 from kiku.config import BPM_TOLERANCE, SCORING_WEIGHTS
 from kiku.db.models import Track
 from kiku.setbuilder.camelot import harmonic_score
-from kiku.setbuilder.constraints import dir_energy_to_numeric, zone_to_numeric
+from kiku.setbuilder.constraints import zone_to_numeric
 from kiku.vibe import resolve_vibe, vibe_distance
 
 # ── Genre Families ──────────────────────────────────────────────────────
@@ -663,8 +663,9 @@ def _load_affinities(session: Session, track_id: int) -> dict[int, str]:
     Returns empty dict if the table doesn't exist yet (pre-migration).
     """
     try:
-        from kiku.db.models import TrackAffinity
         from sqlalchemy import or_
+
+        from kiku.db.models import TrackAffinity
 
         rows = (
             session.query(TrackAffinity)

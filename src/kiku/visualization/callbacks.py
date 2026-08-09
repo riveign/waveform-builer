@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
+from dash import Input, Output, State, callback_context, html, no_update
 
-from dash import ClientsideFunction, Input, Output, State, callback_context, html, no_update
-
-from kiku.db.models import AudioFeatures, Set, SetTrack, Track, TransitionCue, get_session
-from kiku.db.store import get_track_by_title, search_tracks
+from kiku.db.models import AudioFeatures, Set, Track, TransitionCue, get_session
+from kiku.db.store import search_tracks
 from kiku.visualization.figures import (
     build_bpm_histogram,
     build_camelot_bar,
@@ -742,9 +740,13 @@ def _build_dna_tab_with_data():
 
     from kiku.analysis.insights import (
         bpm_histogram as bpm_hist_data,
+    )
+    from kiku.analysis.insights import (
         camelot_distribution,
-        energy_genre_heatmap as heatmap_data,
         mood_quadrant,
+    )
+    from kiku.analysis.insights import (
+        energy_genre_heatmap as heatmap_data,
     )
 
     session = get_session()

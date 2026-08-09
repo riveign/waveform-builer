@@ -878,7 +878,7 @@ class MBCandidate(BaseModel):
     track_count: int
     recordings: list[MBCandidateRecording]
     score: float
-    mapping_preview: list["MBMappingPreviewItem"] = []
+    mapping_preview: list[MBMappingPreviewItem] = []
 
 
 class MBMappingPreviewItem(BaseModel):

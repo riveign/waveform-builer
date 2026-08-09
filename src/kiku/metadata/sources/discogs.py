@@ -134,7 +134,7 @@ class DiscogsSource:
                 resp = client.get(path, params=params or {})
                 resp.raise_for_status()
                 return resp.json()
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("Discogs request failed: %s", path)
             return None
 

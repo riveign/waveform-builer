@@ -7,7 +7,19 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from kiku.api.routes import albums, audio, config, export, hunt, sets, soundcloud, stats, tinder, tracks, waveforms
+from kiku.api.routes import (
+    albums,
+    audio,
+    config,
+    export,
+    hunt,
+    sets,
+    soundcloud,
+    stats,
+    tinder,
+    tracks,
+    waveforms,
+)
 from kiku.db.models import _init_schema
 
 

@@ -56,8 +56,7 @@ def parse_m3u8(content: str, *, source_path: str = "") -> M3U8ParseResult:
         result.playlist_name = Path(source_path).stem
 
     # Strip BOM if present in content itself
-    if content.startswith("\ufeff"):
-        content = content[1:]
+    content = content.removeprefix("\ufeff")
 
     lines = content.splitlines()
 

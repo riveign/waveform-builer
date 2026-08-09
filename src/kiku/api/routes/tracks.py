@@ -232,7 +232,6 @@ def record_played(track_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Track not found")
     track.kiku_play_count = (track.kiku_play_count or 0) + 1
     db.commit()
-    return
 
 
 @router.get("/{track_id}/artwork")
@@ -292,7 +291,8 @@ def _image_media_type(suffix: str) -> str:
 @router.get("/{track_id}/sets", response_model=list[TrackSetAppearance])
 def track_sets(track_id: int, db: Session = Depends(get_db)):
     """Return all sets that contain this track."""
-    from kiku.db.models import Set, SetTrack as SetTrackModel
+    from kiku.db.models import Set
+    from kiku.db.models import SetTrack as SetTrackModel
 
     track = db.get(Track, track_id)
     if not track:
@@ -388,7 +388,6 @@ def suggest_next(
 
     scored = score_transitions(db, track, n=n, genre_filter=genres, weights=weights_dict, exclude_ids=exclude_ids, discovery_density=discovery_density, target_energy=target_energy)
 
-    w = weights_dict if weights_dict else SCORING_WEIGHTS
     suggestions = []
     for cand, total_score in scored:
         h = harmonic_score(track.key, cand.key)

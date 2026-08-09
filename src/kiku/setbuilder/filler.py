@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Generator
 
 from sqlalchemy.orm import Session
 
@@ -11,7 +11,6 @@ from kiku.db.models import Set, Track
 from kiku.setbuilder.constraints import EnergyProfile, parse_energy_json, parse_energy_string
 from kiku.setbuilder.planner import _get_candidate_pool, _violates_artist_cooldown
 from kiku.setbuilder.scoring import genre_momentum_bonus, score_replacement, transition_score
-
 
 DEFAULT_GAP_THRESHOLD = 0.6
 

@@ -32,7 +32,7 @@ class MusicBrainzSource:
                 continue
             try:
                 full = self._client.get_release(mb_id)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("MB detail fetch failed for %s", mb_id)
                 continue
             candidates.append(self._to_candidate(full, mb_id))

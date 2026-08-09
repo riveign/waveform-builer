@@ -9,8 +9,7 @@ from sqlalchemy.orm import Session
 
 from kiku.db.models import AudioFeatures, Track
 from kiku.setbuilder.camelot import parse_camelot
-from kiku.setbuilder.constraints import ENERGY_TAG_VALUES
-from kiku.setbuilder.scoring import GENRE_FAMILIES, genre_to_family
+from kiku.setbuilder.scoring import genre_to_family
 
 
 def camelot_distribution(session: Session) -> dict[int, dict[str, int]]:

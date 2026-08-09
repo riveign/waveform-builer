@@ -10,7 +10,6 @@ from kiku.analysis.teaching import detect_deviation_patterns, deviation_teaching
 from kiku.db.models import Base, Set, SetTrack, Track
 from kiku.import_playlist.service import suggest_planned_sets
 
-
 # ── Track diff ──────────────────────────────────────────────────────────
 
 

@@ -89,13 +89,13 @@ def _read_tags(path: str) -> dict | None:
 
     try:
         audio = MutagenFile(path, easy=True)
-    except Exception:  # noqa: BLE001
+    except Exception:
         audio = None
     if audio is None:
         # Retry without easy mode (e.g. WAV with raw ID3 / INFO chunks).
         try:
             audio = MutagenFile(path)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
     if audio is None:
         return None

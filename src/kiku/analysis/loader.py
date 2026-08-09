@@ -29,7 +29,7 @@ def _load_with_ffmpeg(path: str, sr: int) -> np.ndarray:
         "-v", "quiet",
         "pipe:1",
     ]
-    result = subprocess.run(cmd, capture_output=True)
+    result = subprocess.run(cmd, capture_output=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg failed for {Path(path).name}")
     return np.frombuffer(result.stdout, dtype=np.float32)

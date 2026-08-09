@@ -143,7 +143,5 @@ def test_apply_is_idempotent_noop_when_already_correct(session):
     session.add(t)
     session.commit()
     corr = build_correction([t], _hadone_candidate())
-    touched = apply_correction(session, corr, fields=tuple(
-        ["title", "artist", "album", "label", "release_year", "track_number", "disc_number"]
-    ))
+    touched = apply_correction(session, corr, fields=("title", "artist", "album", "label", "release_year", "track_number", "disc_number"))
     assert touched == 0

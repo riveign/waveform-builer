@@ -55,7 +55,7 @@ class BandcampSource:
                 resp = client.get(url)
                 resp.raise_for_status()
                 return resp.text
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception("Bandcamp fetch failed for %s", url)
             return None
 

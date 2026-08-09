@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import click
 from rich.console import Console
 from rich.table import Table
@@ -296,7 +294,6 @@ def stats():
 @cli.command()
 def gaps():
     """Identify gaps in your library (Camelot, BPM, energy)."""
-    from rich.panel import Panel
 
     from kiku.analysis.insights import library_gaps
     from kiku.db.models import get_session
@@ -715,7 +712,7 @@ def import_playlist(file_path: str, name: str | None, force: bool):
     from kiku.import_playlist.m3u8 import parse_m3u8_file
     from kiku.import_playlist.service import import_playlist as do_import
 
-    console.print(f"[cyan]Reading playlist...[/]")
+    console.print("[cyan]Reading playlist...[/]")
     parse_result = parse_m3u8_file(file_path)
 
     if not parse_result.tracks:
@@ -756,7 +753,7 @@ def import_playlist(file_path: str, name: str | None, force: bool):
 
     # Show unmatched tracks
     if result.unmatched:
-        console.print(f"\n[bold]Unmatched tracks:[/]")
+        console.print("\n[bold]Unmatched tracks:[/]")
         table = Table()
         table.add_column("#", justify="right", style="dim")
         table.add_column("Path")
@@ -987,7 +984,7 @@ def classify(query: str):
 
     af = track.audio_features
     if af:
-        console.print(f"\n[bold]Audio Features:[/]")
+        console.print("\n[bold]Audio Features:[/]")
         console.print(f"  Energy: {af.energy:.3f}" if af.energy else "")
         console.print(f"  Danceability: {af.danceability:.3f}" if af.danceability else "")
         console.print(f"  Loudness: {af.loudness_lufs:.1f} LUFS" if af.loudness_lufs else "")
@@ -1167,7 +1164,6 @@ def autotag_group():
 @click.option("--force", is_flag=True, help="Overwrite existing manual dir_energy tags")
 def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
     """Classify energy zones using your tagged tracks as training data."""
-    from rich.panel import Panel
 
     from kiku.analysis.autotag import (
         load_model,
@@ -1527,8 +1523,8 @@ def fix_album(query, url, source_name, album_key, track_ids, artist, like,
       kiku fix-album --album-key 3f2a91b4c0de --source tags   # re-read the files
     """
     from kiku.db.models import get_session
-    from kiku.metadata.models import CORRECTABLE_FIELDS
     from kiku.metadata.correct import apply_correction
+    from kiku.metadata.models import CORRECTABLE_FIELDS
     from kiku.metadata.service import correct_from_source
     from kiku.metadata.sources.base import LookupUnsupported, SourceUnavailable
 
@@ -1620,10 +1616,9 @@ def fix_album(query, url, source_name, album_key, track_ids, artist, like,
         console.print("[dim]Dry run — nothing written.[/]")
         return
 
-    if not yes:
-        if not click.confirm(f"Apply to {len(changed)} track(s)?", default=False):
-            console.print("[dim]Left your library untouched.[/]")
-            return
+    if not yes and not click.confirm(f"Apply to {len(changed)} track(s)?", default=False):
+        console.print("[dim]Left your library untouched.[/]")
+        return
 
     touched = apply_correction(
         session, corrections,

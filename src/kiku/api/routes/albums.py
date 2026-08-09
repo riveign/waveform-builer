@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from sqlalchemy import func, select
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from kiku.api.deps import get_db
@@ -34,10 +34,12 @@ from kiku.api.schemas import (
 from kiku.db.models import AlbumMetadata, Track
 from kiku.metadata.album_key import (
     album_key as _album_key,
+)
+from kiku.metadata.album_key import (
     classify_artist as _classify_artist,
+)
+from kiku.metadata.album_key import (
     find_album_by_key as _find_album_by_key,
-    normalize as _normalize,
-    resolve_album_artist as _resolve_album_artist,
 )
 
 logger = logging.getLogger(__name__)
@@ -286,7 +288,7 @@ def match_musicbrainz(album_key: str, db: Session = Depends(get_db)) -> MBMatchR
     client = MusicBrainzClient()
     try:
         candidates_raw = client.search_releases(album_name, artist, limit=3)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.exception("MusicBrainz search failed")
         raise HTTPException(status_code=502, detail=f"MusicBrainz search failed: {e}") from e
 
@@ -295,7 +297,7 @@ def match_musicbrainz(album_key: str, db: Session = Depends(get_db)) -> MBMatchR
         mb_release_id = cand["id"]
         try:
             full = client.get_release(mb_release_id)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("Skipping candidate %s: detail fetch failed", mb_release_id)
             continue
 
@@ -390,7 +392,7 @@ def apply_mb_mapping(
         )
         db.add(md)
     md.mb_release_id = body.mb_release_id
-    md.last_matched_at = datetime.utcnow()
+    md.last_matched_at = datetime.now(UTC).replace(tzinfo=None)
     md.match_status = "applied"
 
     db.commit()
@@ -466,7 +468,7 @@ def match_source(
         raise HTTPException(status_code=503, detail=str(e)) from e
     except LookupUnsupported as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.exception("Source lookup failed")
         raise HTTPException(status_code=502, detail=f"Source lookup failed: {e}") from e
 
@@ -508,8 +510,8 @@ def apply_correction_endpoint(
     db: Session = Depends(get_db),
 ) -> ApplyCorrectionResponse:
     """Write the confirmed per-track field values, scoped to this album's tracks."""
-    from kiku.metadata.models import CORRECTABLE_FIELDS, FieldChange
     from kiku.metadata.correct import _TRACK_ATTR
+    from kiku.metadata.models import CORRECTABLE_FIELDS, FieldChange
 
     resolved = _find_album_by_key(db, album_key)
     if not resolved:
@@ -548,7 +550,7 @@ def apply_correction_endpoint(
     md.source_ref = body.source_ref
     if body.source == "musicbrainz":
         md.mb_release_id = body.source_ref
-    md.last_matched_at = datetime.utcnow()
+    md.last_matched_at = datetime.now(UTC).replace(tzinfo=None)
     md.match_status = "applied"
     db.commit()
 

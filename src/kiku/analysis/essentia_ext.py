@@ -145,8 +145,8 @@ def extract_essentia_mood(
     try:
         from essentia.standard import (
             MonoLoader,
-            TensorflowPredictMusiCNN,
             TensorflowPredict2D,
+            TensorflowPredictMusiCNN,
         )
     except ImportError:
         return {}

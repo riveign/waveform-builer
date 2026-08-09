@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from typing import Self
 
 import httpx
 
@@ -37,7 +38,7 @@ class MusicBrainzClient:
             headers={"User-Agent": user_agent, "Accept": "application/json"},
         )
 
-    def __enter__(self) -> "MusicBrainzClient":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

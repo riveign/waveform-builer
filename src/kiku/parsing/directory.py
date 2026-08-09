@@ -30,12 +30,12 @@ _DIR_RE_V1 = re.compile(
 )
 # Pattern 1b: MM - YYYY - Genre (with second dash, no energy)
 _DIR_RE_V1_NO_ENERGY = re.compile(
-    rf"^(\d{{2}})\s*-\s*(\d{{4}})\s*-\s*(.+)$",
+    r"^(\d{2})\s*-\s*(\d{4})\s*-\s*(.+)$",
     re.IGNORECASE,
 )
 # Pattern 1c: MM - YYYY Genre (missing second dash — early 2023 edge case, no energy)
 _DIR_RE_V1_NO_DASH = re.compile(
-    rf"^(\d{{2}})\s*-\s*(\d{{4}})\s+(.+)$",
+    r"^(\d{2})\s*-\s*(\d{4})\s+(.+)$",
     re.IGNORECASE,
 )
 
@@ -45,7 +45,7 @@ _DIR_RE_V2 = re.compile(
     re.IGNORECASE,
 )
 _DIR_RE_V2_NO_ENERGY = re.compile(
-    rf"^(\d{{4}})\s*-\s*(\d{{2}})\s*-\s*(.+)$",
+    r"^(\d{4})\s*-\s*(\d{2})\s*-\s*(.+)$",
     re.IGNORECASE,
 )
 

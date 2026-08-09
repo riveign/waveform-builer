@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from kiku.setbuilder.camelot import harmonic_score, parse_camelot
+from kiku.setbuilder.camelot import parse_camelot
 from kiku.setbuilder.scoring import genre_to_family
-
 
 # ── Per-Transition Teaching ─────────────────────────────────────────────
 

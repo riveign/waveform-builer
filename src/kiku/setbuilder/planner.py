@@ -13,10 +13,10 @@ from kiku.config import ARTIST_COOLDOWN, DEFAULT_BEAM_WIDTH
 from kiku.db.models import Set, SetTrack, Track
 from kiku.db.store import get_track_by_title
 from kiku.energy import get_track_energy
+from kiku.set_roles import has_role
 from kiku.setbuilder.camelot import harmonic_score
 from kiku.setbuilder.constraints import EnergyProfile
 from kiku.setbuilder.scoring import bpm_compatibility, transition_score, vibe_continuity
-from kiku.set_roles import has_role
 from kiku.vibe import resolve_vibe
 
 console = Console()
@@ -277,10 +277,11 @@ def build_set(
                 # BPM pre-filter (±12% to allow some flexibility)
                 if current.bpm and cand.bpm:
                     ratio = cand.bpm / current.bpm
-                    if ratio < 0.88 or ratio > 1.12:
-                        # Also allow double/half time
-                        if not (0.47 < ratio < 0.53 or 1.88 < ratio < 2.12):
-                            continue
+                    # Outside ±12%, and not double/half time either.
+                    if (ratio < 0.88 or ratio > 1.12) and not (
+                        0.47 < ratio < 0.53 or 1.88 < ratio < 2.12
+                    ):
+                        continue
 
                 score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts, target_vibe=target_vibe, vibe_strength=vibe_intensity, preferred_artists=preferred_artists, artist_intensity=artist_intensity)
 

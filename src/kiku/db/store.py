@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Optional
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from kiku.db.models import AudioFeatures, Track, TransitionCue
+from kiku.db.models import (
+    AudioFeatures,
+    HuntSession,
+    HuntTrack,
+    OAuthToken,
+    Set,
+    SetTrack,
+    Track,
+    TransitionCue,
+)
 
 
 def fuzzy_search_tracks(
@@ -49,7 +57,7 @@ def fuzzy_search_tracks(
     return tracks, len(top_ids)
 
 
-def get_track_by_title(session: Session, title: str) -> Optional[Track]:
+def get_track_by_title(session: Session, title: str) -> Track | None:
     """Find a track by title (case-insensitive partial match)."""
     return (
         session.query(Track)
@@ -233,8 +241,9 @@ def library_stats(session: Session) -> dict:
     )
 
     # Energy distribution — uses resolved zones from all sources
-    from kiku.energy import get_track_energy
     from collections import Counter
+
+    from kiku.energy import get_track_energy
     all_tracks = session.query(Track).all()
     zone_counts: Counter[str] = Counter()
     for t in all_tracks:
@@ -336,7 +345,6 @@ def add_track_to_set(
 
     Returns the updated list of SetTrack objects sorted by position.
     """
-    from kiku.db.models import Set, SetTrack
 
     set_ = session.get(Set, set_id)
     if not set_:
@@ -375,7 +383,6 @@ def remove_track_from_set(session: Session, set_id: int, track_id: int) -> bool:
 
     Returns True if removed, False if not found.
     """
-    from kiku.db.models import Set, SetTrack
 
     set_ = session.get(Set, set_id)
     if not set_:
@@ -413,7 +420,6 @@ def reorder_set_tracks(
     Returns the updated list of SetTrack objects sorted by position.
     Raises ValueError if track_ids don't match the set's tracks.
     """
-    from kiku.db.models import Set, SetTrack
 
     set_ = session.get(Set, set_id)
     if not set_:
@@ -464,7 +470,6 @@ def replace_track_in_set(
     Returns the updated list of SetTrack objects sorted by position.
     Raises ValueError if set, position, or track not found.
     """
-    from kiku.db.models import Set, SetTrack
 
     set_ = session.get(Set, set_id)
     if not set_:
@@ -493,7 +498,6 @@ def replace_track_in_set(
 
 def get_set_waveform_data(session: Session, set_id: int) -> list[dict]:
     """Bulk load waveform overviews for all tracks in a set."""
-    from kiku.db.models import Set, SetTrack
 
     set_ = session.get(Set, set_id)
     if not set_:
@@ -546,7 +550,6 @@ def get_tinder_queue(
         )
     elif include_conflicts:
         # Include auto-predicted AND conflict tracks
-        from kiku.analysis.autotag import ZONE_MAP
         q = session.query(Track).filter(
             Track.energy_predicted.isnot(None),
             or_(
@@ -610,9 +613,8 @@ def save_tinder_decision(
 def create_hunt_session(
     session: Session, url: str, platform: str, title: str | None = None,
     uploader: str | None = None,
-) -> "HuntSession":
+) -> HuntSession:
     """Create a new hunt session."""
-    from kiku.db.models import HuntSession
 
     hunt = HuntSession(url=url, platform=platform, title=title, uploader=uploader)
     session.add(hunt)
@@ -620,9 +622,8 @@ def create_hunt_session(
     return hunt
 
 
-def get_hunt_session(session: Session, hunt_id: int) -> "HuntSession | None":
+def get_hunt_session(session: Session, hunt_id: int) -> HuntSession | None:
     """Get a hunt session by ID with tracks eagerly loaded."""
-    from kiku.db.models import HuntSession
 
     return session.query(HuntSession).filter_by(id=hunt_id).first()
 
@@ -631,7 +632,6 @@ def list_hunt_sessions(session: Session, limit: int = 20, offset: int = 0) -> tu
     """List hunt sessions ordered by creation date desc."""
     from sqlalchemy import func
 
-    from kiku.db.models import HuntSession
 
     total = session.query(func.count(HuntSession.id)).scalar() or 0
     hunts = (
@@ -650,7 +650,6 @@ def save_hunt_tracks(
     """Save extracted tracks to a hunt session."""
     import json
 
-    from kiku.db.models import HuntSession, HuntTrack
 
     hunt = session.query(HuntSession).filter_by(id=hunt_id).first()
     if not hunt:
@@ -687,9 +686,8 @@ def save_hunt_tracks(
 
 def update_hunt_track_status(
     session: Session, hunt_track_id: int, status: str,
-) -> "HuntTrack | None":
+) -> HuntTrack | None:
     """Update acquisition status of a hunt track (e.g. 'wanted', 'owned')."""
-    from kiku.db.models import HuntTrack
 
     ht = session.query(HuntTrack).filter_by(id=hunt_track_id).first()
     if ht:
@@ -706,9 +704,8 @@ def save_oauth_token(
     refresh_token: str | None = None, expires_at: str | None = None,
     user_id: str | None = None, username: str | None = None,
     avatar_url: str | None = None,
-) -> "OAuthToken":
+) -> OAuthToken:
     """Create or update an OAuth token for a provider."""
-    from kiku.db.models import OAuthToken
 
     token = session.query(OAuthToken).filter_by(provider=provider).first()
     if token:
@@ -729,16 +726,14 @@ def save_oauth_token(
     return token
 
 
-def get_oauth_token(session: Session, provider: str) -> "OAuthToken | None":
+def get_oauth_token(session: Session, provider: str) -> OAuthToken | None:
     """Get stored OAuth token for a provider."""
-    from kiku.db.models import OAuthToken
 
     return session.query(OAuthToken).filter_by(provider=provider).first()
 
 
 def delete_oauth_token(session: Session, provider: str) -> bool:
     """Remove stored OAuth token. Returns True if deleted."""
-    from kiku.db.models import OAuthToken
 
     token = session.query(OAuthToken).filter_by(provider=provider).first()
     if token:
@@ -752,9 +747,8 @@ def update_oauth_token(
     session: Session, provider: str,
     access_token: str, refresh_token: str | None = None,
     expires_at: str | None = None,
-) -> "OAuthToken | None":
+) -> OAuthToken | None:
     """Update just the token fields (used after refresh)."""
-    from kiku.db.models import OAuthToken
 
     token = session.query(OAuthToken).filter_by(provider=provider).first()
     if token:

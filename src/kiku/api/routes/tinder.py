@@ -261,9 +261,8 @@ def tinder_retrain(db: Session = Depends(get_db)):
 
 def _generate_teaching_moment(track: Track, override_zone: str | None) -> str | None:
     """Generate a one-sentence teaching moment when the DJ overrides a prediction."""
-    from pathlib import Path
 
-    from kiku.analysis.autotag import META_FILENAME, DEFAULT_MODEL_DIR
+    from kiku.analysis.autotag import DEFAULT_MODEL_DIR, META_FILENAME
 
     meta_path = DEFAULT_MODEL_DIR / META_FILENAME
     if not meta_path.exists():

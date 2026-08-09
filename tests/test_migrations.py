@@ -9,13 +9,13 @@ of truth" an invariant instead of an intention.
 from __future__ import annotations
 
 import pytest
-from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.pool import NullPool
 
+from alembic import command
 from kiku.config import PROJECT_ROOT
 from kiku.db.models import Base
 

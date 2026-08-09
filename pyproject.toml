@@ -72,6 +72,7 @@ dev = [
     "kiku[ml]",
     "pytest>=7.0",
     "pytest-cov",
+    "ruff>=0.16",
 ]
 
 [project.scripts]
@@ -79,3 +80,35 @@ kiku = "kiku.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Ruff's default rule set, minus the rules below. Two categories:
+#
+#   (a) wrong for this codebase — a false positive we should not paper over
+#       individually at 87 call sites;
+#   (b) real, deferred, and tracked. These are backlog items in
+#       docs/notes/PLN-001, not decisions that the code is fine. Removing an
+#       entry here is how that backlog gets worked off — delete the line, see
+#       what CI says.
+ignore = [
+    # (a)
+    "B008",    # function-call-in-default-argument — this IS FastAPI's idiom:
+               # Depends(), File(), Form() belong in defaults.
+    # (b) tracked in PLN-001/Q
+    "BLE001",  # blind-except (49) — CLM-003/E4b. Each needs a judgement about
+               # which exception is actually expected; that is its own pass.
+    "S110",    # try-except-pass (13) — same family as BLE001.
+    "DTZ005",  # datetime.now() without tzinfo (17) — the codebase stores naive
+               # local ISO strings throughout; changing that is a data decision.
+    "C408",    # dict()/list() instead of literals (105) — purely cosmetic churn.
+    "RUF059",  # unused unpacked variable (15) — mostly `for _k, v in` shapes.
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Migrations are append-only history: fixing style in an applied revision changes
+# a file whose whole value is that it has not changed.
+"alembic/versions/*" = ["I001", "UP035", "UP007"]

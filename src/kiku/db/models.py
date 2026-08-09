@@ -329,8 +329,9 @@ def _init_schema():
     if _schema_initialized:
         return
 
-    from alembic import command
     from sqlalchemy import inspect
+
+    from alembic import command
 
     engine = get_engine()
     tables = set(inspect(engine).get_table_names())

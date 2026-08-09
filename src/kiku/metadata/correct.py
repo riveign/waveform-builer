@@ -9,7 +9,7 @@ changes. Nothing here writes without an explicit field allow-list.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -214,5 +214,5 @@ def _record_source(session: Session, album_key: str, candidate: ReleaseCandidate
     md.source_ref = candidate.source_id
     if candidate.source == "musicbrainz":
         md.mb_release_id = candidate.source_id
-    md.last_matched_at = datetime.utcnow()
+    md.last_matched_at = datetime.now(UTC).replace(tzinfo=None)
     md.match_status = "applied"

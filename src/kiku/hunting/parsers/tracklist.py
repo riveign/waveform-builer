@@ -325,6 +325,4 @@ def _looks_like_tracklist_line(line: str) -> bool:
         return False
     # Reject lines with too many words (prose, not track names)
     word_count = len(line.split())
-    if word_count > 15:
-        return False
-    return True
+    return word_count <= 15

@@ -13,7 +13,6 @@ from kiku.energy import (
     get_track_energy,
     numeric_to_zone,
     reset_calibration_cache,
-    _FALLBACK_ZONE_BOUNDARIES,
 )
 
 
@@ -344,7 +343,6 @@ class TestGetTrackEnergy:
 class TestCalibrationCache:
     def test_reset_clears_cache(self):
         """After reset, calibration is reloaded on next access."""
-        from kiku.energy import _calibration_loaded
         reset_calibration_cache()
         from kiku import energy
         assert energy._calibration_loaded is False

@@ -6,7 +6,6 @@ import hashlib
 import json
 import sys
 from datetime import datetime
-from pathlib import Path
 
 import click
 from rich.console import Console
@@ -28,7 +27,7 @@ def _file_hash(path: str, chunk_size: int = 1024 * 1024) -> str | None:
         with open(path, "rb") as f:
             h.update(f.read(chunk_size))
         return h.hexdigest()
-    except (OSError, IOError):
+    except OSError:
         return None
 
 

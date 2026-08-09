@@ -234,6 +234,7 @@ def test_restore_set(client):
 def test_purge_after_window(client, db_session):
     """A set deleted longer than the window is purged on the next list call."""
     from datetime import datetime, timedelta
+
     from kiku.db.models import Set
 
     s = db_session.get(Set, 1)

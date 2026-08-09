@@ -24,7 +24,7 @@ def db(tmp_path):
     session = sessionmaker(bind=engine)()
     for i in range(1, 4):
         session.add(Track(
-            id=i, title=f"Mangled {i}", artist="A%d hadone" % i,
+            id=i, title=f"Mangled {i}", artist=f"A{i} hadone",
             album="Solar EP", release_year=2020, label="Sunset",
             file_path=f"/m/0{i}.wav", bpm=125.0, key="8A",
         ))

@@ -8,7 +8,7 @@ album_key, and the winning source is recorded on AlbumMetadata for UI attributio
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy.orm import Session
@@ -48,14 +48,14 @@ def embedded_cover_bytes(file_path: str) -> tuple[bytes, str] | None:
                     apic = tags[key]
                     return apic.data, (apic.mime or "image/jpeg")
             # MP4 / M4A
-            if "covr" in tags and tags["covr"]:
+            if tags.get("covr"):
                 return bytes(tags["covr"][0]), "image/jpeg"
 
         # FLAC
         pics = getattr(audio, "pictures", None)
         if pics:
             return pics[0].data, (pics[0].mime or "image/jpeg")
-    except Exception:  # noqa: BLE001 — artwork must never raise to the client
+    except Exception:
         logger.warning("Embedded artwork read failed for %s", file_path, exc_info=True)
         return None
     return None
@@ -82,7 +82,7 @@ def resolve_album_cover(
     album_key: str,
     *,
     transport: httpx.BaseTransport | None = None,
-) -> tuple["object", str] | None:
+) -> tuple[object, str] | None:
     """Resolve an album's cover, caching the winner. Returns (path, source) or None.
 
     `transport` is injected in tests so the network sources stay offline; in
@@ -158,9 +158,9 @@ def _record_source(
         md = AlbumMetadata(album_key=album_key, album=album, album_artist=artist)
         session.add(md)
     md.cover_source = source
-    md.cover_fetched_at = datetime.utcnow()
+    md.cover_fetched_at = datetime.now(UTC).replace(tzinfo=None)
     try:
         session.commit()
-    except Exception:  # noqa: BLE001 — provenance write must not break image serving
+    except Exception:
         logger.warning("Failed to record cover_source for %s", album_key, exc_info=True)
         session.rollback()

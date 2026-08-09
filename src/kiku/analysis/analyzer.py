@@ -7,13 +7,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 from rich.console import Console
 from rich.progress import Progress
 
 from kiku.db.models import AudioFeatures, Track, get_session
 from kiku.db.paths import normalize_path
-from kiku.db.store import get_track_by_title, get_unanalyzed_tracks, get_partially_analyzed_tracks
+from kiku.db.store import get_partially_analyzed_tracks, get_track_by_title, get_unanalyzed_tracks
 
 console = Console()
 

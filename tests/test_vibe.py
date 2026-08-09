@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import kiku.vibe as vibe
+from kiku import vibe
 from kiku.setbuilder.planner import _end_affinity, _end_pull, _make_vibe_arc
 from kiku.setbuilder.scoring import vibe_continuity, vibe_target_fit, vibe_term
 from kiku.vibe import (
