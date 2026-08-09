@@ -22,6 +22,13 @@ the cost per feature rising? Covers composability, testing, and structural growt
 - **D3 · Cost curve.** How effort-per-feature trends over time. Flat is healthy; rising is
   the definition of accumulating debt.
 
+> **Re-check 2026-08-09.** K4's diagnosis stands but its premise is being dismantled:
+> [[PLN-001]] P1–P3 shipped, so **D2 is no longer empty** — four gates now run on every
+> push (`OBS-002/K5`). E3's inventory is stale in three rows: gates, migrations-as-
+> authority, and lock/manifest are all now yes. E2's edit-counts are unchanged, so K2
+> still holds and P5–P7 are still the work. E4b was fixed only in part: the 49 blind
+> excepts are deferred *visibly*, in `pyproject.toml`'s ignore list (`OBS-002/K6`).
+
 ## E — Evidence
 
 Inherited across `OBS-001` … `OBS-008`. Consolidated:

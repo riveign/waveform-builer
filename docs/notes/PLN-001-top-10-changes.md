@@ -34,7 +34,7 @@ pace of `OBS-001/E7`.
 |---|--------|--------------|-----------|---------------|
 | **P1** ✅ | Make the schema reproducible — *done 2026-08-09* | `CLM-004/K1,K4`, `OBS-003/K2` | 1–2 d | P3, all deployment |
 | **P2** ✅ | Pin the environment — *done 2026-08-09* | `OBS-007/K2,K3` | 1 d | P3 |
-| **P3** | One CI workflow | `OBS-002/K1`, `CLM-004/R3` | 1 d | P7, P8, everything's durability |
+| **P3** ✅ | One CI workflow — *done 2026-08-09* | `OBS-002/K1`, `CLM-004/R3` | 1 d | P7, P8, everything's durability |
 | **P4** | A real route table with URL state | `OBS-004/K3,K4`, `CLM-002/K3` | 3–5 d | P6, P8; deep links |
 | **P5** | `createResource` — one data-orchestration rune | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
 | **P6** | The four missing structural primitives | `OBS-008/K2,K3` | 3–4 d | collapses ~2,700 LOC |
@@ -63,19 +63,20 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 - `requires-python` → `>=3.11`, not the `>=3.10` planned here: `tomllib` at `config.py:8` is the real floor (`OBS-007/R1`). `.python-version` → 3.13.
 - `dev` extra now pulls `api` + `hunting` + `ml` + `rekordbox` (`OBS-007/E5` closed).
 - New `ml` extra — scikit-learn + joblib, kept out of `analysis`.
-- `scripts/setup.sh` = `uv sync --extra dev` + `npm ci`; README and `dev.sh` point at it.
+- `scripts/setup.sh` = `uv sync --extra dev --extra analysis` + `npm ci` (`--lean` to skip audio); README and `dev.sh` point at it.
 - **Found by building from scratch:** `python-multipart` and `scikit-learn`/`joblib` were undeclared — `kiku autotag` and every API test fail on a clean install (`OBS-007/R2`).
 - **Also found:** the `analysis` extra was uninstallable — essentia floor-resolved to a cp314-only wheel, then numba escaped back to a 2021 build needing Python <3.10 (`OBS-007/R3`). Both pinned.
 - **`.venv` converged onto the lock** — one environment, not a lock plus a hand-built venv beside it.
 - **Verified:** clean clone → setup → 429 tests, `svelte-check` 0/0 over 341 files, `kiku stats` builds its own DB; essentia/librosa import and the real library still reports 4,328 tracks.
 
-### P3 — One CI workflow
+### P3 — One CI workflow ✅ **DONE 2026-08-09**
 
-- `.github/workflows/ci.yml` on push + PR: `pytest` · `svelte-check` · `ruff check`/`format --check` · P1's migration test · `vite build`.
-- Add `[tool.ruff]`; take the default rule set and `--fix`. Do not hand-tune rules first, or this becomes a week.
-- Enable ruff `BLE`/`TRY` to catch the 63 `except Exception` blocks (`CLM-003/K5b`).
-- **Done when:** a PR with a deliberate type error is red.
-- **First catches:** the 10 `datetime.utcnow()` deprecations (`OBS-002/E10`).
+- Two jobs, push-to-main + every PR, superseded runs cancelled. **backend:** `uv sync --frozen` · `ruff check` · `ruff format --check` · `pytest`. **frontend:** `npm ci` · `svelte-check` · `vite build`.
+- All 479 ruff findings cleared — 98 autofixed, rest by hand. Real ones: 6 `F821`, 3 dead assignments, a `subprocess.run` without `check=` (`OBS-002/R1`).
+- The 4 `datetime.utcnow()` deprecations fixed; suite warnings 11 → 1.
+- Codebase `ruff format`ted in its own commit, with `.git-blame-ignore-revs` so blame still names whoever changed a line's *meaning*.
+- **Deferred, not blessed:** `BLE001` (49) · `S110` · `DTZ005` · `C408` · `RUF059` sit in `lint.ignore` with counts and reasons. Deleting an entry is how the backlog gets scheduled (`OBS-002/K6`).
+- **Verified by breaking each gate:** unused import → lint red · reformatted function → format red · ORM column with no migration → `Detected added column 'tracks.ci_canary'`, test red · `$state<Tab>(42)` → svelte-check red.
 
 ### P4 — A real route table with URL state
 

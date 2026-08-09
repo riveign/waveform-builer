@@ -11,6 +11,10 @@ superseded-by: null
 
 What stops a bad change from reaching `main` today, and what does not.
 
+> **Re-check 2026-08-09 — partly resolved by [[PLN-001]]/P3.** E1–E10 record the state
+> `CLM-001` and `CLM-003` derive from. **K1 no longer holds**: the gate count is now four,
+> not zero. See **K5**. E2 (zero frontend tests) still stands — that is P8.
+
 ## D — Definitions
 
 - **D1 · Gate.** A check that runs *without being remembered* — i.e. enforced by CI, a
@@ -52,7 +56,27 @@ What stops a bad change from reaching `main` today, and what does not.
 - **K4.** E10 is the signature of missing gates: warnings that a CI run would surface
   weekly instead accumulate silently for months.
 
+- **K5 · Resolved 2026-08-09 — the gate count is four.** `.github/workflows/ci.yml` runs
+  on push-to-main and every PR: `ruff check` · `ruff format --check` · `pytest` (including
+  the P1 migration invariant) · `svelte-check` + `vite build`. Each was verified by being
+  broken on purpose. Closes E4, E6, E7 and, by construction, E10 — the four
+  `datetime.utcnow()` calls were fixed as part of clearing lint.
+- **R1 · The 479 lint findings were mostly noise, but not entirely.** Fixed: 6 `F821`
+  undefined-name in `db/store.py` (quoted annotations over function-local imports; the
+  14 local imports were unnecessary since `models.py` never imports `store.py`), 3 dead
+  assignments, and a `subprocess.run` with no `check=`. Five rules are ignored with written
+  reasons in `pyproject.toml`: `B008` as a genuine false positive (FastAPI's `Depends()`
+  idiom), and `BLE001`/`S110`/`DTZ005`/`C408`/`RUF059` as real-but-deferred.
+- **K6** [R1] ⇒ The deferred ignores are the honest form of a backlog: each entry names a
+  count and a reason, and *deleting the line is how the work gets scheduled*. This keeps
+  `CLM-003/K5b` (the 49 blind excepts) visible rather than silently blessed.
+- **K7 · E8 is unchanged and now cheap to close.** Coverage is still unmeasured; with a
+  gate in place, adding `--cov-fail-under` is a one-line change whenever a number is wanted.
+
 ## Q — Open
 
 - **Q1.** What is actual backend line coverage? Never measured (E8), so K2's "broad" is
   inferred from test-file topology, not from data.
+- **Q2.** CI runs a single interpreter (3.13). `OBS-007/Q3` notes that the essentia pin is
+  coupled to the interpreter by wheel tags — a matrix would surface that, at the cost of
+  installing the audio stack in CI.
