@@ -12,6 +12,10 @@ superseded-by: null
 Whether the declared environment matches the actual one, and whether a second machine
 could reproduce it.
 
+> **Re-check 2026-08-09 — resolved by [[PLN-001]]/P2.** E1–E9 record the state that
+> motivated the fix; `CLM-001` and `CLM-004` derive from them. What changed is in **K6**,
+> and **K2 was wrong** — see R1.
+
 ## E — Evidence
 
 - **E1 · Declared Python floor is 3.9; actual interpreter is 3.13.12.**
@@ -63,7 +67,36 @@ could reproduce it.
 - **K5 · E8 shows the author's instincts are right.** `dev.sh` is exactly the ergonomics
   that E7 is missing at the next level up; the gap is scope, not care.
 
+- **R1 · K2 understated the floor.** K2 said the true minimum was 3.10, reasoning only from
+  PEP 604 unions. `config.py:8` imports `tomllib` at module level, which is stdlib from
+  **3.11**. No `match` statements and no 3.12+ syntax exist, so 3.11 is exact. Declared as
+  `>=3.11`; `.python-version` pins 3.13 to match the working interpreter.
+- **R2 · Two dependencies were undeclared and only a clean install could reveal them.**
+  Both were present in the author's `.venv` by accident and absent from `pyproject.toml`:
+  - `python-multipart` — `sets.py:110` takes an `UploadFile`, and FastAPI raises at import
+    time without it. Every API test errored at collection in a clean clone.
+  - `scikit-learn` + `joblib` — `analysis/autotag.py:281,412` train and persist the energy
+    model. `kiku autotag` would have failed on any fresh install, on any machine.
+- **K6 · Resolved 2026-08-09.**
+  - `requires-python = ">=3.11"` (R1); `.python-version` → 3.13.
+  - `uv.lock` committed: 100 packages, all extras including `analysis`.
+  - `dev` extra now pulls `api` + `hunting` + `ml` + `rekordbox`, so `pytest` runs from a
+    single install — closes E5.
+  - New `ml` extra (scikit-learn, joblib), separate from `analysis` because model training
+    reads DB features rather than audio.
+  - `scripts/setup.sh`: `uv sync --extra dev` + `npm ci`, passing extra args through.
+    README and `dev.sh` preflight both point at it.
+  - Verified from a clean clone: setup → **429 tests pass**, `svelte-check` 0/0 across 341
+    files, and `kiku stats` builds its own database and reports an empty library.
+- **K7** [R2] ⇒ The two undeclared dependencies are the same failure as `OBS-003/R1,R2`:
+  a divergence between the described system and the running one, invisible from inside the
+  author's machine, surfaced immediately once something built the project from scratch. The
+  general form of `CLM-003/K4`.
+
 ## Q — Open
 
-- **Q1.** Is `uv` acceptable as the pin/lock tool, given `dev.sh` currently assumes a plain
-  `.venv`? Changing this touches the one script that works well.
+- ~~**Q1.** Is `uv` acceptable as the pin/lock tool?~~ Yes — adopted, and `dev.sh` keeps its
+  shape; only its preflight message changed.
+- **Q2.** `uv sync` makes `.venv` match the requested extras exactly, so running
+  `setup.sh` without `--extra analysis` removes essentia/librosa from an environment that
+  had them. Documented in the script's output; worth revisiting if it bites.

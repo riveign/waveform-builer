@@ -55,6 +55,15 @@ what is actually limiting the project, so [[PLN-001]] has an ordering principle.
 
 ## K — Conclusions
 
+> **Re-check 2026-08-09 — K1 no longer holds.** `PLN-001`/P1 and P2 both shipped, and a
+> clean clone now goes from `git clone` to a passing suite and a self-building database
+> with one command (`OBS-003/K6`, `OBS-007/K6`). R2's blocker is gone: **CI is now
+> implementable**, which makes P3 the next thing rather than the impossible thing.
+> R4's deployment stories are likewise unblocked. K2's prediction held — relieving the
+> constraint took two days and surfaced five latent defects on the way (`OBS-003/R1,R2`,
+> `OBS-007/R2`), each of which had been invisible precisely because nothing ever built
+> the project from scratch.
+
 - **K1 · The binding constraint: the repository cannot produce a running Kiku on a clean
   machine.** Schema (E1) and environment (E2) are both underspecified.
 - **K2 · It is cheap to relieve (R7) and it gates the two most valuable things available**

@@ -33,7 +33,7 @@ pace of `OBS-001/E7`.
 | # | Change | Derives from | Cost | Unblocks  |
 |---|--------|--------------|-----------|---------------|
 | **P1** ✅ | Make the schema reproducible — *done 2026-08-09* | `CLM-004/K1,K4`, `OBS-003/K2` | 1–2 d | P3, all deployment |
-| **P2** | Pin the environment | `OBS-007/K2,K3` | 1 d | P3 |
+| **P2** ✅ | Pin the environment — *done 2026-08-09* | `OBS-007/K2,K3` | 1 d | P3 |
 | **P3** | One CI workflow | `OBS-002/K1`, `CLM-004/R3` | 1 d | P7, P8, everything's durability |
 | **P4** | A real route table with URL state | `OBS-004/K3,K4`, `CLM-002/K3` | 3–5 d | P6, P8; deep links |
 | **P5** | `createResource` — one data-orchestration rune | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
@@ -57,14 +57,15 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 - **Also:** `tests/conftest.py` now redirects `KIKU_DB_PATH`; a bare `pytest` was migrating the real library.
 - **Result:** 429 tests pass; real 4,328-track library upgraded, `integrity_check: ok`.
 
-### P2 — Pin the environment
+### P2 — Pin the environment ✅ **DONE 2026-08-09**
 
-- Adopt `uv` (or `pip-tools`); commit a Python lockfile. npm already has one.
-- `requires-python` → `>=3.10`; the declared 3.9 is contradicted by 523 unions (`OBS-007/K2`).
-- Fix the `dev` extra to include `api` + `hunting` test deps (`OBS-007/E5`).
-- Add `.python-version`.
-- **Done when:** a scripted clean-clone install gives passing `pytest` + `svelte-check`, no manual step.
-- **Keep:** `dev.sh` works well (`OBS-007/K5`) — change what it installs, not how it runs.
+- `uv.lock` committed — 100 packages, all extras.
+- `requires-python` → `>=3.11`, not the `>=3.10` planned here: `tomllib` at `config.py:8` is the real floor (`OBS-007/R1`). `.python-version` → 3.13.
+- `dev` extra now pulls `api` + `hunting` + `ml` + `rekordbox` (`OBS-007/E5` closed).
+- New `ml` extra — scikit-learn + joblib, kept out of `analysis`.
+- `scripts/setup.sh` = `uv sync --extra dev` + `npm ci`; README and `dev.sh` point at it.
+- **Found by building from scratch:** `python-multipart` and `scikit-learn`/`joblib` were undeclared — `kiku autotag` and every API test fail on a clean install (`OBS-007/R2`).
+- **Verified:** clean clone → setup → 429 tests, `svelte-check` 0/0 over 341 files, `kiku stats` builds its own DB.
 
 ### P3 — One CI workflow
 
