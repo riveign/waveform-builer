@@ -18,23 +18,23 @@ import type {
 } from '$lib/types';
 import { API_BASE, fetchJson } from './client';
 
-export async function listSets(search?: string, limit = 20): Promise<DJSet[]> {
+export async function listSets(search?: string, limit = 20, signal?: AbortSignal): Promise<DJSet[]> {
 	const qs = new URLSearchParams();
 	if (search) qs.set('search', search);
 	qs.set('limit', String(limit));
-	return fetchJson<DJSet[]>(`/api/sets?${qs}`);
+	return fetchJson<DJSet[]>(`/api/sets?${qs}`, { signal });
 }
 
-export async function getSet(id: number): Promise<SetDetail> {
-	return fetchJson<SetDetail>(`/api/sets/${id}`);
+export async function getSet(id: number, signal?: AbortSignal): Promise<SetDetail> {
+	return fetchJson<SetDetail>(`/api/sets/${id}`, { signal });
 }
 
-export async function getSetWaveforms(id: number): Promise<SetWaveformTrack[]> {
-	return fetchJson<SetWaveformTrack[]>(`/api/sets/${id}/waveforms`);
+export async function getSetWaveforms(id: number, signal?: AbortSignal): Promise<SetWaveformTrack[]> {
+	return fetchJson<SetWaveformTrack[]>(`/api/sets/${id}/waveforms`, { signal });
 }
 
-export async function getTransition(setId: number, index: number): Promise<TransitionDetail> {
-	return fetchJson<TransitionDetail>(`/api/sets/${setId}/transition/${index}`);
+export async function getTransition(setId: number, index: number, signal?: AbortSignal): Promise<TransitionDetail> {
+	return fetchJson<TransitionDetail>(`/api/sets/${setId}/transition/${index}`, { signal });
 }
 
 export async function getCues(setId: number, trackId: number): Promise<Cue[]> {
@@ -78,8 +78,8 @@ export async function deleteSet(id: number): Promise<void> {
 }
 
 /** List soft-deleted sets (the trash), most recently deleted first. */
-export async function getDeletedSets(): Promise<DJSet[]> {
-	return fetchJson<DJSet[]>('/api/sets/deleted');
+export async function getDeletedSets(signal?: AbortSignal): Promise<DJSet[]> {
+	return fetchJson<DJSet[]>('/api/sets/deleted', { signal });
 }
 
 /** Recover a soft-deleted set from the trash. */

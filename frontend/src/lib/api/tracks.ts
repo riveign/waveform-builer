@@ -21,7 +21,7 @@ export interface SearchParams {
 	offset?: number;
 }
 
-export async function searchTracks(params: SearchParams): Promise<PaginatedTracks> {
+export async function searchTracks(params: SearchParams, signal?: AbortSignal): Promise<PaginatedTracks> {
 	const qs = new URLSearchParams();
 	for (const [k, v] of Object.entries(params)) {
 		if (v === undefined || v === null || v === '') continue;
@@ -33,7 +33,7 @@ export async function searchTracks(params: SearchParams): Promise<PaginatedTrack
 			qs.set(k, String(v));
 		}
 	}
-	return fetchJson<PaginatedTracks>(`/api/tracks/search?${qs}`);
+	return fetchJson<PaginatedTracks>(`/api/tracks/search?${qs}`, { signal });
 }
 
 export async function autocompleteArtists(q: string, limit = 20): Promise<string[]> {
@@ -46,12 +46,12 @@ export async function autocompleteLabels(q: string, limit = 20): Promise<string[
 	return fetchJson<string[]>(`/api/tracks/autocomplete/labels?${qs}`);
 }
 
-export async function getTrack(id: number): Promise<Track> {
-	return fetchJson<Track>(`/api/tracks/${id}`);
+export async function getTrack(id: number, signal?: AbortSignal): Promise<Track> {
+	return fetchJson<Track>(`/api/tracks/${id}`, { signal });
 }
 
-export async function getTrackFeatures(id: number): Promise<TrackFeatures> {
-	return fetchJson<TrackFeatures>(`/api/tracks/${id}/features`);
+export async function getTrackFeatures(id: number, signal?: AbortSignal): Promise<TrackFeatures> {
+	return fetchJson<TrackFeatures>(`/api/tracks/${id}/features`, { signal });
 }
 
 export async function updateTrackRating(trackId: number, rating: number): Promise<Track> {
@@ -74,8 +74,8 @@ export function getTrackArtworkUrl(id: number): string {
 	return `${API_BASE}/api/tracks/${id}/artwork`;
 }
 
-export async function getTrackSets(id: number): Promise<TrackSetAppearance[]> {
-	return fetchJson<TrackSetAppearance[]>(`/api/tracks/${id}/sets`);
+export async function getTrackSets(id: number, signal?: AbortSignal): Promise<TrackSetAppearance[]> {
+	return fetchJson<TrackSetAppearance[]>(`/api/tracks/${id}/sets`, { signal });
 }
 
 export async function suggestNext(
@@ -83,7 +83,8 @@ export async function suggestNext(
 	n = 10,
 	genreFilter?: string,
 	weights?: ScoringWeights,
-	setId?: number
+	setId?: number,
+	signal?: AbortSignal
 ): Promise<SuggestNextResponse> {
 	const qs = new URLSearchParams({ n: String(n) });
 	if (setId !== undefined) qs.set('set_id', String(setId));
@@ -95,7 +96,7 @@ export async function suggestNext(
 		qs.set('w_genre_coherence', String(weights.genre_coherence));
 		qs.set('w_track_quality', String(weights.track_quality));
 	}
-	return fetchJson<SuggestNextResponse>(`/api/tracks/${trackId}/suggest-next?${qs}`);
+	return fetchJson<SuggestNextResponse>(`/api/tracks/${trackId}/suggest-next?${qs}`, { signal });
 }
 
 // ── Track Affinity API ──
@@ -127,8 +128,9 @@ export async function removeTrackAffinity(
 }
 
 export async function getTrackAffinities(
-	trackId: number
+	trackId: number,
+	signal?: AbortSignal
 ): Promise<TrackAffinity[]> {
-	const res = await fetchJson<{ affinities: TrackAffinity[] }>(`/api/tracks/${trackId}/affinities`);
+	const res = await fetchJson<{ affinities: TrackAffinity[] }>(`/api/tracks/${trackId}/affinities`, { signal });
 	return res.affinities ?? [];
 }

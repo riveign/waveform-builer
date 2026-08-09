@@ -183,7 +183,7 @@ export async function applyAlbumCorrection(
 	});
 }
 
-export async function listAlbums(params: ListAlbumsParams = {}): Promise<PaginatedAlbums> {
+export async function listAlbums(params: ListAlbumsParams = {}, signal?: AbortSignal): Promise<PaginatedAlbums> {
 	const qs = new URLSearchParams();
 	for (const [k, v] of Object.entries(params)) {
 		if (v === undefined || v === null || v === '') continue;
@@ -193,11 +193,11 @@ export async function listAlbums(params: ListAlbumsParams = {}): Promise<Paginat
 			qs.set(k, String(v));
 		}
 	}
-	return fetchJson<PaginatedAlbums>(`/api/albums?${qs}`);
+	return fetchJson<PaginatedAlbums>(`/api/albums?${qs}`, { signal });
 }
 
-export async function getAlbumTracks(albumKey: string): Promise<AlbumTracks> {
-	return fetchJson<AlbumTracks>(`/api/albums/${albumKey}/tracks`);
+export async function getAlbumTracks(albumKey: string, signal?: AbortSignal): Promise<AlbumTracks> {
+	return fetchJson<AlbumTracks>(`/api/albums/${albumKey}/tracks`, { signal });
 }
 
 export async function matchAlbumMusicBrainz(albumKey: string): Promise<MBMatchResponse> {

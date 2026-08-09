@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { DJSet } from '$lib/types';
 	import { listSets, deleteSet, getDeletedSets, restoreSet } from '$lib/api/sets';
-	import { onMount } from 'svelte';
+	import { createResource, invalidate } from '$lib/data/resource.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
 
@@ -13,10 +13,24 @@
 
 	const TRASH_DAYS = 3;
 
-	let sets = $state<DJSet[]>([]);
-	let loading = $state(true);
 	let search = $state('');
 	let viewMode = $state<'active' | 'trash'>('active');
+
+	// Active sets and trash are two different listings of the same thing, so they
+	// share the `sets:` prefix and invalidate together after any write.
+	const res = createResource(
+		() => ({ mode: viewMode, q: search.trim() }),
+		({ mode, q }, signal) =>
+			mode === 'trash' ? getDeletedSets(signal) : listSets(q || undefined, 200, signal),
+		{
+			key: ({ mode, q }) => `sets:list:${mode}:${q}`,
+			initial: [] as DJSet[],
+			// Retyping re-filters the same list; blanking it on every keystroke flickers.
+			keepPrevious: true,
+		},
+	);
+	const sets = $derived(res.data ?? []);
+	const loading = $derived(res.loading);
 	let confirmDeleteId = $state<number | null>(null);
 	let deletingId = $state<number | null>(null);
 	let restoringId = $state<number | null>(null);
@@ -32,7 +46,7 @@
 		deletingId = s.id;
 		try {
 			await deleteSet(s.id);
-			sets = sets.filter((x) => x.id !== s.id);
+			invalidate('sets:list');
 			onchange?.();
 		} catch {
 			// Leave the set in place if the delete didn't go through.
@@ -47,7 +61,7 @@
 		restoringId = s.id;
 		try {
 			await restoreSet(s.id);
-			sets = sets.filter((x) => x.id !== s.id);
+			invalidate('sets:list');
 			onchange?.();
 		} catch {
 			// Leave it in the trash if restore failed.
@@ -65,30 +79,14 @@
 		return Math.max(0, Math.ceil(TRASH_DAYS - elapsedDays));
 	}
 
-	async function refresh() {
-		loading = true;
-		try {
-			sets = viewMode === 'trash'
-				? await getDeletedSets()
-				: await listSets(search.trim() || undefined, 200);
-		} catch {
-			sets = [];
-		} finally {
-			loading = false;
-		}
-	}
-
 	function switchMode(mode: 'active' | 'trash') {
 		viewMode = mode;
 		search = '';
 		confirmDeleteId = null;
-		refresh();
 	}
 
-	onMount(refresh);
-
 	$effect(() => {
-		if (refreshSignal > 0) refresh();
+		if (refreshSignal > 0) invalidate('sets:list');
 	});
 
 	let filtered = $derived(sets);
@@ -125,7 +123,6 @@
 					class="grid-search"
 					placeholder="Find a set..."
 					bind:value={search}
-					oninput={refresh}
 				/>
 				<Button variant="secondary" size="sm" onclick={() => switchMode('trash')} title="Recently deleted sets">
 					Recently deleted
