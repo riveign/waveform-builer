@@ -70,6 +70,24 @@ What stops a bad change from reaching `main` today, and what does not.
 - **K6** [R1] ⇒ The deferred ignores are the honest form of a backlog: each entry names a
   count and a reason, and *deleting the line is how the work gets scheduled*. This keeps
   `CLM-003/K5b` (the 49 blind excepts) visible rather than silently blessed.
+- **R2 · CI failed on its first real run, and the cause was invisible locally.** 102 type
+  errors across 22 files, all cascading from `Cannot find module
+  '$lib/data/resource.svelte'`. `.gitignore` carried a bare `data/` for the root SQLite
+  directory; unanchored, it also matched `frontend/src/lib/data/`, so four P5 commits
+  landed the call sites while omitting the module they import. `git add -A` reported
+  nothing wrong, because the path was *ignored*, not missed. Fixed by anchoring every
+  root-only pattern (`/data/`, `/models/`, `/outputs/`, `/tmp/`, `/dist/`, `/build/`,
+  `/venv/`, `/env/`, `/.specs/`); `__pycache__`, `.eggs` and `.pytest_cache` stay
+  unanchored because they genuinely occur at any depth.
+- **K8** [R2] ⇒ This is the strongest available evidence for `CLM-003/K4`, and it arrived
+  by itself. Local verification had been thorough — type-check, build, a browser driving
+  the real library — and every bit of it passed, because all of it ran against a working
+  tree containing an untracked file. **Only a clean checkout could see the defect, and
+  nothing in the project had ever performed one.** The gate found the bug on its first
+  attempt, which is roughly the best return a day of work can have.
+- **K9** [R2] ⇒ Corollary worth keeping: a gate that has never run is not a gate. P3 was
+  "done" locally for several hours while shipping a frontend that could not build.
+
 - **K7 · E8 is unchanged and now cheap to close.** Coverage is still unmeasured; with a
   gate in place, adding `--cov-fail-under` is a one-line change whenever a number is wanted.
 

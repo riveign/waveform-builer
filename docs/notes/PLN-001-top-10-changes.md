@@ -77,6 +77,7 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 - Codebase `ruff format`ted in its own commit, with `.git-blame-ignore-revs` so blame still names whoever changed a line's *meaning*.
 - **Deferred, not blessed:** `BLE001` (49) · `S110` · `DTZ005` · `C408` · `RUF059` sit in `lint.ignore` with counts and reasons. Deleting an entry is how the backlog gets scheduled (`OBS-002/K6`).
 - **Verified by breaking each gate:** unused import → lint red · reformatted function → format red · ORM column with no migration → `Detected added column 'tracks.ci_canary'`, test red · `$state<Tab>(42)` → svelte-check red.
+- **First real run caught a live bug** (`OBS-002/R2`): an unanchored `data/` in `.gitignore` had kept `frontend/src/lib/data/resource.svelte.ts` — the whole P5 rune — out of every commit. Green locally, unbuildable on a clean checkout. Fixed in `2e54793`; CI green on run 2.
 
 ### P4 — A real route table with URL state ✅ **DONE 2026-08-09**
 
