@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pyrekordbox.rbxml import RekordboxXml
-
 from kiku.config import DATA_DIR
 from kiku.db.models import Set
 from kiku.export.utils import export_path
@@ -56,6 +54,11 @@ def export_set_to_xml(
     str
         Path to the written XML file.
     """
+    # pyrekordbox is the optional `rekordbox` extra. Imported here rather than at
+    # module scope so that installing only `[api]` — which the API routes import —
+    # still lets the app start; you only need it to actually export.
+    from pyrekordbox.rbxml import RekordboxXml
+
     xml = RekordboxXml(name="Kiku", version="0.1.0", company="")
 
     tracks_in_set = sorted(set_.tracks, key=lambda st: st.position)
