@@ -146,6 +146,14 @@ nothing; it is a style instruction wearing a definition's clothes. Define a term
 the derivation turns on a meaning the reader would not otherwise assume — `D` earns its
 place by being *cited* in an `R` step. If no `R` cites it, delete it.
 
+**K7 · `K` sections are bullets, not prose.** `C`, `A` and `R` are argument and may run to
+sentences — a derivation step has to justify itself. `K` is the part people come back to,
+and it must be scannable in seconds: one bullet per statement, the claim first, the
+citation in brackets at the end. A `PLN` item is the strict case — **Do** as a short bullet
+list, then one line each for **Done when** and the **Falsifier**. If an item needs a
+paragraph to explain itself, the reasoning belongs in `R` and the item is hiding a
+decision that should be its own `DEC`.
+
 ---
 
 ## Q — Open

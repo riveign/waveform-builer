@@ -32,7 +32,7 @@ pace of `OBS-001/E7`.
 
 | # | Change | Derives from | Cost | Unblocks  |
 |---|--------|--------------|-----------|---------------|
-| ~~**P1**~~ | ~~Make the schema reproducible and keep it that way~~ **DONE 2026-08-09** | `CLM-004/K1,K4`, `OBS-003/K2` | 1–2 d | P3, all deployment |
+| **P1** ✅ | Make the schema reproducible — *done 2026-08-09* | `CLM-004/K1,K4`, `OBS-003/K2` | 1–2 d | P3, all deployment |
 | **P2** | Pin the environment | `OBS-007/K2,K3` | 1 d | P3 |
 | **P3** | One CI workflow | `OBS-002/K1`, `CLM-004/R3` | 1 d | P7, P8, everything's durability |
 | **P4** | A real route table with URL state | `OBS-004/K3,K4`, `CLM-002/K3` | 3–5 d | P6, P8; deep links |
@@ -47,165 +47,87 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 
 ---
 
-### P1 — Make the schema reproducible and keep it that way
+### P1 — Make the schema reproducible ✅ **DONE 2026-08-09**
 
-**Do.** Add one repair revision creating `hunt_sessions` and `hunt_tracks` *before*
-`c3d4e5f6a7b8` in the chain (or, if the chain proves easier to rebuild than to patch,
-squash to a single new baseline generated from ORM metadata). Add a `KIKU_DB_PATH`
-environment override in `src/kiku/config.py`, mirroring the existing `KIKU_MUSIC_ROOTS`.
-Remove `Base.metadata.create_all()` from the normal startup path so Alembic is the sole
-authority (`OBS-003/K1`). Then write the invariant test: build a fresh DB from base, and
-assert `compare_metadata` between the migrated schema and `Base.metadata` yields no diff.
-
-**Done-when.** `HOME=<tmp> alembic upgrade head` succeeds on an empty DB, and
-`pytest tests/test_migrations.py` passes.
-
-**Falsifier for the whole approach.** If the ORM/migration diff turns out to be large
-enough that a repair revision is impractical, prefer the squashed-baseline route — the goal
-is the invariant, not the history.
-
-**DONE 2026-08-09** — `OBS-003/K6`. Repair revision `b1c2d3e4f5a6`, FK alignment
-`c2d3e4f5a6b7`, `KIKU_DB_PATH`, `_init_schema()` on Alembic, `tests/test_migrations.py`.
-The invariant test immediately found two further drifts nobody knew about
-(`OBS-003/R1,R2`). 429 tests pass; the real library upgrades with integrity intact.
-**Not committed** — the working tree is on `main`, which the project rules forbid
-committing to. Needs a branch.
-
----
+- Repair revision `b1c2d3e4f5a6` creates `hunt_sessions`/`hunt_tracks`, inserted before `c3d4e5f6a7b8`.
+- `_init_schema()` runs `alembic upgrade head`; stamps head on a pre-Alembic DB.
+- `KIKU_DB_PATH` env override — `config.py:37`, closes `OBS-003/E7`.
+- `tests/test_migrations.py`: chain runs from base · every ORM table has a migration · no `compare_metadata` drift.
+- **Found by the new test:** two index drifts + one FK drift, months old, invisible — `OBS-003/R1,R2`.
+- **Also:** `tests/conftest.py` now redirects `KIKU_DB_PATH`; a bare `pytest` was migrating the real library.
+- **Result:** 429 tests pass; real 4,328-track library upgraded, `integrity_check: ok`.
 
 ### P2 — Pin the environment
 
-**Do.** Adopt `uv` (or `pip-tools`) and commit a lockfile. Correct
-`requires-python` to `>=3.10` (`OBS-007/K2` — the declared 3.9 floor is contradicted by 523
-annotations). Fix the `dev` extra so it includes `api`, `hunting`, and `analysis`-optional
-test deps, so `pip install -e '.[dev]'` yields an environment the suite can run in
-(`OBS-007/E5`). Add `.python-version`. The npm side already has a committed lockfile
-(`OBS-007/E3`) — this item is Python-only.
-
-**Done-when.** A scripted clean-clone install produces a passing `pytest` and a passing
-`svelte-check`, with no manual step.
-
-**Note.** Preserve `dev.sh` (`OBS-007/K5`); this changes what it installs, not how it runs.
-
----
+- Adopt `uv` (or `pip-tools`); commit a Python lockfile. npm already has one.
+- `requires-python` → `>=3.10`; the declared 3.9 is contradicted by 523 unions (`OBS-007/K2`).
+- Fix the `dev` extra to include `api` + `hunting` test deps (`OBS-007/E5`).
+- Add `.python-version`.
+- **Done when:** a scripted clean-clone install gives passing `pytest` + `svelte-check`, no manual step.
+- **Keep:** `dev.sh` works well (`OBS-007/K5`) — change what it installs, not how it runs.
 
 ### P3 — One CI workflow
 
-**Do.** A single `.github/workflows/ci.yml` on push and PR, with five jobs:
-`pytest` · `svelte-check` · `ruff check` + `ruff format --check` · the P1 migration test ·
-`vite build`. Add `[tool.ruff]` to `pyproject.toml` — start with the default rule set and
-`--fix` the result; do not hand-tune rules first, or this becomes a week.
-
-**Done-when.** A PR with a deliberate type error is red.
-
-**Why now and not later.** `CLM-003/R3`: without this, every fix below decays by default.
-Fold in the `datetime.utcnow()` deprecations (`OBS-002/E10`) as the first thing the new
-gate catches.
-
----
+- `.github/workflows/ci.yml` on push + PR: `pytest` · `svelte-check` · `ruff check`/`format --check` · P1's migration test · `vite build`.
+- Add `[tool.ruff]`; take the default rule set and `--fix`. Do not hand-tune rules first, or this becomes a week.
+- Enable ruff `BLE`/`TRY` to catch the 63 `except Exception` blocks (`CLM-003/K5b`).
+- **Done when:** a PR with a deliberate type error is red.
+- **First catches:** the 10 `datetime.utcnow()` deprecations (`OBS-002/E10`).
 
 ### P4 — A real route table with URL state
 
-**Do.** Replace the `{#if}` ladder in `Workspace.svelte` (`OBS-004/E3`) with routes:
-`/track/[id]`, `/set/[id]`, `/dna`, `/tinder`, `/hunt`, `/albums`. Move `selectedTrack`,
-`selectedSetId`, `selectedTrackInSet`, `setViewMode` out of `ui.svelte.ts` into route params
-and query strings. Add `+error.svelte` (`OBS-004/E7`). Keep `ssr = false` — the SPA
-decision is fine (`OBS-004/Q1`); this is about routing, not rendering.
+- Replace the `{#if}` ladder in `Workspace.svelte` with `/track/[id]`, `/set/[id]`, `/dna`, `/tinder`, `/hunt`, `/albums`.
+- Move `selectedTrack`, `selectedSetId`, `selectedTrackInSet`, `setViewMode` out of `ui.svelte.ts` into route params + query strings.
+- Add `+error.svelte` (`OBS-004/E7`).
+- Keep `ssr = false` — this is about routing, not rendering.
+- **Done when:** a transition URL pastes into a fresh tab and lands; back button works; largest chunk well below 540 KB.
+- **Why first:** deep-linkable lessons serve the teaching mission (`OBS-004/K3`), and routes give tests something to address.
 
-**Done-when.** A URL for a specific transition can be pasted into a fresh tab and lands on
-it; browser back works; the largest client chunk drops well below 540 KB
-(`OBS-004/E6`, and `OBS-004/K4` says this comes free).
+### P5 — `createResource`, one data-orchestration rune
 
-**Product argument, not just an engineering one.** `OBS-004/K3` — a teaching tool whose
-lessons cannot be bookmarked or shared is fighting its own mission.
-
----
-
-### P5 — `createResource` — one data-orchestration rune
-
-**Do.** A ~100-LOC first-party rune in `lib/data/` owning: fire-on-dependency-change,
-`loading`/`error`/`data`, `AbortController` on re-fire and unmount (`OBS-005/E6`),
-in-flight dedup, and explicit `invalidate(key)` after mutations. Migrate the 26
-hand-rolled load/error pairs (`OBS-005/E3`) onto it.
-
-**Done-when.** `grep -rc 'let loading = \$state' src/lib/components` returns 0, and the
-three bug classes in `OBS-005/K3` are structurally unreachable.
-
-**Falsifier.** Answers `OBS-005/Q1` — if the rune exceeds ~200 LOC or starts growing a
-cache-eviction policy, stop and take TanStack Query instead; the point was to avoid a
-dependency, not to reimplement one.
-
----
+- ~100 LOC in `lib/data/`: fire-on-dependency-change · `loading`/`error`/`data` · `AbortController` on re-fire and unmount · in-flight dedup · `invalidate(key)`.
+- Migrate the 26 hand-rolled load/error components (`OBS-005/E3`) onto it.
+- **Done when:** `grep -rc 'let loading = \$state' src/lib/components` → 0, and `OBS-005/K3`'s three bug classes are unreachable.
+- **Falsifier:** if it passes ~200 LOC or grows a cache-eviction policy, take TanStack Query instead (`OBS-005/Q1`).
 
 ### P6 — The four missing structural primitives
 
-**Do.** `Modal` (backdrop, focus trap via the existing `focusTrap` action, escape, scroll
-lock), `Input`, `EmptyState`, `Skeleton`. Migrate the six bespoke dialogs
-(`OBS-008/E5`) onto `Modal`. This is the deferred spec-026 shared-modal item.
-
-**Done-when.** Total LOC across the six dialog files drops by ≥40%, and the design-system
-gallery renders each new primitive.
-
-**Falsifier.** `CLM-002/K5` — if the dialog files do not shrink, the primitive's API is
-wrong.
-
----
+- `Modal` (backdrop, `focusTrap`, escape, scroll lock) · `Input` · `EmptyState` · `Skeleton`.
+- Migrate the six bespoke dialogs (`OBS-008/E5`) onto `Modal`. This is the deferred spec-026 item.
+- Fold in the 123 stray hex literals (`OBS-008/E2`) while touching these files.
+- **Done when:** the six dialog files shrink ≥40% and the gallery renders each primitive.
+- **Falsifier:** if they don't shrink, the primitive's API is wrong (`CLM-002/K5`).
 
 ### P7 — Generate TS types from OpenAPI
 
-**Do.** `openapi-typescript` against the FastAPI schema, wired as an npm script and a CI
-check that the committed output is current. Delete the hand-written half of
-`lib/types/index.ts` (699 LOC, `OBS-005/E4`); keep only genuinely client-side types.
-
-**Done-when.** Renaming a Pydantic field turns CI red without a human noticing anything.
-
-**Sequencing.** After P3 — the value is the *check*, and the check needs a gate.
-
----
+- `openapi-typescript` against the FastAPI schema, as an npm script + a CI check that the committed output is current.
+- Delete the hand-written half of `lib/types/index.ts` (699 LOC); keep only client-side types.
+- **Done when:** renaming a Pydantic field turns CI red with nobody watching.
+- **After P3** — the value is the check, and the check needs a gate.
 
 ### P8 — Frontend test foundation
 
-**Do.** Vitest + `@testing-library/svelte` for the 12+4 primitives and the two real state
-machines (`playback.svelte.ts` 465 LOC, `player.svelte.ts` 371 LOC — the highest-risk
-untested code in the repo). Playwright smoke test per route from P4: loads, renders, no
-console errors. Do **not** chase coverage percentage; cover primitives and state machines.
-
-**Done-when.** CI runs both; a broken `Modal` fails a test rather than a browser session.
-
-**Sequencing.** After P4 — `CLM-002/K4`: routes are what a smoke test can address.
-
----
+- Vitest + `@testing-library/svelte` on the 16 primitives.
+- Cover the two real state machines: `playback.svelte.ts` (465 LOC), `player.svelte.ts` (371 LOC) — the highest-risk untested code in the repo.
+- Playwright smoke per P4 route: loads, renders, no console errors.
+- Do **not** chase a coverage number. Primitives and state machines only.
+- **After P4** — routes are what a smoke test can address.
 
 ### P9 — Extract a service layer, starting with sets
 
-**Do.** Create `src/kiku/services/`. Move the set use-cases out of
-`api/routes/sets.py` (1,340 LOC) — including its domain-flavoured private helpers
-(`OBS-006/E3`) — into `services/sets.py`, taking a `Session` and returning domain objects.
-Point both `cli.py` and the route at it, killing the duplication in `OBS-006/E6`. Leave the
-two SSE endpoints for last (`OBS-006/K6`).
-
-**Done-when.** `api/routes/sets.py` is routing, validation, and serialization only; a
-grep for `session.query` in it returns 0; the same use-case function backs both entry points.
-
-**Strategic note.** `CLM-001/K5` — this is the actual prerequisite for the Rust migration,
-and it may reveal the migration to be unnecessary. Do this before committing to that plan.
-
----
+- Create `src/kiku/services/`; move set use-cases out of `api/routes/sets.py` (1,340 LOC), including its domain-flavoured private helpers (`OBS-006/E3`).
+- Point both `cli.py` and the route at it, killing the duplication in `OBS-006/E6`.
+- Leave the two SSE endpoints for last (`OBS-006/K6`).
+- **Done when:** `sets.py` is routing/validation/serialization only; `grep session.query` in it → 0; one use-case backs both entry points.
+- **Strategic:** this is the real prerequisite for the Rust migration, and may show it to be unnecessary (`CLM-001/K5`).
 
 ### P10 — Cover the sequencing modules
 
-**Do.** Tests for `planner.py`, `filler.py`, `reorder.py` — the untested modules
-(`OBS-002/E9`). Property-style assertions on invariants that must hold for any input:
-artist cooldown respected; energy curve monotone within a segment; no track appears twice;
-role bias never becomes a hard filter (the explicit design constraint of specs 028–029).
-Add golden-set regression tests over a small fixture library.
-
-**Done-when.** The three modules have named test files, and each invariant above has an
-assertion.
-
-**Why this matters more than its position suggests.** `CLM-003/R6` — these modules'
-bugs produce sets that *look* plausible. They are the only defects in this document that
-the author cannot catch by looking.
+- Tests for `planner.py`, `filler.py`, `reorder.py` (`OBS-002/E9`).
+- Property-style invariants: artist cooldown respected · energy curve monotone within a segment · no track twice · role bias never becomes a hard filter (the explicit constraint of specs 028–029).
+- Golden-set regression over a small fixture library.
+- **Done when:** three named test files, one assertion per invariant above.
+- **Why it matters more than its rank:** these bugs produce sets that *look* plausible — the only defects here the author cannot catch by looking (`CLM-003/R6`).
 
 ---
 
