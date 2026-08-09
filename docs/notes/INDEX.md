@@ -38,6 +38,7 @@ Cite statements, not documents — `OBS-003/K2`, never "see OBS-003".
 |----|-------|----------|
 | [DEC-001](DEC-001-note-taxonomy.md) | Why four note types, and why OBS/CLM/DEC/PLN | Sort by **expiry mode**, not topic — that's what makes "is this still true?" cheap |
 | [DEC-002](DEC-002-knf-in-specs.md) | Specs are derivations that deposit notes | A spec is the *working*, notes are the *deposit* — same skeleton, two lifetimes |
+| [DEC-003](DEC-003-resource-boundary.md) | Where `createResource` stops | It owns the fetch lifecycle; **accumulation stays with the caller** |
 
 ## The spec ↔ KNF map
 
