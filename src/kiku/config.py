@@ -35,6 +35,11 @@ def _get(section: str, key: str, default):
 # ── Paths ──────────────────────────────────────────────────────────────
 
 def _resolve_db_path() -> Path:
+    # Env wins over TOML so a test, a container, or a second library can point
+    # somewhere else without editing a file in $HOME.
+    env_db = os.environ.get("KIKU_DB_PATH")
+    if env_db:
+        return Path(env_db)
     custom = _get("paths", "db_path", None)
     if custom:
         return Path(custom)

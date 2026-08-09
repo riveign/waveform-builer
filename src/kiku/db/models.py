@@ -40,7 +40,7 @@ class Track(Base):
     rb_id = Column(String, unique=True)
     title = Column(String)
     artist = Column(String)
-    album = Column(String)
+    album = Column(String, index=True)  # ix_tracks_album — album grouping/browse
     label = Column(String)
     rb_genre = Column(String)
     dir_genre = Column(String)
@@ -52,7 +52,7 @@ class Track(Base):
     color = Column(String)
     comment = Column(Text)
     duration_sec = Column(Float)
-    file_path = Column(String)
+    file_path = Column(String, index=True)  # ix_tracks_file_path — scan/sync path lookups
     file_hash = Column(String)
     date_added = Column(String)
     play_count = Column(Integer, default=0)
@@ -295,13 +295,55 @@ def get_engine():
     return _engine
 
 
+def _alembic_config():
+    """Alembic config built in memory, not from alembic.ini.
+
+    Loading the ini would run `fileConfig` and reconfigure logging out from under
+    the CLI's Rich output, so we set the two options env.py needs by hand.
+    """
+    from alembic.config import Config
+
+    from kiku.config import PROJECT_ROOT
+
+    script_location = PROJECT_ROOT / "alembic"
+    if not script_location.is_dir():
+        raise RuntimeError(
+            f"Can't find Kiku's migrations at {script_location}. "
+            "The schema is built by Alembic, so Kiku needs the alembic/ directory "
+            "from the repository — install with `pip install -e .` from a checkout."
+        )
+    cfg = Config()
+    cfg.set_main_option("script_location", str(script_location))
+    cfg.set_main_option("sqlalchemy.url", get_db_url())
+    return cfg
+
+
 def _init_schema():
-    """Create tables once per process. Schema migrations handled by Alembic."""
+    """Bring the schema to head once per process.
+
+    Alembic is the sole authority — see tests/test_migrations.py. `create_all` is
+    deliberately not used here: it cannot alter existing tables, so it silently
+    produced schemas that drifted from the migration chain.
+    """
     global _schema_initialized
     if _schema_initialized:
         return
+
+    from alembic import command
+    from sqlalchemy import inspect
+
     engine = get_engine()
-    Base.metadata.create_all(engine)
+    tables = set(inspect(engine).get_table_names())
+    cfg = _alembic_config()
+
+    if tables and "alembic_version" not in tables:
+        # A pre-Alembic database, built by the old create_all path. Its tables are
+        # already at head's shape, so record that rather than replaying the chain
+        # over existing tables.
+        command.stamp(cfg, "head")
+    else:
+        command.upgrade(cfg, "head")
+
     _schema_initialized = True
 
 
