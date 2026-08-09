@@ -12,7 +12,7 @@
 	const owned = $derived(hunt.tracks.filter((t) => t.acquisition_status === 'owned').length);
 	const total = $derived(hunt.tracks.length);
 
-	function formatTime(sec: number | null): string {
+	function formatTime(sec: number | null | undefined): string {
 		if (sec == null) return '';
 		const h = Math.floor(sec / 3600);
 		const m = Math.floor((sec % 3600) / 60);

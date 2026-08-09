@@ -92,7 +92,7 @@
 
 	$effect(() => {
 		localRating = track.rating ?? 0;
-		localZone = track.resolved_energy;
+		localZone = track.resolved_energy ?? null;
 		localRoles = track.set_roles ?? [];
 		showZonePicker = false;
 		showRolePicker = false;

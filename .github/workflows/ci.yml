@@ -56,8 +56,26 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # The API-contract check regenerates the schema from the FastAPI app, so this
+      # job needs the backend installed too.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install backend (for schema generation)
+        run: uv sync --extra api --frozen
+        working-directory: .
+
       - name: Install
         run: npm ci
+
+      # Regenerates the client types from the live FastAPI schema and fails if the
+      # committed output has drifted. This is what makes a renamed Pydantic field a
+      # red build rather than undefined at runtime (docs/notes/OBS-005/K4).
+      - name: API types are current
+        run: npm run check:api
 
       - name: Type-check
         run: npx svelte-check --tsconfig ./tsconfig.json

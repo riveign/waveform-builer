@@ -22,8 +22,8 @@ async function checkStatus() {
 	try {
 		const status = await getSCStatus();
 		connected = status.connected;
-		username = status.username;
-		avatarUrl = status.avatar_url;
+		username = status.username ?? null;
+		avatarUrl = status.avatar_url ?? null;
 	} catch (e) {
 		error = e instanceof Error ? e.message : String(e);
 	}
@@ -92,7 +92,7 @@ async function loadLikes(reset = false) {
 	try {
 		const result = await getSCLikes(likesNextCursor ?? undefined);
 		likes = [...likes, ...result.tracks];
-		likesNextCursor = result.next_cursor;
+		likesNextCursor = result.next_cursor ?? null;
 	} catch (e) {
 		error = e instanceof Error ? e.message : String(e);
 	} finally {

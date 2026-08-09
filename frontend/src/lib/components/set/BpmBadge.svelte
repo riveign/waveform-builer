@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Chip from '$lib/components/primitives/Chip.svelte';
 
-	let { bpmA, bpmB }: { bpmA: number | null; bpmB: number | null } = $props();
+	let { bpmA, bpmB }: { bpmA: number | null | undefined; bpmB: number | null | undefined } = $props();
 
 	let analysis = $derived.by(() => {
 		if (bpmA == null || bpmB == null) {

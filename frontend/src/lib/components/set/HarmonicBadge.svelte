@@ -3,7 +3,7 @@
 	import Chip from '$lib/components/primitives/Chip.svelte';
 	import HarmonyIcon, { toHarmonyRelation } from '$lib/components/primitives/HarmonyIcon.svelte';
 
-	let { keyA, keyB }: { keyA: string | null; keyB: string | null } = $props();
+	let { keyA, keyB }: { keyA: string | null | undefined; keyB: string | null | undefined } = $props();
 
 	let rel = $derived(harmonicRelationship(keyA, keyB));
 	let relation = $derived(toHarmonyRelation(rel.label));
