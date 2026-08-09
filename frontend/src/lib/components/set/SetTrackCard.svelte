@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { SetTrack, Track, EnergyConflict } from '$lib/types';
 	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
-	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { getTrackEnergyNumeric, energyColor as getEnergyColor } from '$lib/utils/energy';
 	import { getTrack } from '$lib/api/tracks';
 	import EnergyConflictBadge from './EnergyConflictBadge.svelte';
@@ -17,6 +16,7 @@
 		energyTarget,
 		energyConflict = null,
 		onplay,
+		onselect,
 	}: {
 		track: SetTrack;
 		position: number;
@@ -25,9 +25,9 @@
 		energyTarget?: number;
 		energyConflict?: EnergyConflict | null;
 		onplay?: (trackId: number) => void;
+		onselect?: (trackId: number) => void;
 	} = $props();
 
-	const ui = getUiStore();
 
 	let contextMenuOpen = $state(false);
 	let contextMenuX = $state(0);
@@ -50,7 +50,7 @@
 	let energyColorVal = $derived(getEnergyColor(energyNorm));
 
 	function handleClick() {
-		ui.selectedTrackInSet = track.track_id;
+		onselect?.(track.track_id);
 	}
 
 	function handlePlayClick(e: MouseEvent) {

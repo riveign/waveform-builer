@@ -1,14 +1,14 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { setHref } from '$lib/nav';
 	import type { TrackSetAppearance } from '$lib/types';
 	import { getTrackSets } from '$lib/api/tracks';
-	import { getUiStore } from '$lib/stores/ui.svelte';
 	import Spinner from '../Spinner.svelte';
 	import Button from '../primitives/Button.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 
 	let { trackId, trackTitle = 'track' }: { trackId: number; trackTitle?: string } = $props();
 
-	const ui = getUiStore();
 
 	let appearances = $state<TrackSetAppearance[]>([]);
 	let loading = $state(true);
@@ -34,8 +34,7 @@
 	});
 
 	function navigateToSet(setId: number) {
-		ui.selectedSetId = setId;
-		ui.activeTab = 'set';
+		goto(setHref(setId));
 	}
 
 	function handleAdded() {

@@ -19,6 +19,9 @@
 		onTransitionClick,
 		onTracksChanged,
 		onTrackPlay,
+		focusedTrackId = null,
+		viewMode = 'list',
+		onFocusTrack,
 	}: {
 		tracks: SetWaveformTrack[];
 		setId: number;
@@ -28,6 +31,9 @@
 		onTransitionClick?: (index: number) => void;
 		onTracksChanged?: () => void;
 		onTrackPlay?: (trackId: number) => void;
+		focusedTrackId?: number | null;
+		viewMode?: 'list' | 'grid';
+		onFocusTrack?: (trackId: number) => void;
 	} = $props();
 
 	const ui = getUiStore();
@@ -147,7 +153,7 @@
 	}
 
 	function handleTrackClick(trackId: number) {
-		ui.selectedTrackInSet = trackId;
+		onFocusTrack?.(trackId);
 	}
 
 	function handleTransitionClickInternal(index: number) {
@@ -204,8 +210,8 @@
 			{/if}
 		</div>
 	{:else}
-		{#if ui.setViewMode === 'grid'}
-			<SetCardGrid tracks={items} {energyTargets} {analysis} />
+		{#if viewMode === 'grid'}
+			<SetCardGrid tracks={items} {energyTargets} {analysis} {focusedTrackId} onselect={handleTrackClick} />
 		{:else}
 		<div class="timeline-content">
 			<!-- Track list with DnD -->
@@ -250,7 +256,8 @@
 										energy_conflict: item.energy_conflict,
 									}}
 									position={i + 1}
-									isSelected={ui.selectedTrackInSet === item.track_id}
+									isSelected={focusedTrackId === item.track_id}
+									onselect={handleTrackClick}
 									isPlaying={ui.playingTrackId === item.track_id}
 									energyTarget={typeof energyTargets[i] === 'number' ? energyTargets[i] : undefined}
 									energyConflict={item.energy_conflict}

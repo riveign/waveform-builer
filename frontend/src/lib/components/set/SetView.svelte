@@ -17,12 +17,34 @@
 	import MenuItem from '$lib/components/primitives/MenuItem.svelte';
 	import MenuSeparator from '$lib/components/primitives/MenuSeparator.svelte';
 	import SegmentedControl, { type SegmentOption } from '$lib/components/primitives/SegmentedControl.svelte';
-	import type { SetViewMode } from '$lib/stores/ui.svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { setHref, setQueryParam } from '$lib/nav';
+
+	export type SetViewMode = 'list' | 'grid';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
 
 	const ui = getUiStore();
+
+	/** Which set, which track inside it, and which layout — all read from the URL
+	 *  by the route and handed down, so this view has no hidden selection state. */
+	let {
+		setId = null,
+		focusedTrackId = null,
+		viewMode = 'list',
+	}: {
+		setId?: number | null;
+		focusedTrackId?: number | null;
+		viewMode?: SetViewMode;
+	} = $props();
+
+	/** Put the focused track in the URL. Replaces rather than pushes: Back should
+	 *  leave the set, not walk every row you clicked inside it. */
+	function focusTrack(trackId: number | null) {
+		setQueryParam(page.url, 't', trackId);
+	}
 
 	const viewOptions: SegmentOption<SetViewMode>[] = [
 		{ value: 'list', label: 'List' },
@@ -132,23 +154,23 @@
 		waveformTracks.filter((t) => t.energy_source !== 'approved' && t.energy_source !== 'tag')
 	);
 
-	/** Derive chart selectedIndex from ui.selectedTrackInSet (track ID) */
+	/** Derive chart selectedIndex from the focused track id in the URL */
 	let selectedChartIndex = $derived.by(() => {
-		if (ui.selectedTrackInSet === null) return undefined;
-		const idx = waveformTracks.findIndex((t) => t.track_id === ui.selectedTrackInSet);
+		if (focusedTrackId === null) return undefined;
+		const idx = waveformTracks.findIndex((t) => t.track_id === focusedTrackId);
 		return idx >= 0 ? idx : undefined;
 	});
 
 	/** Chart click handler: convert index to track ID, update store */
 	function handleChartTrackClick(index: number) {
 		if (index >= 0 && index < waveformTracks.length) {
-			ui.selectedTrackInSet = waveformTracks[index].track_id;
+			focusTrack(waveformTracks[index].track_id);
 		}
 	}
 
 	/** Scroll timeline to selected track when selection changes */
 	$effect(() => {
-		const trackId = ui.selectedTrackInSet;
+		const trackId = focusedTrackId;
 		if (trackId !== null && timelineContainerEl) {
 			const trackEl = timelineContainerEl.querySelector(
 				`[data-track-id="${trackId}"]`
@@ -291,6 +313,16 @@
 			]);
 			setDetail = detail;
 			waveformTracks = waveforms;
+			// Keep the header's set identity in step with what the URL loaded, so a
+			// pasted link and a picker click land on the same rendered state.
+			selectedSet = {
+				id: detail.id,
+				name: detail.name,
+				created_at: detail.created_at,
+				duration_min: detail.duration_min,
+				track_count: detail.tracks.length,
+				source: detail.source,
+			};
 
 			// Use pre-computed analysis from build if available
 			if (ui.pendingAnalysis && ui.pendingAnalysis.set_id === setId) {
@@ -327,11 +359,19 @@
 		}
 	}
 
-	async function handleSetSelect(set: DJSet) {
-		selectedSet = set;
-		renaming = false;
-		await loadSetData(set.id);
+	function handleSetSelect(set: DJSet) {
+		// Selecting a set is a navigation: it changes what the URL identifies.
+		goto(setHref(set.id));
 	}
+
+	/** Load whichever set the URL names, including on first mount and on Back. */
+	$effect(() => {
+		const id = setId;
+		if (id === null) return;
+		if (selectedSet?.id === id) return;
+		renaming = false;
+		void loadSetData(id);
+	});
 
 	function startRename() {
 		if (!selectedSet) return;
@@ -441,8 +481,8 @@
 					<div class="tool-group">
 						<SegmentedControl
 							options={viewOptions}
-							value={ui.setViewMode}
-							onchange={(v) => (ui.setViewMode = v)}
+							value={viewMode}
+							onchange={(v) => setQueryParam(page.url, 'view', v)}
 							ariaLabel="Set view"
 							dense
 						/>
@@ -628,6 +668,9 @@
 							onTransitionClick={handleTransitionClick}
 							onTracksChanged={handleTracksChanged}
 							onTrackPlay={handleTrackPlay}
+							{focusedTrackId}
+							{viewMode}
+							onFocusTrack={focusTrack}
 						/>
 					{/if}
 				</div>
