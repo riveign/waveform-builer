@@ -98,17 +98,18 @@ def search(title: str | None, artist: str | None, genre: str | None,
             bpm_min = bpm_max = float(bpm)
 
     session = get_session()
-    results = search_tracks(
+    results, total = search_tracks(
         session, title=title, artist=artist, genre=genre,
         bpm_min=bpm_min, bpm_max=bpm_max, energy=energy,
         key=key, rating_min=rating, limit=limit,
     )
 
     if not results:
-        console.print("[yellow]No tracks found matching your filters.[/]")
+        console.print("[yellow]Nothing in your library matches those filters.[/]")
         return
 
-    table = Table(title=f"Search Results ({len(results)} tracks)")
+    shown = f"{len(results)} of {total}" if total > len(results) else f"{len(results)}"
+    table = Table(title=f"Search Results ({shown} tracks)")
     table.add_column("#", justify="right", style="dim")
     table.add_column("Title", style="cyan")
     table.add_column("Artist")
