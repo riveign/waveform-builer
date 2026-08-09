@@ -12,6 +12,12 @@ superseded-by: null
 How data gets from the 86 backend endpoints into 92 components, and what each component
 has to do for itself along the way.
 
+> **Re-check 2026-08-09 — [[PLN-001]]/P7 closes K4.** Client types are generated from the
+> OpenAPI schema and gated in CI; `types/index.ts` fell 699 → 164 lines. Doing it surfaced
+> 34 places where the client assumed a field the API does not guarantee, and one server-side
+> `dict` that was erasing a type. 13 types stay hand-written because their endpoints declare
+> no `response_model`.
+>
 > **Re-check 2026-08-09 — resolved by [[PLN-001]]/P5.** 22 of 26 components are on
 > `createResource`; the other 4 hold action or paging state by decision ([[DEC-003]]).
 > **K1 is closed** — `lib/api` no longer stops at transport. **K3 is amended:** (a) and (c)
