@@ -26,10 +26,19 @@ rekordbox = [
     "pyrekordbox>=0.3.1",
 ]
 analysis = [
-    "essentia>=2.1b6.dev1110",
-    "essentia-tensorflow>=2.1b6.dev1110",
+    # Pinned exactly, not floored. Essentia ships only dev builds, and each one
+    # carries wheels for a single CPython tag — dev1438 is cp314-only, so a `>=`
+    # floor resolves to something uninstallable on the 3.13 we pin. dev1389 is the
+    # newest with cp313 wheels. Re-pin deliberately when moving interpreter.
+    "essentia==2.1b6.dev1389",
+    "essentia-tensorflow==2.1b6.dev1389",
     "librosa>=0.10",
     "soundfile>=0.12",
+    # librosa needs numba, and every modern numba caps numpy below what essentia
+    # pulls in. Left alone the resolver escapes backwards to numba 0.53.1, whose
+    # llvmlite supports Python <3.10 and cannot build here. Floor it forward and
+    # let numpy settle underneath instead.
+    "numba>=0.60",
 ]
 api = [
     "fastapi>=0.115",

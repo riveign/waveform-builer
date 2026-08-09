@@ -28,14 +28,20 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 # --- Python ---
-# Anything passed to this script goes through to `uv sync`, so audio analysis is
-#   ./scripts/setup.sh --extra analysis
-# Note that `uv sync` makes .venv match exactly what you ask for: run it without
-# --extra analysis and essentia/librosa are removed again.
+# `uv sync` makes .venv match exactly what is asked for, so the default has to be
+# the full working environment — otherwise re-running this script would silently
+# strip essentia and librosa off a machine that had them. Pass --lean for the
+# smaller install (CI, or frontend-only work), and anything else straight to uv.
+
+EXTRAS=(--extra dev --extra analysis)
+if [[ "${1:-}" == "--lean" ]]; then
+  EXTRAS=(--extra dev)
+  shift
+fi
 
 echo -e "${BOLD}Setting up Kiku…${RST}"
 echo -e "  ${DIM}python  → .venv from uv.lock${RST}"
-uv sync --extra dev "$@"
+uv sync "${EXTRAS[@]}" "$@"
 
 # --- Frontend ---
 
@@ -52,5 +58,5 @@ echo "  ./dev.sh              start the backend and frontend together"
 echo "  uv run pytest         run the backend suite"
 echo "  uv run kiku --help    see what Kiku can do"
 echo ""
-echo -e "${DIM}Audio analysis (essentia + librosa) is a separate extra — it's big, and"
-echo -e "you only need it to run \`kiku analyze\`:  ./scripts/setup.sh --extra analysis${RST}"
+echo -e "${DIM}Skip the audio-analysis stack (essentia, librosa, tensorflow — big, and only"
+echo -e "needed for \`kiku analyze\`) with:  ./scripts/setup.sh --lean${RST}"

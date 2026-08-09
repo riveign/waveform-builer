@@ -84,8 +84,9 @@ could reproduce it.
     single install — closes E5.
   - New `ml` extra (scikit-learn, joblib), separate from `analysis` because model training
     reads DB features rather than audio.
-  - `scripts/setup.sh`: `uv sync --extra dev` + `npm ci`, passing extra args through.
-    README and `dev.sh` preflight both point at it.
+  - `scripts/setup.sh`: `uv sync --extra dev --extra analysis` + `npm ci`; `--lean` drops
+    the audio stack. README and `dev.sh` preflight both point at it.
+  - `.venv` converged onto the lock — one environment, no parallel pip-installed set.
   - Verified from a clean clone: setup → **429 tests pass**, `svelte-check` 0/0 across 341
     files, and `kiku stats` builds its own database and reports an empty library.
 - **K7** [R2] ⇒ The two undeclared dependencies are the same failure as `OBS-003/R1,R2`:
@@ -93,10 +94,28 @@ could reproduce it.
   author's machine, surfaced immediately once something built the project from scratch. The
   general form of `CLM-003/K4`.
 
+- **R3 · The `analysis` extra was uninstallable, and floor-pins were the cause.** Neither
+  problem was visible before a lockfile forced resolution to be explicit:
+  - `essentia>=2.1b6.dev1110` resolved to `dev1438`, which ships **cp314 wheels only** and
+    cannot install on the pinned 3.13. Essentia publishes only dev builds and each carries
+    a single interpreter tag, so `>=` is meaningless for it. Pinned to `==2.1b6.dev1389`,
+    the newest with cp313 wheels.
+  - With essentia pinned, `librosa` → `numba` escaped *backwards* to `numba 0.53.1`
+    (2021), whose `llvmlite 0.36.0` supports Python <3.10 and fails to build. Every modern
+    numba caps numpy below what essentia pulls in, so the resolver preferred an ancient
+    numba over an older numpy. Fixed by flooring `numba>=0.60` in the extra, which settles
+    on numba 0.66 / llvmlite 0.48 / numpy 2.4.6.
+- **K8** [R3] ⇒ `OBS-007/K1` ("the dependency posture is genuinely good") was right about
+  *count* and wrong about *health*. A small dependency graph pinned only by floors is not a
+  pinned graph; two of six extras could not be installed at all. Fewness is not safety.
+
 ## Q — Open
 
 - ~~**Q1.** Is `uv` acceptable as the pin/lock tool?~~ Yes — adopted, and `dev.sh` keeps its
   shape; only its preflight message changed.
-- **Q2.** `uv sync` makes `.venv` match the requested extras exactly, so running
-  `setup.sh` without `--extra analysis` removes essentia/librosa from an environment that
-  had them. Documented in the script's output; worth revisiting if it bites.
+- ~~**Q2.** `uv sync` strips extras not requested, so `setup.sh` could remove
+  essentia/librosa.~~ Closed by making the full environment the default and `--lean` the
+  opt-out, rather than documenting around the footgun.
+- **Q3.** The essentia pin must be revisited deliberately whenever the interpreter moves —
+  `.python-version` 3.13 and `essentia==2.1b6.dev1389` are coupled by wheel tags (R3). A CI
+  matrix would surface this; a comment in `pyproject.toml` is the interim guard.

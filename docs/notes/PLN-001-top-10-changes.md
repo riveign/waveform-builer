@@ -65,7 +65,9 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 - New `ml` extra — scikit-learn + joblib, kept out of `analysis`.
 - `scripts/setup.sh` = `uv sync --extra dev` + `npm ci`; README and `dev.sh` point at it.
 - **Found by building from scratch:** `python-multipart` and `scikit-learn`/`joblib` were undeclared — `kiku autotag` and every API test fail on a clean install (`OBS-007/R2`).
-- **Verified:** clean clone → setup → 429 tests, `svelte-check` 0/0 over 341 files, `kiku stats` builds its own DB.
+- **Also found:** the `analysis` extra was uninstallable — essentia floor-resolved to a cp314-only wheel, then numba escaped back to a 2021 build needing Python <3.10 (`OBS-007/R3`). Both pinned.
+- **`.venv` converged onto the lock** — one environment, not a lock plus a hand-built venv beside it.
+- **Verified:** clean clone → setup → 429 tests, `svelte-check` 0/0 over 341 files, `kiku stats` builds its own DB; essentia/librosa import and the real library still reports 4,328 tracks.
 
 ### P3 — One CI workflow
 

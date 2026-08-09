@@ -23,8 +23,9 @@ cd waveform-builer
 # Python env + frontend deps, both from lockfiles
 ./scripts/setup.sh
 
-# Audio analysis is a separate extra — big, and only needed for `kiku analyze`
-./scripts/setup.sh --extra analysis
+# Skip the audio-analysis stack (essentia, librosa, tensorflow) if you won't
+# be running `kiku analyze` — CI and frontend work don't need it
+./scripts/setup.sh --lean
 ```
 
 The database builds itself from the migration chain the first time you run anything.
