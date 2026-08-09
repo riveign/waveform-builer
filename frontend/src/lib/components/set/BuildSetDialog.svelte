@@ -10,6 +10,8 @@
 	import { autocompleteArtists } from '$lib/api/tracks';
 	import type { Track } from '$lib/types';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import Modal from '$lib/components/primitives/Modal.svelte';
+	import Input from '$lib/components/primitives/Input.svelte';
 
 	interface GenreFamily {
 		family_name: string;
@@ -68,17 +70,11 @@
 	let endTrack = $state<Track | null>(null);
 
 	// ── Dialog element ref ──
-	let dialogEl = $state<HTMLDialogElement | null>(null);
-
-	// ── Sync dialog open/close with `open` prop ──
+	// Opening resets the form and refreshes the genre list.
 	$effect(() => {
-		if (!dialogEl) return;
-		if (open && !dialogEl.open) {
+		if (open) {
 			resetForm();
 			loadGenreFamilies();
-			dialogEl.showModal();
-		} else if (!open && dialogEl.open) {
-			dialogEl.close();
 		}
 	});
 
@@ -202,17 +198,6 @@
 		open = false;
 	}
 
-	function handleBackdropClick(e: MouseEvent) {
-		// Close if clicking the backdrop (the dialog element itself), not the content
-		if (e.target === dialogEl) {
-			open = false;
-		}
-	}
-
-	function handleDialogClose() {
-		open = false;
-	}
-
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && canSubmit && !e.shiftKey) {
 			e.preventDefault();
@@ -221,39 +206,18 @@
 	}
 </script>
 
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<dialog
-	bind:this={dialogEl}
-	class="build-dialog"
-	onclick={handleBackdropClick}
-	onclose={handleDialogClose}
-	onkeydown={handleKeydown}
->
+<Modal {open} title="Build a set" size="lg" onclose={handleCancel}>
+	<!-- Enter submits from anywhere in the form. -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div class="dialog-card" onclick={(e) => e.stopPropagation()}>
-		<div class="dialog-header">
-			<h2 class="dialog-title">Build a set</h2>
-			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close dialog" onclick={handleCancel}>
-				{#snippet icon()}×{/snippet}
-			</Button>
-		</div>
-
-		<div class="dialog-body">
+		<div class="dialog-body" onkeydown={handleKeydown}>
 			<!-- Set Name -->
-			<div class="field">
-				<label class="field-label" for="set-name">Name</label>
-				<input
-					id="set-name"
-					type="text"
-					class="field-input"
-					placeholder="Name your set..."
-					bind:value={name}
-				/>
-				{#if !name.trim()}
-					<span class="field-subtext">Leave blank for an auto-generated name</span>
-				{/if}
-			</div>
+			<Input
+				id="set-name"
+				label="Name"
+				placeholder="Name your set..."
+				bind:value={name}
+				hint={name.trim() ? undefined : 'Leave blank for an auto-generated name'}
+			/>
 
 			<!-- Duration + Exploration Depth side by side -->
 			<div class="field-row">
@@ -473,50 +437,16 @@
 			</div>
 		</div>
 
-		<div class="dialog-footer">
+	{#snippet footer()}
 			<Button variant="secondary" size="sm" onclick={handleCancel}>Cancel</Button>
 			<Button variant="primary" size="sm" onclick={handleSubmit} disabled={!canSubmit}>
 				Build set
 			</Button>
-		</div>
-	</div>
-</dialog>
+	{/snippet}
+</Modal>
 
 <style>
-	/* ── Dialog backdrop + container ── */
-	.build-dialog {
-		border: none;
-		background: transparent;
-		padding: 0;
-		max-width: 100vw;
-		max-height: 100vh;
-		width: 100vw;
-		height: 100vh;
-		overflow: visible;
-	}
-
-	.build-dialog::backdrop {
-		background: rgba(0, 0, 0, 0.6);
-	}
-
 	/* ── Card ── */
-	.dialog-card {
-		position: fixed;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		width: 520px;
-		max-width: calc(100vw - 32px);
-		max-height: calc(100vh - 64px);
-		background: var(--bg-secondary);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-		animation: dialog-in 0.15s ease-out;
-	}
-
 	@keyframes dialog-in {
 		from {
 			opacity: 0;
@@ -529,21 +459,6 @@
 	}
 
 	/* ── Header ── */
-	.dialog-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 16px 20px 12px;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.dialog-title {
-		font-size: 16px;
-		font-weight: 600;
-		color: var(--text-primary);
-		margin: 0;
-	}
-
 	/* ── Body ── */
 	.dialog-body {
 		padding: 16px 20px;
@@ -771,11 +686,4 @@
 	}
 
 	/* ── Footer ── */
-	.dialog-footer {
-		display: flex;
-		justify-content: flex-end;
-		gap: 8px;
-		padding: 12px 20px 16px;
-		border-top: 1px solid var(--border);
-	}
 </style>

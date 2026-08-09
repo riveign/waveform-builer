@@ -8,6 +8,10 @@
 	import RelatedTrackCard from '$lib/components/library/RelatedTrackCard.svelte';
 	import StandaloneTrackCard from '$lib/components/library/StandaloneTrackCard.svelte';
 	import StarRating from '$lib/components/primitives/StarRating.svelte';
+	import Modal from '$lib/components/primitives/Modal.svelte';
+	import Input from '$lib/components/primitives/Input.svelte';
+	import EmptyState from '$lib/components/primitives/EmptyState.svelte';
+	import Skeleton from '$lib/components/primitives/Skeleton.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
 	import HarmonyIcon, {
 		HARMONY_RELATION_LABEL,
@@ -43,6 +47,11 @@
 		{ value: 'detail', label: 'Detail' },
 	];
 	let demoView = $state<DemoView>('flow');
+
+	// ── Structural primitives demo state ──
+	let demoModalOpen = $state(false);
+	let demoName = $state('');
+	let demoMinutes = $state(90);
 
 	// Removable-filter demo for the chip section — the × actually drops the chip.
 	let filterChips = $state(['Techno', 'deadmau5', 'Anjunadeep']);
@@ -1000,7 +1009,76 @@
 		</p>
 		<p class="ds__note">Contrast ratios follow WCAG 2.1 AA.</p>
 	</section>
+
+	<!-- STRUCTURAL PRIMITIVES -->
+	<section class="ds__section">
+		<h2>Modal</h2>
+		<p class="ds__note">
+			The one dialog shell. Built on native <code>&lt;dialog&gt;</code> + <code>showModal()</code>, which
+			gives the backdrop, Escape, focus trapping, an <code>inert</code> background and top-layer stacking
+			for free — Kiku previously had two competing idioms, four dialogs on native <code>&lt;dialog&gt;</code>
+			and two hand-rolling a div overlay with <code>use:focusTrap</code>. Body scroll lock and
+			click-outside dismissal are the only additions. Pass <code>header</code> when the title row needs
+			controls, <code>footer</code> for the action row, and <code>dismissible=&#123;false&#125;</code> mid-write.
+		</p>
+		<Stack gap="var(--space-lg)">
+			<Button variant="secondary" size="sm" onclick={() => (demoModalOpen = true)}>Open a modal</Button>
+		</Stack>
+	</section>
+
+	<section class="ds__section">
+		<h2>Input</h2>
+		<p class="ds__note">
+			A labelled field. The label belongs to the primitive because a field without one is the most
+			common accessibility regression; <code>hint</code> doubles as the error message when
+			<code>invalid</code> is set, and is wired through <code>aria-describedby</code>.
+		</p>
+		<Stack gap="var(--space-lg)">
+			<Input label="Name" placeholder="Name your set..." bind:value={demoName} />
+			<Input label="Target length (minutes)" type="number" bind:value={demoMinutes} min={1} max={300} size="sm" />
+			<Input label="Name" value="" invalid hint="That name is already taken" />
+		</Stack>
+	</section>
+
+	<section class="ds__section">
+		<h2>Empty state</h2>
+		<p class="ds__note">
+			An empty state is a teaching opportunity: say what would fill the space and how to get there,
+			never just "no results". Fourteen surfaces had written their own, which is how the tone drifted.
+		</p>
+		<Stack gap="var(--space-lg)">
+			<EmptyState
+				compact
+				title="No sets yet"
+				hint="Build one from your library, or import a Rekordbox playlist to start from a set you've already played."
+			/>
+		</Stack>
+	</section>
+
+	<section class="ds__section">
+		<h2>Skeleton</h2>
+		<p class="ds__note">
+			A placeholder holding the shape of content that is still loading. Preferred over a spinner
+			wherever the eventual layout is known, because it doesn't move the page when the data lands. The
+			sheen stops under <code>prefers-reduced-motion</code>.
+		</p>
+		<Stack gap="var(--space-lg)">
+			<Skeleton lines={3} />
+			<Skeleton shape="block" height="80px" />
+			<Skeleton shape="circle" />
+		</Stack>
+	</section>
 </div>
+
+<Modal open={demoModalOpen} title="A modal" size="md" onclose={() => (demoModalOpen = false)}>
+	<p class="ds__note">
+		The body is the only scroll region, so the header and footer stay put however long this gets.
+	</p>
+	{#snippet footer()}
+		<Button variant="secondary" size="sm" onclick={() => (demoModalOpen = false)}>Cancel</Button>
+		<Button variant="primary" size="sm" onclick={() => (demoModalOpen = false)}>Done</Button>
+	{/snippet}
+</Modal>
 
 <style>
 	/* Cerceta (teal book palette) resolves ONLY inside this subtree. :global() is

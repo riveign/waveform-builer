@@ -8,7 +8,7 @@
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
-	import { focusTrap } from '$lib/actions/focusTrap';
+	import Modal from '$lib/components/primitives/Modal.svelte';
 
 	const playback = getPlaybackStore();
 	const ui = getUiStore();
@@ -99,27 +99,15 @@
 		return 'var(--score-poor)';
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
-			stopPreview();
-			onclose();
-		}
-	}
-
-	function handleBackdropClick(e: MouseEvent) {
-		if ((e.target as HTMLElement).classList.contains('modal-backdrop')) {
-			stopPreview();
-			onclose();
-		}
+	/** Every exit — Escape, backdrop, the close button — stops the preview first. */
+	function handleClose() {
+		stopPreview();
+		onclose();
 	}
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-<!-- Backdrop is presentational; Escape is handled on the window, the dialog below owns focus. -->
-<div class="modal-backdrop" role="presentation" onclick={handleBackdropClick}>
-	<div class="modal" role="dialog" aria-modal="true" aria-label="Replace track" use:focusTrap>
-		<header class="modal-header">
+<Modal open title="Replace track" size="xl" onclose={handleClose}>
+	{#snippet header()}
 			<h3>Replace track</h3>
 			<div class="current-track">
 				<span class="pos">#{position + 1}</span>
@@ -133,7 +121,7 @@
 					</svg>
 				{/snippet}
 			</Button>
-		</header>
+	{/snippet}
 
 		{#if context}
 			<div class="context-bar">
@@ -249,47 +237,9 @@
 				{/each}
 			{/if}
 		</div>
-	</div>
-</div>
+</Modal>
 
 <style>
-	.modal-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 100;
-	}
-
-	.modal {
-		background: var(--bg-primary);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		width: 620px;
-		max-width: 95vw;
-		max-height: 80vh;
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-	}
-
-	.modal-header {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 12px 16px;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.modal-header h3 {
-		margin: 0;
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--text-primary);
-		white-space: nowrap;
-	}
 
 	.current-track {
 		flex: 1;

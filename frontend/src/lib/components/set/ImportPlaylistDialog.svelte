@@ -2,6 +2,7 @@
 	import type { ImportResult } from '$lib/types';
 	import { importPlaylist, linkSet } from '$lib/api/sets';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import Modal from '$lib/components/primitives/Modal.svelte';
 
 	let {
 		open = $bindable(false),
@@ -11,7 +12,6 @@
 		onimport?: (result: ImportResult) => void;
 	} = $props();
 
-	let dialogEl: HTMLDialogElement | undefined = $state();
 	let file = $state<File | null>(null);
 	let nameOverride = $state('');
 	let force = $state(false);
@@ -24,12 +24,7 @@
 	let linkError = $state('');
 
 	$effect(() => {
-		if (open && dialogEl) {
-			dialogEl.showModal();
-			reset();
-		} else if (!open && dialogEl?.open) {
-			dialogEl.close();
-		}
+		if (open) reset();
 	});
 
 	function reset() {
@@ -108,10 +103,8 @@
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<dialog bind:this={dialogEl} onclose={handleClose} onkeydown={(e) => e.key === 'Escape' && handleClose()}>
-	<div class="dialog-content">
-		<h2>Import Playlist</h2>
-		<p class="subtitle">Drop a Rekordbox M3U8 export to create a set from it</p>
+<Modal {open} title="Import Playlist" size="md" onclose={handleClose}>
+	<p class="subtitle">Drop a Rekordbox M3U8 export to create a set from it</p>
 
 		{#if !result || error}
 			<!-- Drop zone -->
@@ -231,32 +224,12 @@
 				</div>
 			</div>
 		{/if}
-	</div>
-</dialog>
+</Modal>
 
 <style>
-	dialog {
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		padding: 0;
-		max-width: 480px;
-		width: 90vw;
-		background: var(--bg-primary);
-		color: var(--text-primary);
-	}
 
-	dialog::backdrop {
-		background: rgba(0, 0, 0, 0.6);
-	}
 
-	.dialog-content {
-		padding: 24px;
-	}
 
-	h2 {
-		margin: 0 0 4px;
-		font-size: 18px;
-	}
 
 	.subtitle {
 		margin: 0 0 20px;

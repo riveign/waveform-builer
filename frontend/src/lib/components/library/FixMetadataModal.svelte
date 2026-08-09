@@ -8,6 +8,7 @@
 		type CorrectionPreview,
 	} from '$lib/api/albums';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import Modal from '$lib/components/primitives/Modal.svelte';
 
 	let {
 		open = $bindable(false),
@@ -31,7 +32,6 @@
 		disc_number: 'Disc #',
 	};
 
-	let dialogEl: HTMLDialogElement | undefined = $state();
 	let stage = $state<'source' | 'checking' | 'review' | 'applying' | 'done' | 'error'>('source');
 	let error = $state('');
 	let sources = $state<SourceInfo[]>([]);
@@ -60,11 +60,7 @@
 	);
 
 	$effect(() => {
-		if (open && dialogEl) {
-			dialogEl.showModal();
-			void loadSources();
-		} else if (!open && dialogEl?.open) {
-			dialogEl.close();
+if (open) {			void loadSources();
 		}
 	});
 
@@ -152,14 +148,7 @@
 	}
 </script>
 
-<dialog bind:this={dialogEl} onclose={() => (open = false)} onkeydown={(e) => e.key === 'Escape' && close()}>
-	<div class="dialog-content">
-		<header>
-			<h2>Check &amp; fix metadata</h2>
-			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={close}>
-				{#snippet icon()}×{/snippet}
-			</Button>
-		</header>
+<Modal {open} title="Check &amp; fix metadata" size="lg" onclose={close}>
 
 		{#if stage === 'source'}
 			<p class="prompt">Where should we check <strong>{albumName}</strong> against?</p>
@@ -261,35 +250,9 @@
 				<Button variant="primary" size="sm" onclick={close}>Done</Button>
 			</div>
 		{/if}
-	</div>
-</dialog>
+</Modal>
 
 <style>
-	dialog {
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		padding: 0;
-		background: var(--bg-secondary);
-		color: var(--text-primary);
-		max-width: 640px;
-		width: 92vw;
-	}
-	dialog::backdrop {
-		background: rgba(0, 0, 0, 0.55);
-	}
-	.dialog-content {
-		padding: 16px 18px;
-	}
-	header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		margin-bottom: 12px;
-	}
-	h2 {
-		font-size: 15px;
-		margin: 0;
-	}
 	.prompt {
 		font-size: 13px;
 		color: var(--text-secondary);
