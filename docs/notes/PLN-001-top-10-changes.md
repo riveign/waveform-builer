@@ -36,7 +36,7 @@ pace of `OBS-001/E7`.
 | **P2** ✅ | Pin the environment — *done 2026-08-09* | `OBS-007/K2,K3` | 1 d | P3 |
 | **P3** ✅ | One CI workflow — *done 2026-08-09* | `OBS-002/K1`, `CLM-004/R3` | 1 d | P7, P8, everything's durability |
 | **P4** ✅ | A real route table with URL state — *done 2026-08-09* | `OBS-004/K3,K4`, `CLM-002/K3` | 3–5 d | P6, P8; deep links |
-| **P5** 🟡 | `createResource` — one data-orchestration rune | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
+| **P5** ✅ | `createResource` — one data-orchestration rune — *done 2026-08-09* | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
 | **P6** | The four missing structural primitives | `OBS-008/K2,K3` | 3–4 d | collapses ~2,700 LOC |
 | **P7** | Generate TS types from OpenAPI | `OBS-005/K4`, `CLM-003/E2` | 1 d | removes a 5-edit boundary |
 | **P8** | Frontend test foundation | `OBS-002/K3`, `CLM-003/K3` | 3–4 d | frontend confidence |
@@ -88,17 +88,20 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 - **Initial JS: 700 KB on every route → 253–612 KB by route; `/track` is 292 KB (−58%).** The 1,488-line design-system gallery left the app path.
 - **Verified in Chromium** against the real library: cold `/set/12?t=3891` loads the set with the row selected · `?view=grid` restores the grid · Back/Forward walk surfaces · number keys navigate · refresh preserves set + row · bad id → error page · no console errors.
 
-### P5 — `createResource`, one data-orchestration rune 🟡 **PART 1 DONE 2026-08-09**
+### P5 — `createResource`, one data-orchestration rune ✅ **DONE 2026-08-09**
 
-- `lib/data/resource.svelte.ts` (165 LOC): deps-driven refetch · `loading`/`error`/`data` · `AbortController` on re-fire and unmount · in-flight dedup · `invalidate(prefix)`.
-- `lib/api/stats.ts` reads take an optional `AbortSignal`, so cancellation is real, not just a discarded result.
-- **All 8 DNA components migrated.** Where a chart is involved, fetch and draw are now separate effects. They had written the same guard three different ways; one had none.
-- **Verified in Chromium:** six charts render, no console errors, navigating away mid-load is clean.
-- **Correction — dedup does not close `OBS-005/K3`(b).** It merges only requests in flight *at the same moment*. On `/dna`, `DnaView` and `GenreDistribution` share a key and still make two `/api/stats/library` calls, because the parent gates its children behind its own load. Closing (b) needs a cache with a lifetime — the line P5 agreed not to cross. (a) and (c) *are* closed.
-- **Correction — the done-when metric is wrong as written.** `grep 'let loading = $state' → 0` conflates read state with *mutation* state: the upload flag in `ImportPlaylistDialog` and the save flag in `FixMetadataModal` are not reads and do not belong in a read-resource. Restate as: **no component hand-rolls a *fetch* lifecycle**; mutation flags stay local until a separate `createMutation` earns its place.
-- **Part 2 (2026-08-09):** `SetAppearances`, `TransitionIndicator` (latching lazy-load), `SimilarTracks` (fetch + locally-owned seed state), `SetPicker`, `SetGrid` (search in the source ⇒ retyping aborts rather than races; `invalidate('sets:list')` replaces local array splicing). Signals threaded through `tracks.ts`, `sets.ts`, `albums.ts`. **13 of 26 done.**
-- **Boundary settled by [[DEC-003]]:** the rune owns the fetch lifecycle; accumulation stays with the caller.
-- **Remaining: 13.** Reads — `AlbumDetail`, `SetView`, `SetEnergyReview`, `InSetTrackSearch`, `AddFromArtistPanel`, `AddSlotPicksPanel`, `AddToSetPicker`, `ReplaceTrackModal`, `TrackView`. Mixed read+mutation — `FixMetadataModal`, `MusicBrainzMatchModal`, `ImportPlaylistDialog`. Documented exception — `AlbumGrid`, the one accumulating list (`DEC-003`/K2).
+- `lib/data/resource.svelte.ts` (165 LOC): deps-driven refetch · `loading`/`error`/`data` · `AbortController` on re-fire and unmount · in-flight dedup · `invalidate(prefix)` · null source = idle.
+- Optional `AbortSignal` threaded through the reads in `stats.ts`, `tracks.ts`, `sets.ts`, `albums.ts`, `tinder.ts`, `waveforms.ts`.
+- **22 of 26 components migrated.** The other 4 are decisions, not gaps: `FixMetadataModal`, `MusicBrainzMatchModal`, `ImportPlaylistDialog` are user-driven wizards holding *action* state with no reactive source; `AlbumGrid` is the accumulation exception ([[DEC-003]]).
+- **Boundary:** [[DEC-003]] — the rune owns the fetch lifecycle, accumulation stays with the caller.
+
+**Three corrections this item produced, all from measuring rather than reasoning:**
+
+- **Dedup does not close `OBS-005/K3`(b).** It merges only requests in flight *at the same moment*; on `/dna` a parent gating its children makes them sequential, so `/api/stats/library` is still fetched 3×. Closing (b) needs a cache with a lifetime — the line P5 agreed not to cross. (a) and (c) *are* closed.
+- **The done-when metric was wrong.** `grep 'let loading = $state' → 0` conflates read state with mutation state. Restated: **no component hand-rolls a *fetch* lifecycle.** Five components turned out to share one `error` between a read and a write beside it; each now has its own channel.
+- **`TrackView` had a latent bug the split exposed:** waveform and features loaded behind one error flag, so a missing feature row blanked the waveform. Two resources now; only a missing waveform is reported.
+
+**Verified in Chromium throughout:** DNA charts, track view (waveform + features + related + set appearances), albums grid and detail, set view (52 rows ↔ 7 rows on switch), tinder, hunt. Rapid switching — tracks and sets alike — produces no stale write and no console error.
 
 ### P6 — The four missing structural primitives
 

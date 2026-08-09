@@ -12,10 +12,12 @@ superseded-by: null
 How data gets from the 86 backend endpoints into 92 components, and what each component
 has to do for itself along the way.
 
-> **Re-check 2026-08-09 — [[PLN-001]]/P5 part 1.** `createResource` exists and the 8 DNA
-> components are on it; 18 remain, so K1 and K2 still stand. **K3 needs amending:** (a) and
-> (c) are now structurally preventable, but **(b) is not** — de-duplication merges only
-> concurrent requests, and the common case is sequential. See `PLN-001`/P5.
+> **Re-check 2026-08-09 — resolved by [[PLN-001]]/P5.** 22 of 26 components are on
+> `createResource`; the other 4 hold action or paging state by decision ([[DEC-003]]).
+> **K1 is closed** — `lib/api` no longer stops at transport. **K3 is amended:** (a) and (c)
+> are now structurally preventable; **(b) is not**, because de-duplication merges only
+> concurrent requests and the common case is sequential. **K2 still stands** — the oversized
+> files shrank but are still oversized; the rest of that is P6.
 
 ## D — Definitions
 
