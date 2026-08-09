@@ -12,6 +12,11 @@ superseded-by: null
 Whether the backend has a reusable domain layer, or whether logic lives in the places that
 happen to receive requests.
 
+> **Re-checked 2026-08-09 — unchanged, and that is the point.** [[PLN-001]] P1–P7 were all
+> either infrastructure or frontend; nothing touched the layering. `api/routes/sets.py` is
+> **1,410 lines** (up from 1,340). Every conclusion K1–K6 stands as written, and K3's
+> ceiling is now the binding one: this is P9, the last structural item before the Rust
+> question can be answered honestly.
 ## D — Definitions
 
 - **D1 · Domain layer.** Code that expresses Kiku's actual ideas — scoring, planning,

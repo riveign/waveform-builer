@@ -12,6 +12,16 @@ superseded-by: null
 Kiku's technology choices, benchmarked against what a competent product team would run in
 2026 — specifically, the practices that keep a two-year-old codebase pleasant to change.
 
+> **Re-check 2026-08-09 — [[PLN-001]] P1–P7.** E1's scorecard has moved from **4 met /
+> 2 partial / 9 absent** to **10 met / 3 partial / 2 absent**. Now met: CI, lint gate,
+> lockfile, migrations-as-authority, generated client types, route-level code splitting.
+> Still partial: domain/transport separation (P9), env manifest (reproducible via
+> `uv.lock` + `.python-version`, but no container), error telemetry (`+error.svelte`
+> exists, nothing reports). Still absent: frontend tests (P8), structured logging.
+> **K1, K2 and K4 hold. K3 is discharged** — the two load-bearing failures are fixed.
+> **K5 stands**: the service boundary is still missing, so the Rust port is still
+> premature by one step.
+
 ## D — Definitions
 
 - **D1 · Choice.** Which technologies are used.

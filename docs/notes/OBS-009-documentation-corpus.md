@@ -12,6 +12,13 @@ superseded-by: null
 Baseline for the documentation half of this effort: what exists, what it is for, and where
 it has rotted. Motivates [[DOC_SYSTEM]].
 
+> **Re-check 2026-08-09.** K1 and K5 are addressed: KNF exists ([[DOC_SYSTEM]]), 17 notes
+> are in use, and every claim in this analysis is now citable at statement level.
+> **K3 is only half addressed** — notes carry falsifiers, but this index went stale for
+> hours while its own notes were being re-checked, which is the same rot at one level up.
+> **E2/K4 are unchanged and still a live risk:** the five design documents
+> (`BACKEND_MIGRATION.md`, `PERSONAL_SERVER*.md`, `SOUNDCLOUD_EXPORT.md`,
+> `TRACKLIST_EXPORT.md`) remain untracked, one `rm -rf` from gone.
 ## E — Evidence
 
 - **E1 · Root-level markdown: 12 files.** `AGENTS.md`, `BACKEND_MIGRATION.md`,
