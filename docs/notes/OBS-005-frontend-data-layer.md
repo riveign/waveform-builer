@@ -12,6 +12,11 @@ superseded-by: null
 How data gets from the 86 backend endpoints into 92 components, and what each component
 has to do for itself along the way.
 
+> **Re-check 2026-08-09 — [[PLN-001]]/P5 part 1.** `createResource` exists and the 8 DNA
+> components are on it; 18 remain, so K1 and K2 still stand. **K3 needs amending:** (a) and
+> (c) are now structurally preventable, but **(b) is not** — de-duplication merges only
+> concurrent requests, and the common case is sequential. See `PLN-001`/P5.
+
 ## D — Definitions
 
 - **D1 · Transport.** Turning a call into an HTTP request and a typed result.

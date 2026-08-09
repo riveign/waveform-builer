@@ -36,7 +36,7 @@ pace of `OBS-001/E7`.
 | **P2** ✅ | Pin the environment — *done 2026-08-09* | `OBS-007/K2,K3` | 1 d | P3 |
 | **P3** ✅ | One CI workflow — *done 2026-08-09* | `OBS-002/K1`, `CLM-004/R3` | 1 d | P7, P8, everything's durability |
 | **P4** ✅ | A real route table with URL state — *done 2026-08-09* | `OBS-004/K3,K4`, `CLM-002/K3` | 3–5 d | P6, P8; deep links |
-| **P5** | `createResource` — one data-orchestration rune | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
+| **P5** 🟡 | `createResource` — one data-orchestration rune | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
 | **P6** | The four missing structural primitives | `OBS-008/K2,K3` | 3–4 d | collapses ~2,700 LOC |
 | **P7** | Generate TS types from OpenAPI | `OBS-005/K4`, `CLM-003/E2` | 1 d | removes a 5-edit boundary |
 | **P8** | Frontend test foundation | `OBS-002/K3`, `CLM-003/K3` | 3–4 d | frontend confidence |
@@ -88,12 +88,16 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 - **Initial JS: 700 KB on every route → 253–612 KB by route; `/track` is 292 KB (−58%).** The 1,488-line design-system gallery left the app path.
 - **Verified in Chromium** against the real library: cold `/set/12?t=3891` loads the set with the row selected · `?view=grid` restores the grid · Back/Forward walk surfaces · number keys navigate · refresh preserves set + row · bad id → error page · no console errors.
 
-### P5 — `createResource`, one data-orchestration rune
+### P5 — `createResource`, one data-orchestration rune 🟡 **PART 1 DONE 2026-08-09**
 
-- ~100 LOC in `lib/data/`: fire-on-dependency-change · `loading`/`error`/`data` · `AbortController` on re-fire and unmount · in-flight dedup · `invalidate(key)`.
-- Migrate the 26 hand-rolled load/error components (`OBS-005/E3`) onto it.
-- **Done when:** `grep -rc 'let loading = \$state' src/lib/components` → 0, and `OBS-005/K3`'s three bug classes are unreachable.
-- **Falsifier:** if it passes ~200 LOC or grows a cache-eviction policy, take TanStack Query instead (`OBS-005/Q1`).
+- `lib/data/resource.svelte.ts` (165 LOC): deps-driven refetch · `loading`/`error`/`data` · `AbortController` on re-fire and unmount · in-flight dedup · `invalidate(prefix)`.
+- `lib/api/stats.ts` reads take an optional `AbortSignal`, so cancellation is real, not just a discarded result.
+- **All 8 DNA components migrated.** Where a chart is involved, fetch and draw are now separate effects. They had written the same guard three different ways; one had none.
+- **Verified in Chromium:** six charts render, no console errors, navigating away mid-load is clean.
+- **Correction — dedup does not close `OBS-005/K3`(b).** It merges only requests in flight *at the same moment*. On `/dna`, `DnaView` and `GenreDistribution` share a key and still make two `/api/stats/library` calls, because the parent gates its children behind its own load. Closing (b) needs a cache with a lifetime — the line P5 agreed not to cross. (a) and (c) *are* closed.
+- **Correction — the done-when metric is wrong as written.** `grep 'let loading = $state' → 0` conflates read state with *mutation* state: the upload flag in `ImportPlaylistDialog` and the save flag in `FixMetadataModal` are not reads and do not belong in a read-resource. Restate as: **no component hand-rolls a *fetch* lifecycle**; mutation flags stay local until a separate `createMutation` earns its place.
+- **Remaining: 18 components.** Reads — `SimilarTracks`, `SetAppearances`, `AlbumGrid`, `AlbumDetail`, `SetPicker`, `SetGrid`, `SetView`, `SetEnergyReview`, `TransitionIndicator`, `InSetTrackSearch`, `AddFromArtistPanel`, `AddSlotPicksPanel`, `AddToSetPicker`, `ReplaceTrackModal`, `TrackView`. Mixed read+mutation — `FixMetadataModal`, `MusicBrainzMatchModal`, `ImportPlaylistDialog`.
+- **Still open:** `AlbumGrid` (debounced search + offset pagination) is the one shape the rune does not serve yet; decide there whether to add `keepPrevious` paging support or leave paging to the caller.
 
 ### P6 — The four missing structural primitives
 
