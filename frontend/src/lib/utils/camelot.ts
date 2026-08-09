@@ -16,7 +16,7 @@ export const CAMELOT_COLORS: Record<string, string> = {
 	'12A': '#9c27b0', '12B': '#e91e63',
 };
 
-export function getCamelotColor(key: string | null): string {
+export function getCamelotColor(key: string | null | undefined): string {
 	if (!key) return '#666';
 	const upper = key.toUpperCase();
 	if (CAMELOT_COLORS[upper]) return CAMELOT_COLORS[upper];

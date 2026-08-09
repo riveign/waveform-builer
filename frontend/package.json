@@ -9,12 +9,15 @@
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"gen:api": "uv run --project .. python ../scripts/gen_openapi.py openapi.json && openapi-typescript openapi.json -o src/lib/api/schema.d.ts",
+		"check:api": "uv run --project .. python ../scripts/gen_openapi.py openapi.json && openapi-typescript openapi.json --check -o src/lib/api/schema.d.ts"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"openapi-typescript": "^7.13.0",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
 		"typescript": "^5.9.3",

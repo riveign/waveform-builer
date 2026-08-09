@@ -1,252 +1,84 @@
-export interface EnergyConflict {
-	dir_energy: string;
-	predicted: string;
-	message: string;
-}
+/**
+ * Types shared across the app.
+ *
+ * Everything the API returns is *generated* from its OpenAPI schema — see
+ * `npm run gen:api`, and `schema.d.ts` next door. These aliases exist so call
+ * sites keep importing `Track` rather than
+ * `components['schemas']['TrackResponse']`, and so a renamed Pydantic field
+ * breaks the build instead of quietly producing undefined at runtime
+ * (docs/notes/OBS-005/K4).
+ *
+ * Below the aliases are the types the API cannot describe: responses from
+ * endpoints declared without a `response_model`, plus a few genuinely
+ * client-side shapes. Every one of those is a small gap in the contract.
+ */
 
-export interface Track {
-	id: number;
-	title: string | null;
-	artist: string | null;
-	album: string | null;
-	label: string | null;
-	bpm: number | null;
-	key: string | null;
-	rating: number | null;
-	genre: string | null;
-	energy: string | null;
-	duration_sec: number | null;
-	play_count: number | null;
-	kiku_play_count: number | null;
-	has_waveform: boolean;
-	has_features: boolean;
-	resolved_energy: string | null;
-	energy_source: string | null;
-	energy_confidence: number | null;
-	energy_value: number | null;
-	energy_label: string | null;
-	energy_conflict: EnergyConflict | null;
-	date_added: string | null;
-	release_year: number | null;
-	track_number: number | null;
-	disc_number: number | null;
-	comment: string | null;
-	playlist_tags: string[];
-	set_roles: string[];
-	genre_family: string | null;
-}
+import type { components } from '$lib/api/schema';
 
-export interface TrackSetAppearance {
-	set_id: number;
-	set_name: string | null;
-	position: number;
-	created_at: string | null;
-}
+type S = components['schemas'];
 
-export interface TrackFeatures {
-	track_id: number;
-	energy: number | null;
-	danceability: number | null;
-	loudness_lufs: number | null;
-	spectral_centroid: number | null;
-	spectral_complexity: number | null;
-	mood_happy: number | null;
-	mood_sad: number | null;
-	mood_aggressive: number | null;
-	mood_relaxed: number | null;
-	vibe_brightness: number | null;
-	vibe_density: number | null;
-	ml_genre: string | null;
-	ml_genre_confidence: number | null;
-	energy_intro: number | null;
-	energy_body: number | null;
-	energy_outro: number | null;
-	verified_bpm: number | null;
-	verified_key: string | null;
-}
+export type ArcAnalysis = S['ArcAnalysisResponse'];
+export type ArcComparison = S['ArcComparisonResponse'];
+export type ArtistPick = S['ArtistPickItem'];
+export type ArtistPicksResponse = S['ArtistPicksResponse'];
+export type BpmBin = S['BpmBin'];
+export type Cue = S['CueResponse'];
+export type DJSet = S['SetResponse'];
+export type EnergyConflict = S['EnergyConflictResponse'];
+export type EnergyDeviation = S['EnergyDeviationResponse'];
+export type HuntListResponse = S['HuntListResponse'];
+export type HuntSession = S['HuntSessionResponse'];
+export type HuntSessionSummary = S['HuntSessionSummary'];
+export type HuntTrack = S['HuntTrackResponse'];
+export type ImportResult = S['ImportResultResponse'];
+export type LibraryStats = S['LibraryStatsResponse'];
+export type MoodPoint = S['MoodPoint'];
+export type PaginatedTracks = S['PaginatedTracksResponse'];
+export type PlannedSetCandidate = S['PlannedSetCandidate'];
+export type ReplacementBreakdown = S['ReplacementBreakdown'];
+export type ReplacementCandidate = S['ReplacementCandidate'];
+export type ReplacementContext = S['ReplacementContext'];
+export type ReplacementSuggestionsResponse = S['ReplacementSuggestionsResponse'];
+export type SCLikesResponse = S['SCLikesResponse'];
+export type SCPlaylist = S['SCPlaylistResponse'];
+export type SCStatus = S['SCStatusResponse'];
+export type SCTrack = S['SCTrackResponse'];
+export type ScoringWeights = S['ScoringWeightsResponse'];
+export type SetAnalysis = S['SetAnalysisResponse'];
+/** Request body. Fields with server-side defaults are optional for callers —
+ *  the generator marks them required because the server always fills them. */
+export type SetBuildParams = Partial<S['SetBuildRequest']> & Pick<S['SetBuildRequest'], 'name'>;
+export type SetComparison = S['SetComparisonResponse'];
+export type SetCreateParams = Partial<S['SetCreateRequest']> & Pick<S['SetCreateRequest'], 'name'>;
+export type SetDetail = S['SetDetailResponse'];
+export type SetTrack = S['SetTrackResponse'];
+export type SetUpdateParams = Partial<S['SetUpdateRequest']>;
+export type SetWaveformTrack = S['SetWaveformTrackResponse'];
+export type SlotSuggestion = S['SlotSuggestionItem'];
+export type SlotSuggestionsResponse = S['SlotSuggestionsResponse'];
+export type SuggestNextItem = S['SuggestNextItem'];
+export type SuggestNextResponse = S['SuggestNextResponse'];
+export type TinderBatchDecision = S['TinderDecideRequest'];
+export type TinderBatchResult = S['TinderBatchDecideResponse'];
+export type TinderDecideResult = S['TinderDecideResponse'];
+export type TinderQueueItem = S['TinderQueueItem'];
+export type TinderQueueResponse = S['TinderQueueResponse'];
+export type TinderRetrainResult = S['TinderRetrainResponse'];
+export type TinderStats = S['TinderStatsResponse'];
+export type Track = S['TrackResponse'];
+export type TrackDeviation = S['TrackDeviationResponse'];
+export type TrackFeatures = S['TrackFeaturesResponse'];
+export type TrackSetAppearance = S['TrackSetAppearance'];
+export type TrackSummary = S['TrackSummary'];
+export type TransitionAnalysis = S['TransitionAnalysisResponse'];
+export type TransitionDetail = S['TransitionResponse'];
+export type TransitionScoreBreakdown = S['TransitionScoreBreakdown'];
+export type UnmatchedTrack = S['UnmatchedTrack'];
+export type WaveformBandsData = S['WaveformBandsResponse'];
+export type WaveformData = S['WaveformResponse'];
+export type WaveformDetailData = S['WaveformDetailResponse'];
 
-export interface WaveformData {
-	envelope: string;
-	sr: number;
-	hop: number;
-	duration_sec: number;
-}
-
-export interface WaveformDetailData extends WaveformData {
-	beats: string | null;
-}
-
-export interface WaveformBandsData {
-	low: string;
-	midlow: string;
-	midhigh: string;
-	high: string;
-	sr: number;
-	hop: number;
-	duration_sec: number;
-}
-
-export interface DJSet {
-	id: number;
-	name: string | null;
-	created_at: string | null;
-	duration_min: number | null;
-	track_count: number;
-	source: string | null;
-	deleted_at?: string | null;
-}
-
-export interface SetDetail {
-	id: number;
-	name: string | null;
-	created_at: string | null;
-	duration_min: number | null;
-	energy_profile: string | null;
-	genre_filter: string | null;
-	source: string | null;
-	planned_set_id: number | null;
-	tracks: SetTrack[];
-}
-
-export interface SetTrack {
-	position: number;
-	track_id: number;
-	title: string | null;
-	artist: string | null;
-	bpm: number | null;
-	key: string | null;
-	genre: string | null;
-	energy: string | null;
-	duration_sec: number | null;
-	transition_score: number | null;
-	has_waveform: boolean;
-	resolved_energy: string | null;
-	energy_source: string | null;
-	energy_confidence: number | null;
-	energy_value: number | null;
-	energy_label: string | null;
-	energy_conflict: EnergyConflict | null;
-}
-
-export interface SetWaveformTrack {
-	position: number;
-	track_id: number;
-	title: string | null;
-	artist: string | null;
-	bpm: number | null;
-	key: string | null;
-	genre: string | null;
-	energy: string | null;
-	duration_sec: number | null;
-	transition_score: number | null;
-	waveform_overview: string | null;
-	resolved_energy: string | null;
-	energy_source: string | null;
-	energy_confidence: number | null;
-	energy_value: number | null;
-	energy_label: string | null;
-	energy_conflict: EnergyConflict | null;
-}
-
-export interface TransitionScoreBreakdown {
-	harmonic: number;
-	energy_fit: number;
-	bpm_compat: number;
-	genre_coherence: number;
-	track_quality: number;
-	total: number;
-	discovery_label?: string | null;
-	set_appearances?: number | null;
-}
-
-export interface TransitionDetail {
-	position: number;
-	track_a: SetTrack;
-	track_b: SetTrack;
-	score_breakdown: TransitionScoreBreakdown;
-	bpm_a: number | null;
-	bpm_b: number | null;
-	key_a: string | null;
-	key_b: string | null;
-	waveform_a_overview: string | null;
-	waveform_b_overview: string | null;
-	beats_a: string | null;
-	beats_b: string | null;
-}
-
-export interface TransitionAnalysis {
-	position: number;
-	track_a_id: number;
-	track_b_id: number;
-	scores: TransitionScoreBreakdown & { total: number };
-	teaching_moment: string;
-	suggestion: string | null;
-}
-
-export interface ArcAnalysis {
-	energy_curve: number[];
-	energy_shape: string;
-	key_journey: (string | null)[];
-	key_style: string;
-	bpm_range: [number, number];
-	bpm_drift: number;
-	bpm_style: string;
-	genre_segments: { genre_family: string; start_pos: number; end_pos: number }[];
-}
-
-export interface SetAnalysis {
-	set_id: number;
-	track_count: number;
-	transition_count: number;
-	transitions: TransitionAnalysis[];
-	arc: ArcAnalysis;
-	overall_score: number;
-	set_patterns: string[];
-	analyzed_at: string;
-}
-
-export interface Cue {
-	id: number;
-	set_id: number;
-	track_id: number;
-	position: number;
-	name: string;
-	cue_type: string;
-	start_sec: number;
-	end_sec: number | null;
-	hot_cue_num: number;
-	color: string | null;
-	created_at: string | null;
-}
-
-export interface LibraryStats {
-	total_tracks: number;
-	analyzed_tracks: number;
-	genres: Record<string, number>;
-	energies: Record<string, number>;
-	bpm_min: number | null;
-	bpm_max: number | null;
-	bpm_avg: number | null;
-	keys: Record<string, number>;
-	top_artists: Record<string, number>;
-}
-
-export interface BpmBin {
-	bin_center: number;
-	family: string;
-	count: number;
-}
-
-export interface MoodPoint {
-	title: string;
-	artist: string;
-	x: number;
-	y: number;
-	energy: number;
-	genre_family: string;
-}
-
-// ── Library gaps & enhanced stats ──
+// ── Not in the OpenAPI schema ──
 
 export interface CamelotGap {
 	position: string;
@@ -315,35 +147,6 @@ export interface EnhancedStatsResponse {
 
 // ── Scoring weights ──
 
-export interface ScoringWeights {
-	harmonic: number;
-	energy_fit: number;
-	bpm_compat: number;
-	genre_coherence: number;
-	track_quality: number;
-}
-
-// ── Set mutation types ──
-
-export interface SetBuildParams {
-	name: string;
-	duration_min?: number;
-	energy_preset?: string;
-	genre_filter?: string[] | null;
-	bpm_min?: number | null;
-	bpm_max?: number | null;
-	seed_track_id?: number | null;
-	end_track_id?: number | null;
-	beam_width?: number;
-	playlist_preference?: string[] | null;
-	weights?: ScoringWeights;
-	discovery_density?: number;
-	vibe_preset?: string | null;
-	vibe_intensity?: number;
-	preferred_artists?: string[] | null;
-	artist_intensity?: number;
-}
-
 export interface VibePreset {
 	name: string;
 	brightness: number;
@@ -358,342 +161,4 @@ export interface SetBuildComplete {
 	duration_min: number;
 }
 
-export interface SetCreateParams {
-	name: string;
-	energy_profile?: string | null;
-	genre_filter?: string[] | null;
-	source?: string | null;
-}
-
-export interface SetUpdateParams {
-	name?: string | null;
-	energy_profile?: string | null;
-	genre_filter?: string[] | null;
-}
-
-// ── Suggest-next types ──
-
-export interface SuggestNextItem {
-	track: Track;
-	score: number;
-	breakdown: TransitionScoreBreakdown;
-}
-
-export interface SuggestNextResponse {
-	source_track_id: number;
-	suggestions: SuggestNextItem[];
-}
-
-// ── Paginated response ──
-
-export interface PaginatedTracks {
-	items: Track[];
-	total: number;
-	offset: number;
-	limit: number;
-	/** True when these are fuzzy "did you mean" matches, not exact results. */
-	fuzzy?: boolean;
-}
-
-// ── Energy Tinder types ──
-
-export interface TinderQueueItem {
-	track: Track;
-	energy_predicted: string | null;
-	energy_confidence: number | null;
-	mood_happy: number | null;
-	mood_sad: number | null;
-	mood_aggressive: number | null;
-	mood_relaxed: number | null;
-	has_waveform: boolean;
-}
-
-export interface TinderQueueResponse {
-	items: TinderQueueItem[];
-	total: number;
-	offset: number;
-	limit: number;
-}
-
 export type TinderDecision = 'confirm' | 'override' | 'skip';
-
-export interface TinderDecideResult {
-	track_id: number;
-	decision: string;
-	applied_zone: string | null;
-	teaching_moment: string | null;
-}
-
-export interface TinderBatchDecision {
-	track_id: number;
-	decision: TinderDecision;
-	override_zone?: string;
-}
-
-export interface TinderBatchResult {
-	results: TinderDecideResult[];
-}
-
-export interface TinderStats {
-	total_reviewed: number;
-	confirmed: number;
-	overridden: number;
-	skipped: number;
-	queue_remaining: number;
-	confirmed_pct: number;
-	overridden_pct: number;
-	skip_pct: number;
-	retrain_suggested: boolean;
-	retrain_threshold: number;
-}
-
-export interface TinderRetrainResult {
-	accuracy: number | null;
-	class_counts: Record<string, number>;
-	feature_importance: [string, number][];
-	training_samples: number;
-}
-
-// ── Track Hunter types ──
-
-export interface HuntTrack {
-	id: number;
-	position: number;
-	artist: string | null;
-	title: string | null;
-	remix_info: string | null;
-	original_title: string | null;
-	confidence: number;
-	source: string | null;
-	timestamp_sec: number | null;
-	matched_track_id: number | null;
-	match_score: number | null;
-	acquisition_status: string;
-	purchase_links: Record<string, string>;
-	raw_text: string | null;
-	external_url: string | null;
-}
-
-export interface HuntSession {
-	id: number;
-	url: string;
-	platform: string | null;
-	title: string | null;
-	uploader: string | null;
-	status: string;
-	track_count: number;
-	owned_count: number;
-	created_at: string | null;
-	tracks: HuntTrack[];
-}
-
-export interface HuntSessionSummary {
-	id: number;
-	url: string;
-	platform: string | null;
-	title: string | null;
-	uploader: string | null;
-	status: string;
-	track_count: number;
-	owned_count: number;
-	created_at: string | null;
-}
-
-export interface HuntListResponse {
-	items: HuntSessionSummary[];
-	total: number;
-	offset: number;
-	limit: number;
-}
-
-// ── Replace Track types ──
-
-export interface ReplacementBreakdown {
-	harmonic: number;
-	energy_fit: number;
-	bpm_compat: number;
-	genre_coherence: number;
-	track_quality: number;
-	total: number;
-	discovery_label?: string | null;
-	set_appearances?: number | null;
-}
-
-export interface ReplacementCandidate {
-	track: Track;
-	combined_score: number;
-	incoming_breakdown: ReplacementBreakdown | null;
-	outgoing_breakdown: ReplacementBreakdown | null;
-}
-
-export interface TrackSummary {
-	track_id: number;
-	title: string | null;
-	artist: string | null;
-	bpm: number | null;
-	key: string | null;
-	genre: string | null;
-}
-
-export interface ReplacementContext {
-	prev_track: TrackSummary | null;
-	next_track: TrackSummary | null;
-	energy_target: number;
-	position: number;
-}
-
-export interface ReplacementSuggestionsResponse {
-	context: ReplacementContext;
-	candidates: ReplacementCandidate[];
-}
-
-export interface ArtistPick {
-	track: Track;
-	position: number;
-	score: number;
-	breakdown: TransitionScoreBreakdown | null;
-	reason: string;
-}
-
-export interface ArtistPicksResponse {
-	set_id: number;
-	artist: string;
-	picks: ArtistPick[];
-}
-
-export interface SlotSuggestion {
-	track: Track;
-	from_key: string | null;
-	to_key: string | null;
-	move: string;
-	energy_shift: number;
-	score: number;
-	incoming_breakdown: ReplacementBreakdown | null;
-	outgoing_breakdown: ReplacementBreakdown | null;
-	caveat: string | null;
-}
-
-export interface SlotSuggestionsResponse {
-	set_id: number;
-	position: number;
-	mode: string;
-	intent: string;
-	allowed_keys: string[] | null;
-	energy_delta: number;
-	suggestions: SlotSuggestion[];
-}
-
-// ── Import Playlist types ──
-
-export interface UnmatchedTrack {
-	path: string;
-	title: string | null;
-	line: number;
-}
-
-export interface ImportResult {
-	set_id: number;
-	name: string;
-	source: string;
-	total_tracks: number;
-	matched_count: number;
-	unmatched_count: number;
-	unmatched_paths: UnmatchedTrack[];
-	match_methods: Record<string, number>;
-	warnings: string[];
-	duplicate_set_id: number | null;
-	planned_candidates: PlannedSetCandidate[];
-}
-
-export interface PlannedSetCandidate {
-	set_id: number;
-	name: string | null;
-	overlap: number;
-	shared_tracks: number;
-}
-
-// ── Played vs Planned comparison types ──
-
-export interface TrackDeviation {
-	kind: 'kept' | 'moved' | 'cut' | 'added';
-	track_id: number;
-	title: string | null;
-	artist: string | null;
-	planned_position: number | null;
-	played_position: number | null;
-	displacement: number | null;
-	teaching_moment: string;
-}
-
-export interface EnergyDeviation {
-	position: number;
-	track_id: number;
-	planned_energy: number;
-	played_energy: number;
-	delta: number;
-	teaching_moment: string;
-}
-
-export interface ArcComparison {
-	planned_shape: string;
-	played_shape: string;
-	planned_key_style: string;
-	played_key_style: string;
-	planned_bpm_style: string;
-	played_bpm_style: string;
-	planned_bpm_range: number[];
-	played_bpm_range: number[];
-	bpm_drift_delta: number;
-	planned_curve: number[];
-	played_curve: number[];
-}
-
-export interface SetComparison {
-	played_set_id: number;
-	planned_set_id: number;
-	played_name: string | null;
-	planned_name: string | null;
-	kept_count: number;
-	moved_count: number;
-	cut_count: number;
-	added_count: number;
-	track_deviations: TrackDeviation[];
-	energy_deviations: EnergyDeviation[];
-	arc: ArcComparison;
-	deviation_patterns: string[];
-	compared_at: string;
-}
-
-// ── SoundCloud types ──
-
-export interface SCStatus {
-	connected: boolean;
-	username: string | null;
-	avatar_url: string | null;
-	user_id: string | null;
-}
-
-export interface SCPlaylist {
-	id: number;
-	title: string;
-	track_count: number;
-	permalink_url: string;
-	artwork_url: string | null;
-	duration_ms: number;
-}
-
-export interface SCTrack {
-	id: number;
-	title: string;
-	artist: string | null;
-	permalink_url: string;
-	artwork_url: string | null;
-	duration_ms: number;
-	genre: string | null;
-	bpm: number | null;
-}
-
-export interface SCLikesResponse {
-	tracks: SCTrack[];
-	next_cursor: string | null;
-}

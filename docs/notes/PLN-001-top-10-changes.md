@@ -38,7 +38,7 @@ pace of `OBS-001/E7`.
 | **P4** ✅ | A real route table with URL state — *done 2026-08-09* | `OBS-004/K3,K4`, `CLM-002/K3` | 3–5 d | P6, P8; deep links |
 | **P5** ✅ | `createResource` — one data-orchestration rune — *done 2026-08-09* | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
 | **P6** ✅ | The four missing structural primitives — *done 2026-08-09* | `OBS-008/K2,K3` | 3–4 d | collapses ~2,700 LOC |
-| **P7** | Generate TS types from OpenAPI | `OBS-005/K4`, `CLM-003/E2` | 1 d | removes a 5-edit boundary |
+| **P7** ✅ | Generate TS types from OpenAPI — *done 2026-08-09* | `OBS-005/K4`, `CLM-003/E2` | 1 d | removes a 5-edit boundary |
 | **P8** | Frontend test foundation | `OBS-002/K3`, `CLM-003/K3` | 3–4 d | frontend confidence |
 | **P9** | Extract a service layer, starting with sets | `OBS-006/K2,K3`, `CLM-001/K5` | 4–6 d | Rust port; CLI/API parity |
 | **P10** | Cover the sequencing modules | `CLM-003/R6`, `OBS-002/E9` | 2–3 d | correctness of set building |
@@ -127,12 +127,16 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 
 - **Adoption is partial and not overclaimed:** `Input` in two `FillReorderDialog` fields and the set-name field; `EmptyState` on `/track`. `Skeleton` is documented but not yet adopted. Broader rollout is follow-on.
 
-### P7 — Generate TS types from OpenAPI
+### P7 — Generate TS types from OpenAPI ✅ **DONE 2026-08-09**
 
-- `openapi-typescript` against the FastAPI schema, as an npm script + a CI check that the committed output is current.
-- Delete the hand-written half of `lib/types/index.ts` (699 LOC); keep only client-side types.
-- **Done when:** renaming a Pydantic field turns CI red with nobody watching.
-- **After P3** — the value is the check, and the check needs a gate.
+- `scripts/gen_openapi.py` dumps the schema straight from the FastAPI app — **no running server**, so CI regenerates deterministically. Sorted keys, stable diff.
+- `npm run gen:api` regenerates; **`npm run check:api` gates it in CI**.
+- `lib/types/index.ts`: **699 → 164 lines**; 58 of 71 types are aliases onto the generated schema, so call sites still import `Track`.
+- **34 real mismatches surfaced** — every one a field the client assumed but the API doesn't guarantee. Mostly `T | null | undefined` hitting a `T | null` signature; fixed by widening the few outlier helpers rather than 25 × `?? null`.
+- **One fixed at the source:** `scores: dict` in `TransitionAnalysisResponse` reached the client as `{[key: string]: unknown}`, so `scores.total` was untyped. It has always held exactly `TransitionScoreBreakdown`'s shape (`set_analyzer.py:272`). Typing it killed three client errors at once and made the contract real.
+- **Request bodies need care:** openapi-typescript marks defaulted fields required — correct for a response, wrong for a request. `SetBuildParams` and friends are `Partial<>` with only the genuinely required keys picked.
+- **Gate verified:** renaming `teaching_moment` in `schemas.py` turns `check:api` red with *"Generated types are not up-to-date!"*.
+- **Still hand-written (13):** responses from endpoints declared with no `response_model` — the gaps/enhanced-stats family, `VibePreset`, `SetBuildComplete`. Each is a small hole in the contract, and a natural follow-on.
 
 ### P8 — Frontend test foundation
 

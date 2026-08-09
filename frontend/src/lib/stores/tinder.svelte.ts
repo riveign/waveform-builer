@@ -47,7 +47,7 @@ async function decide(decision: TinderDecision, overrideZone?: string) {
 		else if (decision === 'override') sessionOverridden++;
 		else sessionSkipped++;
 
-		lastTeachingMoment = result.teaching_moment;
+		lastTeachingMoment = result.teaching_moment ?? null;
 		currentIndex++;
 	} catch (e) {
 		error = e instanceof Error ? e.message : String(e);

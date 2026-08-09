@@ -91,7 +91,7 @@
 
 	let filtered = $derived(sets);
 
-	function sourceLabel(source: string | null): string {
+	function sourceLabel(source: string | null | undefined): string {
 		switch (source) {
 			case 'm3u8':
 				return 'imported';
@@ -106,7 +106,7 @@
 		}
 	}
 
-	function shortDate(iso: string | null): string {
+	function shortDate(iso: string | null | undefined): string {
 		if (!iso) return '';
 		const d = new Date(iso);
 		if (Number.isNaN(d.getTime())) return '';

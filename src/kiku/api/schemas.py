@@ -625,7 +625,10 @@ class TransitionAnalysisResponse(BaseModel):
     position: int
     track_a_id: int
     track_b_id: int
-    scores: dict
+    # Was a bare `dict`, which reached the client as `{[key: string]: unknown}` and
+    # made `scores.total` untyped. It has always held exactly this shape —
+    # set_analyzer builds it literally (analysis/set_analyzer.py:272).
+    scores: TransitionScoreBreakdown
     teaching_moment: str
     suggestion: str | None = None
 

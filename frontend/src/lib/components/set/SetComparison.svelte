@@ -35,7 +35,7 @@
 	);
 
 	function badgeLabel(d: TrackDeviation): string {
-		if (d.kind === 'moved' && d.displacement !== null) {
+		if (d.kind === 'moved' && d.displacement != null) {
 			return d.displacement > 0 ? `moved +${d.displacement}` : `moved ${d.displacement}`;
 		}
 		return d.kind;

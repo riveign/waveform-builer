@@ -29,7 +29,7 @@
 		onselect,
 		inline = false,
 	}: {
-		current: string | null;
+		current: string | null | undefined;
 		onselect: (zone: string) => void;
 		inline?: boolean;
 	} = $props();

@@ -49,8 +49,8 @@ export function getTrackEnergyNumeric(
 }
 
 /** Energy bar color based on numeric value. */
-export function energyColor(value: number | null): string {
-	if (value === null) return 'var(--text-dim)';
+export function energyColor(value: number | null | undefined): string {
+	if (value == null) return 'var(--text-dim)';
 	if (value < 0.4) return 'var(--energy-low)';
 	if (value < 0.65) return 'var(--energy-mid)';
 	return 'var(--energy-high)';
