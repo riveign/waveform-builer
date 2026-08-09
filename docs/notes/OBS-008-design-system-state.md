@@ -12,6 +12,13 @@ superseded-by: null
 Spec 023 built a design system and migrated twelve surfaces to it. This note measures what
 actually stuck, and whether components compose or merely coexist.
 
+> **Re-check 2026-08-09 — [[PLN-001]]/P6.** **K2 is closed**: the four structural
+> primitives exist and all six dialogs share one shell. **K3's LOC estimate was wrong** —
+> the dialogs shrank 10%, not the ~40% implied, because chrome was ~50 lines each and the
+> rest is domain content. **K4 half-closed**: the gallery now documents every primitive,
+> but nothing still verifies it stays in sync. E2's 123 hex literals are largely untouched.
+> **K5 stands, weakened**: behaviour composes better than it did, not yet fully.
+
 ## D — Definitions
 
 - **D1 · Primitive.** A component with no domain knowledge — usable on any surface.
