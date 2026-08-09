@@ -8,38 +8,26 @@
 	import LibraryGaps from './LibraryGaps.svelte';
 	import Spinner from '$lib/components/Spinner.svelte';
 	import { getLibraryStats } from '$lib/api/stats';
+	import { createResource } from '$lib/data/resource.svelte';
 
 	// A fingerprint needs enough analyzed tracks to mean anything — below this
 	// the charts would read as noise, so we show a warm "too quiet" empty state.
 	const MIN_ANALYZED = 20;
 
-	let loading = $state(true);
-	let error = $state<string | null>(null);
-	let analyzed = $state(0);
-
-	$effect(() => {
-		let cancelled = false;
-
-		(async () => {
-			loading = true;
-			error = null;
-			try {
-				const stats = await getLibraryStats();
-				if (cancelled) return;
-				analyzed = stats.analyzed_tracks;
-			} catch {
-				if (cancelled) return;
-				error =
-					"Couldn't read your library to draw its fingerprint. The library may be mid-sync — give it a moment and try again.";
-			} finally {
-				if (!cancelled) loading = false;
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
+	// Same key as GenreDistribution, but they do not actually share a flight: this
+	// view gates its children behind its own load, and de-duplication cannot help
+	// sequential callers. See resource.svelte.ts.
+	const res = createResource(() => ({}), (_a, signal) => getLibraryStats(signal), {
+		key: () => 'stats:library',
 	});
+	const loading = $derived(res.loading);
+	const error = $derived(
+		res.error
+			? "Couldn't read your library to draw its fingerprint. The library may be mid-sync — give it a moment and try again."
+			: null,
+	);
+	const analyzed = $derived(res.data?.analyzed_tracks ?? 0);
+
 </script>
 
 <div class="dna-view">

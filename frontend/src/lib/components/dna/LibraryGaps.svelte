@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { getLibraryGaps } from '$lib/api/stats';
-	import type { LibraryGapsResponse, CamelotGap, BpmGap, EnergyGap } from '$lib/types';
+	import { createResource } from '$lib/data/resource.svelte';
+	import type { CamelotGap, BpmGap, EnergyGap } from '$lib/types';
 
-	let data = $state<LibraryGapsResponse | null>(null);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	const gaps = createResource(() => ({}), (_a, signal) => getLibraryGaps(signal), {
+		key: () => 'stats:gaps',
+	});
+	const data = $derived(gaps.data ?? null);
+	const loading = $derived(gaps.loading);
+	const error = $derived(gaps.error);
 
 	// Severity heat for gap counts. Mapped onto the token book so the swatch reads
 	// in-palette: critical → destructive, medium → amber, low → score-good.
@@ -14,23 +18,6 @@
 		return 'var(--score-good)';
 	}
 
-	$effect(() => {
-		let cancelled = false;
-		getLibraryGaps()
-			.then((result) => {
-				if (!cancelled) {
-					data = result;
-					loading = false;
-				}
-			})
-			.catch((err) => {
-				if (!cancelled) {
-					error = err instanceof Error ? err.message : "Couldn't load gap analysis — try refreshing";
-					loading = false;
-				}
-			});
-		return () => { cancelled = true; };
-	});
 </script>
 
 <div class="library-gaps">

@@ -2,15 +2,19 @@
 	import { Chart, ScatterController, LinearScale, PointElement, Tooltip, Legend } from 'chart.js';
 	import type { MoodPoint } from '$lib/types';
 	import { getMoodScatter } from '$lib/api/stats';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { familyColors, chartChrome } from '$lib/styles/canvasPalette';
 
 	Chart.register(ScatterController, LinearScale, PointElement, Tooltip, Legend);
 
 	let canvas: HTMLCanvasElement | undefined = $state();
 	let chart: Chart | null = $state(null);
-	let data: MoodPoint[] | null = $state(null);
-	let loading = $state(true);
-	let error: string | null = $state(null);
+	const res = createResource(() => ({}), (_a, signal) => getMoodScatter(signal), {
+		key: () => 'stats:mood-scatter',
+	});
+	const data = $derived(res.data ?? null);
+	const loading = $derived(res.loading);
+	const error = $derived(res.error);
 
 	function buildChart(el: HTMLCanvasElement, points: MoodPoint[]) {
 		const colors = familyColors();
@@ -159,23 +163,6 @@
 	}
 
 	// Fetch data on mount
-	$effect(() => {
-		let cancelled = false;
-		getMoodScatter()
-			.then((result) => {
-				if (!cancelled) {
-					data = result;
-					loading = false;
-				}
-			})
-			.catch((err) => {
-				if (!cancelled) {
-					error = err instanceof Error ? err.message : "Couldn't load mood data — try refreshing";
-					loading = false;
-				}
-			});
-		return () => { cancelled = true; };
-	});
 
 	// Build/rebuild chart when canvas and data are both ready
 	$effect(() => {
