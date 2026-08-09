@@ -14,8 +14,8 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 logger = logging.getLogger(__name__)
 
 # RMS normalization anchors (measured from library)
-_RMS_FLOOR = 0.02   # silence / near-silent recordings
-_RMS_CEIL = 0.50    # loudest mastered tracks (~-5 LUFS)
+_RMS_FLOOR = 0.02  # silence / near-silent recordings
+_RMS_CEIL = 0.50  # loudest mastered tracks (~-5 LUFS)
 
 
 def _rms_to_energy(rms_val: float) -> float:
@@ -29,6 +29,7 @@ def _rms_to_energy(rms_val: float) -> float:
     if rms_val >= _RMS_CEIL:
         return 1.0
     import math
+
     log_val = math.log(rms_val)
     log_floor = math.log(_RMS_FLOOR)
     log_ceil = math.log(_RMS_CEIL)
@@ -44,6 +45,7 @@ def _resolve_model_path(filename: str) -> str | None:
 
     try:
         import essentia
+
         for base in essentia.__path__:
             candidate = Path(base) / filename
             if candidate.exists():
@@ -124,9 +126,13 @@ def extract_essentia_features(
     intro_end = int(total * 0.15)
     outro_start = int(total * 0.85)
 
-    results["energy_intro"] = _rms_to_energy(float(rms(audio[:intro_end]))) if intro_end > 0 else 0.0
+    results["energy_intro"] = (
+        _rms_to_energy(float(rms(audio[:intro_end]))) if intro_end > 0 else 0.0
+    )
     results["energy_body"] = _rms_to_energy(float(rms(audio[intro_end:outro_start])))
-    results["energy_outro"] = _rms_to_energy(float(rms(audio[outro_start:]))) if outro_start < total else 0.0
+    results["energy_outro"] = (
+        _rms_to_energy(float(rms(audio[outro_start:]))) if outro_start < total else 0.0
+    )
 
     return results
 
@@ -145,8 +151,8 @@ def extract_essentia_mood(
     try:
         from essentia.standard import (
             MonoLoader,
-            TensorflowPredictMusiCNN,
             TensorflowPredict2D,
+            TensorflowPredictMusiCNN,
         )
     except ImportError:
         return {}
@@ -186,24 +192,41 @@ def extract_essentia_mood(
 
 # Camelot wheel mapping
 _KEY_TO_CAMELOT = {
-    ("C", "major"): "8B", ("C", "minor"): "5A",
-    ("C#", "major"): "3B", ("C#", "minor"): "12A",
-    ("D", "major"): "10B", ("D", "minor"): "7A",
-    ("D#", "major"): "5B", ("D#", "minor"): "2A",
-    ("E", "major"): "12B", ("E", "minor"): "9A",
-    ("F", "major"): "7B", ("F", "minor"): "4A",
-    ("F#", "major"): "2B", ("F#", "minor"): "11A",
-    ("G", "major"): "9B", ("G", "minor"): "6A",
-    ("G#", "major"): "4B", ("G#", "minor"): "1A",
-    ("A", "major"): "11B", ("A", "minor"): "8A",
-    ("A#", "major"): "6B", ("A#", "minor"): "3A",
-    ("B", "major"): "1B", ("B", "minor"): "10A",
+    ("C", "major"): "8B",
+    ("C", "minor"): "5A",
+    ("C#", "major"): "3B",
+    ("C#", "minor"): "12A",
+    ("D", "major"): "10B",
+    ("D", "minor"): "7A",
+    ("D#", "major"): "5B",
+    ("D#", "minor"): "2A",
+    ("E", "major"): "12B",
+    ("E", "minor"): "9A",
+    ("F", "major"): "7B",
+    ("F", "minor"): "4A",
+    ("F#", "major"): "2B",
+    ("F#", "minor"): "11A",
+    ("G", "major"): "9B",
+    ("G", "minor"): "6A",
+    ("G#", "major"): "4B",
+    ("G#", "minor"): "1A",
+    ("A", "major"): "11B",
+    ("A", "minor"): "8A",
+    ("A#", "major"): "6B",
+    ("A#", "minor"): "3A",
+    ("B", "major"): "1B",
+    ("B", "minor"): "10A",
     # Enharmonic equivalents
-    ("Db", "major"): "3B", ("Db", "minor"): "12A",
-    ("Eb", "major"): "5B", ("Eb", "minor"): "2A",
-    ("Gb", "major"): "2B", ("Gb", "minor"): "11A",
-    ("Ab", "major"): "4B", ("Ab", "minor"): "1A",
-    ("Bb", "major"): "6B", ("Bb", "minor"): "3A",
+    ("Db", "major"): "3B",
+    ("Db", "minor"): "12A",
+    ("Eb", "major"): "5B",
+    ("Eb", "minor"): "2A",
+    ("Gb", "major"): "2B",
+    ("Gb", "minor"): "11A",
+    ("Ab", "major"): "4B",
+    ("Ab", "minor"): "1A",
+    ("Bb", "major"): "6B",
+    ("Bb", "minor"): "3A",
 }
 
 

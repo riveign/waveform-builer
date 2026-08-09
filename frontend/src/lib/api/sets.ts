@@ -18,23 +18,23 @@ import type {
 } from '$lib/types';
 import { API_BASE, fetchJson } from './client';
 
-export async function listSets(search?: string, limit = 20): Promise<DJSet[]> {
+export async function listSets(search?: string, limit = 20, signal?: AbortSignal): Promise<DJSet[]> {
 	const qs = new URLSearchParams();
 	if (search) qs.set('search', search);
 	qs.set('limit', String(limit));
-	return fetchJson<DJSet[]>(`/api/sets?${qs}`);
+	return fetchJson<DJSet[]>(`/api/sets?${qs}`, { signal });
 }
 
-export async function getSet(id: number): Promise<SetDetail> {
-	return fetchJson<SetDetail>(`/api/sets/${id}`);
+export async function getSet(id: number, signal?: AbortSignal): Promise<SetDetail> {
+	return fetchJson<SetDetail>(`/api/sets/${id}`, { signal });
 }
 
-export async function getSetWaveforms(id: number): Promise<SetWaveformTrack[]> {
-	return fetchJson<SetWaveformTrack[]>(`/api/sets/${id}/waveforms`);
+export async function getSetWaveforms(id: number, signal?: AbortSignal): Promise<SetWaveformTrack[]> {
+	return fetchJson<SetWaveformTrack[]>(`/api/sets/${id}/waveforms`, { signal });
 }
 
-export async function getTransition(setId: number, index: number): Promise<TransitionDetail> {
-	return fetchJson<TransitionDetail>(`/api/sets/${setId}/transition/${index}`);
+export async function getTransition(setId: number, index: number, signal?: AbortSignal): Promise<TransitionDetail> {
+	return fetchJson<TransitionDetail>(`/api/sets/${setId}/transition/${index}`, { signal });
 }
 
 export async function getCues(setId: number, trackId: number): Promise<Cue[]> {
@@ -78,8 +78,8 @@ export async function deleteSet(id: number): Promise<void> {
 }
 
 /** List soft-deleted sets (the trash), most recently deleted first. */
-export async function getDeletedSets(): Promise<DJSet[]> {
-	return fetchJson<DJSet[]>('/api/sets/deleted');
+export async function getDeletedSets(signal?: AbortSignal): Promise<DJSet[]> {
+	return fetchJson<DJSet[]>('/api/sets/deleted', { signal });
 }
 
 /** Recover a soft-deleted set from the trash. */
@@ -192,35 +192,40 @@ export async function getReplacements(
 	setId: number,
 	position: number,
 	n = 10,
-	genreFilter?: string
+	genreFilter?: string,
+	signal?: AbortSignal
 ): Promise<ReplacementSuggestionsResponse> {
 	const qs = new URLSearchParams({ n: String(n) });
 	if (genreFilter) qs.set('genre_filter', genreFilter);
 	return fetchJson<ReplacementSuggestionsResponse>(
-		`/api/sets/${setId}/tracks/${position}/replacements?${qs}`
+		`/api/sets/${setId}/tracks/${position}/replacements?${qs}`,
+		{ signal }
 	);
 }
 
 export async function getArtistPicks(
 	setId: number,
 	artist: string,
-	n = 5
+	n = 5,
+	signal?: AbortSignal
 ): Promise<ArtistPicksResponse> {
 	const qs = new URLSearchParams({ artist, n: String(n) });
-	return fetchJson<ArtistPicksResponse>(`/api/sets/${setId}/artist-picks?${qs}`);
+	return fetchJson<ArtistPicksResponse>(`/api/sets/${setId}/artist-picks?${qs}`, { signal });
 }
 
 export async function getSlotSuggestions(
 	setId: number,
 	position: number,
-	opts: { mode: string; intent: string; allowedKeys?: string; energyDelta?: number; n?: number }
+	opts: { mode: string; intent: string; allowedKeys?: string; energyDelta?: number; n?: number },
+	signal?: AbortSignal
 ): Promise<SlotSuggestionsResponse> {
 	const qs = new URLSearchParams({ mode: opts.mode, intent: opts.intent });
 	if (opts.allowedKeys) qs.set('allowed_keys', opts.allowedKeys);
 	if (opts.energyDelta !== undefined) qs.set('energy_delta', String(opts.energyDelta));
 	if (opts.n !== undefined) qs.set('n', String(opts.n));
 	return fetchJson<SlotSuggestionsResponse>(
-		`/api/sets/${setId}/slots/${position}/suggestions?${qs}`
+		`/api/sets/${setId}/slots/${position}/suggestions?${qs}`,
+		{ signal }
 	);
 }
 

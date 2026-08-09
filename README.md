@@ -13,21 +13,23 @@ Learn why your transitions work — not just find the next track, but build the 
 
 ## Installation
 
+Kiku needs Python 3.11+ and [uv](https://docs.astral.sh/uv/), which installs the exact
+versions pinned in `uv.lock` so every machine ends up the same.
+
 ```bash
-# Clone
 git clone git@github.com:riveign/waveform-builer.git
 cd waveform-builer
 
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
+# Python env + frontend deps, both from lockfiles
+./scripts/setup.sh
 
-# Install core + API
-pip install -e ".[api]"
-
-# For full audio analysis (optional, requires essentia + librosa)
-pip install -e ".[analysis]"
+# Skip the audio-analysis stack (essentia, librosa, tensorflow) if you won't
+# be running `kiku analyze` — CI and frontend work don't need it
+./scripts/setup.sh --lean
 ```
+
+The database builds itself from the migration chain the first time you run anything.
+Point Kiku at a different library with `KIKU_DB_PATH=/path/to/library.db`.
 
 ## Quick Start
 

@@ -9,6 +9,7 @@
 		Legend,
 	} from 'chart.js';
 	import { getBpmHistogram } from '$lib/api/stats';
+	import { createResource } from '$lib/data/resource.svelte';
 	import type { BpmBin } from '$lib/types';
 	import { familyColors, chartChrome } from '$lib/styles/canvasPalette';
 
@@ -16,8 +17,11 @@
 
 	let canvas: HTMLCanvasElement;
 	let chart: Chart | null = null;
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	const res = createResource(() => ({}), (_a, signal) => getBpmHistogram(signal), {
+		key: () => 'stats:bpm-histogram',
+	});
+	const loading = $derived(res.loading);
+	const error = $derived(res.error);
 	/** Accessible summary of the tempo spread, for screen readers. */
 	let summary = $state('');
 
@@ -66,92 +70,80 @@
 		return { labels: labelStrings, datasets };
 	}
 
+	// The resource owns the request; this effect owns the canvas and redraws
+	// whenever the data changes.
 	$effect(() => {
-		let destroyed = false;
+		if (res.data === undefined) return;
 
-		(async () => {
-			try {
-				loading = true;
-				error = null;
-				const data = await getBpmHistogram();
+		const data = res.data;
 
-				if (destroyed) return;
 
-				summary = buildSummary(data);
-				const { labels, datasets } = buildStackedData(data);
-				const chrome = chartChrome();
+		summary = buildSummary(data);
+		const { labels, datasets } = buildStackedData(data);
+		const chrome = chartChrome();
 
-				chart = new Chart(canvas, {
-					type: 'bar',
-					data: { labels, datasets },
-					options: {
-						responsive: true,
-						maintainAspectRatio: false,
-						plugins: {
-							legend: {
-								display: true,
-								position: 'bottom',
-								labels: {
-									color: chrome.text,
-									font: { size: 11 },
-									padding: 12,
-									boxWidth: 12,
-								},
-							},
-							tooltip: {
-								mode: 'index',
-								intersect: false,
-								callbacks: {
-									title: (items) => `${items[0]?.label} BPM`,
-								},
-							},
-						},
-						scales: {
-							x: {
-								stacked: true,
-								grid: { color: chrome.grid },
-								ticks: {
-									color: chrome.tick,
-									font: { size: 10 },
-									maxRotation: 0,
-									autoSkip: true,
-									autoSkipPadding: 8,
-								},
-								title: {
-									display: true,
-									text: 'BPM',
-									color: chrome.label,
-									font: { size: 12 },
-								},
-							},
-							y: {
-								stacked: true,
-								grid: { color: chrome.grid },
-								ticks: {
-									color: chrome.tick,
-									font: { size: 10 },
-								},
-								title: {
-									display: true,
-									text: 'Tracks',
-									color: chrome.label,
-									font: { size: 12 },
-								},
-							},
+		chart = new Chart(canvas, {
+			type: 'bar',
+			data: { labels, datasets },
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: {
+					legend: {
+						display: true,
+						position: 'bottom',
+						labels: {
+							color: chrome.text,
+							font: { size: 11 },
+							padding: 12,
+							boxWidth: 12,
 						},
 					},
-				});
-			} catch (e) {
-				if (!destroyed) {
-					error = e instanceof Error ? e.message : "Couldn't read your tempo data — try refreshing";
-				}
-			} finally {
-				if (!destroyed) loading = false;
-			}
-		})();
+					tooltip: {
+						mode: 'index',
+						intersect: false,
+						callbacks: {
+							title: (items) => `${items[0]?.label} BPM`,
+						},
+					},
+				},
+				scales: {
+					x: {
+						stacked: true,
+						grid: { color: chrome.grid },
+						ticks: {
+							color: chrome.tick,
+							font: { size: 10 },
+							maxRotation: 0,
+							autoSkip: true,
+							autoSkipPadding: 8,
+						},
+						title: {
+							display: true,
+							text: 'BPM',
+							color: chrome.label,
+							font: { size: 12 },
+						},
+					},
+					y: {
+						stacked: true,
+						grid: { color: chrome.grid },
+						ticks: {
+							color: chrome.tick,
+							font: { size: 10 },
+						},
+						title: {
+							display: true,
+							text: 'Tracks',
+							color: chrome.label,
+							font: { size: 12 },
+						},
+					},
+				},
+			},
+		});
 
 		return () => {
-			destroyed = true;
 			if (chart) {
 				chart.destroy();
 				chart = null;

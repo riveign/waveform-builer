@@ -26,51 +26,60 @@ def albums_db(tmp_path):
 
     # Album 1: "Solar EP" by "Astral", 3 tracks WITH track_numbers
     for i in range(1, 4):
-        session.add(Track(
-            id=i,
-            title=f"Solar {i}",
-            artist="Astral",
-            album="Solar EP",
-            release_year=2020,
-            label="Sunset Records",
-            track_number=i,
-            disc_number=1,
-            file_path=f"/Volumes/SSD/Musica/Astral/Solar EP/0{i} Solar {i}.flac",
-            bpm=125.0,
-            key="8A",
-        ))
+        session.add(
+            Track(
+                id=i,
+                title=f"Solar {i}",
+                artist="Astral",
+                album="Solar EP",
+                release_year=2020,
+                label="Sunset Records",
+                track_number=i,
+                disc_number=1,
+                file_path=f"/Volumes/SSD/Musica/Astral/Solar EP/0{i} Solar {i}.flac",
+                bpm=125.0,
+                key="8A",
+            )
+        )
 
     # Album 2: "Long Player" by "Nocturne", 4 tracks WITHOUT track_numbers
     # file_path ordering should govern
     for i, suffix in enumerate(["a Opener", "b Middle", "c Bridge", "d Closer"], start=10):
-        session.add(Track(
-            id=i,
-            title=f"Long {suffix}",
-            artist="Nocturne",
-            album="Long Player",
-            release_year=2018,
-            file_path=f"/Musica/Nocturne/{suffix}.flac",
-            bpm=120.0,
-            key="9A",
-        ))
+        session.add(
+            Track(
+                id=i,
+                title=f"Long {suffix}",
+                artist="Nocturne",
+                album="Long Player",
+                release_year=2018,
+                file_path=f"/Musica/Nocturne/{suffix}.flac",
+                bpm=120.0,
+                key="9A",
+            )
+        )
 
     # Album 3: compilation "Various Vibes" — 3 different artists
-    for i, (artist, title) in enumerate([
-        ("Alice", "Sunrise"),
-        ("Bob", "Noon"),
-        ("Charlie", "Dusk"),
-    ], start=20):
-        session.add(Track(
-            id=i,
-            title=title,
-            artist=artist,
-            album="Various Vibes",
-            release_year=2022,
-            label="Mix Tape Inc",
-            file_path=f"/Musica/VA/{i - 19:02d} {title}.flac",
-            bpm=128.0,
-            key="7A",
-        ))
+    for i, (artist, title) in enumerate(
+        [
+            ("Alice", "Sunrise"),
+            ("Bob", "Noon"),
+            ("Charlie", "Dusk"),
+        ],
+        start=20,
+    ):
+        session.add(
+            Track(
+                id=i,
+                title=title,
+                artist=artist,
+                album="Various Vibes",
+                release_year=2022,
+                label="Mix Tape Inc",
+                file_path=f"/Musica/VA/{i - 19:02d} {title}.flac",
+                bpm=128.0,
+                key="7A",
+            )
+        )
 
     session.commit()
     yield session
@@ -182,10 +191,34 @@ def test_apply_mb_mapping_writes_track_numbers(albums_client, albums_db) -> None
     payload = {
         "mb_release_id": "rel-fake-123",
         "mappings": [
-            {"track_id": 10, "mb_position": 1, "track_number": 1, "disc_number": 1, "confidence": 0.95},
-            {"track_id": 11, "mb_position": 2, "track_number": 2, "disc_number": 1, "confidence": 0.92},
-            {"track_id": 12, "mb_position": 3, "track_number": 3, "disc_number": 1, "confidence": 0.88},
-            {"track_id": 13, "mb_position": 4, "track_number": 4, "disc_number": 1, "confidence": 0.90},
+            {
+                "track_id": 10,
+                "mb_position": 1,
+                "track_number": 1,
+                "disc_number": 1,
+                "confidence": 0.95,
+            },
+            {
+                "track_id": 11,
+                "mb_position": 2,
+                "track_number": 2,
+                "disc_number": 1,
+                "confidence": 0.92,
+            },
+            {
+                "track_id": 12,
+                "mb_position": 3,
+                "track_number": 3,
+                "disc_number": 1,
+                "confidence": 0.88,
+            },
+            {
+                "track_id": 13,
+                "mb_position": 4,
+                "track_number": 4,
+                "disc_number": 1,
+                "confidence": 0.90,
+            },
         ],
     }
     res = albums_client.post(f"/api/albums/{key}/apply-mb-mapping", json=payload)
@@ -214,8 +247,20 @@ def test_apply_mb_mapping_ignores_unknown_track_ids(albums_client, albums_db) ->
     payload = {
         "mb_release_id": "rel-x",
         "mappings": [
-            {"track_id": 1, "mb_position": 1, "track_number": 1, "disc_number": 1, "confidence": 0.95},
-            {"track_id": 9999, "mb_position": 2, "track_number": 2, "disc_number": 1, "confidence": 0.9},
+            {
+                "track_id": 1,
+                "mb_position": 1,
+                "track_number": 1,
+                "disc_number": 1,
+                "confidence": 0.95,
+            },
+            {
+                "track_id": 9999,
+                "mb_position": 2,
+                "track_number": 2,
+                "disc_number": 1,
+                "confidence": 0.9,
+            },
         ],
     }
     res = albums_client.post(f"/api/albums/{key}/apply-mb-mapping", json=payload)
@@ -241,9 +286,7 @@ def test_album_cover_404_when_nothing_resolves(albums_client, tmp_path, monkeypa
     assert res.status_code == 404
 
 
-def test_album_cover_serves_cached_file(
-    albums_client, albums_db, tmp_path, monkeypatch
-) -> None:
+def test_album_cover_serves_cached_file(albums_client, albums_db, tmp_path, monkeypatch) -> None:
     """A pre-existing cached file should be served directly without hitting CAA."""
     monkeypatch.setenv("KIKU_DATA_DIR", str(tmp_path))
 
@@ -272,6 +315,7 @@ def test_album_cover_fetches_caa_when_mb_known(
 
     # Pretend the album was previously matched
     from kiku.db.models import AlbumMetadata
+
     md = AlbumMetadata(
         album_key=key,
         album="Solar EP",
@@ -286,6 +330,7 @@ def test_album_cover_fetches_caa_when_mb_known(
 
     def fake_fetch(mb_release_id: str, album_key: str, *, transport=None):
         from pathlib import Path
+
         d = Path(tmp_path) / "cover_art"
         d.mkdir(parents=True, exist_ok=True)
         out = d / f"{album_key}.jpg"
@@ -313,14 +358,16 @@ def test_match_musicbrainz_returns_candidates(albums_client) -> None:
         "date": "2020-05-01",
         "artist-credit": [{"name": "Astral"}],
         "label-info": [{"label": {"name": "Sunset Records"}}],
-        "media": [{
-            "position": 1,
-            "tracks": [
-                {"position": 1, "title": "Solar 1", "length": 200000},
-                {"position": 2, "title": "Solar 2", "length": 210000},
-                {"position": 3, "title": "Solar 3", "length": 220000},
-            ],
-        }],
+        "media": [
+            {
+                "position": 1,
+                "tracks": [
+                    {"position": 1, "title": "Solar 1", "length": 200000},
+                    {"position": 2, "title": "Solar 2", "length": 210000},
+                    {"position": 3, "title": "Solar 3", "length": 220000},
+                ],
+            }
+        ],
     }
 
     mock_client = MagicMock()

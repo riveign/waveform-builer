@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Iterable
+from collections.abc import Iterable
 
 try:
     from thefuzz import fuzz  # type: ignore
@@ -85,19 +85,23 @@ def match_tracklist(
         if ki in chosen:
             mi, score = chosen[ki]
             rec = mb_norm[mi][0]
-            results.append({
-                "track_id": kt["id"],
-                "mb_position": rec.get("position"),
-                "mb_disc": rec.get("disc", 1),
-                "mb_title": rec.get("title"),
-                "confidence": round(score, 3),
-            })
+            results.append(
+                {
+                    "track_id": kt["id"],
+                    "mb_position": rec.get("position"),
+                    "mb_disc": rec.get("disc", 1),
+                    "mb_title": rec.get("title"),
+                    "confidence": round(score, 3),
+                }
+            )
         else:
-            results.append({
-                "track_id": kt["id"],
-                "mb_position": None,
-                "mb_disc": None,
-                "mb_title": None,
-                "confidence": 0.0,
-            })
+            results.append(
+                {
+                    "track_id": kt["id"],
+                    "mb_position": None,
+                    "mb_disc": None,
+                    "mb_title": None,
+                    "confidence": 0.0,
+                }
+            )
     return results

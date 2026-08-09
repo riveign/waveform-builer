@@ -69,6 +69,8 @@
 </script>
 
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { trackHref } from '$lib/nav';
 	import { getTrackArtworkUrl, setTrackAffinity, removeTrackAffinity } from '$lib/api/tracks';
 	import StarRating from '../primitives/StarRating.svelte';
 	import Chip from '../primitives/Chip.svelte';
@@ -78,7 +80,6 @@
 	import MenuSeparator from '../primitives/MenuSeparator.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
-	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { getCamelotColor, formatKey, keyMoveLabel } from '$lib/utils/camelot';
 	import HarmonyIcon, { toHarmonyRelation, HARMONY_RELATION_LABEL } from '$lib/components/primitives/HarmonyIcon.svelte';
 	import MetronomeIcon from '$lib/components/primitives/MetronomeIcon.svelte';
@@ -86,7 +87,6 @@
 	let { mode }: { mode: TrackCardMode } = $props();
 
 	const player = getPlayerStore();
-	const ui = getUiStore();
 
 	let artworkFailed = $state(false);
 	let menuOpen = $state(false);
@@ -196,8 +196,7 @@
 	});
 
 	function handleCardClick() {
-		ui.selectedTrack = track;
-		ui.activeTab = 'track';
+		goto(trackHref(track.id));
 	}
 
 	function handleMenuClick(e: MouseEvent) {
@@ -255,8 +254,7 @@
 
 	function handleOpenTrack() {
 		menuOpen = false;
-		ui.selectedTrack = track;
-		ui.activeTab = 'track';
+		goto(trackHref(track.id));
 	}
 
 	function handleAddToSet(e: MouseEvent) {

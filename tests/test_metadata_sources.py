@@ -38,7 +38,8 @@ def test_bandcamp_parses_tralbum_and_ld():
     assert cand.label == "Primal Instinct"
     assert cand.year == 2026
     assert [r.title for r in cand.recordings] == [
-        "Bite The Hand That Feeds You", "Leave The Door Open",
+        "Bite The Hand That Feeds You",
+        "Leave The Door Open",
     ]
     assert cand.recordings[0].position == 1
     assert cand.recordings[0].length_ms == 289400
@@ -65,7 +66,12 @@ DISCOGS_RELEASE = {
     "year": 2026,
     "labels": [{"name": "Primal Instinct"}],
     "tracklist": [
-        {"position": "A1", "type_": "track", "title": "Bite The Hand That Feeds You", "duration": "4:49"},
+        {
+            "position": "A1",
+            "type_": "track",
+            "title": "Bite The Hand That Feeds You",
+            "duration": "4:49",
+        },
         {"position": "", "type_": "heading", "title": "Side B"},
         {"position": "B1", "type_": "track", "title": "Sit In Their Seat", "duration": "5:18"},
     ],
@@ -88,7 +94,8 @@ def test_discogs_fetch_release_skips_headings_and_sequences_positions():
     assert cand.year == 2026
     # Heading dropped; positions resequenced 1..2 regardless of A1/B1.
     assert [(r.position, r.title) for r in cand.recordings] == [
-        (1, "Bite The Hand That Feeds You"), (2, "Sit In Their Seat"),
+        (1, "Bite The Hand That Feeds You"),
+        (2, "Sit In Their Seat"),
     ]
     assert cand.recordings[0].length_ms == 289000
 
@@ -106,6 +113,7 @@ def test_duration_to_ms():
 
 # ── MusicBrainz (wrapper over existing client) ───────────────────────────
 
+
 class _FakeMBClient:
     def search_releases(self, album, artist, limit=3):
         return [{"id": "rel-1", "score": 100}]
@@ -117,10 +125,15 @@ class _FakeMBClient:
             "artist-credit": [{"name": "Hadone"}],
             "date": "2026-05-15",
             "label-info": [{"label": {"name": "Primal Instinct"}}],
-            "media": [{"position": 1, "tracks": [
-                {"position": 1, "title": "Track One", "length": 200000},
-                {"position": 2, "title": "Track Two"},
-            ]}],
+            "media": [
+                {
+                    "position": 1,
+                    "tracks": [
+                        {"position": 1, "title": "Track One", "length": 200000},
+                        {"position": 2, "title": "Track Two"},
+                    ],
+                }
+            ],
         }
 
 
@@ -138,6 +151,7 @@ def test_musicbrainz_source_maps_release():
 
 # ── Tags helpers ─────────────────────────────────────────────────────────
 
+
 def test_parse_int_handles_slash_and_side_prefix():
     assert _parse_int("3/8") == 3
     assert _parse_int("A1") == 1
@@ -152,6 +166,7 @@ def test_parse_year():
 
 
 # ── Registry ─────────────────────────────────────────────────────────────
+
 
 def test_available_sources_shape():
     rows = {r["name"]: r for r in available_sources()}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Track, TrackFeatures, WaveformDetailData } from '$lib/types';
 	import { getTrackFeatures } from '$lib/api/tracks';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { updateTrackRating, updateTrackSetRoles } from '$lib/api/tracks';
 	import { submitDecision } from '$lib/api/tinder';
 	import { getWaveformDetail } from '$lib/api/waveforms';
@@ -61,11 +62,24 @@
 		}
 	}
 
-	let waveformData = $state<WaveformDetailData | null>(null);
-	let features = $state<TrackFeatures | null>(null);
-	let loadingWaveform = $state(false);
-	let loadingFeatures = $state(false);
-	let error = $state<string | null>(null);
+	// Waveform and features are separate requests with separate failure modes: a
+	// missing feature row should not blank the waveform.
+	const waveformRes = createResource(
+		() => (track.has_waveform ? track.id : null),
+		(id, signal) => getWaveformDetail(id, signal),
+		{ key: (id) => `track:${id}:waveform-detail` },
+	);
+	const featuresRes = createResource(
+		() => (track.has_features ? track.id : null),
+		(id, signal) => getTrackFeatures(id, signal),
+		{ key: (id) => `track:${id}:features` },
+	);
+	const features = $derived<TrackFeatures | null>(featuresRes.data ?? null);
+	const loadingWaveform = $derived(waveformRes.loading);
+	const loadingFeatures = $derived(featuresRes.loading);
+	// Features are non-critical — only a missing waveform is worth reporting.
+	const error = $derived(waveformRes.error);
+	const waveformData = $derived<WaveformDetailData | null>(waveformRes.data ?? null);
 
 	// Editable fields — synced from track prop via $effect below
 	let localRating = $state(0);
@@ -83,12 +97,6 @@
 		showZonePicker = false;
 		showRolePicker = false;
 		teachingMoment = null;
-	});
-
-	$effect(() => {
-		if (track.id) {
-			loadTrackData(track.id);
-		}
 	});
 
 	// Auto-clear teaching moment after 8 seconds
@@ -123,34 +131,6 @@
 		const timer = setTimeout(() => document.addEventListener('mousedown', handleClick), 0);
 		return () => { clearTimeout(timer); document.removeEventListener('mousedown', handleClick); };
 	});
-
-	async function loadTrackData(id: number) {
-		error = null;
-		waveformData = null;
-		features = null;
-
-		if (track.has_waveform) {
-			loadingWaveform = true;
-			try {
-				waveformData = await getWaveformDetail(id);
-			} catch (e) {
-				error = e instanceof Error ? e.message : String(e);
-			} finally {
-				loadingWaveform = false;
-			}
-		}
-
-		if (track.has_features) {
-			loadingFeatures = true;
-			try {
-				features = await getTrackFeatures(id);
-			} catch {
-				// non-critical
-			} finally {
-				loadingFeatures = false;
-			}
-		}
-	}
 
 	async function handleZoneSelect(zone: string) {
 		const prev = localZone;

@@ -22,7 +22,7 @@ from kiku.metadata.models import (
 
 @pytest.fixture()
 def session(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path/'t.db'}", poolclass=NullPool)
+    engine = create_engine(f"sqlite:///{tmp_path / 't.db'}", poolclass=NullPool)
     Base.metadata.create_all(engine)
     s = sessionmaker(bind=engine)()
     yield s
@@ -47,15 +47,17 @@ def _hadone_candidate() -> ReleaseCandidate:
 
 # ── FieldChange semantics ────────────────────────────────────────────────
 
+
 def test_field_change_changed_detects_real_changes():
     assert FieldChange("title", "old", "new").changed is True
     assert FieldChange("title", "Same", "same").changed is False  # case/space-insensitive
-    assert FieldChange("title", "x", None).changed is False        # never blank out
+    assert FieldChange("title", "x", None).changed is False  # never blank out
     assert FieldChange("title", "x", "   ").changed is False
     assert FieldChange("track_number", None, 1).changed is True
 
 
 # ── build_correction ─────────────────────────────────────────────────────
+
 
 def test_build_correction_produces_full_identity_diff(session):
     # Mangled like the real Hadone masters: side-position in artist, junk in title.
@@ -87,6 +89,7 @@ def test_build_correction_respects_field_allowlist(session):
 
 # ── discover_tracks_for_release ───────────────────────────────────────────
 
+
 def test_discover_recovers_ungrouped_album_and_rejects_subset_false_positives(session):
     # Real members (no album grouping, garbled artist)
     session.add(Track(id=1, title="Bite The Hand That Feeds You", artist="A1 hadone"))
@@ -102,16 +105,17 @@ def test_discover_recovers_ungrouped_album_and_rejects_subset_false_positives(se
 
 
 def test_discover_scopes_by_like_pattern(session):
-    session.add(Track(id=1, title="Sit In Their Seat", artist="x",
-                      file_path="/m/2026/Hadone - sit.wav"))
-    session.add(Track(id=2, title="Sit In Their Seat", artist="y",
-                      file_path="/m/2019/other.wav"))
+    session.add(
+        Track(id=1, title="Sit In Their Seat", artist="x", file_path="/m/2026/Hadone - sit.wav")
+    )
+    session.add(Track(id=2, title="Sit In Their Seat", artist="y", file_path="/m/2019/other.wav"))
     session.commit()
     found = discover_tracks_for_release(session, _hadone_candidate(), like="%2026%")
     assert {t.id for t in found} == {1}
 
 
 # ── apply_correction ──────────────────────────────────────────────────────
+
 
 def test_apply_writes_only_allowed_fields_and_records_provenance(session):
     t = Track(id=1, title="sit in their seat_MASTER", artist="B1 hadone")
@@ -137,13 +141,22 @@ def test_apply_writes_only_allowed_fields_and_records_provenance(session):
 
 
 def test_apply_is_idempotent_noop_when_already_correct(session):
-    t = Track(id=1, title="Sit In Their Seat", artist="Hadone",
-              album="Bite The Hand That Feeds You", label="Primal Instinct",
-              release_year=2026, track_number=3, disc_number=1)
+    t = Track(
+        id=1,
+        title="Sit In Their Seat",
+        artist="Hadone",
+        album="Bite The Hand That Feeds You",
+        label="Primal Instinct",
+        release_year=2026,
+        track_number=3,
+        disc_number=1,
+    )
     session.add(t)
     session.commit()
     corr = build_correction([t], _hadone_candidate())
-    touched = apply_correction(session, corr, fields=tuple(
-        ["title", "artist", "album", "label", "release_year", "track_number", "disc_number"]
-    ))
+    touched = apply_correction(
+        session,
+        corr,
+        fields=("title", "artist", "album", "label", "release_year", "track_number", "disc_number"),
+    )
     assert touched == 0

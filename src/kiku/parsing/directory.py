@@ -30,12 +30,12 @@ _DIR_RE_V1 = re.compile(
 )
 # Pattern 1b: MM - YYYY - Genre (with second dash, no energy)
 _DIR_RE_V1_NO_ENERGY = re.compile(
-    rf"^(\d{{2}})\s*-\s*(\d{{4}})\s*-\s*(.+)$",
+    r"^(\d{2})\s*-\s*(\d{4})\s*-\s*(.+)$",
     re.IGNORECASE,
 )
 # Pattern 1c: MM - YYYY Genre (missing second dash — early 2023 edge case, no energy)
 _DIR_RE_V1_NO_DASH = re.compile(
-    rf"^(\d{{2}})\s*-\s*(\d{{4}})\s+(.+)$",
+    r"^(\d{2})\s*-\s*(\d{4})\s+(.+)$",
     re.IGNORECASE,
 )
 
@@ -45,7 +45,7 @@ _DIR_RE_V2 = re.compile(
     re.IGNORECASE,
 )
 _DIR_RE_V2_NO_ENERGY = re.compile(
-    rf"^(\d{{4}})\s*-\s*(\d{{2}})\s*-\s*(.+)$",
+    r"^(\d{4})\s*-\s*(\d{2})\s*-\s*(.+)$",
     re.IGNORECASE,
 )
 
@@ -150,17 +150,13 @@ def parse_directory_name(name: str) -> DirectoryMeta:
         year, month, genre_raw, energy = m.groups()
         genre = _normalize_genre(genre_raw)
         energy = energy.strip().title() if energy else None
-        return DirectoryMeta(
-            genre=genre, energy=energy, acquired_month=f"{year}-{month}"
-        )
+        return DirectoryMeta(genre=genre, energy=energy, acquired_month=f"{year}-{month}")
 
     m = _DIR_RE_V2_NO_ENERGY.match(name)
     if m:
         year, month, genre_raw = m.groups()
         genre = _normalize_genre(genre_raw)
-        return DirectoryMeta(
-            genre=genre, energy=None, acquired_month=f"{year}-{month}"
-        )
+        return DirectoryMeta(genre=genre, energy=None, acquired_month=f"{year}-{month}")
 
     # Try Pattern 1 (MM - YYYY) with energy
     m = _DIR_RE_V1.match(name)
@@ -168,9 +164,7 @@ def parse_directory_name(name: str) -> DirectoryMeta:
         month, year, genre_raw, energy = m.groups()
         genre = _normalize_genre(genre_raw)
         energy = energy.strip().title() if energy else None
-        return DirectoryMeta(
-            genre=genre, energy=energy, acquired_month=f"{year}-{month}"
-        )
+        return DirectoryMeta(genre=genre, energy=energy, acquired_month=f"{year}-{month}")
 
     # Try Pattern 1 without energy (with second dash)
     m = _DIR_RE_V1_NO_ENERGY.match(name)
@@ -191,9 +185,7 @@ def parse_directory_name(name: str) -> DirectoryMeta:
         genre_raw = re.sub(r"\s+\d{2,3}$", "", genre_raw)
 
         genre = _normalize_genre(genre_raw)
-        return DirectoryMeta(
-            genre=genre, energy=energy, acquired_month=f"{year}-{month}"
-        )
+        return DirectoryMeta(genre=genre, energy=energy, acquired_month=f"{year}-{month}")
 
     # Try Pattern 1c: missing second dash (e.g., "04 - 2023 Indie Dance")
     m = _DIR_RE_V1_NO_DASH.match(name)
@@ -203,9 +195,7 @@ def parse_directory_name(name: str) -> DirectoryMeta:
         # Strip trailing sequence numbers
         genre_raw = re.sub(r"\s+\d{2,3}$", "", genre_raw)
         genre = _normalize_genre(genre_raw)
-        return DirectoryMeta(
-            genre=genre, energy=None, acquired_month=f"{year}-{month}"
-        )
+        return DirectoryMeta(genre=genre, energy=None, acquired_month=f"{year}-{month}")
 
     return DirectoryMeta()
 

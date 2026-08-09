@@ -61,10 +61,12 @@ def test_import_with_name_override(client: TestClient):
 
 
 def test_import_unmatched_tracks(client: TestClient):
-    content = _m3u8_content([
-        "/Volumes/SSD/Musica/2025/Techno/Track 1.mp3",
-        "/Volumes/SSD/Musica/2025/Techno/Nonexistent.mp3",
-    ])
+    content = _m3u8_content(
+        [
+            "/Volumes/SSD/Musica/2025/Techno/Track 1.mp3",
+            "/Volumes/SSD/Musica/2025/Techno/Nonexistent.mp3",
+        ]
+    )
     resp = client.post(
         "/api/sets/import/m3u8",
         files={"file": ("test.m3u8", io.BytesIO(content.encode()), "audio/x-mpegurl")},

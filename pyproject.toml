@@ -6,7 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "kiku"
 version = "0.1.0"
 description = "Kiku (聴) — learn why your transitions work"
-requires-python = ">=3.9"
+# 3.11 is a hard floor: config.py imports `tomllib` (stdlib from 3.11), and the
+# codebase uses PEP 604 unions throughout.
+requires-python = ">=3.11"
 dependencies = [
     "sqlalchemy>=2.0",
     "click>=8.0",
@@ -24,14 +26,41 @@ rekordbox = [
     "pyrekordbox>=0.3.1",
 ]
 analysis = [
-    "essentia>=2.1b6.dev1110",
-    "essentia-tensorflow>=2.1b6.dev1110",
+    # Pinned exactly, not floored. Essentia ships only dev builds, and each one
+    # carries wheels for a single CPython tag — dev1438 is cp314-only, so a `>=`
+    # floor resolves to something uninstallable on the 3.13 we pin. dev1389 is the
+    # newest with cp313 wheels. Re-pin deliberately when moving interpreter.
+    "essentia==2.1b6.dev1389",
+    "essentia-tensorflow==2.1b6.dev1389",
     "librosa>=0.10",
     "soundfile>=0.12",
+    # librosa needs numba, and every modern numba caps numpy below what essentia
+    # pulls in. Left alone the resolver escapes backwards to numba 0.53.1, whose
+    # llvmlite supports Python <3.10 and cannot build here. Floor it forward and
+    # let numpy settle underneath instead.
+    #
+    # Ceiling it too: numba 0.66.0 / llvmlite 0.48.0 SEGFAULT (SIGSEGV, no
+    # traceback) inside librosa's jitted beat tracker, which takes the whole
+    # analysis worker pool down with it — `kiku analyze` dies with "a process in
+    # the process pool was terminated abruptly". 0.61.2 is verified good.
+    # Re-test `librosa.beat.beat_track` before raising this.
+    "numba>=0.60,<0.62",
+    # numba 0.61 supports numpy <2.2; without this the resolver installs 2.4.x
+    # and numba refuses to import. Lift alongside the numba ceiling.
+    "numpy<2.2",
 ]
 api = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
+    # POST /sets/import/m3u8 takes an UploadFile; FastAPI raises at import time
+    # without this. It was only ever present here by accident.
+    "python-multipart>=0.0.9",
+]
+ml = [
+    # The energy classifier in analysis/autotag.py. Separate from `analysis`
+    # because training reads features out of the DB, not off disk — no essentia.
+    "scikit-learn>=1.3",
+    "joblib>=1.3",
 ]
 hunting = [
     "yt-dlp>=2024.0",
@@ -44,9 +73,15 @@ visualizer = [
     "plotly>=5.18",
 ]
 dev = [
+    # Everything the test suite imports. `analysis` is deliberately absent: essentia
+    # and librosa are lazily imported inside functions, so no test needs them.
     "kiku[rekordbox]",
+    "kiku[api]",
+    "kiku[hunting]",
+    "kiku[ml]",
     "pytest>=7.0",
     "pytest-cov",
+    "ruff>=0.16",
 ]
 
 [project.scripts]
@@ -54,3 +89,35 @@ kiku = "kiku.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Ruff's default rule set, minus the rules below. Two categories:
+#
+#   (a) wrong for this codebase — a false positive we should not paper over
+#       individually at 87 call sites;
+#   (b) real, deferred, and tracked. These are backlog items in
+#       docs/notes/PLN-001, not decisions that the code is fine. Removing an
+#       entry here is how that backlog gets worked off — delete the line, see
+#       what CI says.
+ignore = [
+    # (a)
+    "B008",    # function-call-in-default-argument — this IS FastAPI's idiom:
+               # Depends(), File(), Form() belong in defaults.
+    # (b) tracked in PLN-001/Q
+    "BLE001",  # blind-except (49) — CLM-003/E4b. Each needs a judgement about
+               # which exception is actually expected; that is its own pass.
+    "S110",    # try-except-pass (13) — same family as BLE001.
+    "DTZ005",  # datetime.now() without tzinfo (17) — the codebase stores naive
+               # local ISO strings throughout; changing that is a data decision.
+    "C408",    # dict()/list() instead of literals (105) — purely cosmetic churn.
+    "RUF059",  # unused unpacked variable (15) — mostly `for _k, v in` shapes.
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Migrations are append-only history: fixing style in an applied revision changes
+# a file whose whole value is that it has not changed.
+"alembic/versions/*" = ["I001", "UP035", "UP007"]

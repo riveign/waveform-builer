@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
+from dash import Input, Output, State, callback_context, html, no_update
 
-from dash import ClientsideFunction, Input, Output, State, callback_context, html, no_update
-
-from kiku.db.models import AudioFeatures, Set, SetTrack, Track, TransitionCue, get_session
-from kiku.db.store import get_track_by_title, search_tracks
+from kiku.db.models import AudioFeatures, Set, Track, TransitionCue, get_session
+from kiku.db.store import search_tracks
 from kiku.visualization.figures import (
     build_bpm_histogram,
     build_camelot_bar,
@@ -50,8 +48,7 @@ def register_callbacks(app):
             return [{display: 'block'}, {display: 'none'}];
         }
         """,
-        [Output("camelot-wheel-container", "style"),
-         Output("camelot-bar-container", "style")],
+        [Output("camelot-wheel-container", "style"), Output("camelot-bar-container", "style")],
         Input("camelot-view-toggle", "value"),
         prevent_initial_call=True,
     )
@@ -77,7 +74,9 @@ def register_callbacks(app):
             )
         return [
             {
-                "label": f"{t.title or '?'} — {t.artist or '?'} ({t.bpm:.0f} BPM, {t.key or '?'})" if t.bpm else f"{t.title or '?'} — {t.artist or '?'}",
+                "label": f"{t.title or '?'} — {t.artist or '?'} ({t.bpm:.0f} BPM, {t.key or '?'})"
+                if t.bpm
+                else f"{t.title or '?'} — {t.artist or '?'}",
                 "value": t.id,
             }
             for t in tracks
@@ -108,21 +107,43 @@ def register_callbacks(app):
         af = track.audio_features
 
         # Track info bar
-        info = html.Div([
-            html.Span(track.title or "Unknown", className="title"),
-            html.Span(f" — {track.artist or 'Unknown'}", className="meta"),
-            html.Span(f"{track.bpm:.0f} BPM" if track.bpm else "", className="badge badge-bpm",
-                       style={"marginLeft": "16px"}),
-            html.Span(track.key or "", className="badge badge-key", style={"marginLeft": "4px"}),
-            html.Span(track.dir_genre or track.rb_genre or "", className="badge badge-genre",
-                       style={"marginLeft": "4px"}),
-            html.Span(track.dir_energy or "", className="badge badge-energy", style={"marginLeft": "4px"}),
-        ], className="track-info")
+        info = html.Div(
+            [
+                html.Span(track.title or "Unknown", className="title"),
+                html.Span(f" — {track.artist or 'Unknown'}", className="meta"),
+                html.Span(
+                    f"{track.bpm:.0f} BPM" if track.bpm else "",
+                    className="badge badge-bpm",
+                    style={"marginLeft": "16px"},
+                ),
+                html.Span(
+                    track.key or "", className="badge badge-key", style={"marginLeft": "4px"}
+                ),
+                html.Span(
+                    track.dir_genre or track.rb_genre or "",
+                    className="badge badge-genre",
+                    style={"marginLeft": "4px"},
+                ),
+                html.Span(
+                    track.dir_energy or "",
+                    className="badge badge-energy",
+                    style={"marginLeft": "4px"},
+                ),
+            ],
+            className="track-info",
+        )
 
         if not af or not af.waveform_overview:
             overview_fig = build_overview_figure(track, af)
             detail_fig = build_track_figure(track, af)
-            return info, {"display": "block"}, overview_fig, detail_fig, track_id, _build_cue_list(session, set_id, track_id)
+            return (
+                info,
+                {"display": "block"},
+                overview_fig,
+                detail_fig,
+                track_id,
+                _build_cue_list(session, set_id, track_id),
+            )
 
         # Build figures
         overview_fig = build_overview_figure(track, af)
@@ -131,7 +152,14 @@ def register_callbacks(app):
         cues = _get_cue_dicts(session, set_id, track_id)
         detail_fig = build_track_figure(track, af, use_detail=True, cue_points=cues)
 
-        return info, {"display": "block"}, overview_fig, detail_fig, track_id, _build_cue_list(session, set_id, track_id)
+        return (
+            info,
+            {"display": "block"},
+            overview_fig,
+            detail_fig,
+            track_id,
+            _build_cue_list(session, set_id, track_id),
+        )
 
     # --- Click on detail waveform: show time for cue creation ---
     @app.callback(
@@ -149,8 +177,7 @@ def register_callbacks(app):
 
     # --- Save cue point on Enter in name input ---
     @app.callback(
-        [Output("cue-list", "children", allow_duplicate=True),
-         Output("cue-name-input", "value")],
+        [Output("cue-list", "children", allow_duplicate=True), Output("cue-name-input", "value")],
         Input("cue-name-input", "n_submit"),
         [
             State("cue-name-input", "value"),
@@ -195,10 +222,7 @@ def register_callbacks(app):
         if search and len(search) >= 2:
             q = q.filter(Set.name.ilike(f"%{search}%"))
         sets = q.limit(20).all()
-        return [
-            {"label": f"{s.name} ({len(s.tracks)} tracks)", "value": s.id}
-            for s in sets
-        ]
+        return [{"label": f"{s.name} ({len(s.tracks)} tracks)", "value": s.id} for s in sets]
 
     # --- Set selection: load timeline ---
     @app.callback(
@@ -228,13 +252,15 @@ def register_callbacks(app):
         if set_.energy_profile:
             try:
                 from kiku.setbuilder.constraints import parse_energy_json
+
                 energy_profile = parse_energy_json(set_.energy_profile)
             except Exception:
                 pass
 
         if view_mode == "staircase":
             timeline_fig = build_staircase_figure(
-                set_.tracks, energy_profile=energy_profile,
+                set_.tracks,
+                energy_profile=energy_profile,
                 track_offsets=track_offsets or {},
             )
         else:
@@ -296,7 +322,9 @@ def register_callbacks(app):
         return (
             track_idx,
             {"display": "block"},
-            f"{st.position}. {st.track.title or '?'} ({st.track.bpm:.0f} BPM)" if st.track.bpm else f"{st.position}. {st.track.title or '?'}",
+            f"{st.position}. {st.track.title or '?'} ({st.track.bpm:.0f} BPM)"
+            if st.track.bpm
+            else f"{st.position}. {st.track.title or '?'}",
             f"{current_offset:+.1f}s",
         )
 
@@ -321,8 +349,7 @@ def register_callbacks(app):
         ],
         prevent_initial_call=True,
     )
-    def nudge_track(left_big, left, right, right_big, reset, reset_all,
-                    track_idx, offsets, set_id):
+    def nudge_track(left_big, left, right, right_big, reset, reset_all, track_idx, offsets, set_id):
         if track_idx is None:
             return no_update, no_update
 
@@ -342,7 +369,11 @@ def register_callbacks(app):
                 bpm = tracks_sorted[track_idx].track.bpm or 120
 
         beat_sec = 60 / bpm  # 1 beat in seconds
-        pos_key = str(tracks_sorted[track_idx].position) if set_ and track_idx < len(tracks_sorted) else str(track_idx)
+        pos_key = (
+            str(tracks_sorted[track_idx].position)
+            if set_ and track_idx < len(tracks_sorted)
+            else str(track_idx)
+        )
         current = offsets.get(pos_key, 0)
 
         if triggered == "btn-nudge-reset":
@@ -379,8 +410,7 @@ def register_callbacks(app):
         ],
         prevent_initial_call=True,
     )
-    def nudge_transition_b(left_big, left, right, right_big, reset,
-                           offsets, current_idx, set_id):
+    def nudge_transition_b(left_big, left, right, right_big, reset, offsets, current_idx, set_id):
         if current_idx is None or not set_id:
             return no_update, no_update
 
@@ -474,17 +504,21 @@ def register_callbacks(app):
         b_offset = b_offsets.get(str(idx), 0)
 
         fig = build_transition_figure(
-            track_a, track_a.audio_features,
-            track_b, track_b.audio_features,
-            cues_a=cues_a, cues_b=cues_b,
+            track_a,
+            track_a.audio_features,
+            track_b,
+            track_b.audio_features,
+            cues_a=cues_a,
+            cues_b=cues_b,
             b_offset=b_offset,
         )
 
         label = (
             f"Track {st_a.position}: {track_a.title or '?'} → "
             f"Track {st_b.position}: {track_b.title or '?'} "
-            f"(Score: {st_b.transition_score:.2f})" if st_b.transition_score else
-            f"Track {st_a.position} → Track {st_b.position}"
+            f"(Score: {st_b.transition_score:.2f})"
+            if st_b.transition_score
+            else f"Track {st_a.position} → Track {st_b.position}"
         )
 
         # Cue list for both tracks at this transition
@@ -492,16 +526,32 @@ def register_callbacks(app):
 
         # Compute player-state for audio positioning
         from kiku.visualization.figures import _compute_transition_timeline
+
         af_a, af_b = track_a.audio_features, track_b.audio_features
         overlap_seconds = 30.0
         view_window = overlap_seconds * 2
         tl = _compute_transition_timeline(
-            af_a, af_b, track_a, track_b,
-            overlap_seconds, b_offset, view_window,
+            af_a,
+            af_b,
+            track_a,
+            track_b,
+            overlap_seconds,
+            b_offset,
+            view_window,
         )
-        (_mapped_a, _mask_a, show_from_raw_a, _a_end_time,
-         _mapped_b, _mask_b, _show_until_raw_b, b_start_on_timeline,
-         scale_a, scale_b, _target_bpm) = tl
+        (
+            _mapped_a,
+            _mask_a,
+            show_from_raw_a,
+            _a_end_time,
+            _mapped_b,
+            _mask_b,
+            _show_until_raw_b,
+            b_start_on_timeline,
+            scale_a,
+            scale_b,
+            _target_bpm,
+        ) = tl
 
         player_state = {
             "track_a_id": track_a.id,
@@ -536,12 +586,15 @@ def register_callbacks(app):
 
         try:
             from kiku.export.rekordbox_xml import export_set_to_xml
+
             cues = _get_all_set_cues(session, set_id)
             output_path = export_set_to_xml(set_, transition_cues=cues)
-            return html.Div([
-                html.Span("Exported: ", style={"color": "#2ecc71", "fontWeight": "600"}),
-                html.Code(output_path, style={"color": "#00d2ff"}),
-            ])
+            return html.Div(
+                [
+                    html.Span("Exported: ", style={"color": "#2ecc71", "fontWeight": "600"}),
+                    html.Code(output_path, style={"color": "#00d2ff"}),
+                ]
+            )
         except Exception as e:
             return html.Div(f"Export error: {e}", style={"color": "#e74c3c"})
 
@@ -742,9 +795,13 @@ def _build_dna_tab_with_data():
 
     from kiku.analysis.insights import (
         bpm_histogram as bpm_hist_data,
+    )
+    from kiku.analysis.insights import (
         camelot_distribution,
-        energy_genre_heatmap as heatmap_data,
         mood_quadrant,
+    )
+    from kiku.analysis.insights import (
+        energy_genre_heatmap as heatmap_data,
     )
 
     session = get_session()
@@ -756,45 +813,97 @@ def _build_dna_tab_with_data():
     mood_fig = build_mood_scatter(mood_quadrant(session))
 
     graph_style = {"height": "400px"}
-    return html.Div([
-        html.Div([
-            html.Div([
-                html.Div([
-                    html.Span("Key Distribution", className="panel-title", style={"flex": 1}),
-                    dcc.RadioItems(
-                        id="camelot-view-toggle",
-                        options=[
-                            {"label": "Wheel", "value": "wheel"},
-                            {"label": "Bar", "value": "bar"},
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Div(
+                                [
+                                    html.Span(
+                                        "Key Distribution",
+                                        className="panel-title",
+                                        style={"flex": 1},
+                                    ),
+                                    dcc.RadioItems(
+                                        id="camelot-view-toggle",
+                                        options=[
+                                            {"label": "Wheel", "value": "wheel"},
+                                            {"label": "Bar", "value": "bar"},
+                                        ],
+                                        value="wheel",
+                                        inline=True,
+                                        style={"color": "#e0e0e0", "fontSize": "0.85rem"},
+                                        inputStyle={"marginRight": "4px"},
+                                        labelStyle={"marginRight": "12px"},
+                                    ),
+                                ],
+                                style={"display": "flex", "alignItems": "center"},
+                            ),
+                            html.Div(
+                                id="camelot-wheel-container",
+                                children=dcc.Graph(
+                                    figure=wheel_fig,
+                                    config={"displayModeBar": False},
+                                    style=graph_style,
+                                ),
+                            ),
+                            html.Div(
+                                id="camelot-bar-container",
+                                style={"display": "none"},
+                                children=dcc.Graph(
+                                    figure=bar_fig,
+                                    config={"displayModeBar": False},
+                                    style=graph_style,
+                                ),
+                            ),
                         ],
-                        value="wheel",
-                        inline=True,
-                        style={"color": "#e0e0e0", "fontSize": "0.85rem"},
-                        inputStyle={"marginRight": "4px"},
-                        labelStyle={"marginRight": "12px"},
+                        className="panel",
+                        style={"flex": 1},
                     ),
-                ], style={"display": "flex", "alignItems": "center"}),
-                html.Div(id="camelot-wheel-container",
-                         children=dcc.Graph(figure=wheel_fig, config={"displayModeBar": False}, style=graph_style)),
-                html.Div(id="camelot-bar-container", style={"display": "none"},
-                         children=dcc.Graph(figure=bar_fig, config={"displayModeBar": False}, style=graph_style)),
-            ], className="panel", style={"flex": 1}),
-            html.Div([
-                html.Div("BPM Distribution", className="panel-title"),
-                dcc.Graph(figure=bpm_fig, config={"displayModeBar": False}, style=graph_style),
-            ], className="panel", style={"flex": 1}),
-        ], style={"display": "flex", "gap": "8px"}),
-        html.Div([
-            html.Div([
-                html.Div("Energy x Genre", className="panel-title"),
-                dcc.Graph(figure=heatmap_fig, config={"displayModeBar": False}, style=graph_style),
-            ], className="panel", style={"flex": 1}),
-            html.Div([
-                html.Div("Mood Quadrant", className="panel-title"),
-                dcc.Graph(figure=mood_fig, config={"displayModeBar": False}, style=graph_style),
-            ], className="panel", style={"flex": 1}),
-        ], style={"display": "flex", "gap": "8px"}),
-    ])
+                    html.Div(
+                        [
+                            html.Div("BPM Distribution", className="panel-title"),
+                            dcc.Graph(
+                                figure=bpm_fig, config={"displayModeBar": False}, style=graph_style
+                            ),
+                        ],
+                        className="panel",
+                        style={"flex": 1},
+                    ),
+                ],
+                style={"display": "flex", "gap": "8px"},
+            ),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Div("Energy x Genre", className="panel-title"),
+                            dcc.Graph(
+                                figure=heatmap_fig,
+                                config={"displayModeBar": False},
+                                style=graph_style,
+                            ),
+                        ],
+                        className="panel",
+                        style={"flex": 1},
+                    ),
+                    html.Div(
+                        [
+                            html.Div("Mood Quadrant", className="panel-title"),
+                            dcc.Graph(
+                                figure=mood_fig, config={"displayModeBar": False}, style=graph_style
+                            ),
+                        ],
+                        className="panel",
+                        style={"flex": 1},
+                    ),
+                ],
+                style={"display": "flex", "gap": "8px"},
+            ),
+        ]
+    )
 
 
 def _get_cue_dicts(session, set_id: int | None, track_id: int) -> list[dict]:
@@ -821,27 +930,43 @@ def _build_cue_list(session, set_id: int | None, track_id: int) -> html.Div:
     """Build the cue point list HTML."""
     cues = _get_cue_dicts(session, set_id, track_id)
     if not cues:
-        return html.Div("No cue points. Click on the waveform to add one.",
-                         style={"color": "#8892b0", "fontSize": "0.85rem"})
+        return html.Div(
+            "No cue points. Click on the waveform to add one.",
+            style={"color": "#8892b0", "fontSize": "0.85rem"},
+        )
 
     rows = []
     for c in cues:
         minutes = int(c["start_sec"] // 60)
         seconds = c["start_sec"] % 60
         slot = chr(65 + c["hot_cue_num"]) if c["hot_cue_num"] >= 0 else "Mem"
-        rows.append(html.Tr([
-            html.Td(c["name"]),
-            html.Td(c["cue_type"]),
-            html.Td(f"{minutes}:{seconds:05.2f}"),
-            html.Td(slot),
-        ]))
+        rows.append(
+            html.Tr(
+                [
+                    html.Td(c["name"]),
+                    html.Td(c["cue_type"]),
+                    html.Td(f"{minutes}:{seconds:05.2f}"),
+                    html.Td(slot),
+                ]
+            )
+        )
 
-    return html.Table([
-        html.Thead(html.Tr([
-            html.Th("Name"), html.Th("Type"), html.Th("Time"), html.Th("Slot"),
-        ])),
-        html.Tbody(rows),
-    ], className="cue-list-table")
+    return html.Table(
+        [
+            html.Thead(
+                html.Tr(
+                    [
+                        html.Th("Name"),
+                        html.Th("Type"),
+                        html.Th("Time"),
+                        html.Th("Slot"),
+                    ]
+                )
+            ),
+            html.Tbody(rows),
+        ],
+        className="cue-list-table",
+    )
 
 
 def _build_transition_cue_list(session, set_id: int, track_a_id: int, track_b_id: int) -> html.Div:
@@ -851,15 +976,23 @@ def _build_transition_cue_list(session, set_id: int, track_a_id: int, track_b_id
 
     parts = []
     if cues_a:
-        parts.append(html.Div([
-            html.Span("Track A cues:", style={"color": "#00d2ff", "fontWeight": "600"}),
-            _build_cue_list(session, set_id, track_a_id),
-        ]))
+        parts.append(
+            html.Div(
+                [
+                    html.Span("Track A cues:", style={"color": "#00d2ff", "fontWeight": "600"}),
+                    _build_cue_list(session, set_id, track_a_id),
+                ]
+            )
+        )
     if cues_b:
-        parts.append(html.Div([
-            html.Span("Track B cues:", style={"color": "#e94560", "fontWeight": "600"}),
-            _build_cue_list(session, set_id, track_b_id),
-        ]))
+        parts.append(
+            html.Div(
+                [
+                    html.Span("Track B cues:", style={"color": "#e94560", "fontWeight": "600"}),
+                    _build_cue_list(session, set_id, track_b_id),
+                ]
+            )
+        )
 
     if not parts:
         return html.Div("No cue points for this transition.", style={"color": "#8892b0"})
@@ -878,11 +1011,13 @@ def _get_all_set_cues(session, set_id: int) -> dict[int, list[dict]]:
     for c in cues:
         if c.track_id not in result:
             result[c.track_id] = []
-        result[c.track_id].append({
-            "name": c.name,
-            "type": c.cue_type,
-            "start": c.start_sec,
-            "end": c.end_sec,
-            "num": c.hot_cue_num,
-        })
+        result[c.track_id].append(
+            {
+                "name": c.name,
+                "type": c.cue_type,
+                "start": c.start_sec,
+                "end": c.end_sec,
+                "num": c.hot_cue_num,
+            }
+        )
     return result

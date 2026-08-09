@@ -35,15 +35,18 @@ def match_tracks(
         return extracted
 
     # Load all library tracks (artist, title) for matching
-    library = session.query(Track.id, Track.artist, Track.title).filter(
-        Track.artist.isnot(None),
-        Track.title.isnot(None),
-    ).all()
+    library = (
+        session.query(Track.id, Track.artist, Track.title)
+        .filter(
+            Track.artist.isnot(None),
+            Track.title.isnot(None),
+        )
+        .all()
+    )
 
     # Pre-normalize library for speed
     lib_normalized = [
-        (t.id, normalize_name(t.artist or ""), normalize_name(t.title or ""))
-        for t in library
+        (t.id, normalize_name(t.artist or ""), normalize_name(t.title or "")) for t in library
     ]
 
     for item in extracted:

@@ -7,6 +7,7 @@
 		Legend,
 	} from 'chart.js';
 	import { getLibraryStats } from '$lib/api/stats';
+	import { createResource } from '$lib/data/resource.svelte';
 	import type { LibraryStats } from '$lib/types';
 	import { familyColors, chartChrome, rgba } from '$lib/styles/canvasPalette';
 
@@ -43,8 +44,11 @@
 
 	let canvas: HTMLCanvasElement;
 	let chart: Chart | null = null;
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	const res = createResource(() => ({}), (_a, signal) => getLibraryStats(signal), {
+		key: () => 'stats:library',
+	});
+	const loading = $derived(res.loading);
+	const error = $derived(res.error);
 	let stats = $state<LibraryStats | null>(null);
 
 	let teachingNote = $derived.by(() => {
@@ -80,98 +84,86 @@
 		return families;
 	}
 
+	// The resource owns the request; this effect owns the canvas and redraws
+	// whenever the data changes.
 	$effect(() => {
-		let destroyed = false;
+		if (res.data === undefined) return;
 
-		(async () => {
-			try {
-				loading = true;
-				error = null;
-				const data = await getLibraryStats();
+		const data = res.data;
 
-				if (destroyed) return;
-				stats = data;
+		stats = data;
 
-				const familyCounts = aggregateFamilies(data.genres);
-				const sorted = Object.entries(familyCounts).sort((a, b) => b[1] - a[1]);
-				const labels = sorted.map(([f]) => f);
-				const values = sorted.map(([, c]) => c);
-				const famColors = familyColors();
-				const colors = labels.map((f) => famColors[f] ?? famColors.Other);
-				const chrome = chartChrome();
+		const familyCounts = aggregateFamilies(data.genres);
+		const sorted = Object.entries(familyCounts).sort((a, b) => b[1] - a[1]);
+		const labels = sorted.map(([f]) => f);
+		const values = sorted.map(([, c]) => c);
+		const famColors = familyColors();
+		const colors = labels.map((f) => famColors[f] ?? famColors.Other);
+		const chrome = chartChrome();
 
-				chart = new Chart(canvas, {
-					type: 'doughnut',
-					data: {
-						labels,
-						datasets: [{
-							data: values,
-							backgroundColor: colors,
-							borderColor: rgba(chrome.surface, 0.8),
-							borderWidth: 2,
-						}],
+		chart = new Chart(canvas, {
+			type: 'doughnut',
+			data: {
+				labels,
+				datasets: [{
+					data: values,
+					backgroundColor: colors,
+					borderColor: rgba(chrome.surface, 0.8),
+					borderWidth: 2,
+				}],
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: true,
+				cutout: '55%',
+				plugins: {
+					legend: {
+						display: true,
+						position: 'bottom',
+						labels: {
+							color: chrome.text,
+							font: { size: 11 },
+							padding: 12,
+							boxWidth: 12,
+						},
 					},
-					options: {
-						responsive: true,
-						maintainAspectRatio: true,
-						cutout: '55%',
-						plugins: {
-							legend: {
-								display: true,
-								position: 'bottom',
-								labels: {
-									color: chrome.text,
-									font: { size: 11 },
-									padding: 12,
-									boxWidth: 12,
-								},
-							},
-							tooltip: {
-								callbacks: {
-									label: (ctx) => {
-										const total = values.reduce((a, b) => a + b, 0);
-										const pct = total > 0 ? Math.round((ctx.raw as number) / total * 100) : 0;
-										return `${ctx.label}: ${ctx.raw} tracks (${pct}%)`;
-									},
-								},
+					tooltip: {
+						callbacks: {
+							label: (ctx) => {
+								const total = values.reduce((a, b) => a + b, 0);
+								const pct = total > 0 ? Math.round((ctx.raw as number) / total * 100) : 0;
+								return `${ctx.label}: ${ctx.raw} tracks (${pct}%)`;
 							},
 						},
 					},
-					plugins: [{
-						id: 'centerText',
-						beforeDraw: (chartInstance) => {
-							const { ctx: drawCtx, chartArea } = chartInstance;
-							if (!chartArea) return;
-							const centerX = (chartArea.left + chartArea.right) / 2;
-							const centerY = (chartArea.top + chartArea.bottom) / 2;
+				},
+			},
+			plugins: [{
+				id: 'centerText',
+				beforeDraw: (chartInstance) => {
+					const { ctx: drawCtx, chartArea } = chartInstance;
+					if (!chartArea) return;
+					const centerX = (chartArea.left + chartArea.right) / 2;
+					const centerY = (chartArea.top + chartArea.bottom) / 2;
 
-							drawCtx.save();
-							drawCtx.textAlign = 'center';
-							drawCtx.textBaseline = 'middle';
+					drawCtx.save();
+					drawCtx.textAlign = 'center';
+					drawCtx.textBaseline = 'middle';
 
-							drawCtx.font = 'bold 22px -apple-system, BlinkMacSystemFont, sans-serif';
-							drawCtx.fillStyle = chrome.text;
-							drawCtx.fillText(String(data.total_tracks), centerX, centerY - 8);
+					drawCtx.font = 'bold 22px -apple-system, BlinkMacSystemFont, sans-serif';
+					drawCtx.fillStyle = chrome.text;
+					drawCtx.fillText(String(data.total_tracks), centerX, centerY - 8);
 
-							drawCtx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
-							drawCtx.fillStyle = chrome.label;
-							drawCtx.fillText('tracks', centerX, centerY + 12);
+					drawCtx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+					drawCtx.fillStyle = chrome.label;
+					drawCtx.fillText('tracks', centerX, centerY + 12);
 
-							drawCtx.restore();
-						},
-					}],
-				});
-			} catch (e) {
-				if (!destroyed) {
-					error = e instanceof Error ? e.message : "Couldn't load genre data — try refreshing";
-				}
-			} finally {
-				if (!destroyed) loading = false;
-			}
-		})();
+					drawCtx.restore();
+				},
+			}],
+		});
 
 		return () => {
-			destroyed = true;
 			if (chart) {
 				chart.destroy();
 				chart = null;

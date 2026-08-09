@@ -1,15 +1,14 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { trackHref } from '$lib/nav';
 	import type { Track } from '$lib/types';
 	import AlbumGrid from './AlbumGrid.svelte';
 	import AlbumDetail from './AlbumDetail.svelte';
-	import { getUiStore } from '$lib/stores/ui.svelte';
 
-	const ui = getUiStore();
 	let openAlbumKey = $state<string | null>(null);
 
 	function handleTrackSelect(track: Track) {
-		ui.selectedTrack = track;
-		ui.activeTab = 'track';
+		goto(trackHref(track.id));
 	}
 </script>
 

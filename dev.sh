@@ -26,13 +26,13 @@ trap cleanup EXIT INT TERM
 
 if [[ ! -d "$DIR/.venv" ]]; then
   echo "No .venv/ found. Set one up first:"
-  echo "  python -m venv .venv && .venv/bin/python -m pip install -e '.[api]'"
+  echo "  ./scripts/setup.sh"
   exit 1
 fi
 
 if [[ ! -d "$DIR/frontend/node_modules" ]]; then
   echo "frontend/node_modules/ is missing. Run this first:"
-  echo "  cd frontend && npm install"
+  echo "  ./scripts/setup.sh"
   exit 1
 fi
 

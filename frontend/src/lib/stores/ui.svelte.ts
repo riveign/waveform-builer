@@ -1,36 +1,35 @@
 import type { Track, SetAnalysis } from '$lib/types';
 
-export type Tab = 'track' | 'set' | 'dna' | 'tinder' | 'hunt' | 'albums';
-export type SetViewMode = 'list' | 'grid';
+/**
+ * Cross-surface UI state that is *not* navigation.
+ *
+ * Anything that identifies what you are looking at — which surface, which track,
+ * which set, which row inside it, list vs grid — lives in the URL instead, so it
+ * survives a refresh and can be shared. See $lib/nav.
+ *
+ * What remains here is genuinely ambient: the track you were last looking at
+ * (offered as a build seed), what the player is on, and two hand-off channels.
+ */
 
-let activeTab = $state<Tab>('track');
+/** The last track opened in Track view. Written by the track route; read by the
+ *  build dialog, which offers it as a seed or tail. Not navigation — a memory. */
 let selectedTrack = $state<Track | null>(null);
-let selectedSetId = $state<number | null>(null);
-let selectedTrackInSet = $state<number | null>(null);
-let setViewMode = $state<SetViewMode>('list');
 let playingTrackId = $state<number | null>(null);
+/** Analysis computed during a build, handed to the set view so it need not re-run. */
 let pendingAnalysis = $state<SetAnalysis | null>(null);
-/** Bumped to ask the page to open the Build a Set dialog (decouples the trigger from the dialog owner). */
+/** Bumped to ask the shell to open the Build a Set dialog. */
 let buildRequested = $state(0);
 
 export function getUiStore() {
 	return {
-		get activeTab() { return activeTab; },
-		set activeTab(v: Tab) { activeTab = v; },
 		get selectedTrack() { return selectedTrack; },
 		set selectedTrack(v: Track | null) { selectedTrack = v; },
-		get selectedSetId() { return selectedSetId; },
-		set selectedSetId(v: number | null) { selectedSetId = v; },
-		get selectedTrackInSet() { return selectedTrackInSet; },
-		set selectedTrackInSet(v: number | null) { selectedTrackInSet = v; },
-		get setViewMode() { return setViewMode; },
-		set setViewMode(v: SetViewMode) { setViewMode = v; },
 		get playingTrackId() { return playingTrackId; },
 		set playingTrackId(v: number | null) { playingTrackId = v; },
 		get pendingAnalysis() { return pendingAnalysis; },
 		set pendingAnalysis(v: SetAnalysis | null) { pendingAnalysis = v; },
 		get buildRequested() { return buildRequested; },
-		/** Ask the page to open the Build a Set dialog. */
+		/** Ask the shell to open the Build a Set dialog. */
 		requestBuild() { buildRequested += 1; },
 	};
 }

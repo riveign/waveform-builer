@@ -140,9 +140,7 @@ def fetch_front_cover(
         mark_cover_missing(album_key)
         return None
     if resp.status_code != 200:
-        logger.warning(
-            "CAA returned %s for release %s", resp.status_code, mb_release_id
-        )
+        logger.warning("CAA returned %s for release %s", resp.status_code, mb_release_id)
         return None
 
     content = resp.content

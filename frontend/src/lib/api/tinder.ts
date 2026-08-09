@@ -11,7 +11,7 @@ export interface TinderQueueParams {
 	offset?: number;
 }
 
-export async function getTinderQueue(params: TinderQueueParams = {}): Promise<TinderQueueResponse> {
+export async function getTinderQueue(params: TinderQueueParams = {}, signal?: AbortSignal): Promise<TinderQueueResponse> {
 	const qs = new URLSearchParams();
 	for (const [k, v] of Object.entries(params)) {
 		if (v === undefined || v === null || v === '') continue;
@@ -21,7 +21,7 @@ export async function getTinderQueue(params: TinderQueueParams = {}): Promise<Ti
 			qs.set(k, String(v));
 		}
 	}
-	return fetchJson<TinderQueueResponse>(`/api/tinder/queue?${qs}`);
+	return fetchJson<TinderQueueResponse>(`/api/tinder/queue?${qs}`, { signal });
 }
 
 export async function submitDecision(

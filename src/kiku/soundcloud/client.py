@@ -46,6 +46,7 @@ class SoundCloudClient:
         expires_at = None
         if "expires_in" in data:
             from datetime import timedelta
+
             expires_at = (datetime.now() + timedelta(seconds=data["expires_in"])).isoformat()
 
         if self._on_token_refresh:

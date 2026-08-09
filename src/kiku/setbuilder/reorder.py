@@ -46,10 +46,9 @@ def score_full_sequence(
     # genre family changes (oscillation like house→techno→house→techno).
     families = [_resolve_genre_family(t) for t in tracks]
     changes = sum(
-        1 for i in range(1, len(families))
-        if families[i] != families[i - 1]
-        and families[i] != "other"
-        and families[i - 1] != "other"
+        1
+        for i in range(1, len(families))
+        if families[i] != families[i - 1] and families[i] != "other" and families[i - 1] != "other"
     )
     max_changes = len(tracks) - 1
     fragmentation = changes / max_changes if max_changes > 0 else 0
@@ -168,12 +167,14 @@ def _diff_orders(
             else:
                 explanation += " improves transition flow at this position"
 
-            changes.append(OrderChange(
-                track_id=track.id,
-                track_title=track.title,
-                from_position=old_pos,
-                to_position=new_pos,
-                explanation=explanation,
-            ))
+            changes.append(
+                OrderChange(
+                    track_id=track.id,
+                    track_title=track.title,
+                    from_position=old_pos,
+                    to_position=new_pos,
+                    explanation=explanation,
+                )
+            )
 
     return changes

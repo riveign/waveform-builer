@@ -10,16 +10,33 @@ from kiku.artists import artist_matches
 from kiku.config import BPM_TOLERANCE, SCORING_WEIGHTS
 from kiku.db.models import Track
 from kiku.setbuilder.camelot import harmonic_score
-from kiku.setbuilder.constraints import dir_energy_to_numeric, zone_to_numeric
+from kiku.setbuilder.constraints import zone_to_numeric
 from kiku.vibe import resolve_vibe, vibe_distance
 
 # ── Genre Families ──────────────────────────────────────────────────────
 GENRE_FAMILIES: dict[str, list[str]] = {
-    "techno": ["techno", "hard techno", "rumble techno", "acid techno",
-                "dub techno", "techno groove", "hypno", "hypno techno",
-                "classic techno", "deep techno", "hardstyle techno"],
-    "house": ["house", "deep house", "tech house", "afro house",
-              "funky house", "hard house", "speed house"],
+    "techno": [
+        "techno",
+        "hard techno",
+        "rumble techno",
+        "acid techno",
+        "dub techno",
+        "techno groove",
+        "hypno",
+        "hypno techno",
+        "classic techno",
+        "deep techno",
+        "hardstyle techno",
+    ],
+    "house": [
+        "house",
+        "deep house",
+        "tech house",
+        "afro house",
+        "funky house",
+        "hard house",
+        "speed house",
+    ],
     "groove": ["hard groove", "hardgroove", "light groove", "ghetto groove"],
     "trance": ["trance", "hard trance"],
     "breaks": ["breaks", "dnb", "garage"],
@@ -35,24 +52,24 @@ RB_GENRE_TO_FAMILY: dict[str, str] = {
     # ── Techno ──
     "techno": "techno",
     "techno (raw / deep / hypnotic)": "techno",
-    "techno (raw  deep  hypnotic)": "techno",          # encoding variant
+    "techno (raw  deep  hypnotic)": "techno",  # encoding variant
     "techno (peak time / driving)": "techno",
-    "techno (peak time  driving)": "techno",            # encoding variant
+    "techno (peak time  driving)": "techno",  # encoding variant
     "techno (peak time / driving / hard)": "techno",
     "hard techno": "techno",
     "minimal": "techno",
     "minimal / deep tech": "techno",
-    "minimal  deep tech": "techno",                     # encoding variant
+    "minimal  deep tech": "techno",  # encoding variant
     "deep tech": "techno",
     "peak time": "techno",
-    "melodic house & techno": "techno",                 # Beatport category, techno-leaning
+    "melodic house & techno": "techno",  # Beatport category, techno-leaning
     "hypno": "techno",
     # ── House ──
     "house": "house",
     "deep house": "house",
     "tech house": "house",
     "afro house": "house",
-    "afro / latin / brazilian": "house",                # Afro house adjacent
+    "afro / latin / brazilian": "house",  # Afro house adjacent
     "bass house": "house",
     "electro house": "house",
     "electro house/electroclash": "house",
@@ -61,59 +78,59 @@ RB_GENRE_TO_FAMILY: dict[str, str] = {
     "jackin house": "house",
     "latin house": "house",
     "organic house": "house",
-    "organic house / downtempo": "house",               # organic house primary
+    "organic house / downtempo": "house",  # organic house primary
     "progressive house": "house",
     "soulful house": "house",
-    "mainstage": "house",                               # big-room house
+    "mainstage": "house",  # big-room house
     # ── Groove ──
     "disco": "groove",
     "disco / nu-disco": "groove",
     "nu disco": "groove",
     "nu disco / disco": "groove",
-    "nu disco / indie dance": "groove",                 # nu disco primary
+    "nu disco / indie dance": "groove",  # nu disco primary
     "funk/rare groove": "groove",
     "soul / funk / disco": "groove",
-    "indie dance": "groove",                            # groove-adjacent
+    "indie dance": "groove",  # groove-adjacent
     # ── Trance ──
     "trance": "trance",
     "trance (main floor)": "trance",
     "trance (raw / deep / hypnotic)": "trance",
-    "trance (raw  deep  hypnotic)": "trance",           # encoding variant
+    "trance (raw  deep  hypnotic)": "trance",  # encoding variant
     "deep trance": "trance",
     "psy-trance": "trance",
     "uplifting trance/progressive trance": "trance",
-    "hard dance / hardcore": "trance",                  # hard dance closer to trance family
+    "hard dance / hardcore": "trance",  # hard dance closer to trance family
     # ── Breaks ──
     "breaks": "breaks",
     "breaks / breakbeat / uk bass": "breaks",
-    "breaks  breakbeat  uk bass": "breaks",             # encoding variant
+    "breaks  breakbeat  uk bass": "breaks",  # encoding variant
     "drum & bass": "breaks",
     "garage": "breaks",
     "uk garage / bassline": "breaks",
-    "uk garage  bassline": "breaks",                    # encoding variant
-    "dubstep": "breaks",                                # bass music → breaks family
+    "uk garage  bassline": "breaks",  # encoding variant
+    "dubstep": "breaks",  # bass music → breaks family
     "bass / club": "breaks",
-    "bass  club": "breaks",                             # encoding variant
-    "bounce": "breaks",                                 # bass-heavy → breaks
+    "bass  club": "breaks",  # encoding variant
+    "bounce": "breaks",  # bass-heavy → breaks
     # ── Electronic ──
     "electro": "electronic",
     "electro (classic / detroit / modern)": "electronic",
     "electronic": "electronic",
     "electronica": "electronic",
     "electronica / downtempo": "electronic",
-    "electrónica": "electronic",                        # Spanish variant
+    "electrónica": "electronic",  # Spanish variant
     "experimental/electronic": "electronic",
     "ambient / experimental": "electronic",
-    "ambient  experimental": "electronic",              # encoding variant
+    "ambient  experimental": "electronic",  # encoding variant
     "balearic/downtempo": "electronic",
-    "dub": "electronic",                                # electronic production style
+    "dub": "electronic",  # electronic production style
     "dance / electro pop": "electronic",
     "dance/electro pop": "electronic",
     "dance / pop": "electronic",
-    "dance  pop": "electronic",                         # encoding variant
+    "dance  pop": "electronic",  # encoding variant
     "dance": "electronic",
     "europop": "electronic",
-    "loop samples": "electronic",                       # DJ tools
+    "loop samples": "electronic",  # DJ tools
     "dj tools": "electronic",
     # ── Other ──
     "pop": "other",
@@ -125,16 +142,14 @@ RB_GENRE_TO_FAMILY: dict[str, str] = {
     "indie/alternative": "other",
     "américa latina": "other",
     "latin music": "other",
-    "bandas sonoras de cine": "other",                  # film soundtracks
+    "bandas sonoras de cine": "other",  # film soundtracks
     "world music": "other",
-    "underreview": "other",                             # uncategorized
+    "underreview": "other",  # uncategorized
 }
 
 # Reverse lookup: genre name → family name
 _GENRE_TO_FAMILY: dict[str, str] = {
-    genre: family
-    for family, members in GENRE_FAMILIES.items()
-    for genre in members
+    genre: family for family, members in GENRE_FAMILIES.items() for genre in members
 }
 # Merge Rekordbox mappings (RB map takes priority for shared keys)
 _GENRE_TO_FAMILY.update(RB_GENRE_TO_FAMILY)
@@ -144,10 +159,10 @@ COMPATIBLE_FAMILIES: set[frozenset[str]] = {
     frozenset({"techno", "electronic"}),
     frozenset({"house", "groove"}),
     frozenset({"house", "electronic"}),
-    frozenset({"house", "trance"}),       # progressive house <-> trance
-    frozenset({"groove", "electronic"}),   # disco/funk <-> electronica
-    frozenset({"breaks", "electronic"}),   # breakbeat <-> electronic
-    frozenset({"techno", "trance"}),       # hard trance <-> techno overlap
+    frozenset({"house", "trance"}),  # progressive house <-> trance
+    frozenset({"groove", "electronic"}),  # disco/funk <-> electronica
+    frozenset({"breaks", "electronic"}),  # breakbeat <-> electronic
+    frozenset({"techno", "trance"}),  # hard trance <-> techno overlap
 }
 
 # Keyword fallback for dir_genre values not in _GENRE_TO_FAMILY.
@@ -281,7 +296,8 @@ def genre_momentum_bonus(
 
     same_count = sum(1 for f in families if f == cand_family)
     compat_count = sum(
-        1 for f in families
+        1
+        for f in families
         if f != cand_family
         and (
             frozenset({f, cand_family}) in COMPATIBLE_FAMILIES
@@ -344,7 +360,7 @@ def track_quality(
         play_signal = (1 - alpha) * ratio + alpha * (1 - ratio)
     elif dd > 0:
         alpha = dd
-        play_signal = (1 - alpha) * ratio + alpha * (ratio ** 0.5)
+        play_signal = (1 - alpha) * ratio + alpha * (ratio**0.5)
     else:
         play_signal = ratio
     score += 0.1 * play_signal
@@ -356,7 +372,7 @@ def track_quality(
         density_signal = (1 - alpha) * density + alpha * (1 - density)
     elif dd > 0:
         alpha = dd
-        density_signal = (1 - alpha) * density + alpha * (density ** 0.5)
+        density_signal = (1 - alpha) * density + alpha * (density**0.5)
     else:
         density_signal = density
     score += 0.1 * density_signal
@@ -522,8 +538,13 @@ def transition_score(
     sac = (set_appearance_counts or {}).get(to_track.id, 0)
     q, _ = track_quality(to_track, prefer_playlists, discovery_density, sac)
 
-    base = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
-            + w["genre_coherence"] * g + w["track_quality"] * q)
+    base = (
+        w["harmonic"] * h
+        + w["energy_fit"] * e
+        + w["bpm_compat"] * b
+        + w["genre_coherence"] * g
+        + w["track_quality"] * q
+    )
     vibe_contribution, _ = vibe_term(from_track, to_track, target_vibe, vibe_strength)
     artist_contribution, _ = artist_term(to_track, preferred_artists, artist_intensity)
     return base + vibe_contribution + artist_contribution
@@ -559,9 +580,16 @@ def score_replacement(
             _best_genre_str(to_t),
         )
         sac = (set_appearance_counts or {}).get(to_t.id, 0)
-        q, label = track_quality(to_t, discovery_density=discovery_density, set_appearance_count=sac)
-        base = (w["harmonic"] * h + w["energy_fit"] * e + w["bpm_compat"] * b
-                + w["genre_coherence"] * g + w["track_quality"] * q)
+        q, label = track_quality(
+            to_t, discovery_density=discovery_density, set_appearance_count=sac
+        )
+        base = (
+            w["harmonic"] * h
+            + w["energy_fit"] * e
+            + w["bpm_compat"] * b
+            + w["genre_coherence"] * g
+            + w["track_quality"] * q
+        )
         vibe_contribution, vibe_bd = vibe_term(from_t, to_t, target_vibe, vibe_strength)
         artist_contribution, artist_bd = artist_term(to_t, preferred_artists, artist_intensity)
         return {
@@ -644,7 +672,14 @@ def score_transitions(
 
     scored = []
     for track in candidates:
-        score = transition_score(from_track, track, target_energy=target_energy, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts)
+        score = transition_score(
+            from_track,
+            track,
+            target_energy=target_energy,
+            weights=weights,
+            discovery_density=discovery_density,
+            set_appearance_counts=set_appearance_counts,
+        )
         # Apply affinity modifier: "good" → +10%, "bad" → -20%
         aff = affinities.get(track.id)
         if aff == "good":
@@ -663,8 +698,9 @@ def _load_affinities(session: Session, track_id: int) -> dict[int, str]:
     Returns empty dict if the table doesn't exist yet (pre-migration).
     """
     try:
-        from kiku.db.models import TrackAffinity
         from sqlalchemy import or_
+
+        from kiku.db.models import TrackAffinity
 
         rows = (
             session.query(TrackAffinity)

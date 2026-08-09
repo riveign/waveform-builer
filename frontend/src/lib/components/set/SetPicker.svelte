@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { DJSet, ImportResult } from '$lib/types';
 	import { listSets, createSet } from '$lib/api/sets';
-	import { onMount } from 'svelte';
+	import { createResource, invalidate } from '$lib/data/resource.svelte';
 	import ImportPlaylistDialog from './ImportPlaylistDialog.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
@@ -10,33 +10,29 @@
 
 	let { onselect, refreshSignal = 0 }: { onselect: (set: DJSet) => void; refreshSignal?: number } = $props();
 
-	let sets = $state<DJSet[]>([]);
-	let loading = $state(true);
+	const res = createResource(() => ({}), (_a, signal) => listSets(undefined, 20, signal), {
+		key: () => 'sets:list',
+		initial: [] as DJSet[],
+	});
+	const sets = $derived(res.data ?? []);
+	const loading = $derived(res.loading);
+
 	let importOpen = $state(false);
 	let creatingNew = $state(false);
 	let newName = $state('');
 	let newInputEl = $state<HTMLInputElement | null>(null);
 
-	async function refresh() {
-		try {
-			sets = await listSets();
-		} catch {
-			sets = [];
-		} finally {
-			loading = false;
-		}
-	}
-
-	onMount(refresh);
-
+	// Any write to the set list — here or anywhere else — refreshes every live
+	// listing under the same key.
 	$effect(() => {
-		if (refreshSignal > 0) refresh();
+		if (refreshSignal > 0) invalidate('sets:list');
 	});
 
 	async function handleImport(result: ImportResult) {
-		// Reload sets and select the newly imported one
-		sets = await listSets();
-		const imported = sets.find(s => s.id === result.set_id);
+		// Reload every set listing, then select the newly imported one.
+		invalidate('sets:list');
+		const fresh = await listSets();
+		const imported = fresh.find((s) => s.id === result.set_id);
 		if (imported) onselect(imported);
 	}
 
@@ -44,7 +40,7 @@
 		if (!newName.trim()) return;
 		try {
 			const newSet = await createSet({ name: newName.trim(), source: 'manual' });
-			sets = await listSets();
+			invalidate('sets:list');
 			onselect(newSet);
 		} catch {
 			// Silently fail — the DJ can try again

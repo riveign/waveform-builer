@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SlotSuggestion } from '$lib/types';
 	import { getSlotSuggestions, addTrackToSet, replaceTrackInSet } from '$lib/api/sets';
+	import { createResource } from '$lib/data/resource.svelte';
 
 	let {
 		setId,
@@ -26,26 +27,25 @@
 	// 1-based in the UI; the API/back end is 0-based.
 	let slotDisplay = $state(1);
 	let position = $derived(Math.max(0, Math.min(trackCount - 1, slotDisplay - 1)));
-	let suggestions = $state<SlotSuggestion[]>([]);
-	let loading = $state(false);
-	let searched = $state(false);
-	let error = $state<string | null>(null);
+	// Nothing is fetched until the DJ picks a direction — a null source stays idle.
+	const res = createResource(
+		() => (intent ? { setId, position, mode, intent } : null),
+		({ setId: s, position: pos, mode: m, intent: i }, signal) =>
+			getSlotSuggestions(s, pos, { mode: m, intent: i, n: 8 }, signal),
+		{ key: ({ setId: s, position: pos, mode: m, intent: i }) => `set:${s}:slot:${pos}:${m}:${i}` },
+	);
+	const suggestions = $derived<SlotSuggestion[]>(res.data?.suggestions ?? []);
+	const loading = $derived(res.loading);
+	const searched = $derived(intent !== null);
+
+	/** Applying a pick is a write, with its own failure mode. */
+	let applyError = $state<string | null>(null);
+	const error = $derived(res.error ?? applyError);
 	let applyingId = $state<number | null>(null);
 
-	async function loadSuggestions(nextIntent: string) {
+	function loadSuggestions(nextIntent: string) {
+		applyError = null;
 		intent = nextIntent;
-		loading = true;
-		searched = true;
-		error = null;
-		try {
-			const res = await getSlotSuggestions(setId, position, { mode, intent, n: 8 });
-			suggestions = res.suggestions;
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Something went wrong reading your library.';
-			suggestions = [];
-		} finally {
-			loading = false;
-		}
 	}
 
 	async function applyPick(pick: SlotSuggestion) {
@@ -59,7 +59,7 @@
 			onApplied();
 			onclose();
 		} catch (e) {
-			error = e instanceof Error ? e.message : "Couldn't apply that pick.";
+			applyError = e instanceof Error ? e.message : "Couldn't apply that pick.";
 		} finally {
 			applyingId = null;
 		}

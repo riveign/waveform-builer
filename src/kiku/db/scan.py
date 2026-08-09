@@ -11,7 +11,7 @@ from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from sqlalchemy.orm import Session
 
 from kiku.config import MUSIC_ROOTS
@@ -22,9 +22,18 @@ from kiku.parsing.directory import parse_track_path
 console = Console()
 
 # Supported audio extensions (lowercase, with dot)
-AUDIO_EXTENSIONS = frozenset({
-    ".mp3", ".flac", ".wav", ".aiff", ".aif", ".m4a", ".ogg", ".wma",
-})
+AUDIO_EXTENSIONS = frozenset(
+    {
+        ".mp3",
+        ".flac",
+        ".wav",
+        ".aiff",
+        ".aif",
+        ".m4a",
+        ".ogg",
+        ".wma",
+    }
+)
 
 
 def _read_tags(file_path: Path) -> dict:
@@ -54,6 +63,7 @@ def _read_tags(file_path: Path) -> dict:
     # Try easy tags first for uniform access
     try:
         from mutagen import File as MutagenFile
+
         easy = MutagenFile(file_path, easy=True)
         if easy and easy.tags:
             tags = easy.tags
@@ -137,6 +147,7 @@ def _parse_year(val: str | None) -> int | None:
     if val is None:
         return None
     import re
+
     m = re.search(r"\d{4}", val)
     if m:
         return int(m.group())
@@ -326,7 +337,7 @@ def scan_filesystem(
     if roots is None:
         roots = MUSIC_ROOTS
 
-    console.print(f"[bold]Exploring your music folders...[/]")
+    console.print("[bold]Exploring your music folders...[/]")
     for root in roots:
         console.print(f"  [dim]{root}[/]")
 
@@ -352,7 +363,11 @@ def scan_filesystem(
     # --- Preview pass (unless --yes) ---
     if not yes:
         stats = _process_files(
-            audio_files, session, path_index, force=force, dry_run=True,
+            audio_files,
+            session,
+            path_index,
+            force=force,
+            dry_run=True,
         )
         _print_preview(stats)
 
@@ -366,7 +381,11 @@ def scan_filesystem(
 
     # --- Write pass ---
     stats = _process_files(
-        audio_files, session, path_index, force=force, dry_run=False,
+        audio_files,
+        session,
+        path_index,
+        force=force,
+        dry_run=False,
     )
 
     console.print()

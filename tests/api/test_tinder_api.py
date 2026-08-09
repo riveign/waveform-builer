@@ -32,10 +32,13 @@ def test_tinder_queue_filter_bpm(client):
 
 
 def test_tinder_decide_confirm(client):
-    resp = client.post("/api/tinder/decide", json={
-        "track_id": 1,
-        "decision": "confirm",
-    })
+    resp = client.post(
+        "/api/tinder/decide",
+        json={
+            "track_id": 1,
+            "decision": "confirm",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["decision"] == "confirm"
@@ -43,11 +46,14 @@ def test_tinder_decide_confirm(client):
 
 
 def test_tinder_decide_override(client):
-    resp = client.post("/api/tinder/decide", json={
-        "track_id": 2,
-        "decision": "override",
-        "override_zone": "warmup",
-    })
+    resp = client.post(
+        "/api/tinder/decide",
+        json={
+            "track_id": 2,
+            "decision": "override",
+            "override_zone": "warmup",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["decision"] == "override"
@@ -55,27 +61,36 @@ def test_tinder_decide_override(client):
 
 
 def test_tinder_decide_skip(client):
-    resp = client.post("/api/tinder/decide", json={
-        "track_id": 3,
-        "decision": "skip",
-    })
+    resp = client.post(
+        "/api/tinder/decide",
+        json={
+            "track_id": 3,
+            "decision": "skip",
+        },
+    )
     assert resp.status_code == 200
     assert resp.json()["decision"] == "skip"
 
 
 def test_tinder_decide_not_found(client):
-    resp = client.post("/api/tinder/decide", json={
-        "track_id": 9999,
-        "decision": "confirm",
-    })
+    resp = client.post(
+        "/api/tinder/decide",
+        json={
+            "track_id": 9999,
+            "decision": "confirm",
+        },
+    )
     assert resp.status_code == 404
 
 
 def test_tinder_decide_invalid_decision(client):
-    resp = client.post("/api/tinder/decide", json={
-        "track_id": 1,
-        "decision": "yolo",
-    })
+    resp = client.post(
+        "/api/tinder/decide",
+        json={
+            "track_id": 1,
+            "decision": "yolo",
+        },
+    )
     assert resp.status_code == 400
 
 

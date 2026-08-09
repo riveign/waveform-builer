@@ -1,4 +1,5 @@
 """Spec 028 — set roles shaping the auto-builder (soft bias) + teaching."""
+
 from __future__ import annotations
 
 import json
@@ -16,7 +17,7 @@ from kiku.setbuilder.planner import _pick_seed
 
 @pytest.fixture()
 def session(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path/'t.db'}", poolclass=NullPool)
+    engine = create_engine(f"sqlite:///{tmp_path / 't.db'}", poolclass=NullPool)
     Base.metadata.create_all(engine)
     s = sessionmaker(bind=engine)()
     yield s
@@ -24,15 +25,22 @@ def session(tmp_path):
 
 
 def _t(session, tid, energy, roles=None, bpm=124.0, key="8A"):
-    tr = Track(id=tid, title=f"T{tid}", artist=f"A{tid}", bpm=bpm, key=key,
-               dir_energy=energy, set_roles=json.dumps(roles) if roles else None)
+    tr = Track(
+        id=tid,
+        title=f"T{tid}",
+        artist=f"A{tid}",
+        bpm=bpm,
+        key=key,
+        dir_energy=energy,
+        set_roles=json.dumps(roles) if roles else None,
+    )
     session.add(tr)
     return tr
 
 
 def test_track_roles_parse(session):
     tr = _t(session, 1, "warmup", roles=["opener", "bogus"])
-    assert track_roles(tr) == ["opener"]           # unknown dropped
+    assert track_roles(tr) == ["opener"]  # unknown dropped
     assert has_role(tr, "opener") and not has_role(tr, "closer")
     assert track_roles(_t(session, 2, "warmup")) == []  # untagged
 
@@ -40,7 +48,7 @@ def test_track_roles_parse(session):
 def test_seed_prefers_opener_when_energy_close(session):
     prof = parse_energy_string("warmup:30:0.3,peak:30:0.9")
     # both near the 0.3 warmup target; #2 is the marked opener
-    a = _t(session, 1, "warmup")                    # ~low energy, no role
+    a = _t(session, 1, "warmup")  # ~low energy, no role
     b = _t(session, 2, "warmup", roles=["opener"])  # ~low energy, opener
     session.commit()
     assert _pick_seed([a, b], prof).id == 2
@@ -49,8 +57,8 @@ def test_seed_prefers_opener_when_energy_close(session):
 def test_seed_does_not_force_opener_on_clear_loss(session):
     prof = parse_energy_string("warmup:30:0.3,peak:30:0.9")
     # #1 sits ON the warmup target; #2 is a peak-energy opener (far from target)
-    a = _t(session, 1, "warmup")                    # great energy fit, no role
-    b = _t(session, 2, "peak", roles=["opener"])    # opener but wrong energy
+    a = _t(session, 1, "warmup")  # great energy fit, no role
+    b = _t(session, 2, "peak", roles=["opener"])  # opener but wrong energy
     session.commit()
     # the ~0.15 bonus must NOT overcome a large energy gap
     assert _pick_seed([a, b], prof).id == 1
@@ -58,6 +66,7 @@ def test_seed_does_not_force_opener_on_clear_loss(session):
 
 def test_teaching_notes_for_tagged_first_and_last(session):
     from kiku.analysis.set_analyzer import analyze_set
+
     o = _t(session, 1, "warmup", roles=["opener"])
     m = _t(session, 2, "build")
     c = _t(session, 3, "close", roles=["closer"])
@@ -79,12 +88,12 @@ from kiku.setbuilder.constraints import (
 
 
 def test_valley_segment_indices():
-    assert resolve_energy("story").valley_segment_indices() == {2}   # 'release'
+    assert resolve_energy("story").valley_segment_indices() == {2}  # 'release'
     assert resolve_energy("journey").valley_segment_indices() == set()  # cooldown is last
     w = parse_energy_string("a:10:0.9,b:10:0.3,c:10:0.9,d:10:0.4,e:10:0.9")
-    assert w.valley_segment_indices() == {1, 3}                      # two valleys
+    assert w.valley_segment_indices() == {1, 3}  # two valleys
     ends = parse_energy_string("a:10:0.1,b:10:0.9,c:10:0.1")
-    assert ends.valley_segment_indices() == set()                   # first/last never
+    assert ends.valley_segment_indices() == set()  # first/last never
 
 
 def test_segment_index_at():
@@ -94,14 +103,15 @@ def test_segment_index_at():
 
 def test_story_preset_registered():
     assert "story" in DEFAULT_ENERGY_PRESETS
-    assert resolve_energy("story").valley_segment_indices()          # has a breather
+    assert resolve_energy("story").valley_segment_indices()  # has a breather
 
 
 def test_break_teaching_note_at_energy_valley(session):
     from kiku.analysis.set_analyzer import analyze_set
-    hi = _t(session, 1, "peak")                       # high
-    br = _t(session, 2, "warmup", roles=["break"])    # low -> curve valley + break tag
-    hi2 = _t(session, 3, "peak")                      # high again
+
+    hi = _t(session, 1, "peak")  # high
+    br = _t(session, 2, "warmup", roles=["break"])  # low -> curve valley + break tag
+    hi2 = _t(session, 3, "peak")  # high again
     st = Set(id=1, name="S", duration_min=30)
     session.add(st)
     session.flush()
@@ -113,12 +123,13 @@ def test_break_teaching_note_at_energy_valley(session):
 
 def test_break_placed_in_valley_on_story(session):
     from kiku.setbuilder.planner import build_set
+
     # Pool must be large enough (and the build long enough) to REACH the release
     # valley, which sits at elapsed 50-62 min in the "story" arc (~6 min/track).
     for i in range(1, 16):
-        _t(session, i, "peak", bpm=126.0, key="8A")           # high-energy pool
+        _t(session, i, "peak", bpm=126.0, key="8A")  # high-energy pool
     _t(session, 99, "warmup", roles=["break"], bpm=126.0, key="8A")  # the breather
     session.commit()
     s = build_set(session, duration_min=64, energy_profile=resolve_energy("story"), set_name="s")
     ids = [st.track_id for st in sorted(s.tracks, key=lambda x: x.position)]
-    assert 99 in ids and 0 < ids.index(99) < len(ids) - 1   # placed, interior
+    assert 99 in ids and 0 < ids.index(99) < len(ids) - 1  # placed, interior

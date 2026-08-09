@@ -43,11 +43,13 @@ def list_energy_presets():
             )
             for seg in profile.segments
         ]
-        result.append(EnergyPresetResponse(
-            name=name,
-            description=_PRESET_DESCRIPTIONS.get(name, ""),
-            segments=segments,
-        ))
+        result.append(
+            EnergyPresetResponse(
+                name=name,
+                description=_PRESET_DESCRIPTIONS.get(name, ""),
+                segments=segments,
+            )
+        )
 
     return result
 
@@ -65,11 +67,13 @@ def list_genre_families():
             for other in pair
             if other != family_name
         ]
-        result.append(GenreFamilyResponse(
-            family_name=family_name,
-            genres=genres,
-            compatible_with=sorted(compatible),
-        ))
+        result.append(
+            GenreFamilyResponse(
+                family_name=family_name,
+                genres=genres,
+                compatible_with=sorted(compatible),
+            )
+        )
 
     return result
 

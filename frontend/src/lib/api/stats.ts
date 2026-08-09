@@ -1,30 +1,33 @@
 import type { LibraryStats, BpmBin, MoodPoint, LibraryGapsResponse, EnhancedStatsResponse } from '$lib/types';
 import { fetchJson } from './client';
 
-export async function getLibraryStats(): Promise<LibraryStats> {
-	return fetchJson<LibraryStats>('/api/stats/library');
+// Every read takes an optional AbortSignal so callers (createResource) can cancel
+// a request the moment its answer stops being wanted.
+
+export async function getLibraryStats(signal?: AbortSignal): Promise<LibraryStats> {
+	return fetchJson<LibraryStats>('/api/stats/library', { signal });
 }
 
-export async function getCamelotStats(): Promise<Record<string, { A: number; B: number }>> {
-	return fetchJson<Record<string, { A: number; B: number }>>('/api/stats/camelot');
+export async function getCamelotStats(signal?: AbortSignal): Promise<Record<string, { A: number; B: number }>> {
+	return fetchJson<Record<string, { A: number; B: number }>>('/api/stats/camelot', { signal });
 }
 
-export async function getBpmHistogram(): Promise<BpmBin[]> {
-	return fetchJson<BpmBin[]>('/api/stats/bpm-histogram');
+export async function getBpmHistogram(signal?: AbortSignal): Promise<BpmBin[]> {
+	return fetchJson<BpmBin[]>('/api/stats/bpm-histogram', { signal });
 }
 
-export async function getEnergyGenre(): Promise<Record<string, Record<string, number>>> {
-	return fetchJson<Record<string, Record<string, number>>>('/api/stats/energy-genre');
+export async function getEnergyGenre(signal?: AbortSignal): Promise<Record<string, Record<string, number>>> {
+	return fetchJson<Record<string, Record<string, number>>>('/api/stats/energy-genre', { signal });
 }
 
-export async function getMoodScatter(): Promise<MoodPoint[]> {
-	return fetchJson<MoodPoint[]>('/api/stats/mood-scatter');
+export async function getMoodScatter(signal?: AbortSignal): Promise<MoodPoint[]> {
+	return fetchJson<MoodPoint[]>('/api/stats/mood-scatter', { signal });
 }
 
-export async function getLibraryGaps(): Promise<LibraryGapsResponse> {
-	return fetchJson<LibraryGapsResponse>('/api/stats/gaps');
+export async function getLibraryGaps(signal?: AbortSignal): Promise<LibraryGapsResponse> {
+	return fetchJson<LibraryGapsResponse>('/api/stats/gaps', { signal });
 }
 
-export async function getEnhancedStats(): Promise<EnhancedStatsResponse> {
-	return fetchJson<EnhancedStatsResponse>('/api/stats/enhanced');
+export async function getEnhancedStats(signal?: AbortSignal): Promise<EnhancedStatsResponse> {
+	return fetchJson<EnhancedStatsResponse>('/api/stats/enhanced', { signal });
 }

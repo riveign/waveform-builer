@@ -7,13 +7,12 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 from rich.console import Console
 from rich.progress import Progress
 
 from kiku.db.models import AudioFeatures, Track, get_session
 from kiku.db.paths import normalize_path
-from kiku.db.store import get_track_by_title, get_unanalyzed_tracks, get_partially_analyzed_tracks
+from kiku.db.store import get_partially_analyzed_tracks, get_track_by_title, get_unanalyzed_tracks
 
 console = Console()
 
@@ -33,6 +32,7 @@ def _analyze_energy_mood(file_path: str) -> dict | None:
     try:
         audio_44100 = _load_at_sr(file_path, 44100)
         from kiku.analysis.essentia_ext import extract_essentia_features
+
         # We only need energy fields from the full extractor
         full = extract_essentia_features(file_path, audio=audio_44100)
         for k in ("energy", "energy_intro", "energy_body", "energy_outro"):
@@ -45,6 +45,7 @@ def _analyze_energy_mood(file_path: str) -> dict | None:
     try:
         audio_16000 = _load_at_sr(file_path, 16000)
         from kiku.analysis.essentia_ext import extract_essentia_mood
+
         results.update(extract_essentia_mood(file_path, audio=audio_16000))
     except Exception:
         pass
@@ -53,7 +54,9 @@ def _analyze_energy_mood(file_path: str) -> dict | None:
 
 
 def _analyze_single(
-    file_path: str, waveform_only: bool = False, bands_only: bool = False,
+    file_path: str,
+    waveform_only: bool = False,
+    bands_only: bool = False,
 ) -> dict | None:
     """Analyze a single track file. Runs in subprocess.
 
@@ -74,6 +77,7 @@ def _analyze_single(
         # Essentia features
         try:
             from kiku.analysis.essentia_ext import extract_essentia_features
+
             results.update(extract_essentia_features(file_path, audio=buffers.audio_44100))
         except ImportError:
             console.print("[yellow]essentia not installed, skipping essentia features[/]")
@@ -83,6 +87,7 @@ def _analyze_single(
         # Essentia mood (optional)
         try:
             from kiku.analysis.essentia_ext import extract_essentia_mood
+
             results.update(extract_essentia_mood(file_path, audio=buffers.audio_16000))
         except Exception:
             pass
@@ -90,6 +95,7 @@ def _analyze_single(
         # MFCC features
         try:
             from kiku.analysis.librosa_ext import extract_mfccs
+
             results.update(extract_mfccs(file_path, audio=buffers.audio_22050, sr=22050))
         except ImportError:
             console.print("[yellow]librosa not installed, skipping MFCC features[/]")
@@ -100,7 +106,10 @@ def _analyze_single(
     if not bands_only:
         try:
             from kiku.analysis.waveform import extract_waveform
-            results.update(extract_waveform(file_path, audio=buffers.audio_22050, skip_beats=waveform_only))
+
+            results.update(
+                extract_waveform(file_path, audio=buffers.audio_22050, skip_beats=waveform_only)
+            )
         except ImportError:
             pass
         except Exception as e:
@@ -110,6 +119,7 @@ def _analyze_single(
     if bands_only or not waveform_only:
         try:
             from kiku.analysis.waveform import extract_band_envelopes
+
             results.update(extract_band_envelopes(file_path, audio=buffers.audio_22050))
         except ImportError:
             pass
@@ -124,19 +134,41 @@ def _save_features(session, track: Track, results: dict):
     af = track.audio_features or AudioFeatures(track_id=track.id)
 
     for key in [
-        "energy", "danceability", "loudness_lufs", "spectral_centroid",
-        "spectral_complexity", "mood_happy", "mood_sad", "mood_aggressive",
-        "mood_relaxed", "ml_genre", "ml_genre_confidence", "energy_intro",
-        "energy_body", "energy_outro", "verified_bpm", "verified_key",
+        "energy",
+        "danceability",
+        "loudness_lufs",
+        "spectral_centroid",
+        "spectral_complexity",
+        "mood_happy",
+        "mood_sad",
+        "mood_aggressive",
+        "mood_relaxed",
+        "ml_genre",
+        "ml_genre_confidence",
+        "energy_intro",
+        "energy_body",
+        "energy_outro",
+        "verified_bpm",
+        "verified_key",
     ]:
         if key in results and results[key] is not None:
             setattr(af, key, results[key])
 
     # Serialize numpy arrays to bytes
     for key in [
-        "mfcc_mean", "mfcc_var", "waveform_overview", "waveform_detail", "beat_positions",
-        "band_low", "band_midlow", "band_midhigh", "band_high",
-        "band_low_overview", "band_midlow_overview", "band_midhigh_overview", "band_high_overview",
+        "mfcc_mean",
+        "mfcc_var",
+        "waveform_overview",
+        "waveform_detail",
+        "beat_positions",
+        "band_low",
+        "band_midlow",
+        "band_midhigh",
+        "band_high",
+        "band_low_overview",
+        "band_midlow_overview",
+        "band_midhigh_overview",
+        "band_high_overview",
     ]:
         if key in results and results[key] is not None:
             setattr(af, key, results[key].tobytes())
@@ -184,7 +216,9 @@ def run_analysis(
 
         console.print(f"Analyzing: [cyan]{track.title}[/] — {track.artist}")
         results = _analyze_single(
-            resolved, waveform_only=waveform_only, bands_only=bands_only,
+            resolved,
+            waveform_only=waveform_only,
+            bands_only=bands_only,
         )
         if results:
             _save_features(session, track, results)
@@ -197,15 +231,13 @@ def run_analysis(
     if recompute:
         targets = [t.strip().lower() for t in recompute.split(",")]
         if "energy_mood" not in targets and "energy" not in targets and "mood" not in targets:
-            console.print(f"[red]Unknown recompute target: {recompute}. Use: energy, mood, energy_mood[/]")
+            console.print(
+                f"[red]Unknown recompute target: {recompute}. Use: energy, mood, energy_mood[/]"
+            )
             return
 
         # Get all tracks with existing audio_features
-        tracks = (
-            session.query(Track)
-            .join(AudioFeatures)
-            .all()
-        )
+        tracks = session.query(Track).join(AudioFeatures).all()
         available = [(t, _resolve_path(t.file_path)) for t in tracks if t.file_path]
         available = [(t, p) for t, p in available if Path(p).exists()]
         if not available:
@@ -231,10 +263,7 @@ def run_analysis(
                 task = progress.add_task(label, total=len(available))
                 mp_ctx = multiprocessing.get_context("spawn")
                 with ProcessPoolExecutor(max_workers=workers, mp_context=mp_ctx) as executor:
-                    futures = {
-                        executor.submit(_analyze_energy_mood, p): t
-                        for t, p in available
-                    }
+                    futures = {executor.submit(_analyze_energy_mood, p): t for t, p in available}
                     for future in as_completed(futures):
                         track = futures[future]
                         try:
@@ -254,10 +283,7 @@ def run_analysis(
         tracks = (
             session.query(Track)
             .outerjoin(AudioFeatures)
-            .filter(
-                (AudioFeatures.band_low.is_(None))
-                | (AudioFeatures.track_id.is_(None))
-            )
+            .filter((AudioFeatures.band_low.is_(None)) | (AudioFeatures.track_id.is_(None)))
             .all()
         )
         if force:
@@ -268,8 +294,7 @@ def run_analysis(
             session.query(Track)
             .outerjoin(AudioFeatures)
             .filter(
-                (AudioFeatures.waveform_overview.is_(None))
-                | (AudioFeatures.track_id.is_(None))
+                (AudioFeatures.waveform_overview.is_(None)) | (AudioFeatures.track_id.is_(None))
             )
             .all()
         )
@@ -282,7 +307,9 @@ def run_analysis(
         partial = get_partially_analyzed_tracks(session)
         tracks = unanalyzed + partial
         if partial:
-            console.print(f"[dim]Found {len(partial)} partially analyzed tracks (waveform-only).[/]")
+            console.print(
+                f"[dim]Found {len(partial)} partially analyzed tracks (waveform-only).[/]"
+            )
 
     # Auto-detect worker count
     if workers <= 0:
@@ -297,7 +324,9 @@ def run_analysis(
         all_with_path = [t for t in tracks if t.file_path]
         total_missing = len(all_with_path) - len(available)
         if total_missing:
-            console.print(f"[dim]{total_missing} tracks have inaccessible files. Mount external drives?[/]")
+            console.print(
+                f"[dim]{total_missing} tracks have inaccessible files. Mount external drives?[/]"
+            )
         return
 
     console.print(f"Analyzing {len(available)} tracks (workers={workers})...")
@@ -315,7 +344,9 @@ def run_analysis(
             task = progress.add_task(label, total=len(available))
             for track, resolved in available:
                 results = _analyze_single(
-                    resolved, waveform_only=waveform_only, bands_only=bands_only,
+                    resolved,
+                    waveform_only=waveform_only,
+                    bands_only=bands_only,
                 )
                 if results:
                     _save_features(session, track, results)

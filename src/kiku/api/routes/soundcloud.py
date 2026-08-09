@@ -162,21 +162,24 @@ def soundcloud_likes(cursor: str | None = None, db: Session = Depends(get_db)):
         if not isinstance(t, dict):
             continue
         user = t.get("user", {})
-        tracks.append(SCTrackResponse(
-            id=t.get("id", 0),
-            title=t.get("title", ""),
-            artist=user.get("username"),
-            permalink_url=t.get("permalink_url", ""),
-            artwork_url=t.get("artwork_url"),
-            duration_ms=t.get("duration", 0),
-            genre=t.get("genre"),
-            bpm=t.get("bpm"),
-        ))
+        tracks.append(
+            SCTrackResponse(
+                id=t.get("id", 0),
+                title=t.get("title", ""),
+                artist=user.get("username"),
+                permalink_url=t.get("permalink_url", ""),
+                artwork_url=t.get("artwork_url"),
+                duration_ms=t.get("duration", 0),
+                genre=t.get("genre"),
+                bpm=t.get("bpm"),
+            )
+        )
 
     # Extract cursor from next_href
     next_cursor = None
     if data.get("next_href"):
         from urllib.parse import parse_qs, urlparse
+
         parsed = urlparse(data["next_href"])
         qs = parse_qs(parsed.query)
         next_cursor = qs.get("cursor", [None])[0]
@@ -190,7 +193,7 @@ def soundcloud_chase(body: SCChaseRequest, db: Session = Depends(get_db)):
 
     Creates a HuntSession, matches against library, generates purchase links.
     """
-    from kiku.db.store import create_hunt_session, save_hunt_tracks
+    from kiku.db.store import create_hunt_session
     from kiku.hunting.matcher import match_tracks
     from kiku.hunting.sources import generate_purchase_links
 
@@ -207,7 +210,9 @@ def soundcloud_chase(body: SCChaseRequest, db: Session = Depends(get_db)):
         playlists = client.get_playlists()
         pl = next((p for p in playlists if p.get("id") == body.playlist_id), None)
         session_title = pl.get("title", "SoundCloud Playlist") if pl else "SoundCloud Playlist"
-        session_url = pl.get("permalink_url", f"soundcloud://playlist/{body.playlist_id}") if pl else ""
+        session_url = (
+            pl.get("permalink_url", f"soundcloud://playlist/{body.playlist_id}") if pl else ""
+        )
         source = "soundcloud_playlist"
     elif body.track_ids:
         # Chase selected likes — fetch full like list and filter
@@ -223,6 +228,7 @@ def soundcloud_chase(body: SCChaseRequest, db: Session = Depends(get_db)):
             if len(all_likes) >= len(wanted_ids) or not page.get("next_href"):
                 break
             from urllib.parse import parse_qs, urlparse
+
             parsed = urlparse(page["next_href"])
             qs = parse_qs(parsed.query)
             cursor = qs.get("cursor", [None])[0]
@@ -239,8 +245,11 @@ def soundcloud_chase(body: SCChaseRequest, db: Session = Depends(get_db)):
 
     # Create hunt session
     hunt = create_hunt_session(
-        db, url=session_url, platform="soundcloud",
-        title=session_title, uploader=None,
+        db,
+        url=session_url,
+        platform="soundcloud",
+        title=session_title,
+        uploader=None,
     )
     hunt.status = "matching"
     db.flush()
@@ -259,16 +268,18 @@ def soundcloud_chase(body: SCChaseRequest, db: Session = Depends(get_db)):
             artist = parts[0].strip()
             title = parts[1].strip()
 
-        track_dicts.append({
-            "position": i + 1,
-            "artist": artist,
-            "title": title,
-            "confidence": 1.0,
-            "source": source,
-            "raw_text": sc_title,
-            "external_url": t.get("permalink_url"),
-            "external_id": str(t.get("id", "")),
-        })
+        track_dicts.append(
+            {
+                "position": i + 1,
+                "artist": artist,
+                "title": title,
+                "confidence": 1.0,
+                "source": source,
+                "raw_text": sc_title,
+                "external_url": t.get("permalink_url"),
+                "external_id": str(t.get("id", "")),
+            }
+        )
 
     # Match against library
     matched = match_tracks(db, track_dicts)
@@ -286,6 +297,7 @@ def soundcloud_chase(body: SCChaseRequest, db: Session = Depends(get_db)):
 
     # Re-use hunt.py serializer
     from kiku.api.routes.hunt import _hunt_session_to_response
+
     return _hunt_session_to_response(hunt)
 
 

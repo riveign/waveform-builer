@@ -1,47 +1,40 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { setHref } from '$lib/nav';
 	import type { TrackSetAppearance } from '$lib/types';
 	import { getTrackSets } from '$lib/api/tracks';
-	import { getUiStore } from '$lib/stores/ui.svelte';
+	import { createResource, invalidate } from '$lib/data/resource.svelte';
 	import Spinner from '../Spinner.svelte';
 	import Button from '../primitives/Button.svelte';
 	import AddToSetPicker from '../set/AddToSetPicker.svelte';
 
 	let { trackId, trackTitle = 'track' }: { trackId: number; trackTitle?: string } = $props();
 
-	const ui = getUiStore();
 
-	let appearances = $state<TrackSetAppearance[]>([]);
-	let loading = $state(true);
 	let showPicker = $state(false);
 
-	async function load() {
-		loading = true;
-		try {
-			appearances = await getTrackSets(trackId);
-		} catch {
-			appearances = [];
-		} finally {
-			loading = false;
-		}
-	}
+	const res = createResource(
+		() => trackId,
+		(id, signal) => getTrackSets(id, signal),
+		{ key: (id) => `track:${id}:sets`, initial: [] as TrackSetAppearance[] },
+	);
+	const appearances = $derived(res.data ?? []);
+	const loading = $derived(res.loading);
 
-	// The panel is always visible now — there is no expand gesture to defer the
-	// fetch behind — so load immediately whenever the track changes.
+	// Close the picker whenever the subject changes.
 	$effect(() => {
 		trackId;
 		showPicker = false;
-		load();
 	});
 
 	function navigateToSet(setId: number) {
-		ui.selectedSetId = setId;
-		ui.activeTab = 'set';
+		goto(setHref(setId));
 	}
 
 	function handleAdded() {
 		// A set just gained this track — refresh so it shows up in the list.
 		showPicker = false;
-		load();
+		res.refresh();
 	}
 </script>
 

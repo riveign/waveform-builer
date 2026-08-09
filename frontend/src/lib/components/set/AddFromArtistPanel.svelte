@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ArtistPick } from '$lib/types';
 	import { getArtistPicks, addTrackToSet } from '$lib/api/sets';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { autocompleteArtists } from '$lib/api/tracks';
 	import Typeahead from '$lib/components/library/Typeahead.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
@@ -19,32 +20,21 @@
 
 	let selectedArtists = $state<string[]>([]);
 	let artist = $derived(selectedArtists[0] ?? '');
-	let picks = $state<ArtistPick[]>([]);
-	let loading = $state(false);
-	let searched = $state(false);
-	let error = $state<string | null>(null);
+
+	const res = createResource(
+		() => (artist ? { setId, artist } : null),
+		({ setId: s, artist: a }, signal) => getArtistPicks(s, a, 5, signal),
+		{ key: ({ setId: s, artist: a }) => `set:${s}:artist-picks:${a}` },
+	);
+	const picks = $derived<ArtistPick[]>(res.data?.picks ?? []);
+	const loading = $derived(res.loading);
+	const searched = $derived(!!artist);
+
+	/** Inserting is a write, with its own failure mode. */
+	let insertError = $state<string | null>(null);
+	const error = $derived(res.error ?? insertError);
 	let insertingId = $state<number | null>(null);
 
-	async function loadPicks() {
-		if (!artist) return;
-		loading = true;
-		searched = true;
-		error = null;
-		try {
-			const res = await getArtistPicks(setId, artist, 5);
-			picks = res.picks;
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Something went wrong reading your library.';
-			picks = [];
-		} finally {
-			loading = false;
-		}
-	}
-
-	// Re-run when the chosen artist changes.
-	$effect(() => {
-		if (artist) loadPicks();
-	});
 
 	async function insertPick(pick: ArtistPick) {
 		insertingId = pick.track.id;
@@ -53,7 +43,7 @@
 			onInserted();
 			onclose();
 		} catch (e) {
-			error = e instanceof Error ? e.message : "Couldn't add that track.";
+			insertError = e instanceof Error ? e.message : "Couldn't add that track.";
 			insertingId = null;
 		}
 	}

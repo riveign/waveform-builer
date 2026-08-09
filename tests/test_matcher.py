@@ -21,10 +21,15 @@ def db_session(tmp_path):
     session = Session()
 
     for i in range(1, 6):
-        session.add(Track(
-            id=i, title=f"Track {i}", artist=f"Artist {i}",
-            bpm=125.0, key="8A",
-        ))
+        session.add(
+            Track(
+                id=i,
+                title=f"Track {i}",
+                artist=f"Artist {i}",
+                bpm=125.0,
+                key="8A",
+            )
+        )
     session.commit()
     yield session
     session.close()

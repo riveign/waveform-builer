@@ -9,6 +9,7 @@
 		Tooltip,
 	} from 'chart.js';
 	import { getLibraryStats, getEnhancedStats } from '$lib/api/stats';
+	import { createResource } from '$lib/data/resource.svelte';
 	import type { LibraryStats, EnhancedStatsResponse } from '$lib/types';
 	import { accentColor, chartChrome, rgba } from '$lib/styles/canvasPalette';
 
@@ -16,8 +17,19 @@
 
 	let canvas: HTMLCanvasElement;
 	let chart: Chart | null = null;
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+	const res = createResource(
+		() => ({}),
+		async (_a, signal) => {
+			const [stats, enhanced] = await Promise.all([
+				getLibraryStats(signal),
+				getEnhancedStats(signal),
+			]);
+			return { stats, enhanced };
+		},
+		{ key: () => 'stats:taste-radar' },
+	);
+	const loading = $derived(res.loading);
+	const error = $derived(res.error);
 	let teachingNote = $state('');
 	/** Accessible summary of each radar axis, for screen readers. */
 	let summary = $state('');
@@ -74,101 +86,84 @@
 		return { strongest: AXES[maxIdx], weakest: AXES[minIdx] };
 	}
 
+	// The resource owns both requests; this effect owns the canvas.
 	$effect(() => {
-		let destroyed = false;
+		if (!res.data || !canvas) return;
 
-		(async () => {
-			try {
-				loading = true;
-				error = null;
 
-				const [stats, enhanced] = await Promise.all([
-					getLibraryStats(),
-					getEnhancedStats(),
-				]);
+		const { stats, enhanced } = res.data;
 
-				if (destroyed) return;
+		const values = computeAxes(stats, enhanced);
+		const { strongest, weakest } = findStrongestWeakest(values);
+		teachingNote = `Strongest: ${strongest} — weakest: ${weakest}. A rounder shape means a more versatile collection.`;
+		summary =
+			'Taste radar across six axes: ' +
+			AXES.map((axis, i) => `${axis} ${Math.round(values[i] * 100)}%`).join(', ') +
+			`. Strongest is ${strongest}, weakest is ${weakest}.`;
 
-				const values = computeAxes(stats, enhanced);
-				const { strongest, weakest } = findStrongestWeakest(values);
-				teachingNote = `Strongest: ${strongest} — weakest: ${weakest}. A rounder shape means a more versatile collection.`;
-				summary =
-					'Taste radar across six axes: ' +
-					AXES.map((axis, i) => `${axis} ${Math.round(values[i] * 100)}%`).join(', ') +
-					`. Strongest is ${strongest}, weakest is ${weakest}.`;
+		const chrome = chartChrome();
+		const accent = accentColor();
 
-				const chrome = chartChrome();
-				const accent = accentColor();
-
-				chart = new Chart(canvas, {
-					type: 'radar',
-					data: {
-						labels: AXES,
-						datasets: [{
-							data: values,
-							backgroundColor: rgba(accent, 0.15),
-							borderColor: rgba(accent, 0.8),
-							borderWidth: 2,
-							pointBackgroundColor: accent,
-							pointBorderColor: chrome.surface,
-							pointBorderWidth: 1,
-							pointRadius: 4,
-							pointHoverRadius: 6,
-							fill: true,
-						}],
-					},
-					options: {
-						responsive: true,
-						maintainAspectRatio: false,
-						plugins: {
-							legend: { display: false },
-							tooltip: {
-								callbacks: {
-									label: (ctx) => {
-										const val = ctx.raw as number;
-										return `${ctx.label}: ${Math.round(val * 100)}%`;
-									},
-								},
-								backgroundColor: chrome.surface,
-								borderColor: chrome.border,
-								borderWidth: 1,
+		chart = new Chart(canvas, {
+			type: 'radar',
+			data: {
+				labels: AXES,
+				datasets: [{
+					data: values,
+					backgroundColor: rgba(accent, 0.15),
+					borderColor: rgba(accent, 0.8),
+					borderWidth: 2,
+					pointBackgroundColor: accent,
+					pointBorderColor: chrome.surface,
+					pointBorderWidth: 1,
+					pointRadius: 4,
+					pointHoverRadius: 6,
+					fill: true,
+				}],
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						callbacks: {
+							label: (ctx) => {
+								const val = ctx.raw as number;
+								return `${ctx.label}: ${Math.round(val * 100)}%`;
 							},
 						},
-						scales: {
-							r: {
-								min: 0,
-								max: 1,
-								ticks: {
-									stepSize: 0.25,
-									color: chrome.muted,
-									backdropColor: 'transparent',
-									font: { size: 9 },
-								},
-								grid: {
-									color: chrome.grid,
-								},
-								angleLines: {
-									color: chrome.grid,
-								},
-								pointLabels: {
-									color: chrome.label,
-									font: { size: 11 },
-								},
-							},
+						backgroundColor: chrome.surface,
+						borderColor: chrome.border,
+						borderWidth: 1,
+					},
+				},
+				scales: {
+					r: {
+						min: 0,
+						max: 1,
+						ticks: {
+							stepSize: 0.25,
+							color: chrome.muted,
+							backdropColor: 'transparent',
+							font: { size: 9 },
+						},
+						grid: {
+							color: chrome.grid,
+						},
+						angleLines: {
+							color: chrome.grid,
+						},
+						pointLabels: {
+							color: chrome.label,
+							font: { size: 11 },
 						},
 					},
-				});
-			} catch (e) {
-				if (!destroyed) {
-					error = e instanceof Error ? e.message : "Couldn't build your taste profile — try refreshing";
-				}
-			} finally {
-				if (!destroyed) loading = false;
-			}
-		})();
+				},
+			},
+		});
 
 		return () => {
-			destroyed = true;
 			if (chart) {
 				chart.destroy();
 				chart = null;

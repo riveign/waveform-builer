@@ -8,140 +8,130 @@
 		Legend,
 	} from 'chart.js';
 	import { getCamelotStats } from '$lib/api/stats';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { token, chartChrome, rgba } from '$lib/styles/canvasPalette';
 
 	Chart.register(PolarAreaController, RadialLinearScale, ArcElement, Tooltip, Legend);
 
 	let canvas: HTMLCanvasElement;
 	let chart: Chart | null = null;
-	let loading = $state(true);
-	let error = $state<string | null>(null);
+
+	const stats = createResource(() => ({}), (_a, signal) => getCamelotStats(signal), {
+		key: () => 'stats:camelot',
+	});
+	const loading = $derived(stats.loading);
+	const error = $derived(stats.error);
 	/** Accessible summary of harmonic coverage, for screen readers. */
 	let summary = $state('');
 
 	const CAMELOT_LABELS = Array.from({ length: 12 }, (_, i) => String(i + 1));
 
+	// Fetch and draw are separate concerns: the resource owns the request, this
+	// effect owns the canvas and re-draws whenever the data changes.
 	$effect(() => {
-		let destroyed = false;
+		const data = stats.data;
+		if (!data || !canvas) return;
 
-		(async () => {
-			try {
-				loading = true;
-				error = null;
-				const data = await getCamelotStats();
+		const minorCounts = CAMELOT_LABELS.map((k) => data[k]?.A ?? 0);
+		const majorCounts = CAMELOT_LABELS.map((k) => data[k]?.B ?? 0);
 
-				if (destroyed) return;
-
-				const minorCounts = CAMELOT_LABELS.map((k) => data[k]?.A ?? 0);
-				const majorCounts = CAMELOT_LABELS.map((k) => data[k]?.B ?? 0);
-
-				const total = [...minorCounts, ...majorCounts].reduce((a, b) => a + b, 0);
-				const covered = CAMELOT_LABELS.filter(
-					(_, i) => minorCounts[i] + majorCounts[i] > 0,
-				).length;
-				let busiestIdx = 0;
-				let busiestCount = -1;
-				CAMELOT_LABELS.forEach((_, i) => {
-					const c = minorCounts[i] + majorCounts[i];
-					if (c > busiestCount) {
-						busiestCount = c;
-						busiestIdx = i;
-					}
-				});
-				summary = `Camelot key coverage: ${total} tracks across ${covered} of 12 key positions. Busiest is key ${CAMELOT_LABELS[busiestIdx]} with ${busiestCount} tracks.`;
-
-				const chrome = chartChrome();
-				// Two distinct cerceta hues for the Minor (A) / Major (B) series.
-				const minorHex = token('--teal-400', '#00B1B8');
-				const majorHex = token('--magenta-500', '#E4488C');
-
-				chart = new Chart(canvas, {
-					type: 'polarArea',
-					data: {
-						labels: CAMELOT_LABELS.map((k) => `${k}A / ${k}B`),
-						datasets: [
-							{
-								label: 'Minor (A)',
-								data: minorCounts,
-								backgroundColor: CAMELOT_LABELS.map(
-									() => rgba(minorHex, 0.6)
-								),
-								borderColor: rgba(minorHex, 0.8),
-								borderWidth: 1,
-							},
-							{
-								label: 'Major (B)',
-								data: majorCounts,
-								backgroundColor: CAMELOT_LABELS.map(
-									() => majorHex
-								),
-								borderColor: rgba(majorHex, 0.8),
-								borderWidth: 1,
-							},
-						],
-					},
-					options: {
-						responsive: true,
-						maintainAspectRatio: true,
-						plugins: {
-							legend: {
-								display: true,
-								position: 'bottom',
-								labels: {
-									color: chrome.text,
-									font: { size: 12 },
-									padding: 16,
-								},
-							},
-							tooltip: {
-								callbacks: {
-									title: (items) => {
-										const idx = items[0]?.dataIndex;
-										if (idx == null) return '';
-										return `Key ${CAMELOT_LABELS[idx]}`;
-									},
-									label: (item) => {
-										const idx = item.dataIndex;
-										const key = CAMELOT_LABELS[idx];
-										const dsLabel = item.dataset.label ?? '';
-										const suffix = dsLabel.includes('Minor') ? 'A' : 'B';
-										return `${key}${suffix}: ${item.raw} tracks`;
-									},
-								},
-							},
-						},
-						scales: {
-							r: {
-								grid: { color: chrome.grid },
-								ticks: {
-									color: chrome.tick,
-									backdropColor: 'transparent',
-								},
-								pointLabels: {
-									color: chrome.label,
-									font: { size: 11 },
-								},
-							},
-						},
-					},
-				});
-			} catch (e) {
-				if (!destroyed) {
-					error = e instanceof Error ? e.message : "Couldn't read your key data — try refreshing";
-				}
-			} finally {
-				if (!destroyed) loading = false;
+		const total = [...minorCounts, ...majorCounts].reduce((a, b) => a + b, 0);
+		const covered = CAMELOT_LABELS.filter(
+			(_, i) => minorCounts[i] + majorCounts[i] > 0,
+		).length;
+		let busiestIdx = 0;
+		let busiestCount = -1;
+		CAMELOT_LABELS.forEach((_, i) => {
+			const c = minorCounts[i] + majorCounts[i];
+			if (c > busiestCount) {
+				busiestCount = c;
+				busiestIdx = i;
 			}
-		})();
+		});
+		summary = `Camelot key coverage: ${total} tracks across ${covered} of 12 key positions. Busiest is key ${CAMELOT_LABELS[busiestIdx]} with ${busiestCount} tracks.`;
+
+		const chrome = chartChrome();
+		// Two distinct cerceta hues for the Minor (A) / Major (B) series.
+		const minorHex = token('--teal-400', '#00B1B8');
+		const majorHex = token('--magenta-500', '#E4488C');
+
+		chart = new Chart(canvas, {
+			type: 'polarArea',
+			data: {
+				labels: CAMELOT_LABELS.map((k) => `${k}A / ${k}B`),
+				datasets: [
+					{
+						label: 'Minor (A)',
+						data: minorCounts,
+						backgroundColor: CAMELOT_LABELS.map(
+							() => rgba(minorHex, 0.6)
+						),
+						borderColor: rgba(minorHex, 0.8),
+						borderWidth: 1,
+					},
+					{
+						label: 'Major (B)',
+						data: majorCounts,
+						backgroundColor: CAMELOT_LABELS.map(
+							() => majorHex
+						),
+						borderColor: rgba(majorHex, 0.8),
+						borderWidth: 1,
+					},
+				],
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: true,
+				plugins: {
+					legend: {
+						display: true,
+						position: 'bottom',
+						labels: {
+							color: chrome.text,
+							font: { size: 12 },
+							padding: 16,
+						},
+					},
+					tooltip: {
+						callbacks: {
+							title: (items) => {
+								const idx = items[0]?.dataIndex;
+								if (idx == null) return '';
+								return `Key ${CAMELOT_LABELS[idx]}`;
+							},
+							label: (item) => {
+								const idx = item.dataIndex;
+								const key = CAMELOT_LABELS[idx];
+								const dsLabel = item.dataset.label ?? '';
+								const suffix = dsLabel.includes('Minor') ? 'A' : 'B';
+								return `${key}${suffix}: ${item.raw} tracks`;
+							},
+						},
+					},
+				},
+				scales: {
+					r: {
+						grid: { color: chrome.grid },
+						ticks: {
+							color: chrome.tick,
+							backdropColor: 'transparent',
+						},
+						pointLabels: {
+							color: chrome.label,
+							font: { size: 11 },
+						},
+					},
+				},
+			},
+		});
 
 		return () => {
-			destroyed = true;
-			if (chart) {
-				chart.destroy();
-				chart = null;
-			}
+			chart?.destroy();
+			chart = null;
 		};
 	});
+
 </script>
 
 <div class="camelot-wheel">

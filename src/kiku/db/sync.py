@@ -6,7 +6,6 @@ import hashlib
 import json
 import sys
 from datetime import datetime
-from pathlib import Path
 
 import click
 from rich.console import Console
@@ -28,7 +27,7 @@ def _file_hash(path: str, chunk_size: int = 1024 * 1024) -> str | None:
         with open(path, "rb") as f:
             h.update(f.read(chunk_size))
         return h.hexdigest()
-    except (OSError, IOError):
+    except OSError:
         return None
 
 
@@ -314,9 +313,7 @@ def sync_rekordbox(
 
     # --- Dry-run / preview pass ---
     if not yes:
-        stats = _process_tracks(
-            db, session, compute_hashes=compute_hashes, dry_run=True
-        )
+        stats = _process_tracks(db, session, compute_hashes=compute_hashes, dry_run=True)
         _print_preview(stats)
 
         if dry_run:
@@ -330,15 +327,12 @@ def sync_rekordbox(
             return {**stats, "cancelled": True}
 
     # --- Write pass ---
-    stats = _process_tracks(
-        db, session, compute_hashes=compute_hashes, dry_run=False
-    )
+    stats = _process_tracks(db, session, compute_hashes=compute_hashes, dry_run=False)
     db.close()
 
     console.print(f"\n[green]Sync complete![/] {stats['total']:,} tracks processed")
     console.print(
-        f"  Added: {stats['added']:,}, Updated: {stats['updated']:,}, "
-        f"Skipped: {stats['skipped']:,}"
+        f"  Added: {stats['added']:,}, Updated: {stats['updated']:,}, Skipped: {stats['skipped']:,}"
     )
 
     return stats

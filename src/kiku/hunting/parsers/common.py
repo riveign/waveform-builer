@@ -5,14 +5,10 @@ from __future__ import annotations
 import re
 
 # Timestamp patterns: "01:23:45", "1:23:45", "23:45", "1:23"
-TIMESTAMP_RE = re.compile(
-    r"(?:(\d{1,2}):)?(\d{1,2}):(\d{2})"
-)
+TIMESTAMP_RE = re.compile(r"(?:(\d{1,2}):)?(\d{1,2}):(\d{2})")
 
 # "Artist - Title" or "Artist — Title" (em-dash)
-ARTIST_TITLE_RE = re.compile(
-    r"^(.+?)\s*[-–—]\s*(.+)$"
-)
+ARTIST_TITLE_RE = re.compile(r"^(.+?)\s*[-–—]\s*(.+)$")
 
 # Remix/edit detection: "Title (Artist Remix)" or "Title [Artist Edit]"
 REMIX_RE = re.compile(
@@ -21,14 +17,10 @@ REMIX_RE = re.compile(
 )
 
 # Numbered tracklist: "1. Artist - Title" or "01) Artist - Title"
-NUMBERED_LINE_RE = re.compile(
-    r"^\s*(\d{1,3})\s*[.\)]\s*(.+)$"
-)
+NUMBERED_LINE_RE = re.compile(r"^\s*(\d{1,3})\s*[.\)]\s*(.+)$")
 
 # Timestamp + track line: "01:23:45 Artist - Title" or "[01:23] Artist - Title"
-TIMESTAMPED_LINE_RE = re.compile(
-    r"^\s*\[?" + TIMESTAMP_RE.pattern + r"\]?\s+(.+)$"
-)
+TIMESTAMPED_LINE_RE = re.compile(r"^\s*\[?" + TIMESTAMP_RE.pattern + r"\]?\s+(.+)$")
 
 # YouTube "Music in this video" section markers
 YT_MUSIC_SECTION_RE = re.compile(

@@ -119,9 +119,9 @@ def extract_band_envelopes(
         sos = butter(4, [low_n, high_n], btype="bandpass", output="sos")
         filtered = sosfilt(sos, y).astype(np.float32)
 
-        rms = librosa.feature.rms(
-            y=filtered, frame_length=2048, hop_length=hop_length
-        )[0].astype(np.float32)
+        rms = librosa.feature.rms(y=filtered, frame_length=2048, hop_length=hop_length)[0].astype(
+            np.float32
+        )
 
         overview = peak_downsample(rms, overview_points).astype(np.float32)
 
@@ -196,7 +196,9 @@ def import_rekordbox_waveform(
     else:
         # Only preview available — use as both
         result["waveform_detail"] = preview_heights
-        result["waveform_overview"] = peak_downsample(preview_heights, overview_points).astype(np.float32)
+        result["waveform_overview"] = peak_downsample(preview_heights, overview_points).astype(
+            np.float32
+        )
 
     # --- SR/hop to produce correct time axis ---
     # envelope_to_time_axis computes: arange(n) * hop / sr
@@ -238,8 +240,6 @@ def read_anlz_path(anlz_dir: str | Path) -> str | None:
         return None
 
 
-def envelope_to_time_axis(
-    n_frames: int, sr: int, hop_length: int
-) -> np.ndarray:
+def envelope_to_time_axis(n_frames: int, sr: int, hop_length: int) -> np.ndarray:
     """Convert frame indices to time values in seconds."""
     return np.arange(n_frames) * hop_length / sr

@@ -91,33 +91,55 @@ def diff_tracks(planned_ids: list[int], played_ids: list[int]) -> list[dict]:
         if planned_pos.get(tid):
             p = planned_pos[tid].pop(0)
             if p == pos:
-                entries.append({
-                    "kind": "kept", "track_id": tid,
-                    "planned_position": p, "played_position": pos, "displacement": None,
-                })
+                entries.append(
+                    {
+                        "kind": "kept",
+                        "track_id": tid,
+                        "planned_position": p,
+                        "played_position": pos,
+                        "displacement": None,
+                    }
+                )
             else:
-                entries.append({
-                    "kind": "moved", "track_id": tid,
-                    "planned_position": p, "played_position": pos, "displacement": pos - p,
-                })
+                entries.append(
+                    {
+                        "kind": "moved",
+                        "track_id": tid,
+                        "planned_position": p,
+                        "played_position": pos,
+                        "displacement": pos - p,
+                    }
+                )
         else:
-            entries.append({
-                "kind": "added", "track_id": tid,
-                "planned_position": None, "played_position": pos, "displacement": None,
-            })
+            entries.append(
+                {
+                    "kind": "added",
+                    "track_id": tid,
+                    "planned_position": None,
+                    "played_position": pos,
+                    "displacement": None,
+                }
+            )
 
     for tid, positions in planned_pos.items():
         for p in positions:
-            entries.append({
-                "kind": "cut", "track_id": tid,
-                "planned_position": p, "played_position": None, "displacement": None,
-            })
+            entries.append(
+                {
+                    "kind": "cut",
+                    "track_id": tid,
+                    "planned_position": p,
+                    "played_position": None,
+                    "displacement": None,
+                }
+            )
 
     # Stable order: played order first, then cuts by planned position
-    entries.sort(key=lambda e: (
-        e["played_position"] is None,
-        e["played_position"] if e["played_position"] is not None else e["planned_position"],
-    ))
+    entries.sort(
+        key=lambda e: (
+            e["played_position"] is None,
+            e["played_position"] if e["played_position"] is not None else e["planned_position"],
+        )
+    )
     return entries
 
 
@@ -218,20 +240,22 @@ def compare_sets(db: Session, played_id: int, planned_id: int) -> SetComparisonR
     deviations: list[TrackDeviation] = []
     for e in raw_entries:
         t = track_lookup.get(e["track_id"])
-        deviations.append(TrackDeviation(
-            kind=e["kind"],
-            track_id=e["track_id"],
-            title=t.title if t else None,
-            artist=t.artist if t else None,
-            planned_position=e["planned_position"],
-            played_position=e["played_position"],
-            displacement=e["displacement"],
-            teaching_moment=deviation_teaching_moment(
-                e["kind"],
+        deviations.append(
+            TrackDeviation(
+                kind=e["kind"],
+                track_id=e["track_id"],
                 title=t.title if t else None,
+                artist=t.artist if t else None,
+                planned_position=e["planned_position"],
+                played_position=e["played_position"],
                 displacement=e["displacement"],
-            ),
-        ))
+                teaching_moment=deviation_teaching_moment(
+                    e["kind"],
+                    title=t.title if t else None,
+                    displacement=e["displacement"],
+                ),
+            )
+        )
 
     # Energy: planned target curve sampled at played positions vs played resolved energies
     played_curve = _played_energies(played_sts)
@@ -241,16 +265,20 @@ def compare_sets(db: Session, played_id: int, planned_id: int) -> SetComparisonR
 
     energy_deviations: list[EnergyDeviation] = []
     for pos, delta in detect_energy_jumps(planned_curve, played_curve):
-        energy_deviations.append(EnergyDeviation(
-            position=pos,
-            track_id=played_sts[pos].track_id,
-            planned_energy=planned_curve[pos],
-            played_energy=played_curve[pos],
-            delta=delta,
-            teaching_moment=deviation_teaching_moment(
-                "energy_jump", delta=delta, position=pos,
-            ),
-        ))
+        energy_deviations.append(
+            EnergyDeviation(
+                position=pos,
+                track_id=played_sts[pos].track_id,
+                planned_energy=planned_curve[pos],
+                played_energy=played_curve[pos],
+                delta=delta,
+                teaching_moment=deviation_teaching_moment(
+                    "energy_jump",
+                    delta=delta,
+                    position=pos,
+                ),
+            )
+        )
 
     arc = ArcComparison(
         planned_shape=planned_analysis.arc.energy_shape,

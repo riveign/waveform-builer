@@ -1,16 +1,18 @@
-# Python
+# Python. __pycache__ and .eggs are unanchored on purpose — they appear at any
+# depth. The build outputs only ever exist at the repo root, so they are anchored:
+# a bare `dist/` or `build/` would also swallow any source directory of that name.
 __pycache__/
 *.py[cod]
 *.egg-info/
 *.egg
-dist/
-build/
+/dist/
+/build/
 .eggs/
 
 # Virtual environment
-.venv/
-venv/
-env/
+/.venv/
+/venv/
+/env/
 
 # IDE
 .idea/
@@ -22,15 +24,17 @@ env/
 .DS_Store
 Thumbs.db
 
-# Data (user-specific, contains local DB and exports)
-data/
+# Data (user-specific, contains local DB and exports).
+# Anchored: an unanchored `data/` also matched frontend/src/lib/data/, which
+# silently kept a source module out of every clean checkout.
+/data/
 *.db
 
 # ML models (downloaded, not tracked)
-models/
+/models/
 
 # Temporary files
-tmp/
+/tmp/
 .pytest_cache/
 
 # Claude config (user-specific)
@@ -44,5 +48,5 @@ frontend/build/
 # Agentic config
 .agentic-config.backup.*
 .agentic-config.conf.yml
-.specs/
-outputs/
+/.specs/
+/outputs/

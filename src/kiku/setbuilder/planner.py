@@ -13,10 +13,10 @@ from kiku.config import ARTIST_COOLDOWN, DEFAULT_BEAM_WIDTH
 from kiku.db.models import Set, SetTrack, Track
 from kiku.db.store import get_track_by_title
 from kiku.energy import get_track_energy
+from kiku.set_roles import has_role
 from kiku.setbuilder.camelot import harmonic_score
 from kiku.setbuilder.constraints import EnergyProfile
 from kiku.setbuilder.scoring import bpm_compatibility, transition_score, vibe_continuity
-from kiku.set_roles import has_role
 from kiku.vibe import resolve_vibe
 
 console = Console()
@@ -28,9 +28,7 @@ console = Console()
 _ROLE_SPAN = 0.15
 
 
-def _lerp_vibe(
-    a: tuple[float, float], b: tuple[float, float], t: float
-) -> tuple[float, float]:
+def _lerp_vibe(a: tuple[float, float], b: tuple[float, float], t: float) -> tuple[float, float]:
     t = max(0.0, min(1.0, t))
     return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
 
@@ -59,6 +57,7 @@ def _make_vibe_arc(
             if progress > 0.85:
                 return _lerp_vibe(preset_vibe, end_vibe, (progress - 0.85) / 0.15)
             return preset_vibe
+
         return arc
     if preset_vibe:
         return lambda _progress: preset_vibe
@@ -176,6 +175,7 @@ def build_set(
     """
     if not energy_profile:
         from kiku.setbuilder.constraints import parse_energy_string
+
         energy_profile = parse_energy_string(
             "warmup:30:0.3,build:20:0.6,peak:40:0.9,cooldown:20:0.4"
         )
@@ -185,7 +185,11 @@ def build_set(
     # Batch query: how many sets each track appears in (for density signal)
     set_appearance_counts: dict[int, int] = {}
     if discovery_density != 0.0:
-        rows = session.query(SetTrack.track_id, func.count(SetTrack.set_id.distinct())).group_by(SetTrack.track_id).all()
+        rows = (
+            session.query(SetTrack.track_id, func.count(SetTrack.set_id.distinct()))
+            .group_by(SetTrack.track_id)
+            .all()
+        )
         set_appearance_counts = {track_id: cnt for track_id, cnt in rows}
 
     if not candidates:
@@ -277,12 +281,25 @@ def build_set(
                 # BPM pre-filter (±12% to allow some flexibility)
                 if current.bpm and cand.bpm:
                     ratio = cand.bpm / current.bpm
-                    if ratio < 0.88 or ratio > 1.12:
-                        # Also allow double/half time
-                        if not (0.47 < ratio < 0.53 or 1.88 < ratio < 2.12):
-                            continue
+                    # Outside ±12%, and not double/half time either.
+                    if (ratio < 0.88 or ratio > 1.12) and not (
+                        0.47 < ratio < 0.53 or 1.88 < ratio < 2.12
+                    ):
+                        continue
 
-                score = transition_score(current, cand, target_energy=target_e, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts, target_vibe=target_vibe, vibe_strength=vibe_intensity, preferred_artists=preferred_artists, artist_intensity=artist_intensity)
+                score = transition_score(
+                    current,
+                    cand,
+                    target_energy=target_e,
+                    prefer_playlists=prefer_playlists,
+                    weights=weights,
+                    discovery_density=discovery_density,
+                    set_appearance_counts=set_appearance_counts,
+                    target_vibe=target_vibe,
+                    vibe_strength=vibe_intensity,
+                    preferred_artists=preferred_artists,
+                    artist_intensity=artist_intensity,
+                )
 
                 # BPM progression bonus: reward tracks closer to target BPM at this point
                 if target_bpm and cand.bpm:
@@ -320,11 +337,13 @@ def build_set(
 
             for cand, score in top:
                 cand_dur = cand.duration_sec / 60.0 if cand.duration_sec else avg_track_min
-                new_beams.append((
-                    seq + [cand],
-                    cum_score + score,
-                    elapsed + cand_dur,
-                ))
+                new_beams.append(
+                    (
+                        seq + [cand],
+                        cum_score + score,
+                        elapsed + cand_dur,
+                    )
+                )
 
         # Keep top beam_width beams by average score
         new_beams.sort(key=lambda b: b[1] / max(len(b[0]), 1), reverse=True)
@@ -349,10 +368,12 @@ def build_set(
     set_ = Set(
         name=name,
         duration_min=int(best_elapsed),
-        energy_profile=json.dumps([
-            {"name": s.name, "duration_min": s.duration_min, "target_energy": s.target_energy}
-            for s in energy_profile.segments
-        ]),
+        energy_profile=json.dumps(
+            [
+                {"name": s.name, "duration_min": s.duration_min, "target_energy": s.target_energy}
+                for s in energy_profile.segments
+            ]
+        ),
         genre_filter=json.dumps(genres) if genres else None,
     )
     session.add(set_)
@@ -360,7 +381,20 @@ def build_set(
 
     prev_track = None
     for i, track in enumerate(best_seq):
-        t_score = transition_score(prev_track, track, prefer_playlists=prefer_playlists, weights=weights, discovery_density=discovery_density, set_appearance_counts=set_appearance_counts, preferred_artists=preferred_artists, artist_intensity=artist_intensity) if prev_track else None
+        t_score = (
+            transition_score(
+                prev_track,
+                track,
+                prefer_playlists=prefer_playlists,
+                weights=weights,
+                discovery_density=discovery_density,
+                set_appearance_counts=set_appearance_counts,
+                preferred_artists=preferred_artists,
+                artist_intensity=artist_intensity,
+            )
+            if prev_track
+            else None
+        )
         st = SetTrack(
             set_id=set_.id,
             position=i,

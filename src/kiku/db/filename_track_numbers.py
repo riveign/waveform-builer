@@ -1,9 +1,9 @@
 """Parse leading disc/track numbers from filenames as a fallback when Rekordbox lacks them."""
+
 from __future__ import annotations
 
 import os
 import re
-
 
 _DISC_TRACK = re.compile(r"^(\d{1,2})[-_](\d{1,2})[\s._-]")
 _TRACK_ONLY = re.compile(r"^(\d{1,2})[\s._-]")

@@ -2,20 +2,22 @@
 	import type { SetWaveformTrack, SetAnalysis } from '$lib/types';
 	import { formatKey, getCamelotColor, harmonicMove } from '$lib/utils/camelot';
 	import { getTrackEnergyNumeric, energyColor } from '$lib/utils/energy';
-	import { getUiStore } from '$lib/stores/ui.svelte';
 	import Chip from '$lib/components/primitives/Chip.svelte';
 
 	let {
 		tracks,
 		energyTargets = [],
 		analysis = null,
+		focusedTrackId = null,
+		onselect,
 	}: {
 		tracks: SetWaveformTrack[];
 		energyTargets?: (number | undefined)[];
 		analysis?: SetAnalysis | null;
+		focusedTrackId?: number | null;
+		onselect?: (trackId: number) => void;
 	} = $props();
 
-	const ui = getUiStore();
 
 	// Incoming-transition CTX score keyed by transition position (i-1 lands on card i).
 	let ctxMap = $derived.by(() => {
@@ -32,7 +34,7 @@
 	}
 
 	function selectTrack(trackId: number) {
-		ui.selectedTrackInSet = trackId;
+		onselect?.(trackId);
 	}
 </script>
 
@@ -46,7 +48,7 @@
 		{@const target = energyTargets[i]}
 		<div
 			class="grid-card"
-			class:selected={ui.selectedTrackInSet === track.track_id}
+			class:selected={focusedTrackId === track.track_id}
 			role="button"
 				aria-label="Select {track.title ?? 'Untitled'} by {track.artist ?? 'Unknown'}"
 			tabindex="0"

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TinderQueueItem, TinderDecision } from '$lib/types';
 	import { getTinderQueue, submitDecision } from '$lib/api/tinder';
+	import { createResource } from '$lib/data/resource.svelte';
 	import TinderCard from '../tinder/TinderCard.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
 	import { focusTrap } from '$lib/actions/focusTrap';
@@ -13,40 +14,40 @@
 		onclose: (reviewed: boolean) => void;
 	} = $props();
 
-	let queue = $state<TinderQueueItem[]>([]);
+	const res = createResource(
+		() => trackIds,
+		(ids, signal) =>
+			getTinderQueue({ track_ids: ids, include_conflicts: true, limit: 100 }, signal),
+		{ key: (ids) => `tinder:queue:${ids.join(',')}`, initial: undefined },
+	);
+	const queue = $derived<TinderQueueItem[]>(res.data?.items ?? []);
+	const loading = $derived(res.loading);
+	const totalToReview = $derived(queue.length);
+
+	/** Errors from submitting a decision are a different lifecycle from loading the
+	 *  queue, so they get their own state; the view shows whichever is set. */
+	let submitError = $state<string | null>(null);
+	const error = $derived(res.error ?? submitError);
+
 	let currentIndex = $state(0);
-	let loading = $state(true);
-	let error = $state<string | null>(null);
 	let teachingMoment = $state<string | null>(null);
 	let reviewed = $state(0);
-	let totalToReview = $state(0);
+
+	// A fresh queue restarts the review.
+	$effect(() => {
+		res.data;
+		currentIndex = 0;
+		reviewed = 0;
+	});
 
 	let currentItem = $derived(currentIndex < queue.length ? queue[currentIndex] : null);
 	let done = $derived(!loading && (queue.length === 0 || currentIndex >= queue.length));
 
-	async function loadQueue() {
-		loading = true;
-		error = null;
-		try {
-			const res = await getTinderQueue({
-				track_ids: trackIds,
-				include_conflicts: true,
-				limit: 100,
-			});
-			queue = res.items;
-			totalToReview = res.items.length;
-			currentIndex = 0;
-			reviewed = 0;
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-		} finally {
-			loading = false;
-		}
-	}
 
 	async function handleDecide(decision: TinderDecision, overrideZone?: string) {
 		if (!currentItem) return;
 		teachingMoment = null;
+		submitError = null;
 		try {
 			const result = await submitDecision(currentItem.track.id, decision, overrideZone);
 			if (result.teaching_moment) {
@@ -57,7 +58,7 @@
 			}
 			currentIndex++;
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			submitError = e instanceof Error ? e.message : String(e);
 		}
 	}
 
@@ -68,8 +69,6 @@
 		}
 	}
 
-	// Load queue on mount
-	loadQueue();
 </script>
 
 <svelte:window onkeydown={handleKeydown} />

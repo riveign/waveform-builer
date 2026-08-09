@@ -8,10 +8,17 @@ from kiku.db.models import AudioFeatures
 def test_track_features_includes_vibe(client, db_session):
     """The features endpoint must serve the derived vibe (regression: the
     route builds the response manually and once omitted these fields)."""
-    db_session.add(AudioFeatures(
-        track_id=1, energy=0.6, spectral_centroid=1600.0, spectral_complexity=8.0,
-        danceability=0.5, vibe_brightness=0.34, vibe_density=0.74,
-    ))
+    db_session.add(
+        AudioFeatures(
+            track_id=1,
+            energy=0.6,
+            spectral_centroid=1600.0,
+            spectral_complexity=8.0,
+            danceability=0.5,
+            vibe_brightness=0.34,
+            vibe_density=0.74,
+        )
+    )
     db_session.commit()
     resp = client.get("/api/tracks/1/features")
     assert resp.status_code == 200
@@ -216,5 +223,5 @@ def test_search_filter_set_roles_multi_or(client):
     client.patch("/api/tracks/5/set-roles", json={"roles": ["break"]})
     resp = client.get("/api/tracks/search?set_role=opener&set_role=closer")
     ids = {t["id"] for t in resp.json()["items"]}
-    assert 3 in ids and 4 in ids       # union of both roles
-    assert 5 not in ids                # break not selected
+    assert 3 in ids and 4 in ids  # union of both roles
+    assert 5 not in ids  # break not selected

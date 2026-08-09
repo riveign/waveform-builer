@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import click
 from rich.console import Console
 from rich.table import Table
@@ -82,9 +80,16 @@ def config_path():
 @click.option("--energy", "-e", default=None, help="Energy level filter (e.g., Peak, Warmup)")
 @click.option("--rating", "-r", default=None, type=int, help="Minimum star rating (1-5)")
 @click.option("-n", "--limit", default=50, help="Max results")
-def search(title: str | None, artist: str | None, genre: str | None,
-           key: str | None, bpm: str | None, energy: str | None,
-           rating: int | None, limit: int):
+def search(
+    title: str | None,
+    artist: str | None,
+    genre: str | None,
+    key: str | None,
+    bpm: str | None,
+    energy: str | None,
+    rating: int | None,
+    limit: int,
+):
     """Search your track library with filters."""
     from kiku.db.models import get_session
     from kiku.db.store import search_tracks
@@ -98,17 +103,25 @@ def search(title: str | None, artist: str | None, genre: str | None,
             bpm_min = bpm_max = float(bpm)
 
     session = get_session()
-    results = search_tracks(
-        session, title=title, artist=artist, genre=genre,
-        bpm_min=bpm_min, bpm_max=bpm_max, energy=energy,
-        key=key, rating_min=rating, limit=limit,
+    results, total = search_tracks(
+        session,
+        title=title,
+        artist=artist,
+        genre=genre,
+        bpm_min=bpm_min,
+        bpm_max=bpm_max,
+        energy=energy,
+        key=key,
+        rating_min=rating,
+        limit=limit,
     )
 
     if not results:
-        console.print("[yellow]No tracks found matching your filters.[/]")
+        console.print("[yellow]Nothing in your library matches those filters.[/]")
         return
 
-    table = Table(title=f"Search Results ({len(results)} tracks)")
+    shown = f"{len(results)} of {total}" if total > len(results) else f"{len(results)}"
+    table = Table(title=f"Search Results ({shown} tracks)")
     table.add_column("#", justify="right", style="dim")
     table.add_column("Title", style="cyan")
     table.add_column("Artist")
@@ -139,8 +152,12 @@ def search(title: str | None, artist: str | None, genre: str | None,
 
 @cli.command()
 @click.option("--hashes", is_flag=True, help="Compute file hashes for change detection (slower)")
-@click.option("--db-path", default=None, type=click.Path(exists=True),
-              help="Path to Rekordbox master.db (required on Linux)")
+@click.option(
+    "--db-path",
+    default=None,
+    type=click.Path(exists=True),
+    help="Path to Rekordbox master.db (required on Linux)",
+)
 @click.option("--dry-run", is_flag=True, help="Show what would change without writing anything")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation and sync immediately")
 def sync(hashes: bool, db_path: str | None, dry_run: bool, yes: bool):
@@ -151,8 +168,13 @@ def sync(hashes: bool, db_path: str | None, dry_run: bool, yes: bool):
 
 
 @cli.command()
-@click.option("--path", "-p", type=click.Path(exists=True), default=None,
-              help="Override MUSIC_ROOTS with a specific path")
+@click.option(
+    "--path",
+    "-p",
+    type=click.Path(exists=True),
+    default=None,
+    help="Override MUSIC_ROOTS with a specific path",
+)
 @click.option("--dry-run", is_flag=True, help="Show what would be imported without writing to DB")
 @click.option("--force", is_flag=True, help="Re-import even if track already exists")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation and scan immediately")
@@ -179,11 +201,15 @@ def stats():
         console.print("[yellow]No tracks in your collection. Run 'kiku sync' first.[/]")
         return
 
-    console.print(f"\n[bold]Library: {s['total_tracks']} tracks[/] ({s['analyzed_tracks']} analyzed)\n")
+    console.print(
+        f"\n[bold]Library: {s['total_tracks']} tracks[/] ({s['analyzed_tracks']} analyzed)\n"
+    )
 
     # BPM
     if s["bpm_avg"]:
-        console.print(f"[bold]BPM range:[/] {s['bpm_min']:.0f} – {s['bpm_max']:.0f} (avg {s['bpm_avg']})\n")
+        console.print(
+            f"[bold]BPM range:[/] {s['bpm_min']:.0f} – {s['bpm_max']:.0f} (avg {s['bpm_avg']})\n"
+        )
 
     # Genres
     if s["genres"]:
@@ -243,8 +269,11 @@ def stats():
         table.add_column("Max", justify="right")
         for family, info in es["bpm_per_genre"].items():
             table.add_row(
-                family, str(info["count"]),
-                str(info["avg"]), str(info["min"]), str(info["max"]),
+                family,
+                str(info["count"]),
+                str(info["avg"]),
+                str(info["min"]),
+                str(info["max"]),
             )
         console.print(table)
 
@@ -289,13 +318,14 @@ def stats():
     if cov["total"] > 0:
         console.print()
         console.print(f"[bold]Coverage[/] ({cov['total']} tracks)")
-        console.print(f"  Key: {cov['key']}% | BPM: {cov['bpm']}% | Rating: {cov['rating']}% | Audio features: {cov['features']}%")
+        console.print(
+            f"  Key: {cov['key']}% | BPM: {cov['bpm']}% | Rating: {cov['rating']}% | Audio features: {cov['features']}%"
+        )
 
 
 @cli.command()
 def gaps():
     """Identify gaps in your library (Camelot, BPM, energy)."""
-    from rich.panel import Panel
 
     from kiku.analysis.insights import library_gaps
     from kiku.db.models import get_session
@@ -533,8 +563,14 @@ def slot_suggest_cmd(set_name_or_id, position, mode, intent, allowed_keys, energ
         keys = {k.strip() for k in allowed_keys.split(",") if k.strip()} or None
 
     picks = rank_slot_picks(
-        session, s.id, position, mode, intent,
-        allowed_keys=keys, energy_delta=energy_delta, n=num,
+        session,
+        s.id,
+        position,
+        mode,
+        intent,
+        allowed_keys=keys,
+        energy_delta=energy_delta,
+        n=num,
     )
     if not picks:
         console.print(
@@ -544,9 +580,7 @@ def slot_suggest_cmd(set_name_or_id, position, mode, intent, allowed_keys, energ
         )
         return
 
-    table = Table(
-        title=f"Slot {position + 1} of '{s.name}' — {mode}, {intent.replace('_', ' ')}"
-    )
+    table = Table(title=f"Slot {position + 1} of '{s.name}' — {mode}, {intent.replace('_', ' ')}")
     table.add_column("#", justify="right", style="dim")
     table.add_column("Title", style="cyan")
     table.add_column("Artist")
@@ -571,18 +605,31 @@ def slot_suggest_cmd(set_name_or_id, position, mode, intent, allowed_keys, energ
 
 @cli.command()
 @click.option("--duration", default=120, help="Set duration in minutes")
-@click.option("--energy", default="journey",
-              help="Energy preset (warmup/peak-time/journey/afterhours) or raw format name:min:energy,...")
+@click.option(
+    "--energy",
+    default="journey",
+    help="Energy preset (warmup/peak-time/journey/afterhours) or raw format name:min:energy,...",
+)
 @click.option("--genres", default=None, help="Comma-separated genre filter")
 @click.option("--bpm-min", default=None, type=float, help="Minimum BPM")
 @click.option("--bpm-max", default=None, type=float, help="Maximum BPM")
 @click.option("--seed", default=None, help="Seed track title")
 @click.option("--output", default=None, help="Set name")
 @click.option("--beam-width", default=5, help="Beam search width")
-@click.option("--prefer-playlists", default=None, help="Comma-separated playlist name prefixes to boost")
-def build(duration: int, energy: str, genres: str | None, bpm_min: float | None,
-          bpm_max: float | None, seed: str | None, output: str | None, beam_width: int,
-          prefer_playlists: str | None):
+@click.option(
+    "--prefer-playlists", default=None, help="Comma-separated playlist name prefixes to boost"
+)
+def build(
+    duration: int,
+    energy: str,
+    genres: str | None,
+    bpm_min: float | None,
+    bpm_max: float | None,
+    seed: str | None,
+    output: str | None,
+    beam_width: int,
+    prefer_playlists: str | None,
+):
     """Generate an optimized DJ set."""
     from kiku.db.models import get_session
     from kiku.setbuilder.constraints import resolve_energy
@@ -649,12 +696,27 @@ def build(duration: int, energy: str, genres: str | None, bpm_min: float | None,
 
 @cli.command()
 @click.argument("set_name")
-@click.option("--format", "fmt", default="m3u8", type=click.Choice(["m3u8", "rekordbox"]), help="Export format (default: m3u8)")
+@click.option(
+    "--format",
+    "fmt",
+    default="m3u8",
+    type=click.Choice(["m3u8", "rekordbox"]),
+    help="Export format (default: m3u8)",
+)
 @click.option("--output", "-o", default=None, help="Output file path")
-@click.option("--with-cues", is_flag=True, help="Include transition cue points (rekordbox format only)")
+@click.option(
+    "--with-cues", is_flag=True, help="Include transition cue points (rekordbox format only)"
+)
 @click.option("--with-metadata", is_flag=True, help="Include Kiku metadata as comments (m3u8 only)")
-@click.option("--platform", default="macos", type=click.Choice(["macos", "linux"]), help="Target platform for path aliasing")
-def export(set_name: str, fmt: str, output: str | None, with_cues: bool, with_metadata: bool, platform: str):
+@click.option(
+    "--platform",
+    default="macos",
+    type=click.Choice(["macos", "linux"]),
+    help="Target platform for path aliasing",
+)
+def export(
+    set_name: str, fmt: str, output: str | None, with_cues: bool, with_metadata: bool, platform: str
+):
     """Export a set for import into Rekordbox or other DJ software."""
     from kiku.db.models import Set, TransitionCue, get_session
 
@@ -662,14 +724,19 @@ def export(set_name: str, fmt: str, output: str | None, with_cues: bool, with_me
     set_ = session.query(Set).filter(Set.name.ilike(f"%{set_name}%")).first()
 
     if not set_:
-        console.print(f"[yellow]Couldn't find a set matching '{set_name}' -- check the name and try again.[/]")
+        console.print(
+            f"[yellow]Couldn't find a set matching '{set_name}' -- check the name and try again.[/]"
+        )
         return
 
     if fmt == "m3u8":
         from kiku.export.m3u8 import export_set_to_m3u8
 
         output_path = export_set_to_m3u8(
-            set_, output, target_platform=platform, with_metadata=with_metadata,
+            set_,
+            output,
+            target_platform=platform,
+            with_metadata=with_metadata,
         )
         track_count = len(set_.tracks)
         console.print(f"[green]Exported {track_count} tracks to {output_path}[/]")
@@ -689,11 +756,18 @@ def export(set_name: str, fmt: str, output: str | None, with_cues: bool, with_me
             if cues:
                 transition_cues: dict[int, list[dict]] = {}
                 for c in cues:
-                    transition_cues.setdefault(c.track_id, []).append({
-                        "name": c.name, "type": c.cue_type,
-                        "start": c.start_sec, "end": c.end_sec, "num": c.hot_cue_num,
-                    })
-                console.print(f"[cyan]Including {len(cues)} cue points from {len(transition_cues)} tracks[/]")
+                    transition_cues.setdefault(c.track_id, []).append(
+                        {
+                            "name": c.name,
+                            "type": c.cue_type,
+                            "start": c.start_sec,
+                            "end": c.end_sec,
+                            "num": c.hot_cue_num,
+                        }
+                    )
+                console.print(
+                    f"[cyan]Including {len(cues)} cue points from {len(transition_cues)} tracks[/]"
+                )
             else:
                 console.print("[dim]No cue points found for this set.[/]")
 
@@ -703,7 +777,9 @@ def export(set_name: str, fmt: str, output: str | None, with_cues: bool, with_me
 
 @cli.command("import-playlist")
 @click.argument("file_path", type=click.Path(exists=True))
-@click.option("--name", "-n", default=None, help="Set name override (defaults to playlist filename)")
+@click.option(
+    "--name", "-n", default=None, help="Set name override (defaults to playlist filename)"
+)
 @click.option("--force", is_flag=True, help="Re-import even if source already exists")
 def import_playlist(file_path: str, name: str | None, force: bool):
     """Import a Rekordbox M3U8 playlist as a new set.
@@ -714,7 +790,7 @@ def import_playlist(file_path: str, name: str | None, force: bool):
     from kiku.import_playlist.m3u8 import parse_m3u8_file
     from kiku.import_playlist.service import import_playlist as do_import
 
-    console.print(f"[cyan]Reading playlist...[/]")
+    console.print("[cyan]Reading playlist...[/]")
     parse_result = parse_m3u8_file(file_path)
 
     if not parse_result.tracks:
@@ -755,7 +831,7 @@ def import_playlist(file_path: str, name: str | None, force: bool):
 
     # Show unmatched tracks
     if result.unmatched:
-        console.print(f"\n[bold]Unmatched tracks:[/]")
+        console.print("\n[bold]Unmatched tracks:[/]")
         table = Table()
         table.add_column("#", justify="right", style="dim")
         table.add_column("Path")
@@ -798,8 +874,16 @@ def analyze_set_cmd(set_name_or_id: str):
         return
 
     # Print summary
-    score_color = "green" if result.overall_score >= 0.7 else "yellow" if result.overall_score >= 0.5 else "red"
-    console.print(f"\n[bold]{s.name}[/] — {result.track_count} tracks, {result.transition_count} transitions")
+    score_color = (
+        "green"
+        if result.overall_score >= 0.7
+        else "yellow"
+        if result.overall_score >= 0.5
+        else "red"
+    )
+    console.print(
+        f"\n[bold]{s.name}[/] — {result.track_count} tracks, {result.transition_count} transitions"
+    )
     console.print(f"Overall score: [bold {score_color}]{result.overall_score:.3f}[/]")
     console.print(
         f"Energy shape: [cyan]{result.arc.energy_shape}[/] | "
@@ -815,7 +899,9 @@ def analyze_set_cmd(set_name_or_id: str):
     table.add_column("Teaching Moment")
     table.add_column("Suggestion", style="dim")
     for t in result.transitions:
-        t_color = "green" if t.scores["total"] >= 0.7 else "yellow" if t.scores["total"] >= 0.5 else "red"
+        t_color = (
+            "green" if t.scores["total"] >= 0.7 else "yellow" if t.scores["total"] >= 0.5 else "red"
+        )
         table.add_row(
             str(t.position + 1),
             f"[{t_color}]{t.scores['total']:.3f}[/]",
@@ -870,8 +956,7 @@ def compare_cmd(played_set: str, planned_set: str | None):
             return
     else:
         console.print(
-            "[yellow]No planned set linked. Pass it explicitly: "
-            "kiku compare <played> <planned>[/]"
+            "[yellow]No planned set linked. Pass it explicitly: kiku compare <played> <planned>[/]"
         )
         return
 
@@ -975,9 +1060,12 @@ def classify(query: str):
         return
 
     console.print(f"\n[bold]{track.title}[/] — {track.artist}")
-    console.print(f"  BPM: {track.bpm or '?'} | Key: {track.key or '?'} | Rating: {track.rating or '?'}")
+    console.print(
+        f"  BPM: {track.bpm or '?'} | Key: {track.key or '?'} | Rating: {track.rating or '?'}"
+    )
     console.print(f"  Rekordbox genre: {track.rb_genre or '?'}")
     from kiku.energy import get_track_energy
+
     te = get_track_energy(track)
     console.print(f"  Directory genre: {track.dir_genre or '?'} | Energy: {te.label}")
     console.print(f"  Duration: {track.duration_sec:.0f}s" if track.duration_sec else "")
@@ -986,19 +1074,26 @@ def classify(query: str):
 
     af = track.audio_features
     if af:
-        console.print(f"\n[bold]Audio Features:[/]")
+        console.print("\n[bold]Audio Features:[/]")
         console.print(f"  Energy: {af.energy:.3f}" if af.energy else "")
         console.print(f"  Danceability: {af.danceability:.3f}" if af.danceability else "")
         console.print(f"  Loudness: {af.loudness_lufs:.1f} LUFS" if af.loudness_lufs else "")
         console.print(f"  Brightness: {af.spectral_centroid:.0f}" if af.spectral_centroid else "")
-        console.print(f"  Mood: happy={af.mood_happy:.2f} sad={af.mood_sad:.2f} "
-                       f"aggressive={af.mood_aggressive:.2f} relaxed={af.mood_relaxed:.2f}"
-                       if af.mood_happy is not None else "")
-        console.print(f"  ML Genre: {af.ml_genre} ({af.ml_genre_confidence:.2f})"
-                       if af.ml_genre else "")
-        console.print(f"  Energy curve: intro={af.energy_intro:.2f} body={af.energy_body:.2f} "
-                       f"outro={af.energy_outro:.2f}"
-                       if af.energy_intro is not None else "")
+        console.print(
+            f"  Mood: happy={af.mood_happy:.2f} sad={af.mood_sad:.2f} "
+            f"aggressive={af.mood_aggressive:.2f} relaxed={af.mood_relaxed:.2f}"
+            if af.mood_happy is not None
+            else ""
+        )
+        console.print(
+            f"  ML Genre: {af.ml_genre} ({af.ml_genre_confidence:.2f})" if af.ml_genre else ""
+        )
+        console.print(
+            f"  Energy curve: intro={af.energy_intro:.2f} body={af.energy_body:.2f} "
+            f"outro={af.energy_outro:.2f}"
+            if af.energy_intro is not None
+            else ""
+        )
         console.print(f"  Verified BPM: {af.verified_bpm}" if af.verified_bpm else "")
         console.print(f"  Verified Key: {af.verified_key}" if af.verified_key else "")
     else:
@@ -1128,7 +1223,9 @@ def import_waveforms(anlz_root: str, force: bool):
 
     console.print(f"\n[bold green]Done![/] Imported {imported} waveforms")
     if skipped_exists:
-        console.print(f"  Skipped {skipped_exists} (already have waveforms, use --force to overwrite)")
+        console.print(
+            f"  Skipped {skipped_exists} (already have waveforms, use --force to overwrite)"
+        )
     if skipped_no_match:
         console.print(f"  Skipped {skipped_no_match} (no matching track in DB)")
     if errors:
@@ -1137,18 +1234,31 @@ def import_waveforms(anlz_root: str, force: bool):
 
 @cli.command()
 @click.option("--force", is_flag=True, help="Re-analyze all tracks")
-@click.option("--workers", default=0, help="Number of parallel workers (0 = auto: half of CPU cores)")
+@click.option(
+    "--workers", default=0, help="Number of parallel workers (0 = auto: half of CPU cores)"
+)
 @click.option("--track", "track_name", default=None, help="Analyze a single track")
 @click.option("--waveform-only", is_flag=True, help="Only extract waveforms (skip full analysis)")
 @click.option("--bands", is_flag=True, help="Extract frequency band envelopes only")
 @click.option("--recompute", default=None, help="Recompute specific features: energy_mood")
-def analyze(force: bool, workers: int, track_name: str | None, waveform_only: bool, bands: bool, recompute: str | None):
+def analyze(
+    force: bool,
+    workers: int,
+    track_name: str | None,
+    waveform_only: bool,
+    bands: bool,
+    recompute: str | None,
+):
     """Run audio analysis on tracks (requires essentia + librosa)."""
     from kiku.analysis.analyzer import run_analysis
 
     run_analysis(
-        force=force, workers=workers, single_track=track_name,
-        waveform_only=waveform_only, bands_only=bands, recompute=recompute,
+        force=force,
+        workers=workers,
+        single_track=track_name,
+        waveform_only=waveform_only,
+        bands_only=bands,
+        recompute=recompute,
     )
 
 
@@ -1158,15 +1268,24 @@ def autotag_group():
 
 
 @autotag_group.command("energy")
-@click.option("--dry-run", "mode", flag_value="dry-run", default=True, help="Show predictions without writing (default)")
-@click.option("--approve", "mode", flag_value="approve", help="Review and approve predictions interactively")
-@click.option("--auto", "mode", flag_value="auto", help="Write all predictions above threshold automatically")
+@click.option(
+    "--dry-run",
+    "mode",
+    flag_value="dry-run",
+    default=True,
+    help="Show predictions without writing (default)",
+)
+@click.option(
+    "--approve", "mode", flag_value="approve", help="Review and approve predictions interactively"
+)
+@click.option(
+    "--auto", "mode", flag_value="auto", help="Write all predictions above threshold automatically"
+)
 @click.option("--retrain", is_flag=True, help="Retrain the model before predicting")
 @click.option("--threshold", default=0.7, type=float, help="Minimum confidence to suggest (0-1)")
 @click.option("--force", is_flag=True, help="Overwrite existing manual dir_energy tags")
 def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
     """Classify energy zones using your tagged tracks as training data."""
-    from rich.panel import Panel
 
     from kiku.analysis.autotag import (
         load_model,
@@ -1225,9 +1344,12 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
                 # Run calibration for composite energy boundaries
                 try:
                     from kiku.analysis.autotag import calibrate_energy
+
                     cal = calibrate_energy(session)
                     result["calibration"] = cal
-                    console.print(f"[cyan]Calibrated energy boundaries from {cal['training_samples']} tagged tracks[/]")
+                    console.print(
+                        f"[cyan]Calibrated energy boundaries from {cal['training_samples']} tagged tracks[/]"
+                    )
                 except ValueError as cal_err:
                     console.print(f"[yellow]Calibration skipped: {cal_err}[/]")
 
@@ -1236,6 +1358,7 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
 
                 # Reset calibration cache
                 from kiku.energy import reset_calibration_cache
+
                 reset_calibration_cache()
 
             model = result["model"]
@@ -1247,8 +1370,10 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
         try:
             model, meta = load_model()
             if meta:
-                console.print(f"[dim]Loaded model trained on {meta.get('training_samples', '?')} samples "
-                              f"(accuracy: {meta.get('accuracy', '?'):.2f})[/]")
+                console.print(
+                    f"[dim]Loaded model trained on {meta.get('training_samples', '?')} samples "
+                    f"(accuracy: {meta.get('accuracy', '?'):.2f})[/]"
+                )
         except FileNotFoundError as e:
             console.print(f"[red]{e}[/]")
             return
@@ -1286,7 +1411,9 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
         )
         if i >= 50 and mode == "dry-run":
             console.print(table)
-            console.print(f"[dim]... and {len(predictions) - 50} more. Use --approve or --auto to process all.[/]")
+            console.print(
+                f"[dim]... and {len(predictions) - 50} more. Use --approve or --auto to process all.[/]"
+            )
             return
 
     console.print(table)
@@ -1329,8 +1456,10 @@ def autotag_energy(mode: str, retrain: bool, threshold: float, force: bool):
         applied += 1
 
     session.commit()
-    console.print(f"\n[green]Applied {applied} predictions[/]" +
-                  (f" [dim](skipped {skipped} with existing tags)[/]" if skipped else ""))
+    console.print(
+        f"\n[green]Applied {applied} predictions[/]"
+        + (f" [dim](skipped {skipped} with existing tags)[/]" if skipped else "")
+    )
 
 
 @autotag_group.command("vibe")
@@ -1402,8 +1531,10 @@ def hunt(url: str, no_comments: bool, as_json: bool):
     merged = merge_tracklists(credit_tracks, chapter_tracks, desc_tracks, comment_tracks)
 
     if not merged:
-        console.print("[yellow]Couldn't find a tracklist in this set.[/] "
-                      "The description may not contain track names.")
+        console.print(
+            "[yellow]Couldn't find a tracklist in this set.[/] "
+            "The description may not contain track names."
+        )
         return
 
     console.print(f"[bold]Found {len(merged)} tracks[/]\n")
@@ -1434,14 +1565,18 @@ def hunt(url: str, no_comments: bool, as_json: bool):
 
     # Save to DB
     hunt_session = create_hunt_session(
-        session, url=url, platform=platform,
-        title=metadata.title, uploader=metadata.uploader,
+        session,
+        url=url,
+        platform=platform,
+        title=metadata.title,
+        uploader=metadata.uploader,
     )
     save_hunt_tracks(session, hunt_session.id, matched)
     session.commit()
 
     if as_json:
         import json as json_mod
+
         console.print(json_mod.dumps(matched, indent=2, default=str))
         return
 
@@ -1477,9 +1612,13 @@ def hunt(url: str, no_comments: bool, as_json: bool):
 
     if unowned > 0:
         console.print(f"\n[bold]You're missing {unowned} of {len(matched)} tracks.[/]")
-        console.print("[dim]Hunt session saved. View purchase links in the UI or run with --json-output.[/]")
+        console.print(
+            "[dim]Hunt session saved. View purchase links in the UI or run with --json-output.[/]"
+        )
     else:
-        console.print(f"\n[green]You own all {len(matched)} tracks![/] Time to learn from this set.")
+        console.print(
+            f"\n[green]You own all {len(matched)} tracks![/] Time to learn from this set."
+        )
 
 
 def _infer_source(url: str | None, query: str | None) -> str | None:
@@ -1498,21 +1637,51 @@ def _infer_source(url: str | None, query: str | None) -> str | None:
 
 @cli.command("fix-album")
 @click.argument("query", required=False)
-@click.option("--url", default=None, help="Release URL to read (Bandcamp album page or Discogs release)")
-@click.option("--source", "source_name", default=None,
-              type=click.Choice(["bandcamp", "musicbrainz", "discogs", "tags"]),
-              help="Where to check metadata against (inferred from --url when omitted)")
+@click.option(
+    "--url", default=None, help="Release URL to read (Bandcamp album page or Discogs release)"
+)
+@click.option(
+    "--source",
+    "source_name",
+    default=None,
+    type=click.Choice(["bandcamp", "musicbrainz", "discogs", "tags"]),
+    help="Where to check metadata against (inferred from --url when omitted)",
+)
 @click.option("--album-key", default=None, help="Correct an album already grouped in your library")
 @click.option("--track-ids", default=None, help="Comma-separated track ids to correct")
 @click.option("--artist", "-a", default=None, help="Artist, to sharpen a search query")
-@click.option("--like", default=None, help="Scope URL-based discovery to file paths matching this SQL LIKE pattern")
-@click.option("--candidate", "candidate_index", default=0, type=int, help="Pick the Nth search candidate (0-based)")
-@click.option("--fields", default=None,
-              help="Comma-separated fields to write (default: title,artist,album,label,release_year,track_number,disc_number)")
+@click.option(
+    "--like",
+    default=None,
+    help="Scope URL-based discovery to file paths matching this SQL LIKE pattern",
+)
+@click.option(
+    "--candidate",
+    "candidate_index",
+    default=0,
+    type=int,
+    help="Pick the Nth search candidate (0-based)",
+)
+@click.option(
+    "--fields",
+    default=None,
+    help="Comma-separated fields to write (default: title,artist,album,label,release_year,track_number,disc_number)",
+)
 @click.option("--dry-run", is_flag=True, help="Show the diff without writing anything")
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation and apply")
-def fix_album(query, url, source_name, album_key, track_ids, artist, like,
-              candidate_index, fields, dry_run, yes):
+def fix_album(
+    query,
+    url,
+    source_name,
+    album_key,
+    track_ids,
+    artist,
+    like,
+    candidate_index,
+    fields,
+    dry_run,
+    yes,
+):
     """Check and correct an album's metadata against an external source.
 
     Point it at a release — a Bandcamp URL, a library album, or a search —
@@ -1526,19 +1695,20 @@ def fix_album(query, url, source_name, album_key, track_ids, artist, like,
       kiku fix-album --album-key 3f2a91b4c0de --source tags   # re-read the files
     """
     from kiku.db.models import get_session
-    from kiku.metadata.models import CORRECTABLE_FIELDS
     from kiku.metadata.correct import apply_correction
+    from kiku.metadata.models import CORRECTABLE_FIELDS
     from kiku.metadata.service import correct_from_source
     from kiku.metadata.sources.base import LookupUnsupported, SourceUnavailable
 
     source_name = source_name or _infer_source(url, query)
     if not source_name:
-        console.print("[red]Couldn't tell which source to use.[/] Pass --source or a recognizable --url.")
+        console.print(
+            "[red]Couldn't tell which source to use.[/] Pass --source or a recognizable --url."
+        )
         return
 
     chosen_fields = (
-        tuple(f.strip() for f in fields.split(",") if f.strip())
-        if fields else CORRECTABLE_FIELDS
+        tuple(f.strip() for f in fields.split(",") if f.strip()) if fields else CORRECTABLE_FIELDS
     )
     unknown = set(chosen_fields) - set(CORRECTABLE_FIELDS)
     if unknown:
@@ -1558,10 +1728,16 @@ def fix_album(query, url, source_name, album_key, track_ids, artist, like,
     console.print(f"[cyan]Checking against {source_name}…[/]")
     try:
         candidate, tracks, corrections = correct_from_source(
-            session, source_name,
-            album_key=album_key, track_ids=ids, url=url,
-            album=query, artist=artist, like=like,
-            candidate_index=candidate_index, fields=chosen_fields,
+            session,
+            source_name,
+            album_key=album_key,
+            track_ids=ids,
+            url=url,
+            album=query,
+            artist=artist,
+            like=like,
+            candidate_index=candidate_index,
+            fields=chosen_fields,
         )
     except SourceUnavailable as e:
         console.print(f"[red]{e}[/]")
@@ -1571,7 +1747,9 @@ def fix_album(query, url, source_name, album_key, track_ids, artist, like,
         return
 
     if candidate is None:
-        console.print("[yellow]No matching release found at that source.[/] Try a different query or source.")
+        console.print(
+            "[yellow]No matching release found at that source.[/] Try a different query or source."
+        )
         return
 
     console.print(
@@ -1581,8 +1759,10 @@ def fix_album(query, url, source_name, album_key, track_ids, artist, like,
     )
 
     if not tracks:
-        console.print("[yellow]Couldn't find matching tracks in your library.[/] "
-                      "Try --album-key, --track-ids, or a --like path scope.")
+        console.print(
+            "[yellow]Couldn't find matching tracks in your library.[/] "
+            "Try --album-key, --track-ids, or a --like path scope."
+        )
         return
 
     changed = [c for c in corrections if c.has_changes]
@@ -1597,7 +1777,9 @@ def fix_album(query, url, source_name, album_key, track_ids, artist, like,
     table.add_column("Now", style="red")
     table.add_column("→ New", style="green")
     for c in sorted(changed, key=lambda c: (c.changes and 99, c.track_id)):
-        conf_color = "green" if c.confidence >= 0.85 else "yellow" if c.confidence >= 0.70 else "red"
+        conf_color = (
+            "green" if c.confidence >= 0.85 else "yellow" if c.confidence >= 0.70 else "red"
+        )
         first = True
         for ch in c.changes:
             if not ch.changed:
@@ -1619,13 +1801,15 @@ def fix_album(query, url, source_name, album_key, track_ids, artist, like,
         console.print("[dim]Dry run — nothing written.[/]")
         return
 
-    if not yes:
-        if not click.confirm(f"Apply to {len(changed)} track(s)?", default=False):
-            console.print("[dim]Left your library untouched.[/]")
-            return
+    if not yes and not click.confirm(f"Apply to {len(changed)} track(s)?", default=False):
+        console.print("[dim]Left your library untouched.[/]")
+        return
 
     touched = apply_correction(
-        session, corrections,
-        fields=chosen_fields, candidate=candidate, album_key=album_key,
+        session,
+        corrections,
+        fields=chosen_fields,
+        candidate=candidate,
+        album_key=album_key,
     )
     console.print(f"[bold green]Fixed {touched} track(s).[/] {candidate.album or ''}")

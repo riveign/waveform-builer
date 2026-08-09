@@ -8,21 +8,22 @@ from pydantic import BaseModel, field_validator
 class TrackRatingRequest(BaseModel):
     rating: int  # 0 = clear rating; 1–5 = star count
 
-    @field_validator('rating')
+    @field_validator("rating")
     @classmethod
     def validate_rating(cls, v: int) -> int:
         if not 0 <= v <= 5:
-            raise ValueError('rating must be between 0 and 5')
+            raise ValueError("rating must be between 0 and 5")
         return v
 
 
 class TrackSetRolesRequest(BaseModel):
     roles: list[str] = []
 
-    @field_validator('roles')
+    @field_validator("roles")
     @classmethod
     def validate_roles(cls, v: list[str]) -> list[str]:
         from kiku.set_roles import normalize_roles
+
         return normalize_roles(v)
 
 
@@ -277,15 +278,17 @@ class SetBuildRequest(BaseModel):
     bpm_min: float | None = None
     bpm_max: float | None = None
     seed_track_id: int | None = None
-    end_track_id: int | None = None       # Soft ending anchor — pulls the tail toward it
+    end_track_id: int | None = None  # Soft ending anchor — pulls the tail toward it
     beam_width: int = 5
     playlist_preference: list[str] | None = None
     weights: ScoringWeightsRequest | None = None
     discovery_density: float = 0.0
-    vibe_preset: str | None = None        # e.g. "dark & deep", "euphoric" — see VIBE_PRESETS
-    vibe_intensity: float = 0.0           # 0 = ignore vibe, 1 = vibe steers strongly
-    preferred_artists: list[str] | None = None  # artists the DJ asked to feature — soft bias, never a filter
-    artist_intensity: float = 0.0         # 0 = ignore, 1 = strong nudge toward preferred artists
+    vibe_preset: str | None = None  # e.g. "dark & deep", "euphoric" — see VIBE_PRESETS
+    vibe_intensity: float = 0.0  # 0 = ignore vibe, 1 = vibe steers strongly
+    preferred_artists: list[str] | None = (
+        None  # artists the DJ asked to feature — soft bias, never a filter
+    )
+    artist_intensity: float = 0.0  # 0 = ignore, 1 = strong nudge toward preferred artists
 
 
 class SetCreateRequest(BaseModel):
@@ -758,7 +761,7 @@ class TrackAffinityRequest(BaseModel):
     other_track_id: int
     affinity: str  # "good" or "bad"
 
-    @field_validator('affinity')
+    @field_validator("affinity")
     @classmethod
     def validate_affinity(cls, v: str) -> str:
         if v not in ("good", "bad"):
@@ -878,7 +881,7 @@ class MBCandidate(BaseModel):
     track_count: int
     recordings: list[MBCandidateRecording]
     score: float
-    mapping_preview: list["MBMappingPreviewItem"] = []
+    mapping_preview: list[MBMappingPreviewItem] = []
 
 
 class MBMappingPreviewItem(BaseModel):
@@ -914,6 +917,7 @@ class MBApplyResponse(BaseModel):
 
 
 # ── Multi-source metadata correction (spec 016) ──────────────────────────
+
 
 class SourceInfo(BaseModel):
     name: str

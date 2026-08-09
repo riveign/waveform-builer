@@ -25,9 +25,7 @@ def test_artist_picks_ranked(client):
 
 
 def test_artist_picks_n_cap(client):
-    resp = client.get(
-        "/api/sets/1/artist-picks", params={"artist": "Artist 2", "n": 2}
-    )
+    resp = client.get("/api/sets/1/artist-picks", params={"artist": "Artist 2", "n": 2})
     assert resp.status_code == 200
     assert len(resp.json()["picks"]) <= 2
 
@@ -39,8 +37,6 @@ def test_artist_picks_missing_set_404(client):
 
 def test_artist_picks_no_new_tracks_empty(client):
     # Unknown artist owns nothing → 200 with empty picks (warm, not an error).
-    resp = client.get(
-        "/api/sets/1/artist-picks", params={"artist": "Nonexistent Artist"}
-    )
+    resp = client.get("/api/sets/1/artist-picks", params={"artist": "Nonexistent Artist"})
     assert resp.status_code == 200
     assert resp.json()["picks"] == []

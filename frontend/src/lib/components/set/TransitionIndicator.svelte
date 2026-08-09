@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { TransitionScoreBreakdown } from '$lib/types';
 	import { getTransition } from '$lib/api/sets';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { harmonicMove } from '$lib/utils/camelot';
 
 	interface Props {
@@ -41,10 +42,19 @@
 		prevEnergyDelta = null,
 	}: Props = $props();
 
-	let loading = $state(false);
-	let breakdown = $state<TransitionScoreBreakdown | null>(null);
-	let error = $state<string | null>(null);
 	let expanded = $state(false);
+	/** Latches on first expand: the breakdown stays loaded once you've asked for it,
+	 *  so collapsing and re-opening doesn't refetch. */
+	let everExpanded = $state(false);
+
+	const res = createResource(
+		() => (everExpanded ? { setId, transitionIndex } : null),
+		({ setId: s, transitionIndex: i }, signal) => getTransition(s, i, signal),
+		{ key: ({ setId: s, transitionIndex: i }) => `set:${s}:transition:${i}` },
+	);
+	const breakdown = $derived<TransitionScoreBreakdown | null>(res.data?.score_breakdown ?? null);
+	const loading = $derived(res.loading);
+	const error = $derived(res.error);
 
 	let builderScore = $derived(breakdown?.total ?? score ?? null);
 	let ctxScore = $derived(analysisScore ?? builderScore);
@@ -95,18 +105,8 @@
 	let noteworthy = $derived(move !== 'hold' || divergence >= 0.15 || energyInflection);
 	let showNote = $derived(noteworthy && !!teachingMoment);
 
-	async function fetchBreakdown() {
-		if (breakdown || loading) return;
-		loading = true;
-		error = null;
-		try {
-			const detail = await getTransition(setId, transitionIndex);
-			breakdown = detail.score_breakdown;
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load transition';
-		} finally {
-			loading = false;
-		}
+	function fetchBreakdown() {
+		everExpanded = true;
 	}
 
 	function handleClick() {

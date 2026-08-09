@@ -31,8 +31,8 @@ export function prefetchPeaks(trackId: number): void {
 	getWaveformOverview(trackId).catch(() => {});
 }
 
-export async function getWaveformDetail(trackId: number): Promise<WaveformDetailData> {
-	return fetchJson<WaveformDetailData>(`/api/waveforms/${trackId}/detail`);
+export async function getWaveformDetail(trackId: number, signal?: AbortSignal): Promise<WaveformDetailData> {
+	return fetchJson<WaveformDetailData>(`/api/waveforms/${trackId}/detail`, { signal });
 }
 
 export async function getWaveformBands(trackId: number): Promise<WaveformBandsData> {

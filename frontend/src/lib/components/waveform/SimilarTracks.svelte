@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SuggestNextItem } from '$lib/types';
 	import { suggestNext, getTrackAffinities, type TrackAffinity } from '$lib/api/tracks';
+	import { createResource } from '$lib/data/resource.svelte';
 	import RelatedTrackCard from '../library/RelatedTrackCard.svelte';
 	import Spinner from '../Spinner.svelte';
 	import { rovingFocus } from '$lib/actions/rovingFocus';
@@ -18,12 +19,40 @@
 		track_quality: 0.1,
 	};
 
-	let pool = $state<SuggestNextItem[]>([]);
+	const res = createResource(
+		() => trackId,
+		async (id, signal) => {
+			const [suggestions, affinities] = await Promise.all([
+				suggestNext(id, FETCH_COUNT, undefined, MIX_WEIGHTS, undefined, signal),
+				getTrackAffinities(id, signal).catch(() => [] as TrackAffinity[]),
+			]);
+			return { suggestions: suggestions.suggestions, affinities };
+		},
+		{ key: (id) => `track:${id}:similar` },
+	);
+
+	const pool = $derived<SuggestNextItem[]>(res.data?.suggestions ?? []);
+	const loading = $derived(res.loading);
+
+	// Seeded from the fetch, then owned locally as the DJ marks tracks good or bad.
 	let rejectedIds = $state<Set<number>>(new Set());
-	let loading = $state(false);
 	let showAll = $state(false);
 	let affinityMap = $state<Record<number, string>>({});
 	let dismissing = $state<Set<number>>(new Set());
+
+	$effect(() => {
+		const data = res.data;
+		const map: Record<number, string> = {};
+		const rejected = new Set<number>();
+		for (const a of data?.affinities ?? []) {
+			map[a.track_id] = a.affinity;
+			if (a.affinity === 'bad') rejected.add(a.track_id);
+		}
+		affinityMap = map;
+		rejectedIds = rejected;
+		showAll = false;
+		dismissing = new Set();
+	});
 	const VISIBLE_COUNT = 8; // 2 rows × 4 columns at full content width
 	const FETCH_COUNT = 30;
 
@@ -37,38 +66,6 @@
 	);
 	let hasMore = $derived(available.length > VISIBLE_COUNT);
 
-	// Auto-load when track changes
-	$effect(() => {
-		const id = trackId;
-		loading = true;
-		pool = [];
-		rejectedIds = new Set();
-		showAll = false;
-		affinityMap = {};
-		dismissing = new Set();
-
-		Promise.all([
-			suggestNext(id, FETCH_COUNT, undefined, MIX_WEIGHTS),
-			getTrackAffinities(id).catch(() => [] as TrackAffinity[]),
-		])
-			.then(([res, affinities]) => {
-				pool = res.suggestions;
-				const map: Record<number, string> = {};
-				const rejected = new Set<number>();
-				for (const a of affinities) {
-					map[a.track_id] = a.affinity;
-					if (a.affinity === 'bad') rejected.add(a.track_id);
-				}
-				affinityMap = map;
-				rejectedIds = rejected;
-			})
-			.catch(() => {
-				pool = [];
-			})
-			.finally(() => {
-				loading = false;
-			});
-	});
 
 	function handleAffinityChange(trackIdChanged: number, newAffinity: string | null) {
 		if (newAffinity === 'bad') {

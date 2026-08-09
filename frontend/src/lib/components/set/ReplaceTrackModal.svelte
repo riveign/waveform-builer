@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { ReplacementCandidate, ReplacementContext, SetTrack } from '$lib/types';
 	import { getReplacements, replaceTrackInSet } from '$lib/api/sets';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
 	import { API_BASE } from '$lib/api/client';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
@@ -26,31 +27,22 @@
 		onreplaced: () => void;
 	} = $props();
 
-	let loading = $state(true);
+	const res = createResource(
+		() => ({ setId, position }),
+		({ setId: s, position: pos }, signal) => getReplacements(s, pos, 10, undefined, signal),
+		{ key: ({ setId: s, position: pos }) => `set:${s}:replacements:${pos}` },
+	);
+	const loading = $derived(res.loading);
+	const context = $derived<ReplacementContext | null>(res.data?.context ?? null);
+	const candidates = $derived<ReplacementCandidate[]>(res.data?.candidates ?? []);
+
+	/** Replacing is a write; its failures are not the read's. */
+	let replaceError = $state<string | null>(null);
+	const error = $derived(res.error ?? replaceError);
+
 	let replacing = $state<number | null>(null);
-	let context = $state<ReplacementContext | null>(null);
-	let candidates = $state<ReplacementCandidate[]>([]);
-	let error = $state<string | null>(null);
 	let previewTrackId = $state<number | null>(null);
 	let audioEl = $state<HTMLAudioElement | null>(null);
-
-	$effect(() => {
-		loadReplacements();
-	});
-
-	async function loadReplacements() {
-		loading = true;
-		error = null;
-		try {
-			const res = await getReplacements(setId, position);
-			context = res.context;
-			candidates = res.candidates;
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load suggestions';
-		} finally {
-			loading = false;
-		}
-	}
 
 	async function handleReplace(trackId: number) {
 		if (replacing !== null) return;

@@ -32,7 +32,7 @@ class MusicBrainzSource:
                 continue
             try:
                 full = self._client.get_release(mb_id)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("MB detail fetch failed for %s", mb_id)
                 continue
             candidates.append(self._to_candidate(full, mb_id))
@@ -51,12 +51,14 @@ class MusicBrainzSource:
                 if not (pos and title):
                     continue
                 length = tr.get("length")
-                recordings.append(RecordingCandidate(
-                    title=title,
-                    position=int(pos),
-                    disc=disc_no,
-                    length_ms=int(length) if length else None,
-                ))
+                recordings.append(
+                    RecordingCandidate(
+                        title=title,
+                        position=int(pos),
+                        disc=disc_no,
+                        length_ms=int(length) if length else None,
+                    )
+                )
 
         label_info = full.get("label-info") or []
         label = None

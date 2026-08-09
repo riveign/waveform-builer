@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { getEnergyGenre } from '$lib/api/stats';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { familyColors } from '$lib/styles/canvasPalette';
 
 	const ENERGY_LEVELS = ['low', 'warmup', 'closing', 'mid', 'dance', 'up', 'high', 'fast', 'peak'] as const;
 
-	let data: Record<string, Record<string, number>> | null = $state(null);
-	let loading = $state(true);
-	let error: string | null = $state(null);
+	const res = createResource(() => ({}), (_a, signal) => getEnergyGenre(signal), {
+		key: () => 'stats:energy-genre',
+	});
+	const data = $derived(res.data ?? null);
+	const loading = $derived(res.loading);
+	const error = $derived(res.error);
 	let tooltip = $state({ visible: false, text: '', x: 0, y: 0 });
 
 	let families = $derived(
@@ -54,23 +58,6 @@
 		tooltip = { ...tooltip, visible: false };
 	}
 
-	$effect(() => {
-		let cancelled = false;
-		getEnergyGenre()
-			.then((result) => {
-				if (!cancelled) {
-					data = result;
-					loading = false;
-				}
-			})
-			.catch((err) => {
-				if (!cancelled) {
-					error = err instanceof Error ? err.message : "Couldn't load energy-genre data — try refreshing";
-					loading = false;
-				}
-			});
-		return () => { cancelled = true; };
-	});
 </script>
 
 <div class="heatmap-container">

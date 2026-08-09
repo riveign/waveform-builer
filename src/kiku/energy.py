@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 class TrackEnergy:
     """Resolved energy for a track."""
 
-    zone: str | None       # Canonical zone: intro, warmup, build, drive, peak, close
-    numeric: float         # 0-1 value, always available
-    source: str            # Provenance: "approved", "dir_energy", "predicted", "audio", "none"
-    confidence: float      # 0-1 trust level
-    label: str             # Human-readable: "build (folder)", "drive (estimated)"
+    zone: str | None  # Canonical zone: intro, warmup, build, drive, peak, close
+    numeric: float  # 0-1 value, always available
+    source: str  # Provenance: "approved", "dir_energy", "predicted", "audio", "none"
+    confidence: float  # 0-1 trust level
+    label: str  # Human-readable: "build (folder)", "drive (estimated)"
 
 
 # Fixed fallback boundaries (used when no calibration file exists)
@@ -56,7 +56,9 @@ def _load_calibration() -> dict | None:
 
     try:
         _calibration = json.loads(cal_path.read_text())
-        logger.info("Loaded energy calibration (%d samples)", _calibration.get("training_samples", 0))
+        logger.info(
+            "Loaded energy calibration (%d samples)", _calibration.get("training_samples", 0)
+        )
     except Exception:
         logger.warning("Failed to load energy calibration, using fallback boundaries")
         _calibration = None
@@ -125,7 +127,7 @@ def numeric_to_zone(energy: float) -> str:
 
 
 _SOURCE_LABELS: dict[str, str] = {
-    "approved": "",           # DJ confirmed — no qualifier needed
+    "approved": "",  # DJ confirmed — no qualifier needed
     "dir_energy": "folder",
     "predicted": "estimated",
     "audio": "from audio",

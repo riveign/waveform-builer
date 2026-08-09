@@ -19,15 +19,23 @@ from kiku.metadata.models import RecordingCandidate, ReleaseCandidate
 
 @pytest.fixture()
 def db(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path/'a.db'}", poolclass=NullPool)
+    engine = create_engine(f"sqlite:///{tmp_path / 'a.db'}", poolclass=NullPool)
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     for i in range(1, 4):
-        session.add(Track(
-            id=i, title=f"Mangled {i}", artist="A%d hadone" % i,
-            album="Solar EP", release_year=2020, label="Sunset",
-            file_path=f"/m/0{i}.wav", bpm=125.0, key="8A",
-        ))
+        session.add(
+            Track(
+                id=i,
+                title=f"Mangled {i}",
+                artist=f"A{i} hadone",
+                album="Solar EP",
+                release_year=2020,
+                label="Sunset",
+                file_path=f"/m/0{i}.wav",
+                bpm=125.0,
+                key="8A",
+            )
+        )
     session.commit()
     yield session
     session.close()
@@ -60,8 +68,12 @@ def test_list_sources_reports_modes_and_availability(client):
 def test_match_source_returns_full_field_diff(client, db):
     key = _solar_key(db)
     candidate = ReleaseCandidate(
-        source="bandcamp", source_id="https://x.bandcamp.com/album/solar",
-        album="Solar EP", artist="Astral", label="Sunset Records", year=2021,
+        source="bandcamp",
+        source_id="https://x.bandcamp.com/album/solar",
+        album="Solar EP",
+        artist="Astral",
+        label="Sunset Records",
+        year=2021,
         recordings=[
             RecordingCandidate(title="Mangled 1", position=1, disc=1),
             RecordingCandidate(title="Mangled 2", position=2, disc=1),
@@ -94,8 +106,10 @@ def test_apply_correction_writes_only_allowed_fields_scoped_to_album(client, db)
             "source_ref": "https://x.bandcamp.com/album/solar",
             "fields": ["artist", "label"],
             "items": [
-                {"track_id": 1, "values": {"artist": "Astral", "label": "Sunset Records",
-                                            "release_year": 1999}},
+                {
+                    "track_id": 1,
+                    "values": {"artist": "Astral", "label": "Sunset Records", "release_year": 1999},
+                },
                 {"track_id": 999, "values": {"artist": "Hacker"}},  # not in album → ignored
             ],
         },
