@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { DJSet } from '$lib/types';
 	import { listSets, createSet, addTrackToSet } from '$lib/api/sets';
-	import { onMount } from 'svelte';
+	import { createResource, invalidate } from '$lib/data/resource.svelte';
 	import Button from '$lib/components/primitives/Button.svelte';
 	import MenuItem from '$lib/components/primitives/MenuItem.svelte';
 
@@ -17,9 +17,14 @@
 		onadded?: (setId: number, setName: string) => void;
 	} = $props();
 
-	let sets = $state<DJSet[]>([]);
+	const res = createResource(() => ({}), (_a, signal) => listSets('', 100, signal), {
+		key: () => 'sets:list:picker',
+		initial: [] as DJSet[],
+	});
+	const sets = $derived(res.data ?? []);
+	const loading = $derived(res.loading);
+
 	let search = $state('');
-	let loading = $state(true);
 	let adding = $state<number | null>(null);
 	let creatingNew = $state(false);
 	let newName = $state('');
@@ -34,16 +39,8 @@
 			: sets
 	);
 
-	onMount(async () => {
-		try {
-			const allSets = await listSets('', 100);
-			sets = allSets;
-		} catch {
-			sets = [];
-		} finally {
-			loading = false;
-			searchEl?.focus();
-		}
+	$effect(() => {
+		if (!res.loading) searchEl?.focus();
 	});
 
 	async function handlePickSet(set: DJSet) {
@@ -52,6 +49,7 @@
 		try {
 			await addTrackToSet(set.id, trackId);
 			trackSetIds = new Set([...trackSetIds, set.id]);
+			invalidate('sets:list');
 			onadded?.(set.id, set.name ?? 'set');
 			showToast(`Added to ${set.name}`);
 			onclose();
@@ -68,6 +66,7 @@
 		try {
 			const newSet = await createSet({ name: newName.trim(), source: 'manual' });
 			await addTrackToSet(newSet.id, trackId);
+			invalidate('sets:list');
 			onadded?.(newSet.id, newSet.name ?? newName.trim());
 			showToast(`Created "${newName.trim()}" and added track`);
 			onclose();

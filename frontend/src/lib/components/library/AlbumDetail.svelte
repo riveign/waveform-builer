@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import type { Track } from '$lib/types';
 	import { getAlbumTracks, getAlbumCoverUrl, type Album } from '$lib/api/albums';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import Button from '../primitives/Button.svelte';
 	import MusicBrainzMatchModal from './MusicBrainzMatchModal.svelte';
@@ -19,26 +19,18 @@
 
 	const player = getPlayerStore();
 
-	let album = $state<Album | null>(null);
-	let tracks = $state<Track[]>([]);
-	let loading = $state(false);
-	let error = $state<string | null>(null);
+	const res = createResource(
+		() => albumKey,
+		(key, signal) => getAlbumTracks(key, signal),
+		{ key: (k) => `album:${k}:tracks` },
+	);
+	const album = $derived<Album | null>(res.data?.album ?? null);
+	const tracks = $derived<Track[]>(res.data?.tracks ?? []);
+	const loading = $derived(res.loading);
+	const error = $derived(res.error);
+
 	let mbModalOpen = $state(false);
 	let fixModalOpen = $state(false);
-
-	async function load() {
-		loading = true;
-		error = null;
-		try {
-			const res = await getAlbumTracks(albumKey);
-			album = res.album;
-			tracks = res.tracks;
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Could not load album';
-		} finally {
-			loading = false;
-		}
-	}
 
 	function hashKey(key: string): number {
 		let h = 0;
@@ -79,14 +71,12 @@
 
 	function onMBApplied() {
 		mbModalOpen = false;
-		load();
+		res.refresh();
 	}
 
 	function onFixApplied() {
-		load();
+		res.refresh();
 	}
-
-	onMount(load);
 </script>
 
 <div class="album-detail">

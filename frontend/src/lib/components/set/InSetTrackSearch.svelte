@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Track, SuggestNextItem } from '$lib/types';
 	import { suggestNext } from '$lib/api/tracks';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { addTrackToSet } from '$lib/api/sets';
 	import { formatKey, getCamelotColor } from '$lib/utils/camelot';
 
@@ -21,38 +22,37 @@
 	} = $props();
 
 	let expanded = $state(false);
-	let loading = $state(false);
-	let results = $state<SuggestNextItem[]>([]);
+	/** Latches on first expand so collapsing doesn't throw the suggestions away. */
+	let everExpanded = $state(false);
+	/** Tracks added from this panel, hidden locally rather than refetching. */
+	let addedIds = $state<Set<number>>(new Set());
+
+	const res = createResource(
+		() => (everExpanded && lastTrackId ? { lastTrackId, setId } : null),
+		({ lastTrackId: tid, setId: sid }, signal) =>
+			suggestNext(tid, 20, undefined, undefined, sid, signal),
+		{ key: ({ lastTrackId: tid, setId: sid }) => `set:${sid}:in-set-search:${tid}` },
+	);
+	const results = $derived<SuggestNextItem[]>(res.data?.suggestions ?? []);
+	const loading = $derived(res.loading);
 	let adding = $state<number | null>(null);
 	let toast = $state<string | null>(null);
 
 	let filtered = $derived(
-		results.filter((r) => !excludeTrackIds.includes(r.track.id))
+		results.filter((r) => !excludeTrackIds.includes(r.track.id) && !addedIds.has(r.track.id))
 	);
 
-	async function loadSuggestions() {
-		if (!lastTrackId) return;
-		loading = true;
-		try {
-			const res = await suggestNext(lastTrackId, 20, undefined, undefined, setId);
-			results = res.suggestions;
-		} catch {
-			results = [];
-		} finally {
-			loading = false;
-		}
-	}
 
 	function handleExpand() {
 		expanded = true;
-		loadSuggestions();
+		everExpanded = true;
 	}
 
 	async function handleAdd(track: Track) {
 		adding = track.id;
 		try {
 			await addTrackToSet(setId, track.id);
-			results = results.filter((r) => r.track.id !== track.id);
+			addedIds = new Set([...addedIds, track.id]);
 			toast = `Added ${track.title ?? 'track'}`;
 			setTimeout(() => { toast = null; }, 2500);
 			ontrackadded?.();
@@ -79,7 +79,7 @@
 	<div class="in-set-search">
 		<div class="search-header">
 			<span class="search-label">Add tracks</span>
-			<button class="close-btn" onclick={() => { expanded = false; results = []; }}>&times;</button>
+			<button class="close-btn" onclick={() => { expanded = false; }}>&times;</button>
 		</div>
 
 		{#if loading}

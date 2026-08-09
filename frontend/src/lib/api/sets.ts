@@ -192,35 +192,40 @@ export async function getReplacements(
 	setId: number,
 	position: number,
 	n = 10,
-	genreFilter?: string
+	genreFilter?: string,
+	signal?: AbortSignal
 ): Promise<ReplacementSuggestionsResponse> {
 	const qs = new URLSearchParams({ n: String(n) });
 	if (genreFilter) qs.set('genre_filter', genreFilter);
 	return fetchJson<ReplacementSuggestionsResponse>(
-		`/api/sets/${setId}/tracks/${position}/replacements?${qs}`
+		`/api/sets/${setId}/tracks/${position}/replacements?${qs}`,
+		{ signal }
 	);
 }
 
 export async function getArtistPicks(
 	setId: number,
 	artist: string,
-	n = 5
+	n = 5,
+	signal?: AbortSignal
 ): Promise<ArtistPicksResponse> {
 	const qs = new URLSearchParams({ artist, n: String(n) });
-	return fetchJson<ArtistPicksResponse>(`/api/sets/${setId}/artist-picks?${qs}`);
+	return fetchJson<ArtistPicksResponse>(`/api/sets/${setId}/artist-picks?${qs}`, { signal });
 }
 
 export async function getSlotSuggestions(
 	setId: number,
 	position: number,
-	opts: { mode: string; intent: string; allowedKeys?: string; energyDelta?: number; n?: number }
+	opts: { mode: string; intent: string; allowedKeys?: string; energyDelta?: number; n?: number },
+	signal?: AbortSignal
 ): Promise<SlotSuggestionsResponse> {
 	const qs = new URLSearchParams({ mode: opts.mode, intent: opts.intent });
 	if (opts.allowedKeys) qs.set('allowed_keys', opts.allowedKeys);
 	if (opts.energyDelta !== undefined) qs.set('energy_delta', String(opts.energyDelta));
 	if (opts.n !== undefined) qs.set('n', String(opts.n));
 	return fetchJson<SlotSuggestionsResponse>(
-		`/api/sets/${setId}/slots/${position}/suggestions?${qs}`
+		`/api/sets/${setId}/slots/${position}/suggestions?${qs}`,
+		{ signal }
 	);
 }
 
