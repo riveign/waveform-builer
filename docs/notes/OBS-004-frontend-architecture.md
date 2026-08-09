@@ -12,6 +12,10 @@ superseded-by: null
 Establishes the structural shape of the SvelteKit app — what the framework is being asked
 to do, and what it is not — before judging whether it should be rebuilt.
 
+> **Re-check 2026-08-09 — resolved by [[PLN-001]]/P4.** E2–E7 record the single-route
+> shape that `CLM-002` derives from. **K2, K3, K4 and K5 no longer hold** — see **K6**.
+> K1 (the stack is not the problem) is unchanged and was the basis for not rebuilding.
+
 ## D — Definitions
 
 - **D1 · Surface.** One of the six top-level things the DJ can be looking at: Track, Set,
@@ -62,6 +66,22 @@ to do, and what it is not — before judging whether it should be rebuilt.
   routing fixes the bundle for free; there is no separate bundle-optimisation project.
 - **K5 · E7 means any uncaught render error blanks the entire app**, because there is one
   route and no boundary at any level.
+
+- **K6 · Resolved 2026-08-09.** Six surfaces became six routes under an `(app)` group,
+  with `/track/[[id]]` and `/set/[[id]]` carrying their subject in the path, `?t=` the
+  focused track and `?view=` the layout. Consequences, each closing a K above:
+  - K3's three costs are gone: deep links work, Back/Forward walk surfaces, refresh
+    preserves both the set and the row inside it. Verified in Chromium.
+  - K4 held exactly as predicted — splitting came free with routing. Initial JS fell from
+    **700 KB on every route** to 253–612 KB by route; the landing route `/track` is
+    **292 KB, −58%**. The design-system gallery left the app path entirely.
+  - K5 closed by `+error.svelte`; a bad id renders a page instead of blanking the app.
+  - K2 is narrower now: `load()`, routing and per-route splitting are all in use. SSR and
+    form actions remain unused, which is the deliberate SPA choice (E5), not debt.
+- **K7 · A dead-state bug fell out of the tracing.** `ui.selectedSetId` had two writers
+  (`SetAppearances`, build-complete) and no reader, so "jump to this set" silently did
+  nothing in both places. Moving set identity into the path fixed it by construction —
+  the class of bug that disappears when state has one home.
 
 ## Q — Open
 

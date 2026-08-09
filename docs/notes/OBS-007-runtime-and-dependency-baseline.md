@@ -105,9 +105,20 @@ could reproduce it.
     numba caps numpy below what essentia pulls in, so the resolver preferred an ancient
     numba over an older numpy. Fixed by flooring `numba>=0.60` in the extra, which settles
     on numba 0.66 / llvmlite 0.48 / numpy 2.4.6.
+- **R4 · The numba floor from R3 was itself a regression, found only by running the
+  thing.** `numba>=0.60` resolved forward to 0.66.0 / llvmlite 0.48.0, which **SIGSEGVs
+  with no traceback** inside librosa's jitted beat tracker and takes the analysis worker
+  pool down: `kiku analyze` dies with "a process in the process pool was terminated
+  abruptly". Now `>=0.60,<0.62` (0.61.2 verified) plus `numpy<2.2`, which numba 0.61
+  requires. Verified on real audio: `beat_track` returns tempo 143.6 over 69 beats.
 - **K8** [R3] ⇒ `OBS-007/K1` ("the dependency posture is genuinely good") was right about
   *count* and wrong about *health*. A small dependency graph pinned only by floors is not a
   pinned graph; two of six extras could not be installed at all. Fewness is not safety.
+- **K9** [R4] ⇒ A lockfile proves a resolution *exists*, not that it *works*. R3's two
+  failures were caught by installing; R4's was caught only by running the audio path,
+  which no test covers (`OBS-002/E2` in spirit — the untested half). The audio pipeline is
+  the one part of Kiku with neither a test nor a gate, and it is the part where a bad pin
+  fails as a silent worker-pool death rather than an import error.
 
 ## Q — Open
 

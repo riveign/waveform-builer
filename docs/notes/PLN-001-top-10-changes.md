@@ -35,7 +35,7 @@ pace of `OBS-001/E7`.
 | **P1** ✅ | Make the schema reproducible — *done 2026-08-09* | `CLM-004/K1,K4`, `OBS-003/K2` | 1–2 d | P3, all deployment |
 | **P2** ✅ | Pin the environment — *done 2026-08-09* | `OBS-007/K2,K3` | 1 d | P3 |
 | **P3** ✅ | One CI workflow — *done 2026-08-09* | `OBS-002/K1`, `CLM-004/R3` | 1 d | P7, P8, everything's durability |
-| **P4** | A real route table with URL state | `OBS-004/K3,K4`, `CLM-002/K3` | 3–5 d | P6, P8; deep links |
+| **P4** ✅ | A real route table with URL state — *done 2026-08-09* | `OBS-004/K3,K4`, `CLM-002/K3` | 3–5 d | P6, P8; deep links |
 | **P5** | `createResource` — one data-orchestration rune | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
 | **P6** | The four missing structural primitives | `OBS-008/K2,K3` | 3–4 d | collapses ~2,700 LOC |
 | **P7** | Generate TS types from OpenAPI | `OBS-005/K4`, `CLM-003/E2` | 1 d | removes a 5-edit boundary |
@@ -78,14 +78,15 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 - **Deferred, not blessed:** `BLE001` (49) · `S110` · `DTZ005` · `C408` · `RUF059` sit in `lint.ignore` with counts and reasons. Deleting an entry is how the backlog gets scheduled (`OBS-002/K6`).
 - **Verified by breaking each gate:** unused import → lint red · reformatted function → format red · ORM column with no migration → `Detected added column 'tracks.ci_canary'`, test red · `$state<Tab>(42)` → svelte-check red.
 
-### P4 — A real route table with URL state
+### P4 — A real route table with URL state ✅ **DONE 2026-08-09**
 
-- Replace the `{#if}` ladder in `Workspace.svelte` with `/track/[id]`, `/set/[id]`, `/dna`, `/tinder`, `/hunt`, `/albums`.
-- Move `selectedTrack`, `selectedSetId`, `selectedTrackInSet`, `setViewMode` out of `ui.svelte.ts` into route params + query strings.
-- Add `+error.svelte` (`OBS-004/E7`).
-- Keep `ssr = false` — this is about routing, not rendering.
-- **Done when:** a transition URL pastes into a fresh tab and lands; back button works; largest chunk well below 540 KB.
-- **Why first:** deep-linkable lessons serve the teaching mission (`OBS-004/K3`), and routes give tests something to address.
+- Six routes under an `(app)` group (so `/design-system` stays outside the shell): `/track/[[id]]` · `/set/[[id]]` · `/dna` · `/tinder` · `/hunt` · `/albums`; `/` redirects to `/track`.
+- `?t=` focused track, `?view=` list/grid — written with `replaceState`, so Back leaves the set instead of walking every row you clicked.
+- Navigation state left `ui.svelte.ts` entirely; what stays is ambient (last-viewed track for the build seed, playing track, two hand-off channels). `Workspace.svelte` deleted.
+- `+error.svelte` added — a bad id renders a page, not a blank app.
+- **Fixed a dead-state bug:** `ui.selectedSetId` had two writers and no reader, so jumping to a set from a track or a finished build silently did nothing (`OBS-004/K7`).
+- **Initial JS: 700 KB on every route → 253–612 KB by route; `/track` is 292 KB (−58%).** The 1,488-line design-system gallery left the app path.
+- **Verified in Chromium** against the real library: cold `/set/12?t=3891` loads the set with the row selected · `?view=grid` restores the grid · Back/Forward walk surfaces · number keys navigate · refresh preserves set + row · bad id → error page · no console errors.
 
 ### P5 — `createResource`, one data-orchestration rune
 
