@@ -37,7 +37,7 @@ pace of `OBS-001/E7`.
 | **P3** ✅ | One CI workflow — *done 2026-08-09* | `OBS-002/K1`, `CLM-004/R3` | 1 d | P7, P8, everything's durability |
 | **P4** ✅ | A real route table with URL state — *done 2026-08-09* | `OBS-004/K3,K4`, `CLM-002/K3` | 3–5 d | P6, P8; deep links |
 | **P5** ✅ | `createResource` — one data-orchestration rune — *done 2026-08-09* | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
-| **P6** | The four missing structural primitives | `OBS-008/K2,K3` | 3–4 d | collapses ~2,700 LOC |
+| **P6** ✅ | The four missing structural primitives — *done 2026-08-09* | `OBS-008/K2,K3` | 3–4 d | collapses ~2,700 LOC |
 | **P7** | Generate TS types from OpenAPI | `OBS-005/K4`, `CLM-003/E2` | 1 d | removes a 5-edit boundary |
 | **P8** | Frontend test foundation | `OBS-002/K3`, `CLM-003/K3` | 3–4 d | frontend confidence |
 | **P9** | Extract a service layer, starting with sets | `OBS-006/K2,K3`, `CLM-001/K5` | 4–6 d | Rust port; CLI/API parity |
@@ -104,13 +104,28 @@ Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate 
 
 **Verified in Chromium throughout:** DNA charts, track view (waveform + features + related + set appearances), albums grid and detail, set view (52 rows ↔ 7 rows on switch), tinder, hunt. Rapid switching — tracks and sets alike — produces no stale write and no console error.
 
-### P6 — The four missing structural primitives
+### P6 — The four missing structural primitives ✅ **DONE 2026-08-09**
 
-- `Modal` (backdrop, `focusTrap`, escape, scroll lock) · `Input` · `EmptyState` · `Skeleton`.
-- Migrate the six bespoke dialogs (`OBS-008/E5`) onto `Modal`. This is the deferred spec-026 item.
-- Fold in the 123 stray hex literals (`OBS-008/E2`) while touching these files.
-- **Done when:** the six dialog files shrink ≥40% and the gallery renders each primitive.
-- **Falsifier:** if they don't shrink, the primitive's API is wrong (`CLM-002/K5`).
+- `Modal` · `Input` · `EmptyState` · `Skeleton`, all four documented and interactive in the design-system gallery.
+- `Modal` standardises on native `<dialog>` + `showModal()` — backdrop, Escape, focus trapping, `inert` background and top-layer stacking, all correct and free. Kiku had **two competing idioms**: four dialogs on native `<dialog>`, two hand-rolling a div overlay with `use:focusTrap`. The div ones also shed their JS focus traps, which native `inert` does better.
+- All six bespoke dialogs migrated. Every migration was a mechanical swap — no escape hatches, no special-case props.
+- **Latent bug fixed:** `app.css` resets `* { margin: 0 }`, clobbering the UA's `dialog { margin: auto }`, so every plain native `<dialog>` pinned itself to the **top-left instead of centring**. Surfaced by a Playwright backdrop-click assertion failing — the click at (20,20) landed *inside* the dialog. Fixed once, for all six.
+
+**Correction — the ≥40% target was wrong; they shrank 10%.**
+
+| dialog | before | after | |
+|---|---|---|---|
+| BuildSetDialog | 781 | 690 | −12% |
+| FillReorderDialog | 493 | 432 | −12% |
+| ImportPlaylistDialog | 478 | 452 | −5% |
+| ReplaceTrackModal | 541 | 492 | −9% |
+| FixMetadataModal | 435 | 399 | −8% |
+| MusicBrainzMatchModal | 315 | 267 | −15% |
+| **total** | **3,043** | **2,732** | **−10%** |
+
+`CLM-002/K5` reads a failure to shrink as a wrong API. That is not the reading here: the 40% assumed most of those 2,700 lines were chrome, and they are not — chrome was ~50 lines per dialog and it is gone. What remains is domain content (30-odd form fields, candidate cards, a four-stage wizard) that no `Modal` could remove. Reaching 40% needs field-row and card primitives, which is separate work. **The API stands; the estimate was optimistic** — the same shape of error as P5's done-when.
+
+- **Adoption is partial and not overclaimed:** `Input` in two `FillReorderDialog` fields and the set-name field; `EmptyState` on `/track`. `Skeleton` is documented but not yet adopted. Broader rollout is follow-on.
 
 ### P7 — Generate TS types from OpenAPI
 

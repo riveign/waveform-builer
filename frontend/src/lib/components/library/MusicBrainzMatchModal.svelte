@@ -7,6 +7,7 @@
 		type MBMappingPreviewItem,
 	} from '$lib/api/albums';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import Modal from '$lib/components/primitives/Modal.svelte';
 
 	let {
 		open = $bindable(false),
@@ -20,7 +21,6 @@
 		onapply: () => void;
 	} = $props();
 
-	let dialogEl: HTMLDialogElement | undefined = $state();
 	let stage = $state<'loading' | 'pick' | 'review' | 'applying' | 'error'>('loading');
 	let error = $state('');
 	let candidates = $state<MBCandidate[]>([]);
@@ -28,12 +28,7 @@
 	let overrides = $state<Record<number, number | null>>({});
 
 	$effect(() => {
-		if (open && dialogEl) {
-			dialogEl.showModal();
-			runMatch();
-		} else if (!open && dialogEl?.open) {
-			dialogEl.close();
-		}
+		if (open) runMatch();
 	});
 
 	async function runMatch() {
@@ -111,23 +106,9 @@
 		overrides = {};
 	}
 
-	function handleClose() {
-		open = false;
-	}
 </script>
 
-<dialog
-	bind:this={dialogEl}
-	onclose={handleClose}
-	onkeydown={(e) => e.key === 'Escape' && close()}
->
-	<div class="dialog-content">
-		<header>
-			<h2>Match on MusicBrainz</h2>
-			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={close}>
-				{#snippet icon()}×{/snippet}
-			</Button>
-		</header>
+<Modal {open} title="Match on MusicBrainz" size="lg" onclose={close}>
 
 		{#if stage === 'loading'}
 			<div class="status">Searching MusicBrainz...</div>
@@ -195,39 +176,9 @@
 		{:else if stage === 'applying'}
 			<div class="status">Writing track numbers...</div>
 		{/if}
-	</div>
-</dialog>
+</Modal>
 
 <style>
-	dialog {
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		background: var(--bg-primary);
-		color: var(--text-primary);
-		padding: 0;
-		max-width: 720px;
-		width: 90vw;
-		max-height: 80vh;
-	}
-	dialog::backdrop {
-		background: rgba(0, 0, 0, 0.6);
-	}
-
-	.dialog-content {
-		display: flex;
-		flex-direction: column;
-		max-height: 80vh;
-	}
-
-	header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 14px 18px;
-		border-bottom: 1px solid var(--border);
-	}
-	h2 { margin: 0; font-size: 15px; font-weight: 600; }
-
 	.prompt {
 		padding: 12px 18px 4px;
 		font-size: 13px;

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TrackView from '$lib/components/waveform/TrackView.svelte';
+	import EmptyState from '$lib/components/primitives/EmptyState.svelte';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 
 	let { data } = $props();
@@ -18,18 +19,8 @@
 		<TrackView track={data.track} />
 	{/key}
 {:else}
-	<div class="empty-state">
-		<p>Choose a track to explore its sound</p>
-	</div>
+	<EmptyState
+		title="Choose a track to explore its sound"
+		hint="Pick one from your library on the left — you'll see its waveform, what Kiku hears in it, and what mixes well next."
+	/>
 {/if}
-
-<style>
-	.empty-state {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		color: var(--text-dim);
-		font-size: var(--text-md);
-	}
-</style>

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { fillSet, optimizeOrder, reorderSetTracks, addTrackToSet, type OptimizeOrderResponse } from '$lib/api/sets';
 	import Button from '$lib/components/primitives/Button.svelte';
+	import Modal from '$lib/components/primitives/Modal.svelte';
+	import Input from '$lib/components/primitives/Input.svelte';
 	import SegmentedControl, { type SegmentOption } from '$lib/components/primitives/SegmentedControl.svelte';
-	import { focusTrap } from '$lib/actions/focusTrap';
 
 	const tabOptions: SegmentOption<'fill' | 'reorder'>[] = [
 		{ value: 'fill', label: 'Fill gaps' },
@@ -127,25 +128,13 @@
 	}
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="dialog-overlay" onclick={onclose} onkeydown={(e) => { if (e.key === 'Escape') onclose(); }}>
-	<!-- Inner panel stops backdrop-dismiss clicks; the overlay above owns Escape. -->
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div
-		class="dialog"
-		role="dialog"
-		aria-modal="true"
-		aria-label="Fill or reorder set"
-		tabindex="-1"
-		use:focusTrap
-		onclick={(e) => e.stopPropagation()}
-	>
-		<div class="dialog-header">
-			<SegmentedControl options={tabOptions} value={activeTab} onchange={(v) => activeTab = v} ariaLabel="Fill or reorder" />
-			<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={onclose}>
-				{#snippet icon()}×{/snippet}
-			</Button>
-		</div>
+<Modal open title="Fill or reorder set" size="lg" onclose={onclose}>
+	{#snippet header()}
+		<SegmentedControl options={tabOptions} value={activeTab} onchange={(v) => activeTab = v} ariaLabel="Fill or reorder" />
+		<Button variant="ghost" size="sm" iconOnly ariaLabel="Close" onclick={onclose}>
+			{#snippet icon()}×{/snippet}
+		</Button>
+	{/snippet}
 
 		{#if activeTab === 'fill'}
 			<div class="tab-content">
@@ -153,14 +142,8 @@
 
 				{#if !fillComplete && !fillRunning}
 					<div class="fill-form">
-						<label class="form-label">
-							Target length (minutes)
-							<input type="number" bind:value={fillTargetMin} min={1} max={300} class="form-input" />
-						</label>
-						<label class="form-label">
-							Max tracks to add
-							<input type="number" bind:value={fillMaxTracks} min={1} max={30} class="form-input" />
-						</label>
+						<Input label="Target length (minutes)" type="number" bind:value={fillTargetMin} min={1} max={300} size="sm" />
+						<Input label="Max tracks to add" type="number" bind:value={fillMaxTracks} min={1} max={30} size="sm" />
 						<div class="form-actions">
 							<Button variant="secondary" size="sm" onclick={onclose}>Cancel</Button>
 							<Button variant="primary" size="sm" onclick={startFill}>Find tracks</Button>
@@ -283,38 +266,9 @@
 				{/if}
 			</div>
 		{/if}
-	</div>
-</div>
+</Modal>
 
 <style>
-	.dialog-overlay {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 200;
-	}
-
-	.dialog {
-		background: var(--bg-primary);
-		border: 1px solid var(--border);
-		border-radius: 12px;
-		width: 560px;
-		max-height: 80vh;
-		overflow-y: auto;
-		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-	}
-
-	.dialog-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		padding: 12px 16px;
-		border-bottom: 1px solid var(--border);
-	}
-
 	.tab-content {
 		padding: 16px;
 	}
@@ -331,23 +285,7 @@
 		gap: 12px;
 	}
 
-	.form-label {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		font-size: 13px;
-		color: var(--text-secondary);
-	}
 
-	.form-input {
-		padding: 8px 10px;
-		font-size: 13px;
-		background: var(--bg-secondary);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		color: var(--text-primary);
-		width: 100px;
-	}
 
 	.form-actions {
 		display: flex;
