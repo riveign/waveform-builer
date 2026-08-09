@@ -12,6 +12,8 @@ superseded-by: null
 The output of the status analysis: what to do, in order. Cost is in author-days at the
 pace of `OBS-001/E7`.
 
+**Status 2026-08-09: P1–P7 done and merged to `main`, CI green. P8–P10 open.**
+
 ## R — Reasoning (the ordering)
 
 - **R1** [`CLM-004/K1,K2`] ⇒ P1–P2 relieve the binding constraint. They come first because
@@ -43,7 +45,11 @@ pace of `OBS-001/E7`.
 | **P9** | Extract a service layer, starting with sets | `OBS-006/K2,K3`, `CLM-001/K5` | 4–6 d | Rust port; CLI/API parity |
 | **P10** | Cover the sequencing modules | `CLM-003/R6`, `OBS-002/E9` | 2–3 d | correctness of set building |
 
-Total ≈ 21–31 author-days. P1–P3 are ~4 days and carry a disproportionate share of the value.
+Total ≈ 21–31 author-days. **P1–P7 are done and merged**; P8–P10 remain (~9–13 days).
+
+P1–P3 carried the disproportionate share, as predicted: they relieved the binding
+constraint and put six gates on every PR. Those gates have since caught two bugs that no
+local check could see (`OBS-002/R2`, and the eager `pyrekordbox` import in P7).
 
 ---
 

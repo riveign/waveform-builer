@@ -146,6 +146,17 @@ nothing; it is a style instruction wearing a definition's clothes. Define a term
 the derivation turns on a meaning the reader would not otherwise assume — `D` earns its
 place by being *cited* in an `R` step. If no `R` cites it, delete it.
 
+**K8 · A re-check that stops at the note is half a re-check.** `OBS` notes are re-measured
+in place and `CLM` notes get dated re-check blocks — but the index is what a reader meets
+first, and it carries its own one-line summary of every note. When a note's conclusions
+change, **`INDEX.md` changes in the same commit.** This was learned the hard way: seven
+plan items shipped, every affected note was diligently re-checked, and the index still
+announced "0 gates, no CI" under a heading that reads *what is true right now*. A stale
+index is worse than no index, because it is trusted.
+
+Corollary for `OBS` notes that did **not** change: say so, with a date. "Re-checked, still
+true" is information; silence is indistinguishable from nobody looking.
+
 **K7 · `K` sections are bullets, not prose.** `C`, `A` and `R` are argument and may run to
 sentences — a derivation step has to justify itself. `K` is the part people come back to,
 and it must be scannable in seconds: one bullet per statement, the claim first, the

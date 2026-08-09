@@ -12,6 +12,11 @@ superseded-by: null
 Baseline measurement of where the code actually lives, so later claims about
 maintainability have a denominator.
 
+> **Re-measured 2026-08-09 after [[PLN-001]] P1–P7.** Python 25,596 → 27,418 LOC;
+> frontend 29,579 → 35,398 (generated `schema.d.ts` is 5,925 of that). Components 92 → 102,
+> primitives 12 → 15, routes 1 → 7. **K3 still holds** — the ten oversized files shrank but
+> remain oversized, which is what P9 and further primitive extraction are for. K4's dead
+> weight is untouched: the Dash visualizer is still there, still blocked on Q1.
 ## E — Evidence
 
 Measured on `main` at commit `12dc127`, 2026-08-09.

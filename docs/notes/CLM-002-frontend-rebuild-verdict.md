@@ -12,6 +12,13 @@ superseded-by: null
 The author has explicitly opened the door to a complete frontend rebuild. Should they, and
 if not, what is the minimum set of changes that captures what a rebuild would have bought?
 
+> **Re-check 2026-08-09 — K1 held.** All three changes named in K3 shipped incrementally,
+> in the order K4 required: the route table (P4), `createResource` (P5), and the structural
+> primitives (P6). No rebuild was needed and none of the 29,600 lines was re-typed.
+> **K5's falsifier came out mixed**: the largest files did shrink, but by ~10% rather than
+> the implied 40% — see `PLN-001`/P6 for why that reads as an optimistic estimate rather
+> than a wrong abstraction.
+
 ## D — Definitions
 
 - **D1 · Rebuild.** Starting a new frontend application and re-implementing the six

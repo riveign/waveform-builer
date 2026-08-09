@@ -3,34 +3,40 @@
 Format: [KNF](../DOC_SYSTEM.md). Dependency direction is one-way: `OBS → CLM → DEC → PLN`.
 Cite statements, not documents — `OBS-003/K2`, never "see OBS-003".
 
+**Status 2026-08-09 — [[PLN-001]] P1–P7 shipped and merged, P8–P10 open.** Six of the nine
+`OBS` notes below have been overtaken by that work. They are kept, not rewritten: the
+original evidence is what `CLM-001`–`CLM-004` derive from, so each note carries a dated
+re-check at the top saying which of its conclusions no longer hold. The **Now** column here
+is the short version.
+
 ## OBS — what is true right now
 
-| ID | Title | Headline |
-|----|-------|----------|
-| [OBS-001](OBS-001-codebase-inventory.md) | Codebase inventory and mass distribution | ~55k LOC, 46/54 backend/frontend; 10 files hold 21% of it |
-| [OBS-002](OBS-002-quality-gates.md) | Test coverage and automated quality gates | 426 backend tests pass; **0 frontend tests, 0 gates, no CI** |
-| [OBS-003](OBS-003-schema-management-split.md) | Alembic vs `create_all` | **`alembic upgrade head` raises on an empty DB** — reproduced |
-| [OBS-004](OBS-004-frontend-architecture.md) | Frontend architecture and delivery shape | Current stack, one route, no URL state, one 540 KB chunk |
-| [OBS-005](OBS-005-frontend-data-layer.md) | Frontend data layer | Transport centralised and clean; orchestration hand-rolled 44× |
-| [OBS-006](OBS-006-backend-layering.md) | Backend layering | Clean domain core, ~6,400 LOC transport rind doing service work |
-| [OBS-007](OBS-007-runtime-and-dependency-baseline.md) | Runtime and dependency baseline | Lean deps; **no Python lock, no manifest, declared floor is false** |
-| [OBS-008](OBS-008-design-system-state.md) | Design system maturity | Tokens excellent (2,033 uses); structural primitives missing |
-| [OBS-009](OBS-009-documentation-corpus.md) | State of the written record | 43 documents, none addressable below file level; 5 untracked |
+| ID | Title | Originally | Now |
+|----|-------|-----------|-----|
+| [OBS-001](OBS-001-codebase-inventory.md) | Codebase inventory | ~55k LOC, 46/54 backend/frontend | 🟡 ~63k LOC; the 10 oversized files are smaller but still oversized |
+| [OBS-002](OBS-002-quality-gates.md) | Quality gates | **0 gates, no CI** | 🟡 **6 gates on every PR**; frontend tests still **0** → P8 |
+| [OBS-003](OBS-003-schema-management-split.md) | Alembic vs `create_all` | `upgrade head` raised on an empty DB | ✅ Alembic is sole authority, invariant test in CI |
+| [OBS-004](OBS-004-frontend-architecture.md) | Frontend architecture | one route, no URL state, 540 KB chunk | ✅ 7 routes, URL-addressable, landing route 292 KB |
+| [OBS-005](OBS-005-frontend-data-layer.md) | Frontend data layer | orchestration hand-rolled 44× | ✅ `createResource` (22/26) · types generated · **K3(b) still open** |
+| [OBS-006](OBS-006-backend-layering.md) | Backend layering | clean core, thick transport rind | ⬜ unchanged — `sets.py` still 1,410 lines → P9 |
+| [OBS-007](OBS-007-runtime-and-dependency-baseline.md) | Runtime + dependencies | no lock, false interpreter floor | ✅ `uv.lock`, `>=3.11` pinned, one-command setup |
+| [OBS-008](OBS-008-design-system-state.md) | Design system | structural primitives missing | ✅ 15 primitives, one dialog shell; 123 hex literals remain |
+| [OBS-009](OBS-009-documentation-corpus.md) | The written record | nothing addressable below file level | 🟡 KNF exists and is used; **5 design docs still untracked** |
 
 ## CLM — what it means
 
-| ID | Title | Verdict |
-|----|-------|---------|
-| [CLM-001](CLM-001-tech-stack-verdict.md) | Tech stack verdict | Choices right, apparatus absent — **4/15 (+2 partial) on the 2026 benchmark** |
-| [CLM-002](CLM-002-frontend-rebuild-verdict.md) | Frontend rebuild verdict | **Do not rebuild.** Rebuild dividend is one trivial row |
-| [CLM-003](CLM-003-maintainability-verdict.md) | Maintainability verdict | Good bones, no immune system; cost curve is rising |
-| [CLM-004](CLM-004-binding-constraint.md) | The binding constraint | **The repo cannot produce a running Kiku on a clean machine** |
+| ID | Title | Verdict | Now |
+|----|-------|---------|-----|
+| [CLM-001](CLM-001-tech-stack-verdict.md) | Tech stack | Choices right, apparatus absent — **4/15** | 🟡 **10/15 met, 3 partial** — frontend tests and observability are what's left |
+| [CLM-002](CLM-002-frontend-rebuild-verdict.md) | Frontend rebuild | **Do not rebuild** | ✅ held — all three named changes shipped incrementally |
+| [CLM-003](CLM-003-maintainability-verdict.md) | Maintainability | Good bones, no immune system | 🟡 immune system exists; the 5-edit boundaries are half-closed |
+| [CLM-004](CLM-004-binding-constraint.md) | The binding constraint | repo can't build itself on a clean machine | ✅ **relieved** — clean clone → passing suite in one command |
 
 ## PLN — what to do
 
-| ID | Title | Shape |
-|----|-------|-------|
-| [PLN-001](PLN-001-top-10-changes.md) | The ten changes, ranked | ≈21–31 author-days; P1–P3 are ~4 of them |
+| ID | Title | Progress |
+|----|-------|----------|
+| [PLN-001](PLN-001-top-10-changes.md) | The ten changes, ranked | **P1–P7 done and merged.** Open: P8 frontend tests · P9 service layer · P10 sequencing tests |
 
 ## DEC — what we chose
 
@@ -62,7 +68,8 @@ leftovers → `PLN` (`DEC-002`/K4). Then it links to them instead of holding the
 
 ## Reading paths
 
-- **"Just tell me what to do"** → [PLN-001](PLN-001-top-10-changes.md), the table.
+- **"Where are we?"** → the Now column above, then [PLN-001](PLN-001-top-10-changes.md).
+- **"What's left to do"** → [PLN-001](PLN-001-top-10-changes.md), items P8–P10.
 - **"Why that order?"** → [CLM-004](CLM-004-binding-constraint.md).
 - **"Should I rebuild the frontend?"** → [CLM-002](CLM-002-frontend-rebuild-verdict.md).
 - **"How does Kiku compare to how good teams build things?"** → [CLM-001](CLM-001-tech-stack-verdict.md)/E1.
