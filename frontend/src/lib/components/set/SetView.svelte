@@ -18,6 +18,7 @@
 	import MenuSeparator from '$lib/components/primitives/MenuSeparator.svelte';
 	import SegmentedControl, { type SegmentOption } from '$lib/components/primitives/SegmentedControl.svelte';
 	import { goto } from '$app/navigation';
+	import { createResource } from '$lib/data/resource.svelte';
 	import { page } from '$app/state';
 	import { setHref, setQueryParam } from '$lib/nav';
 
@@ -111,7 +112,18 @@
 	let waveformTracks = $state<SetWaveformTrack[]>([]);
 	let transition = $state<TransitionData | null>(null);
 	let activeTransitionIndex = $state(-1);
-	let loading = $state(false);
+	const res = createResource(
+		() => setId,
+		async (id, signal) => {
+			const [detail, waveforms] = await Promise.all([getSet(id, signal), getSetWaveforms(id, signal)]);
+			return { detail, waveforms };
+		},
+		{ key: (id) => `set:${id}:detail` },
+	);
+	const loading = $derived(res.loading);
+	/** Writes in this view — rename, link, delete, analyze — fail differently from
+	 *  the load, so they get their own channel and the view shows either. */
+	let actionError = $state<string | null>(null);
 	let loadingTransition = $state(false);
 	let exporting = $state(false);
 	let exportMsg = $state<string | null>(null);
@@ -127,7 +139,7 @@
 	let renameValue = $state('');
 	let savingName = $state(false);
 	let renameInputEl = $state<HTMLInputElement | null>(null);
-	let error = $state<string | null>(null);
+	const error = $derived(res.error ?? actionError);
 	let timelineContainerEl = $state<HTMLDivElement>(null!);
 	let analysis = $state<SetAnalysis | null>(null);
 	let analyzingSet = $state(false);
@@ -225,7 +237,7 @@
 			confirmDelete = false;
 			pickerRefresh++;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Delete failed';
+			actionError = e instanceof Error ? e.message : 'Delete failed';
 		} finally {
 			deleting = false;
 		}
@@ -250,7 +262,7 @@
 			comparison = await compareSet(selectedSet.id);
 			showComparison = true;
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			actionError = e instanceof Error ? e.message : String(e);
 		} finally {
 			comparing = false;
 		}
@@ -264,7 +276,7 @@
 			showComparison = false;
 			if (setDetail) setDetail = { ...setDetail, planned_set_id: null };
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			actionError = e instanceof Error ? e.message : String(e);
 		}
 	}
 
@@ -291,87 +303,72 @@
 			// Show how the night deviated right away
 			await handleCompare();
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			actionError = e instanceof Error ? e.message : String(e);
 		} finally {
 			linking = false;
 		}
 	}
 
-	async function loadSetData(setId: number) {
-		loading = true;
-		error = null;
+	// The resource owns the request. This seeds the view from it and then chases the
+	// two dependent reads — cached analysis, and a comparison when the set is linked.
+	$effect(() => {
+		const data = res.data;
 		transition = null;
 		activeTransitionIndex = -1;
 		analysis = null;
 		comparison = null;
 		showComparison = false;
 		showLinkPicker = false;
-		try {
-			const [detail, waveforms] = await Promise.all([
-				getSet(setId),
-				getSetWaveforms(setId),
-			]);
-			setDetail = detail;
-			waveformTracks = waveforms;
-			// Keep the header's set identity in step with what the URL loaded, so a
-			// pasted link and a picker click land on the same rendered state.
-			selectedSet = {
-				id: detail.id,
-				name: detail.name,
-				created_at: detail.created_at,
-				duration_min: detail.duration_min,
-				track_count: detail.tracks.length,
-				source: detail.source,
-			};
+		actionError = null;
+		if (!data) {
+			selectedSet = null;
+			setDetail = null;
+			waveformTracks = [];
+			return;
+		}
 
-			// Use pre-computed analysis from build if available
-			if (ui.pendingAnalysis && ui.pendingAnalysis.set_id === setId) {
+		const { detail, waveforms } = data;
+		setDetail = detail;
+		waveformTracks = waveforms;
+		selectedSet = {
+			id: detail.id,
+			name: detail.name,
+			created_at: detail.created_at,
+			duration_min: detail.duration_min,
+			track_count: detail.tracks.length,
+			source: detail.source,
+		};
+
+		void (async () => {
+			// A build hands its analysis over rather than making us recompute it.
+			if (ui.pendingAnalysis && ui.pendingAnalysis.set_id === detail.id) {
 				analysis = ui.pendingAnalysis;
 				ui.pendingAnalysis = null;
 			} else {
-				// Try loading cached analysis
 				try {
-					analysis = await getSetAnalysis(setId);
+					analysis = await getSetAnalysis(detail.id);
 				} catch {
 					analysis = null;
 				}
 			}
 
-			// Auto-analyze if no analysis exists and set has enough tracks
-			if (!analysis && waveforms.length >= 2) {
-				handleAnalyze();
-			}
+			if (!analysis && waveforms.length >= 2) handleAnalyze();
 
-			// Load the cached comparison when this set is linked to a plan
 			if (detail.planned_set_id) {
 				try {
-					comparison = await getSetComparison(setId);
+					comparison = await getSetComparison(detail.id);
 				} catch {
 					comparison = null;
 				}
 			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
-			waveformTracks = [];
-			setDetail = null;
-		} finally {
-			loading = false;
-		}
-	}
+		})();
+	});
 
 	function handleSetSelect(set: DJSet) {
 		// Selecting a set is a navigation: it changes what the URL identifies.
 		goto(setHref(set.id));
 	}
 
-	/** Load whichever set the URL names, including on first mount and on Back. */
-	$effect(() => {
-		const id = setId;
-		if (id === null) return;
-		if (selectedSet?.id === id) return;
-		renaming = false;
-		void loadSetData(id);
-	});
 
 	function startRename() {
 		if (!selectedSet) return;
@@ -396,7 +393,7 @@
 			renaming = false;
 			pickerRefresh++;
 		} catch (e) {
-			error = e instanceof Error ? e.message : "Couldn't rename the set";
+			actionError = e instanceof Error ? e.message : "Couldn't rename the set";
 		} finally {
 			savingName = false;
 		}
@@ -404,7 +401,7 @@
 
 	async function handleTracksChanged() {
 		if (!selectedSet) return;
-		await loadSetData(selectedSet.id);
+		res.refresh();
 	}
 
 	async function handleTransitionClick(index: number) {
@@ -421,7 +418,7 @@
 		try {
 			transition = await getTransition(selectedSet.id, index);
 		} catch (e) {
-			error = e instanceof Error ? e.message : String(e);
+			actionError = e instanceof Error ? e.message : String(e);
 		} finally {
 			loadingTransition = false;
 		}
@@ -700,7 +697,7 @@
 			trackIds={tracksNeedingReview.map((t) => t.track_id)}
 			onclose={(reviewed) => {
 				showEnergyReview = false;
-				if (reviewed && selectedSet) loadSetData(selectedSet.id);
+				if (reviewed && selectedSet) res.refresh();
 			}}
 		/>
 	{/if}
