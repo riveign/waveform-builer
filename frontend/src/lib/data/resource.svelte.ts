@@ -80,6 +80,8 @@ export function createResource<A, T>(
 	let generation = 0;
 	let currentKey: string | null = null;
 	let registered: { key: string; fn: () => void } | null = null;
+	/** The flight this resource put into the shared map, if it started one. */
+	let ownedFlight: { key: string; promise: Promise<unknown> } | null = null;
 
 	function unregister() {
 		if (!registered) return;
@@ -90,7 +92,7 @@ export function createResource<A, T>(
 	}
 
 	async function run(args: A, key: string, { dedupe }: { dedupe: boolean }) {
-		controller?.abort();
+		abandonInFlight();
 		controller = new AbortController();
 		const mine = ++generation;
 		const signal = controller.signal;
@@ -103,7 +105,19 @@ export function createResource<A, T>(
 			// Share a flight with any identical request already running.
 			const existing = dedupe ? (inFlight.get(key) as Promise<T> | undefined) : undefined;
 			const promise = existing ?? fetcher(args, signal);
-			if (!existing) inFlight.set(key, promise);
+			if (!existing) {
+				inFlight.set(key, promise);
+				ownedFlight = { key, promise };
+				// The entry clears itself when the request settles, however it settles.
+				// Doing this in a `finally` block below instead would leak the entry
+				// whenever the awaiting resource returned early — and a stale entry is
+				// worse than no de-duplication, because the next caller on that key
+				// would await a promise nobody is going to resolve.
+				void promise.then(
+					() => releaseFlight(key, promise),
+					() => releaseFlight(key, promise),
+				);
+			}
 
 			const result = await promise;
 			if (mine !== generation) return; // superseded — discard
@@ -113,9 +127,29 @@ export function createResource<A, T>(
 			error = e instanceof Error ? e.message : String(e);
 			if (!keepPrevious) data = initial;
 		} finally {
-			if (inFlight.get(key) !== undefined && !dedupe) inFlight.delete(key);
-			else if (dedupe) inFlight.delete(key);
 			if (mine === generation) loading = false;
+		}
+	}
+
+	/** Drop a flight entry, but only if it is still the one we registered. */
+	function releaseFlight(key: string, promise: Promise<unknown>) {
+		if (inFlight.get(key) === promise) inFlight.delete(key);
+		if (ownedFlight?.promise === promise) ownedFlight = null;
+	}
+
+	/**
+	 * Abort whatever is running and stop advertising its flight.
+	 *
+	 * A fetcher that honours its signal rejects on abort and releases the entry
+	 * itself; one that ignores it never settles at all. Releasing here covers both,
+	 * so an abandoned request can never strand its key — the next caller would
+	 * otherwise await a promise nobody will resolve, and sit loading forever.
+	 */
+	function abandonInFlight() {
+		controller?.abort();
+		if (ownedFlight) {
+			releaseFlight(ownedFlight.key, ownedFlight.promise);
+			ownedFlight = null;
 		}
 	}
 
@@ -126,7 +160,7 @@ export function createResource<A, T>(
 			unregister();
 
 			if (args === null) {
-				controller?.abort();
+				abandonInFlight();
 				generation++;
 				loading = false;
 				error = null;
@@ -148,7 +182,7 @@ export function createResource<A, T>(
 	});
 
 	onDestroy(() => {
-		controller?.abort();
+		abandonInFlight();
 		generation++;
 		unregister();
 	});

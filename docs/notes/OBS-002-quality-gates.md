@@ -13,7 +13,7 @@ What stops a bad change from reaching `main` today, and what does not.
 
 > **Re-check 2026-08-09 — partly resolved by [[PLN-001]]/P3.** E1–E10 record the state
 > `CLM-001` and `CLM-003` derive from. **K1 no longer holds**: the gate count is now four,
-> not zero. See **K5**. E2 (zero frontend tests) still stands — that is P8.
+> not zero. See **K5**. **E2 is closed as of 2026-08-10** — 65 frontend tests run in CI (**K11**).
 
 ## D — Definitions
 
@@ -92,6 +92,11 @@ What stops a bad change from reaching `main` today, and what does not.
   `filler.py` and `reorder.py` now have named test files — 43 invariant tests, which found
   a live artist-cooldown bug in `fill_set` on their first run. `cli.py` and `db/store.py`
   remain untested; `cli.py` is where `OBS-002/R1`'s broken `kiku search` hid.
+- **K11 · E2 is closed (2026-08-10).** 65 frontend tests via Vitest + Testing Library, run
+  as a CI gate. They found two live bugs on their first pass — an in-flight leak in
+  `createResource` that could strand a key loading forever, and an invalid ARIA nesting in
+  `StarRating`. **K3's 54%-of-the-code/0%-of-the-tests asymmetry is gone**; what remains
+  uncovered is the Web Audio graph and per-route smoke tests, both needing a real browser.
 - **K7 · E8 is unchanged and now cheap to close.** Coverage is still unmeasured; with a
   gate in place, adding `--cov-fail-under` is a one-line change whenever a number is wanted.
 

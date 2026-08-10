@@ -50,3 +50,6 @@ frontend/build/
 .agentic-config.conf.yml
 /.specs/
 /outputs/
+
+# Playwright / vitest run artifacts
+frontend/test-results/

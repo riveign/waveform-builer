@@ -12,7 +12,7 @@ superseded-by: null
 The output of the status analysis: what to do, in order. Cost is in author-days at the
 pace of `OBS-001/E7`.
 
-**Status 2026-08-10: P1–P7 and P10 done. P8 (frontend tests) and P9 (service layer) open.**
+**Status 2026-08-10: P1–P8 and P10 done. Only P9 (service layer) remains.**
 
 ## R — Reasoning (the ordering)
 
@@ -41,7 +41,7 @@ pace of `OBS-001/E7`.
 | **P5** ✅ | `createResource` — one data-orchestration rune — *done 2026-08-09* | `OBS-005/K1,K3` | 2–3 d | shrinks 26 components |
 | **P6** ✅ | The four missing structural primitives — *done 2026-08-09* | `OBS-008/K2,K3` | 3–4 d | collapses ~2,700 LOC |
 | **P7** ✅ | Generate TS types from OpenAPI — *done 2026-08-09* | `OBS-005/K4`, `CLM-003/E2` | 1 d | removes a 5-edit boundary |
-| **P8** | Frontend test foundation | `OBS-002/K3`, `CLM-003/K3` | 3–4 d | frontend confidence |
+| **P8** ✅ | Frontend test foundation — *done 2026-08-10* | `OBS-002/K3`, `CLM-003/K3` | 3–4 d | frontend confidence |
 | **P9** | Extract a service layer, starting with sets | `OBS-006/K2,K3`, `CLM-001/K5` | 4–6 d | Rust port; CLI/API parity |
 | **P10** ✅ | Cover the sequencing modules — *done 2026-08-10* | `CLM-003/R6`, `OBS-002/E9` | 2–3 d | correctness of set building |
 
@@ -144,13 +144,13 @@ local check could see (`OBS-002/R2`, and the eager `pyrekordbox` import in P7).
 - **Gate verified:** renaming `teaching_moment` in `schemas.py` turns `check:api` red with *"Generated types are not up-to-date!"*.
 - **Still hand-written (13):** responses from endpoints declared with no `response_model` — the gaps/enhanced-stats family, `VibePreset`, `SetBuildComplete`. Each is a small hole in the contract, and a natural follow-on.
 
-### P8 — Frontend test foundation
+### P8 — Frontend test foundation ✅ **DONE 2026-08-10**
 
-- Vitest + `@testing-library/svelte` on the 16 primitives.
-- Cover the two real state machines: `playback.svelte.ts` (465 LOC), `player.svelte.ts` (371 LOC) — the highest-risk untested code in the repo.
-- Playwright smoke per P4 route: loads, renders, no console errors.
-- Do **not** chase a coverage number. Primitives and state machines only.
-- **After P4** — routes are what a smoke test can address.
+- Vitest + `@testing-library/svelte` on jsdom, wired into CI as `npm test`. **65 tests.**
+- Aimed at code where a bug is invisible in a browser, not at a coverage number: `createResource` (14) · playback store (18) · `Modal` (14) · `Input` (9) · `StarRating` (8) · `Button` (2).
+- **Two real bugs found.** `createResource` leaked in-flight entries — an abandoned request left its key in the shared map, so a fetcher that ignores its signal stranded the next caller on that key **loading forever**. And `StarRating` put `role="radio"` children inside `role="group"`; radios must be owned by a `radiogroup` or assistive tech never treats the five stars as one control.
+- **Two jsdom shims**, marked as such in `src/tests/setup.ts`: no `HTMLDialogElement.showModal/close`, and no `localStorage`. Environment gaps, not Kiku's.
+- **Deliberately uncovered:** the Web Audio graph (`connectDeck` bails before `AudioContext` when a deck has no media element — which is what lets the state machine run under jsdom at all), and route smoke tests, which need a real browser. That is a separate slice, not a claim made here.
 
 ### P9 — Extract a service layer, starting with sets
 
