@@ -47,7 +47,7 @@
 	class="star-rating"
 	class:star-rating-sm={size === 'sm'}
 	class:star-rating-lg={size === 'lg'}
-	role="group"
+	role="radiogroup"
 	aria-label="Track rating"
 >
 	{#each [1, 2, 3, 4, 5] as n}
