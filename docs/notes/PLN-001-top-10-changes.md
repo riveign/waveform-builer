@@ -12,7 +12,7 @@ superseded-by: null
 The output of the status analysis: what to do, in order. Cost is in author-days at the
 pace of `OBS-001/E7`.
 
-**Status 2026-08-10: P1–P8 and P10 done. Only P9 (service layer) remains.**
+**Status 2026-08-10: all ten done and merged.**
 
 ## R — Reasoning (the ordering)
 
@@ -42,7 +42,7 @@ pace of `OBS-001/E7`.
 | **P6** ✅ | The four missing structural primitives — *done 2026-08-09* | `OBS-008/K2,K3` | 3–4 d | collapses ~2,700 LOC |
 | **P7** ✅ | Generate TS types from OpenAPI — *done 2026-08-09* | `OBS-005/K4`, `CLM-003/E2` | 1 d | removes a 5-edit boundary |
 | **P8** ✅ | Frontend test foundation — *done 2026-08-10* | `OBS-002/K3`, `CLM-003/K3` | 3–4 d | frontend confidence |
-| **P9** | Extract a service layer, starting with sets | `OBS-006/K2,K3`, `CLM-001/K5` | 4–6 d | Rust port; CLI/API parity |
+| **P9** ✅ | Extract a service layer, starting with sets — *done 2026-08-10* | `OBS-006/K2,K3`, `CLM-001/K5` | 4–6 d | Rust port; CLI/API parity |
 | **P10** ✅ | Cover the sequencing modules — *done 2026-08-10* | `CLM-003/R6`, `OBS-002/E9` | 2–3 d | correctness of set building |
 
 Total ≈ 21–31 author-days. **P1–P7 are done and merged**; P8–P10 remain (~9–13 days).
@@ -152,13 +152,14 @@ local check could see (`OBS-002/R2`, and the eager `pyrekordbox` import in P7).
 - **Two jsdom shims**, marked as such in `src/tests/setup.ts`: no `HTMLDialogElement.showModal/close`, and no `localStorage`. Environment gaps, not Kiku's.
 - **Deliberately uncovered:** the Web Audio graph (`connectDeck` bails before `AudioContext` when a deck has no media element — which is what lets the state machine run under jsdom at all), and route smoke tests, which need a real browser. That is a separate slice, not a claim made here.
 
-### P9 — Extract a service layer, starting with sets
+### P9 — Extract a service layer, starting with sets ✅ **DONE 2026-08-10**
 
-- Create `src/kiku/services/`; move set use-cases out of `api/routes/sets.py` (1,340 LOC), including its domain-flavoured private helpers (`OBS-006/E3`).
-- Point both `cli.py` and the route at it, killing the duplication in `OBS-006/E6`.
-- Leave the two SSE endpoints for last (`OBS-006/K6`).
-- **Done when:** `sets.py` is routing/validation/serialization only; `grep session.query` in it → 0; one use-case backs both entry points.
-- **Strategic:** this is the real prerequisite for the Rust migration, and may show it to be unnecessary (`CLM-001/K5`).
+- `src/kiku/services/sets.py` (349 LOC, 29 tests): what a set is and what you can do to one, expressed once. Raises `SetNotFound`/`SetInvalid`; each transport translates. Formats nothing.
+- **`sets.py` 1,410 → 1,261 lines · `db.query` 5 → 0.**
+- **The duplication actually killed is `resolve`** — "an id, or part of a name" was hand-written in **five** CLI commands and absent from the API. One implementation now; `Set.name.ilike` no longer appears in `cli.py`.
+- **A claim I made while writing this was wrong.** I assumed analysis caching lived in the route, so `kiku analyze-set` recomputed each time. It does not — `set_analyzer.analyze_set` writes `analysis_cache` itself (`set_analyzer.py:143`), as does `compare_sets`. Both callers were already consistent, so the service does *not* re-cache. Caught before shipping, but only by reading the code the comment described.
+- **The two SSE endpoints are deliberately untouched** — streaming plus a held session is the shape that resists this, and `OBS-006/K6` says move it last.
+- **Verified beyond the suite:** CLI by name and by id, artist-picks, slot-suggest, export, the not-found message; and create/list/update/delete/trash/restore/404/self-link over HTTP against a fresh database.
 
 ### P10 — Cover the sequencing modules ✅ **DONE 2026-08-10**
 

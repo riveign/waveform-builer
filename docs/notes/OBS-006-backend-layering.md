@@ -12,6 +12,17 @@ superseded-by: null
 Whether the backend has a reusable domain layer, or whether logic lives in the places that
 happen to receive requests.
 
+> **Re-check 2026-08-10 — [[PLN-001]]/P9 shipped.** `src/kiku/services/` exists; **K2 is
+> half-discharged**. `sets.py` is 1,261 lines with **zero** `db.query`, and `E6`'s
+> duplication is gone for set resolution — one use-case now backs both transports.
+> **K3 stands for the other route modules** (albums, tracks, tinder still query the ORM
+> directly), and **K6 stands**: the two SSE endpoints were deliberately left. **K5's
+> consequence for `CLM-001/K5` is the interesting one — with a service boundary in place,
+> a Rust port would now be porting the domain rather than the rind, which is the question
+> that was premature before.**
+>
+> **Superseded — the note below described the state before P9:**
+>
 > **Re-checked 2026-08-09 — unchanged, and that is the point.** [[PLN-001]] P1–P7 were all
 > either infrastructure or frontend; nothing touched the layering. `api/routes/sets.py` is
 > **1,410 lines** (up from 1,340). Every conclusion K1–K6 stands as written, and K3's

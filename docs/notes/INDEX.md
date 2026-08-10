@@ -3,7 +3,7 @@
 Format: [KNF](../DOC_SYSTEM.md). Dependency direction is one-way: `OBS → CLM → DEC → PLN`.
 Cite statements, not documents — `OBS-003/K2`, never "see OBS-003".
 
-**Status 2026-08-10 — [[PLN-001]] P1–P8 and P10 shipped; only P9 (service layer) remains.** Six of the nine
+**Status 2026-08-10 — [[PLN-001]] is complete: all ten changes shipped and merged.** Six of the nine
 `OBS` notes below have been overtaken by that work. They are kept, not rewritten: the
 original evidence is what `CLM-001`–`CLM-004` derive from, so each note carries a dated
 re-check at the top saying which of its conclusions no longer hold. The **Now** column here
@@ -14,11 +14,11 @@ is the short version.
 | ID | Title | Originally | Now |
 |----|-------|-----------|-----|
 | [OBS-001](OBS-001-codebase-inventory.md) | Codebase inventory | ~55k LOC, 46/54 backend/frontend | 🟡 ~63k LOC; the 10 oversized files are smaller but still oversized |
-| [OBS-002](OBS-002-quality-gates.md) | Quality gates | **0 gates, no CI** | ✅ **7 gates on every PR** · 472 backend + 65 frontend tests |
+| [OBS-002](OBS-002-quality-gates.md) | Quality gates | **0 gates, no CI** | ✅ **7 gates on every PR** · 501 backend + 65 frontend tests |
 | [OBS-003](OBS-003-schema-management-split.md) | Alembic vs `create_all` | `upgrade head` raised on an empty DB | ✅ Alembic is sole authority, invariant test in CI |
 | [OBS-004](OBS-004-frontend-architecture.md) | Frontend architecture | one route, no URL state, 540 KB chunk | ✅ 7 routes, URL-addressable, landing route 292 KB |
 | [OBS-005](OBS-005-frontend-data-layer.md) | Frontend data layer | orchestration hand-rolled 44× | ✅ `createResource` (22/26) · types generated · **K3(b) still open** |
-| [OBS-006](OBS-006-backend-layering.md) | Backend layering | clean core, thick transport rind | ⬜ unchanged — `sets.py` still 1,410 lines → P9 |
+| [OBS-006](OBS-006-backend-layering.md) | Backend layering | clean core, thick transport rind | 🟡 service layer exists; `sets.py` 1,261 lines, 0 `db.query`. Other route modules still query directly |
 | [OBS-007](OBS-007-runtime-and-dependency-baseline.md) | Runtime + dependencies | no lock, false interpreter floor | ✅ `uv.lock`, `>=3.11` pinned, one-command setup |
 | [OBS-008](OBS-008-design-system-state.md) | Design system | structural primitives missing | ✅ 15 primitives, one dialog shell; 123 hex literals remain |
 | [OBS-009](OBS-009-documentation-corpus.md) | The written record | nothing addressable below file level | 🟡 KNF exists and is used; **5 design docs still untracked** |
@@ -36,7 +36,7 @@ is the short version.
 
 | ID | Title | Progress |
 |----|-------|----------|
-| [PLN-001](PLN-001-top-10-changes.md) | The ten changes, ranked | **9 of 10 done.** Open: P9 service layer |
+| [PLN-001](PLN-001-top-10-changes.md) | The ten changes, ranked | ✅ **All ten done and merged.** |
 
 ## DEC — what we chose
 
