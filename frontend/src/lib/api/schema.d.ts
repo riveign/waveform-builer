@@ -458,7 +458,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Set
-         * @description Soft-delete a set — move it to the trash, recoverable for SOFT_DELETE_DAYS days.
+         * @description Soft-delete a set — move it to the trash, recoverable for a few days.
          */
         delete: operations["delete_set_api_sets__set_id__delete"];
         options?: never;

@@ -6,6 +6,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from kiku.services import sets as sets_service
+
 console = Console()
 
 
@@ -460,20 +462,15 @@ def artist_picks_cmd(set_name_or_id: str, artist: str, num: int):
     Ranks tracks you already own by that artist (collaborations included)
     by where they fit best across the whole set.
     """
-    from kiku.db.models import Set, get_session
+    from kiku.db.models import get_session
     from kiku.setbuilder.artist_picks import rank_artist_picks
 
     session = get_session()
 
-    # Resolve set by ID or name
     try:
-        set_id = int(set_name_or_id)
-        s = session.get(Set, set_id)
-    except ValueError:
-        s = session.query(Set).filter(Set.name.ilike(f"%{set_name_or_id}%")).first()
-
-    if not s:
-        console.print(f"[yellow]Couldn't find set '{set_name_or_id}'.[/]")
+        s = sets_service.resolve(session, set_name_or_id)
+    except sets_service.SetNotFound as e:
+        console.print(f"[yellow]{e}[/]")
         return
 
     picks = rank_artist_picks(session, s.id, artist, n=num)
@@ -542,20 +539,15 @@ def slot_suggest_cmd(set_name_or_id, position, mode, intent, allowed_keys, energ
     mixing out of the track before AND into the track after. Each pick shows the
     move, the energy shift, and any caveat when the slot resists.
     """
-    from kiku.db.models import Set, get_session
+    from kiku.db.models import get_session
     from kiku.setbuilder.slot_picks import rank_slot_picks
 
     session = get_session()
 
-    # Resolve set by ID or name.
     try:
-        set_id = int(set_name_or_id)
-        s = session.get(Set, set_id)
-    except ValueError:
-        s = session.query(Set).filter(Set.name.ilike(f"%{set_name_or_id}%")).first()
-
-    if not s:
-        console.print(f"[yellow]Couldn't find set '{set_name_or_id}'.[/]")
+        s = sets_service.resolve(session, set_name_or_id)
+    except sets_service.SetNotFound as e:
+        console.print(f"[yellow]{e}[/]")
         return
 
     keys = None
@@ -718,12 +710,12 @@ def export(
     set_name: str, fmt: str, output: str | None, with_cues: bool, with_metadata: bool, platform: str
 ):
     """Export a set for import into Rekordbox or other DJ software."""
-    from kiku.db.models import Set, TransitionCue, get_session
+    from kiku.db.models import TransitionCue, get_session
 
     session = get_session()
-    set_ = session.query(Set).filter(Set.name.ilike(f"%{set_name}%")).first()
-
-    if not set_:
+    try:
+        set_ = sets_service.resolve(session, set_name)
+    except sets_service.SetNotFound:
         console.print(
             f"[yellow]Couldn't find a set matching '{set_name}' -- check the name and try again.[/]"
         )
@@ -851,19 +843,14 @@ def analyze_set_cmd(set_name_or_id: str):
     Shows why your transitions work and where to grow.
     """
     from kiku.analysis.set_analyzer import analyze_set
-    from kiku.db.models import Set, get_session
+    from kiku.db.models import get_session
 
     session = get_session()
 
-    # Resolve set by ID or name
     try:
-        set_id = int(set_name_or_id)
-        s = session.get(Set, set_id)
-    except ValueError:
-        s = session.query(Set).filter(Set.name.ilike(f"%{set_name_or_id}%")).first()
-
-    if not s:
-        console.print(f"[red]Couldn't find set '{set_name_or_id}'.[/]")
+        s = sets_service.resolve(session, set_name_or_id)
+    except sets_service.SetNotFound as e:
+        console.print(f"[red]{e}[/]")
         return
 
     console.print(f"[cyan]Analyzing set: {s.name}...[/]")
@@ -935,9 +922,9 @@ def compare_cmd(played_set: str, planned_set: str | None):
 
     def _resolve(ref: str) -> Set | None:
         try:
-            return session.get(Set, int(ref))
-        except ValueError:
-            return session.query(Set).filter(Set.name.ilike(f"%{ref}%")).first()
+            return sets_service.resolve(session, ref)
+        except sets_service.SetNotFound:
+            return None
 
     played = _resolve(played_set)
     if not played:

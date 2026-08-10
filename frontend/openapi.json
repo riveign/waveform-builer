@@ -6487,7 +6487,7 @@
     },
     "/api/sets/{set_id}": {
       "delete": {
-        "description": "Soft-delete a set \u2014 move it to the trash, recoverable for SOFT_DELETE_DAYS days.",
+        "description": "Soft-delete a set \u2014 move it to the trash, recoverable for a few days.",
         "operationId": "delete_set_api_sets__set_id__delete",
         "parameters": [
           {

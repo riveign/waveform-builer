@@ -6,7 +6,6 @@ import base64
 import json
 import logging
 import time
-from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import StreamingResponse
@@ -60,6 +59,7 @@ from kiku.db.store import (
     replace_track_in_set,
     save_cue,
 )
+from kiku.services import sets as sets_service
 
 logger = logging.getLogger(__name__)
 
@@ -193,115 +193,62 @@ async def import_m3u8_playlist(
 @router.post("/{set_id}/analyze", response_model=SetAnalysisResponse)
 def analyze_set_endpoint(set_id: int, db: Session = Depends(get_db)):
     """Trigger full analysis on a set: score transitions, compute arc, generate teaching moments."""
-    from dataclasses import asdict
-
-    from kiku.analysis.set_analyzer import analyze_set
-
     try:
-        result = analyze_set(db, set_id)
-    except ValueError as e:
+        return sets_service.analyze(db, set_id)
+    except sets_service.SetNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-    data = asdict(result)
-    # Convert tuple to list for JSON
-    data["arc"]["bpm_range"] = list(data["arc"]["bpm_range"])
-    return data
 
 
 @router.get("/{set_id}/analysis", response_model=SetAnalysisResponse)
 def get_set_analysis(set_id: int, db: Session = Depends(get_db)):
     """Get cached analysis for a set. Returns 404 if not yet analyzed."""
-    s = db.get(Set, set_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Set not found")
-    if not s.is_analyzed or not s.analysis_cache:
-        raise HTTPException(
-            status_code=404,
-            detail="Set has not been analyzed yet. Use POST /analyze first.",
-        )
-
-    return json.loads(s.analysis_cache)
+    try:
+        return sets_service.cached_analysis(db, set_id)
+    except sets_service.SetNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # ── Played vs Planned (link + compare) ──
 
 
-def _clear_comparison_caches(db: Session, set_: Set) -> None:
-    """Clear comparison caches touching this set — its own and any played set linked to it."""
-    set_.comparison_cache = None
-    for linked in db.query(Set).filter(Set.planned_set_id == set_.id).all():
-        linked.comparison_cache = None
-
-
 @router.put("/{set_id}/link")
 def link_set(set_id: int, body: SetLinkRequest, db: Session = Depends(get_db)):
     """Link a played (imported) set to the planned Kiku set it was based on."""
-    s = db.get(Set, set_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Set not found")
-    if body.planned_set_id == set_id:
-        raise HTTPException(
-            status_code=400,
-            detail="A set can't be its own plan — pick the set you built in Kiku",
-        )
-    planned = db.get(Set, body.planned_set_id)
-    if not planned:
-        raise HTTPException(status_code=404, detail="Planned set not found")
-
-    s.planned_set_id = body.planned_set_id
-    s.comparison_cache = None
-    db.commit()
+    try:
+        sets_service.link_to_plan(db, set_id, body.planned_set_id)
+    except sets_service.SetInvalid as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except sets_service.SetNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return {"set_id": set_id, "planned_set_id": body.planned_set_id}
 
 
 @router.delete("/{set_id}/link", status_code=204)
 def unlink_set(set_id: int, db: Session = Depends(get_db)):
     """Remove the planned-set link. Linking is optional and reversible."""
-    s = db.get(Set, set_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Set not found")
-    s.planned_set_id = None
-    s.comparison_cache = None
-    db.commit()
+    try:
+        sets_service.unlink_from_plan(db, set_id)
+    except sets_service.SetNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return Response(status_code=204)
 
 
 @router.post("/{set_id}/compare", response_model=SetComparisonResponse)
 def compare_set_endpoint(set_id: int, db: Session = Depends(get_db)):
     """Compare a played set against its linked plan. Computes and caches the deviation report."""
-    from dataclasses import asdict
-
-    from kiku.analysis.set_compare import compare_sets
-
-    s = db.get(Set, set_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Set not found")
-    if not s.planned_set_id:
-        raise HTTPException(
-            status_code=404,
-            detail="No planned set linked — link one first with PUT /link",
-        )
-
     try:
-        result = compare_sets(db, set_id, s.planned_set_id)
-    except ValueError as e:
+        return sets_service.compare(db, set_id)
+    except sets_service.SetNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-    return asdict(result)
 
 
 @router.get("/{set_id}/comparison", response_model=SetComparisonResponse)
 def get_set_comparison(set_id: int, db: Session = Depends(get_db)):
     """Get the cached played-vs-planned comparison. 404 if not compared yet."""
-    s = db.get(Set, set_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Set not found")
-    if not s.comparison_cache:
-        raise HTTPException(
-            status_code=404,
-            detail="Set hasn't been compared yet. Use POST /compare first.",
-        )
-    return json.loads(s.comparison_cache)
+    try:
+        return sets_service.cached_comparison(db, set_id)
+    except sets_service.SetNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/build")
@@ -477,15 +424,13 @@ def get_vibe_presets():
 @router.post("", response_model=SetResponse, status_code=201)
 def create_set(body: SetCreateRequest, db: Session = Depends(get_db)):
     """Create an empty set."""
-    set_ = Set(
+    set_ = sets_service.create(
+        db,
         name=body.name,
         energy_profile=body.energy_profile,
-        genre_filter=json.dumps(body.genre_filter) if body.genre_filter else None,
+        genre_filter=body.genre_filter,
         source=body.source,
     )
-    db.add(set_)
-    db.commit()
-    db.refresh(set_)
     return SetResponse(
         id=set_.id,
         name=set_.name,
@@ -499,17 +444,16 @@ def create_set(body: SetCreateRequest, db: Session = Depends(get_db)):
 @router.put("/{set_id}", response_model=SetResponse)
 def update_set(set_id: int, body: SetUpdateRequest, db: Session = Depends(get_db)):
     """Update set metadata."""
-    set_ = db.get(Set, set_id)
-    if not set_:
-        raise HTTPException(status_code=404, detail="Set not found")
-    if body.name is not None:
-        set_.name = body.name
-    if body.energy_profile is not None:
-        set_.energy_profile = body.energy_profile
-    if body.genre_filter is not None:
-        set_.genre_filter = json.dumps(body.genre_filter)
-    db.commit()
-    db.refresh(set_)
+    try:
+        set_ = sets_service.update(
+            db,
+            set_id,
+            name=body.name,
+            energy_profile=body.energy_profile,
+            genre_filter=body.genre_filter,
+        )
+    except sets_service.SetNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return SetResponse(
         id=set_.id,
         name=set_.name,
@@ -520,42 +464,23 @@ def update_set(set_id: int, body: SetUpdateRequest, db: Session = Depends(get_db
     )
 
 
-# How long a soft-deleted set stays recoverable before it's purged for good.
-SOFT_DELETE_DAYS = 3
-
-
-def _purge_expired_sets(db: Session) -> None:
-    """Hard-delete sets that have been in the trash longer than SOFT_DELETE_DAYS.
-
-    ISO timestamps sort chronologically as strings, so a string comparison is safe.
-    """
-    cutoff = (datetime.now() - timedelta(days=SOFT_DELETE_DAYS)).isoformat()
-    expired = db.query(Set).filter(Set.deleted_at.isnot(None), Set.deleted_at < cutoff).all()
-    if expired:
-        for s in expired:
-            db.delete(s)
-        db.commit()
-
-
 @router.delete("/{set_id}", status_code=204)
 def delete_set(set_id: int, db: Session = Depends(get_db)):
-    """Soft-delete a set — move it to the trash, recoverable for SOFT_DELETE_DAYS days."""
-    set_ = db.get(Set, set_id)
-    if not set_:
-        raise HTTPException(status_code=404, detail="Set not found")
-    set_.deleted_at = datetime.now().isoformat()
-    db.commit()
+    """Soft-delete a set — move it to the trash, recoverable for a few days."""
+    try:
+        sets_service.soft_delete(db, set_id)
+    except sets_service.SetNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return Response(status_code=204)
 
 
 @router.post("/{set_id}/restore", response_model=SetResponse)
 def restore_set(set_id: int, db: Session = Depends(get_db)):
     """Recover a soft-deleted set from the trash."""
-    set_ = db.get(Set, set_id)
-    if not set_:
-        raise HTTPException(status_code=404, detail="Set not found")
-    set_.deleted_at = None
-    db.commit()
+    try:
+        set_ = sets_service.restore(db, set_id)
+    except sets_service.SetNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return SetResponse(
         id=set_.id,
         name=set_.name,
@@ -598,9 +523,7 @@ def add_track(set_id: int, body: SetAddTrackRequest, db: Session = Depends(get_d
     set_.duration_min = round(total_sec / 60)
 
     # Invalidate analysis cache
-    set_.is_analyzed = 0
-    set_.analysis_cache = None
-    _clear_comparison_caches(db, set_)
+    sets_service.invalidate_analysis(db, set_)
 
     db.commit()
     db.refresh(set_)
@@ -634,9 +557,7 @@ def remove_track(set_id: int, track_id: int, db: Session = Depends(get_db)):
                 )
             elif i == 0:
                 st.transition_score = None
-        set_.is_analyzed = 0
-        set_.analysis_cache = None
-        _clear_comparison_caches(db, set_)
+        sets_service.invalidate_analysis(db, set_)
         db.commit()
     return Response(status_code=204)
 
@@ -654,9 +575,7 @@ def reorder_tracks(set_id: int, body: SetReorderTracksRequest, db: Session = Dep
     # Invalidate analysis cache
     set_ = db.get(Set, set_id)
     if set_:
-        set_.is_analyzed = 0
-        set_.analysis_cache = None
-        _clear_comparison_caches(db, set_)
+        sets_service.invalidate_analysis(db, set_)
         db.commit()
 
     return [_set_track_response(st) for st in tracks]
@@ -816,12 +735,7 @@ def list_sets(
     limit: int = 20,
     db: Session = Depends(get_db),
 ):
-    _purge_expired_sets(db)
-    q = db.query(Set).filter(Set.deleted_at.is_(None))
-    if search:
-        q = q.filter(Set.name.ilike(f"%{search}%"))
-    q = q.order_by(Set.created_at.desc()).limit(limit)
-    sets = q.all()
+    sets = sets_service.list_active(db, search=search, limit=limit)
     return [
         SetResponse(
             id=s.id,
@@ -838,8 +752,7 @@ def list_sets(
 @router.get("/deleted", response_model=list[SetResponse])
 def list_deleted_sets(db: Session = Depends(get_db)):
     """List soft-deleted sets (the trash), most recently deleted first."""
-    _purge_expired_sets(db)
-    sets = db.query(Set).filter(Set.deleted_at.isnot(None)).order_by(Set.deleted_at.desc()).all()
+    sets = sets_service.list_trashed(db)
     return [
         SetResponse(
             id=s.id,
@@ -1145,97 +1058,35 @@ def get_replacements(
 
     Scores candidates against both neighbors (prev and next track).
     """
-    from sqlalchemy import or_
-
-    from kiku.config import BPM_TOLERANCE
-    from kiku.setbuilder.scoring import score_replacement
-
-    s = db.get(Set, set_id)
-    if not s:
-        raise HTTPException(status_code=404, detail="Set not found")
-
-    ordered = sorted(s.tracks, key=lambda st: st.position)
-    if position < 0 or position >= len(ordered):
-        raise HTTPException(status_code=404, detail="Invalid position")
-
-    current_st = ordered[position]
-    current_track = current_st.track
-    prev_track = ordered[position - 1].track if position > 0 else None
-    next_track = ordered[position + 1].track if position < len(ordered) - 1 else None
-
-    # Compute energy target at this position from set's energy_profile
-    energy_target = 0.5
-    if s.energy_profile:
-        try:
-            from kiku.setbuilder.constraints import parse_energy_json, parse_energy_string
-
-            try:
-                profile = parse_energy_json(s.energy_profile)
-            except (json.JSONDecodeError, KeyError):
-                profile = parse_energy_string(s.energy_profile)
-            # Estimate elapsed time based on position
-            total_tracks = len(ordered)
-            total_dur = s.duration_min or 120
-            elapsed = (position / max(total_tracks - 1, 1)) * total_dur
-            energy_target = profile.target_energy_at(elapsed)
-        except Exception:
-            pass
-
-    # Collect existing track IDs to exclude
-    set_track_ids = {st.track_id for st in ordered}
-
-    # BPM pre-filter: use the average BPM of neighbors for filtering
-    ref_bpms = [t.bpm for t in [prev_track, next_track] if t and t.bpm and t.bpm > 0]
-    ref_bpm = sum(ref_bpms) / len(ref_bpms) if ref_bpms else (current_track.bpm or 0)
-
-    q = db.query(Track).filter(Track.id.notin_(set_track_ids))
-    if ref_bpm and ref_bpm > 0:
-        bpm_lo = ref_bpm * (1 - BPM_TOLERANCE * 2)
-        bpm_hi = ref_bpm * (1 + BPM_TOLERANCE * 2)
-        q = q.filter(Track.bpm.between(bpm_lo, bpm_hi))
-
-    if genre_filter:
-        genres = [g.strip() for g in genre_filter.split(",")]
-        genre_conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genres]
-        q = q.filter(or_(*genre_conditions))
-
-    candidates = q.all()
-
-    # Score each candidate
-    scored = []
-    for cand in candidates:
-        combined, incoming, outgoing = score_replacement(
-            cand,
-            prev_track,
-            next_track,
-            target_energy=energy_target,
+    try:
+        result = sets_service.replacement_candidates(
+            db,
+            set_id,
+            position,
+            n=n,
+            genre_filter=genre_filter,
             discovery_density=discovery_density,
         )
-        scored.append((cand, combined, incoming, outgoing))
+    except sets_service.SetNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
-    scored.sort(key=lambda x: x[1], reverse=True)
-    top = scored[:n]
-
-    # Build response
-    result_candidates = []
-    for cand, combined, incoming, outgoing in top:
-        result_candidates.append(
-            ReplacementCandidate(
-                track=_track_response(cand),
-                combined_score=combined,
-                incoming_breakdown=ReplacementBreakdown(**incoming) if incoming else None,
-                outgoing_breakdown=ReplacementBreakdown(**outgoing) if outgoing else None,
-            )
+    candidates = [
+        ReplacementCandidate(
+            track=_track_response(cand),
+            combined_score=combined,
+            incoming_breakdown=ReplacementBreakdown(**incoming) if incoming else None,
+            outgoing_breakdown=ReplacementBreakdown(**outgoing) if outgoing else None,
         )
-
+        for cand, combined, incoming, outgoing in result["candidates"]
+    ]
     context = ReplacementContext(
-        prev_track=_track_summary(prev_track) if prev_track else None,
-        next_track=_track_summary(next_track) if next_track else None,
-        energy_target=round(energy_target, 3),
-        position=position,
+        prev_track=_track_summary(result["prev_track"]) if result["prev_track"] else None,
+        next_track=_track_summary(result["next_track"]) if result["next_track"] else None,
+        energy_target=result["energy_target"],
+        position=result["position"],
     )
 
-    return ReplacementSuggestionsResponse(context=context, candidates=result_candidates)
+    return ReplacementSuggestionsResponse(context=context, candidates=candidates)
 
 
 @router.post("/{set_id}/tracks/{position}/replace", response_model=list[SetTrackResponse])
