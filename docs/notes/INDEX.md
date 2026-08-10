@@ -3,7 +3,7 @@
 Format: [KNF](../DOC_SYSTEM.md). Dependency direction is one-way: `OBS → CLM → DEC → PLN`.
 Cite statements, not documents — `OBS-003/K2`, never "see OBS-003".
 
-**Status 2026-08-09 — [[PLN-001]] P1–P7 shipped and merged, P8–P10 open.** Six of the nine
+**Status 2026-08-10 — [[PLN-001]] P1–P7 and P10 shipped; P8 and P9 open.** Six of the nine
 `OBS` notes below have been overtaken by that work. They are kept, not rewritten: the
 original evidence is what `CLM-001`–`CLM-004` derive from, so each note carries a dated
 re-check at the top saying which of its conclusions no longer hold. The **Now** column here
@@ -14,7 +14,7 @@ is the short version.
 | ID | Title | Originally | Now |
 |----|-------|-----------|-----|
 | [OBS-001](OBS-001-codebase-inventory.md) | Codebase inventory | ~55k LOC, 46/54 backend/frontend | 🟡 ~63k LOC; the 10 oversized files are smaller but still oversized |
-| [OBS-002](OBS-002-quality-gates.md) | Quality gates | **0 gates, no CI** | 🟡 **6 gates on every PR**; frontend tests still **0** → P8 |
+| [OBS-002](OBS-002-quality-gates.md) | Quality gates | **0 gates, no CI** | 🟡 **6 gates on every PR**, 472 backend tests; frontend tests still **0** → P8 |
 | [OBS-003](OBS-003-schema-management-split.md) | Alembic vs `create_all` | `upgrade head` raised on an empty DB | ✅ Alembic is sole authority, invariant test in CI |
 | [OBS-004](OBS-004-frontend-architecture.md) | Frontend architecture | one route, no URL state, 540 KB chunk | ✅ 7 routes, URL-addressable, landing route 292 KB |
 | [OBS-005](OBS-005-frontend-data-layer.md) | Frontend data layer | orchestration hand-rolled 44× | ✅ `createResource` (22/26) · types generated · **K3(b) still open** |
@@ -36,7 +36,7 @@ is the short version.
 
 | ID | Title | Progress |
 |----|-------|----------|
-| [PLN-001](PLN-001-top-10-changes.md) | The ten changes, ranked | **P1–P7 done and merged.** Open: P8 frontend tests · P9 service layer · P10 sequencing tests |
+| [PLN-001](PLN-001-top-10-changes.md) | The ten changes, ranked | **P1–P7 + P10 done.** Open: P8 frontend tests · P9 service layer |
 
 ## DEC — what we chose
 

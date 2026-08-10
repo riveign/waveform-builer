@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from kiku.config import ARTIST_COOLDOWN
 from kiku.db.models import Set, Track
 from kiku.setbuilder.constraints import EnergyProfile, parse_energy_json, parse_energy_string
 from kiku.setbuilder.planner import _get_candidate_pool, _violates_artist_cooldown
@@ -145,11 +146,21 @@ def fill_set(
         pos = gap["position"]
         preceding = tracks[:pos]  # tracks before the gap
 
+        # Tracks the insertion would land between. `_violates_artist_cooldown`
+        # looks at the tail of whatever it is given, so passing the whole set
+        # checked the END of the set no matter where the gap was — a candidate
+        # could be dropped three slots from its own artist and pass.
+        following = tracks[pos : pos + ARTIST_COOLDOWN]
+
         scored_candidates = []
         for cand in candidates:
             if cand.id in existing_ids:
                 continue
-            if _violates_artist_cooldown(tracks, cand):
+            if _violates_artist_cooldown(preceding, cand):
+                continue
+            if cand.artist and any(
+                t.artist and t.artist.lower() == cand.artist.lower() for t in following
+            ):
                 continue
             combined, incoming_bd, outgoing_bd = score_replacement(
                 cand,

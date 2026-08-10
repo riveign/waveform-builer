@@ -28,6 +28,10 @@ the cost per feature rising? Covers composability, testing, and structural growt
 > authority, and lock/manifest are all now yes. E2's edit-counts are unchanged, so K2
 > still holds and P5–P7 are still the work. E4b was fixed only in part: the 49 blind
 > excepts are deferred *visibly*, in `pyproject.toml`'s ignore list (`OBS-002/K6`).
+> **R6 is discharged and was right (2026-08-10):** the sequencing modules are covered, and
+> the invariants found an artist-cooldown bug in `fill_set` that every other gate missed
+> because the set it produced looked perfectly reasonable. K3's second lopsidedness —
+> covered where assertions are easy, absent where they are hard — is now the smaller half.
 
 ## E — Evidence
 
