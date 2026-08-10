@@ -3,7 +3,7 @@
 Format: [KNF](../DOC_SYSTEM.md). Dependency direction is one-way: `OBS → CLM → DEC → PLN`.
 Cite statements, not documents — `OBS-003/K2`, never "see OBS-003".
 
-**Status 2026-08-10 — [[PLN-001]] P1–P7 and P10 shipped; P8 and P9 open.** Six of the nine
+**Status 2026-08-10 — [[PLN-001]] P1–P8 and P10 shipped; only P9 (service layer) remains.** Six of the nine
 `OBS` notes below have been overtaken by that work. They are kept, not rewritten: the
 original evidence is what `CLM-001`–`CLM-004` derive from, so each note carries a dated
 re-check at the top saying which of its conclusions no longer hold. The **Now** column here
@@ -14,7 +14,7 @@ is the short version.
 | ID | Title | Originally | Now |
 |----|-------|-----------|-----|
 | [OBS-001](OBS-001-codebase-inventory.md) | Codebase inventory | ~55k LOC, 46/54 backend/frontend | 🟡 ~63k LOC; the 10 oversized files are smaller but still oversized |
-| [OBS-002](OBS-002-quality-gates.md) | Quality gates | **0 gates, no CI** | 🟡 **6 gates on every PR**, 472 backend tests; frontend tests still **0** → P8 |
+| [OBS-002](OBS-002-quality-gates.md) | Quality gates | **0 gates, no CI** | ✅ **7 gates on every PR** · 472 backend + 65 frontend tests |
 | [OBS-003](OBS-003-schema-management-split.md) | Alembic vs `create_all` | `upgrade head` raised on an empty DB | ✅ Alembic is sole authority, invariant test in CI |
 | [OBS-004](OBS-004-frontend-architecture.md) | Frontend architecture | one route, no URL state, 540 KB chunk | ✅ 7 routes, URL-addressable, landing route 292 KB |
 | [OBS-005](OBS-005-frontend-data-layer.md) | Frontend data layer | orchestration hand-rolled 44× | ✅ `createResource` (22/26) · types generated · **K3(b) still open** |
@@ -27,7 +27,7 @@ is the short version.
 
 | ID | Title | Verdict | Now |
 |----|-------|---------|-----|
-| [CLM-001](CLM-001-tech-stack-verdict.md) | Tech stack | Choices right, apparatus absent — **4/15** | 🟡 **10/15 met, 3 partial** — frontend tests and observability are what's left |
+| [CLM-001](CLM-001-tech-stack-verdict.md) | Tech stack | Choices right, apparatus absent — **4/15** | 🟡 **11/15 met, 3 partial** — observability is the main gap left |
 | [CLM-002](CLM-002-frontend-rebuild-verdict.md) | Frontend rebuild | **Do not rebuild** | ✅ held — all three named changes shipped incrementally |
 | [CLM-003](CLM-003-maintainability-verdict.md) | Maintainability | Good bones, no immune system | 🟡 immune system exists; the 5-edit boundaries are half-closed |
 | [CLM-004](CLM-004-binding-constraint.md) | The binding constraint | repo can't build itself on a clean machine | ✅ **relieved** — clean clone → passing suite in one command |
@@ -36,7 +36,7 @@ is the short version.
 
 | ID | Title | Progress |
 |----|-------|----------|
-| [PLN-001](PLN-001-top-10-changes.md) | The ten changes, ranked | **P1–P7 + P10 done.** Open: P8 frontend tests · P9 service layer |
+| [PLN-001](PLN-001-top-10-changes.md) | The ten changes, ranked | **9 of 10 done.** Open: P9 service layer |
 
 ## DEC — what we chose
 
