@@ -12,7 +12,7 @@ superseded-by: null
 The output of the status analysis: what to do, in order. Cost is in author-days at the
 pace of `OBS-001/E7`.
 
-**Status 2026-08-09: P1–P7 done and merged to `main`, CI green. P8–P10 open.**
+**Status 2026-08-10: P1–P7 and P10 done. P8 (frontend tests) and P9 (service layer) open.**
 
 ## R — Reasoning (the ordering)
 
@@ -43,7 +43,7 @@ pace of `OBS-001/E7`.
 | **P7** ✅ | Generate TS types from OpenAPI — *done 2026-08-09* | `OBS-005/K4`, `CLM-003/E2` | 1 d | removes a 5-edit boundary |
 | **P8** | Frontend test foundation | `OBS-002/K3`, `CLM-003/K3` | 3–4 d | frontend confidence |
 | **P9** | Extract a service layer, starting with sets | `OBS-006/K2,K3`, `CLM-001/K5` | 4–6 d | Rust port; CLI/API parity |
-| **P10** | Cover the sequencing modules | `CLM-003/R6`, `OBS-002/E9` | 2–3 d | correctness of set building |
+| **P10** ✅ | Cover the sequencing modules — *done 2026-08-10* | `CLM-003/R6`, `OBS-002/E9` | 2–3 d | correctness of set building |
 
 Total ≈ 21–31 author-days. **P1–P7 are done and merged**; P8–P10 remain (~9–13 days).
 
@@ -160,13 +160,15 @@ local check could see (`OBS-002/R2`, and the eager `pyrekordbox` import in P7).
 - **Done when:** `sets.py` is routing/validation/serialization only; `grep session.query` in it → 0; one use-case backs both entry points.
 - **Strategic:** this is the real prerequisite for the Rust migration, and may show it to be unnecessary (`CLM-001/K5`).
 
-### P10 — Cover the sequencing modules
+### P10 — Cover the sequencing modules ✅ **DONE 2026-08-10**
 
-- Tests for `planner.py`, `filler.py`, `reorder.py` (`OBS-002/E9`).
-- Property-style invariants: artist cooldown respected · energy curve monotone within a segment · no track twice · role bias never becomes a hard filter (the explicit constraint of specs 028–029).
-- Golden-set regression over a small fixture library.
-- **Done when:** three named test files, one assertion per invariant above.
-- **Why it matters more than its rank:** these bugs produce sets that *look* plausible — the only defects here the author cannot catch by looking (`CLM-003/R6`).
+- **43 tests** across `test_planner.py`, `test_filler.py`, `test_reorder.py`. 429 → 472.
+- Written as **invariants that hold for any library**, not one expected tracklist — the only shape of test that catches a plausible-looking wrong answer.
+- **reorder:** result is a permutation of the input (nothing lost, duplicated or invented) under every RNG seed · score never falls · the reported change list matches what actually moved · genre oscillation scores below clustering.
+- **planner:** no track twice · positions contiguous from zero · **no artist repeats inside the cooldown** · genre **is** a hard filter while preferred-artists and set-role bias are **not** · a library smaller than the target stops instead of repeating.
+- **filler:** stream always opens and closes · never proposes a track already in the set, or twice · honours `max_fill_tracks` · reported count matches the stream · every proposal carries its explanation.
+- **Found a real bug.** `fill_set` passed the *whole set* to `_violates_artist_cooldown`, which looks at the tail of whatever it receives — so it always checked the END of the set regardless of gap position. In `[A1…A6]`, a track by Artist 1 was proposed at **position 3**, three slots from itself and well inside the five-track cooldown. Now checked against the insertion point on both sides.
+- **This is `CLM-003/R6` vindicated:** the bug was invisible to every other gate, produced a set that looked entirely reasonable, and only an invariant could see it.
 
 ---
 

@@ -88,6 +88,10 @@ What stops a bad change from reaching `main` today, and what does not.
 - **K9** [R2] ⇒ Corollary worth keeping: a gate that has never run is not a gate. P3 was
   "done" locally for several hours while shipping a frontend that could not build.
 
+- **K10 · E9 is closed for the sequencing modules (2026-08-10).** `planner.py`,
+  `filler.py` and `reorder.py` now have named test files — 43 invariant tests, which found
+  a live artist-cooldown bug in `fill_set` on their first run. `cli.py` and `db/store.py`
+  remain untested; `cli.py` is where `OBS-002/R1`'s broken `kiku search` hid.
 - **K7 · E8 is unchanged and now cheap to close.** Coverage is still unmeasured; with a
   gate in place, adding `--cov-fail-under` is a one-line change whenever a number is wanted.
 
