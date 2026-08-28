@@ -826,7 +826,11 @@ export interface paths {
         post?: never;
         /**
          * Remove Track
-         * @description Remove a track from a set.
+         * @description Remove a track from a set, returning the set's tracks as they now stand.
+         *
+         *     Like add and reorder, this hands back the whole new list: the removal shifts
+         *     every later position and rescores the transition that closed over the gap, so
+         *     the caller would otherwise have to re-read the set to learn what it now is.
          */
         delete: operations["remove_track_api_sets__set_id__tracks__track_id__delete"];
         options?: never;
@@ -4714,11 +4718,13 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Successful Response */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SetTrackResponse"][];
+                };
             };
             /** @description Validation Error */
             422: {

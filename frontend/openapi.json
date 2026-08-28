@@ -7625,7 +7625,7 @@
     },
     "/api/sets/{set_id}/tracks/{track_id}": {
       "delete": {
-        "description": "Remove a track from a set.",
+        "description": "Remove a track from a set, returning the set's tracks as they now stand.\n\nLike add and reorder, this hands back the whole new list: the removal shifts\nevery later position and rescores the transition that closed over the gap, so\nthe caller would otherwise have to re-read the set to learn what it now is.",
         "operationId": "remove_track_api_sets__set_id__tracks__track_id__delete",
         "parameters": [
           {
@@ -7648,7 +7648,18 @@
           }
         ],
         "responses": {
-          "204": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SetTrackResponse"
+                  },
+                  "title": "Response Remove Track Api Sets  Set Id  Tracks  Track Id  Delete",
+                  "type": "array"
+                }
+              }
+            },
             "description": "Successful Response"
           },
           "422": {

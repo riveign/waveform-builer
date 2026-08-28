@@ -423,35 +423,41 @@ def reorder_set_tracks(session: Session, set_id: int, track_ids: list[int]) -> l
     if not set_:
         raise ValueError("Set not found")
 
-    existing = {st.track_id: st for st in set_.tracks}
-    existing_ids = set(existing.keys())
-    provided_ids = set(track_ids)
+    # A set may legitimately play the same track twice, so compare how MANY of
+    # each track were asked for, not just which ones. The two plays of a track are
+    # interchangeable, so the new order is still unambiguous.
+    existing_counts = Counter(st.track_id for st in set_.tracks)
+    provided_counts = Counter(track_ids)
 
-    if existing_ids != provided_ids:
-        missing = existing_ids - provided_ids
-        extra = provided_ids - existing_ids
+    if existing_counts != provided_counts:
+        missing = existing_counts - provided_counts
+        extra = provided_counts - existing_counts
         parts = []
         if missing:
-            parts.append(f"missing: {sorted(missing)}")
+            parts.append(f"missing: {sorted(missing.elements())}")
         if extra:
-            parts.append(f"unknown: {sorted(extra)}")
+            parts.append(f"unknown: {sorted(extra.elements())}")
         raise ValueError(f"track_ids mismatch: {', '.join(parts)}")
 
-    if len(track_ids) != len(set(track_ids)):
-        raise ValueError("Duplicate track IDs in reorder list")
+    # Each track's scores, oldest position first, so repeated plays keep their own.
+    scores: dict[int, list] = {}
+    for st in sorted(set_.tracks, key=lambda st: st.position):
+        scores.setdefault(st.track_id, []).append(st.transition_score)
 
     # Delete all existing SetTrack rows and recreate with new positions
     for st in list(set_.tracks):
         session.delete(st)
     session.flush()
 
+    taken: Counter[int] = Counter()
     for pos, tid in enumerate(track_ids):
         new_st = SetTrack(
             set_id=set_id,
             position=pos,
             track_id=tid,
-            transition_score=existing[tid].transition_score,
+            transition_score=scores[tid][taken[tid]],
         )
+        taken[tid] += 1
         session.add(new_st)
 
     session.commit()

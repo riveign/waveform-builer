@@ -207,12 +207,27 @@ def test_add_track_to_set(client):
 def test_remove_track_from_set(client):
     """DELETE track removes it and re-compacts positions."""
     resp = client.delete("/api/sets/1/tracks/3")
-    assert resp.status_code in (200, 204)
+    assert resp.status_code == 200
     # Verify track 3 is gone
     detail = client.get("/api/sets/1").json()
     track_ids = [t["track_id"] for t in detail["tracks"]]
     assert 3 not in track_ids
     assert len(detail["tracks"]) == 4
+
+
+def test_remove_track_returns_the_new_list(client):
+    """The response IS the set's new state, so callers needn't re-read it.
+
+    Positions come back compacted and gap-free — the caller can render straight
+    from this instead of refetching the set.
+    """
+    resp = client.delete("/api/sets/1/tracks/3")
+    assert resp.status_code == 200
+    tracks = resp.json()
+    assert [t["track_id"] for t in tracks] == [1, 2, 4, 5]
+    assert [t["position"] for t in tracks] == [0, 1, 2, 3]
+    # The first track leads; nothing transitions into it.
+    assert tracks[0]["transition_score"] is None
 
 
 def test_reorder_set_tracks(client):
@@ -270,3 +285,28 @@ def test_purge_after_window(client, db_session):
 
 def test_restore_missing_set(client):
     assert client.post("/api/sets/999/restore").status_code == 404
+
+
+def test_reorder_set_with_repeated_track(client, db_session):
+    """A set that plays the same track twice must still reorder (regression: the
+    reorder compared sets of ids, so a repeat looked like a duplicate and 400'd)."""
+    from kiku.db.models import SetTrack
+
+    db_session.add(SetTrack(set_id=1, position=5, track_id=1, transition_score=0.5))
+    db_session.commit()
+
+    current = [t["track_id"] for t in sorted(client.get("/api/sets/1").json()["tracks"], key=lambda t: t["position"])]
+    assert current.count(1) == 2
+
+    resp = client.put("/api/sets/1/tracks/reorder", json={"track_ids": current[::-1]})
+    assert resp.status_code == 200
+    result = [t["track_id"] for t in sorted(resp.json(), key=lambda t: t["position"])]
+    assert result == current[::-1]
+
+
+def test_reorder_still_rejects_a_track_that_is_not_in_the_set(client):
+    """Counting must not weaken the guard — an unknown track is still a 400."""
+    current = [t["track_id"] for t in client.get("/api/sets/1").json()["tracks"]]
+    resp = client.put("/api/sets/1/tracks/reorder", json={"track_ids": current[:-1] + [9999]})
+    assert resp.status_code == 400
+    assert "9999" in resp.json()["detail"]
