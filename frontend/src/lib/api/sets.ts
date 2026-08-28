@@ -16,7 +16,7 @@ import type {
 	SlotSuggestionsResponse,
 	TransitionDetail,
 } from '$lib/types';
-import { API_BASE, fetchJson } from './client';
+import { API_BASE, fetchJson, fetchVoid } from './client';
 
 export async function listSets(search?: string, limit = 20, signal?: AbortSignal): Promise<DJSet[]> {
 	const qs = new URLSearchParams();
@@ -74,7 +74,7 @@ export async function updateSet(id: number, params: SetUpdateParams): Promise<DJ
 }
 
 export async function deleteSet(id: number): Promise<void> {
-	await fetch(`${API_BASE}/api/sets/${id}`, { method: 'DELETE' });
+	await fetchVoid(`/api/sets/${id}`, { method: 'DELETE' });
 }
 
 /** List soft-deleted sets (the trash), most recently deleted first. */
@@ -176,8 +176,10 @@ export async function addTrackToSet(
 	});
 }
 
-export async function removeTrackFromSet(setId: number, trackId: number): Promise<void> {
-	await fetch(`${API_BASE}/api/sets/${setId}/tracks/${trackId}`, { method: 'DELETE' });
+/** Returns the set's tracks as they now stand — positions compacted, transitions
+ *  rescored — so the caller can render from the reply instead of re-reading. */
+export async function removeTrackFromSet(setId: number, trackId: number): Promise<SetTrack[]> {
+	return fetchJson<SetTrack[]>(`/api/sets/${setId}/tracks/${trackId}`, { method: 'DELETE' });
 }
 
 export async function reorderSetTracks(setId: number, trackIds: number[]): Promise<SetTrack[]> {
@@ -309,7 +311,7 @@ export async function linkSet(setId: number, plannedSetId: number): Promise<void
 }
 
 export async function unlinkSet(setId: number): Promise<void> {
-	await fetch(`${API_BASE}/api/sets/${setId}/link`, { method: 'DELETE' });
+	await fetchVoid(`/api/sets/${setId}/link`, { method: 'DELETE' });
 }
 
 export async function compareSet(setId: number): Promise<SetComparison> {

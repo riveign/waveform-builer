@@ -23,9 +23,23 @@
 		selectedIndex?: number;
 		onTrackClick?: (index: number) => void;
 		plannedCurve?: number[] | null;
+		/** Half-height arc — pairs with the compact set view. */
+		dense?: boolean;
+		/** Folded away to hand the whole screen to the tracks. */
+		collapsed?: boolean;
+		oncollapse?: (collapsed: boolean) => void;
 	}
 
-	let { tracks, energyProfile, selectedIndex, onTrackClick, plannedCurve = null }: Props = $props();
+	let {
+		tracks,
+		energyProfile,
+		selectedIndex,
+		onTrackClick,
+		plannedCurve = null,
+		dense = false,
+		collapsed = false,
+		oncollapse,
+	}: Props = $props();
 
 	let canvas = $state<HTMLCanvasElement>(null!);
 	let chart: Chart | null = null;
@@ -433,16 +447,30 @@
 	});
 </script>
 
-<div class="energy-flow-chart">
-	<h3 class="chart-title">Energy Flow</h3>
+<div class="energy-flow-chart" class:dense class:collapsed>
+	<div class="chart-header">
+		<h3 class="chart-title">Energy Flow</h3>
+		{#if oncollapse}
+			<button
+				class="collapse-btn"
+				onclick={() => oncollapse?.(!collapsed)}
+				aria-expanded={!collapsed}
+				title={collapsed ? 'Show the arc' : 'Hide the arc — more room for the tracks'}
+			>
+				{collapsed ? 'Show arc ▾' : 'Hide arc ▴'}
+			</button>
+		{/if}
+	</div>
 	{#if tracks.length === 0}
-		<div class="empty">Add tracks to see the set's arc</div>
+		{#if !collapsed}<div class="empty">Add tracks to see the set's arc</div>{/if}
 	{:else}
 		<!-- The canvas is a visual duplicate of the sr-only summary + table below,
 		     which is the real accessible representation; hide the canvas from AT. -->
-		<div class="chart-container">
-			<canvas bind:this={canvas} aria-hidden="true"></canvas>
-		</div>
+		{#if !collapsed}
+			<div class="chart-container">
+				<canvas bind:this={canvas} aria-hidden="true"></canvas>
+			</div>
+		{/if}
 		<div class="sr-only" role="img" aria-label={chartSummary}>
 			<p>{chartSummary}</p>
 			<table>
@@ -479,13 +507,58 @@
 		flex-direction: column;
 	}
 
+	.chart-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-md, 12px);
+		margin-bottom: 8px;
+	}
+
 	.chart-title {
 		font-size: 13px;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 		color: var(--text-secondary);
-		margin-bottom: 8px;
+		margin: 0;
+	}
+
+	.collapse-btn {
+		border: none;
+		background: none;
+		padding: 2px 6px;
+		border-radius: 4px;
+		font-size: 11px;
+		color: var(--text-dim);
+		cursor: pointer;
+	}
+
+	.collapse-btn:hover {
+		color: var(--text-primary);
+		background: var(--bg-tertiary);
+	}
+
+	/* ── Dense / collapsed: the arc gives the screen back to the tracks. ── */
+
+	.energy-flow-chart.dense {
+		padding: 6px 12px;
+	}
+
+	.energy-flow-chart.dense .chart-header {
+		margin-bottom: 4px;
+	}
+
+	.energy-flow-chart.dense .chart-container {
+		height: 96px;
+	}
+
+	.energy-flow-chart.collapsed {
+		padding: 4px 12px;
+	}
+
+	.energy-flow-chart.collapsed .chart-header {
+		margin-bottom: 0;
 	}
 
 	.chart-container {

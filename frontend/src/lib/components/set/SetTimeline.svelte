@@ -1,9 +1,10 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { dndzone } from 'svelte-dnd-action';
 	import type { SetTrack, SetWaveformTrack, SetAnalysis } from '$lib/types';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { parseCamelot } from '$lib/utils/camelot';
-	import { reorderSetTracks, removeTrackFromSet, addTrackToSet } from '$lib/api/sets';
+	import { getSetTracksStore } from '$lib/stores/setTracks.svelte';
 	import SetTrackCard from './SetTrackCard.svelte';
 	import TransitionIndicator from './TransitionIndicator.svelte';
 	import SetCardGrid from './SetCardGrid.svelte';
@@ -32,27 +33,38 @@
 		onTracksChanged?: () => void;
 		onTrackPlay?: (trackId: number) => void;
 		focusedTrackId?: number | null;
-		viewMode?: 'list' | 'grid';
+		viewMode?: 'list' | 'compact' | 'grid';
 		onFocusTrack?: (trackId: number) => void;
 	} = $props();
 
 	const ui = getUiStore();
+	const store = getSetTracksStore();
 
-	// DnD items — need `id` field for svelte-dnd-action
-	let items = $state<(SetWaveformTrack & { id: number })[]>([]);
-	let reordering = $state(false);
+	/** Compact = the same list, thinned down so a whole set fits on one screen. */
+	let dense = $derived(viewMode === 'compact');
+
+	/**
+	 * What the rows render from. Normally this is just the store's list with the
+	 * `id` svelte-dnd-action needs. While a drag is in progress the library owns
+	 * the order — it hands us intermediate arrays on every hover — so we let it
+	 * drive from `dragItems` and hand the result to the store on drop.
+	 */
+	let dragItems = $state<(SetWaveformTrack & { id: number })[] | null>(null);
+	// Position (not track_id) as id — a track can appear twice in one set.
+	let items = $derived(
+		dragItems ?? tracks.map((t, i) => ({ ...t, id: t.position ?? i })),
+	);
+
 	let removeInFlight = $state<number | null>(null);
 	let dropActive = $state(false);
 	let dropAdding = $state(false);
 	let replacePosition = $state<number | null>(null);
 
-	// Sync items when tracks prop changes (but not during drag)
-	// Use position (not track_id) as id — a track can appear multiple times in a set
-	$effect(() => {
-		if (!reordering) {
-			items = tracks.map((t, i) => ({ ...t, id: t.position ?? i }));
-		}
-	});
+	// Keyboard move mode: a lifted track follows ↑/↓ until you drop it.
+	let liftedIndex = $state<number | null>(null);
+	let liftOrigin: number | null = null;
+	let refocusing = false;
+	let listEl = $state<HTMLElement | undefined>();
 
 	/** Parse energy profile string like "warmup(0.3)->build(0.6)->peak(0.9)->cooldown(0.4)"
 	 *  into interpolated target values per track position. */
@@ -119,34 +131,91 @@
 
 	// DnD event handlers
 	function handleConsider(e: CustomEvent<{ items: (SetWaveformTrack & { id: number })[] }>) {
-		reordering = true;
-		items = e.detail.items;
+		dragItems = e.detail.items;
 	}
 
-	async function handleFinalize(e: CustomEvent<{ items: (SetWaveformTrack & { id: number })[] }>) {
-		items = e.detail.items;
-		reordering = false;
+	function handleFinalize(e: CustomEvent<{ items: (SetWaveformTrack & { id: number })[] }>) {
+		// The store takes it from here: the new order is already on screen, and the
+		// write follows it. Releasing `dragItems` hands rendering back to the store.
+		store.setOrder(e.detail.items);
+		dragItems = null;
+	}
 
-		// Persist the new order
-		const trackIds = items.map((i) => i.track_id);
-		try {
-			await reorderSetTracks(setId, trackIds);
-			onTracksChanged?.();
-		} catch (err) {
-			// Revert on failure — re-sync from props
-			items = tracks.map((t, i) => ({ ...t, id: t.position ?? i }));
-			console.error('Failed to reorder tracks:', err);
+	// ── Nudge + keyboard reorder ──
+	// Drag-and-drop is fine for a neighbouring swap; for anything further down a
+	// long set it fights the scroller. These move a track without holding it, and
+	// the move shows up immediately — the store coalesces the writes behind it.
+
+	/** Keep the keyboard on the control the DJ just used, now at its new index. */
+	async function refocus(selector: string, fallback?: string) {
+		refocusing = true;
+		await tick();
+		const pick = (sel: string) => {
+			const el = listEl?.querySelector<HTMLButtonElement>(sel);
+			return el && !el.disabled ? el : null;
+		};
+		(pick(selector) ?? (fallback ? pick(fallback) : null))?.focus();
+		refocusing = false;
+	}
+
+	async function nudge(index: number, dir: -1 | 1) {
+		if (liftedIndex !== null || removeInFlight !== null) return;
+		if (!store.move(index, index + dir)) return;
+		const to = index + dir;
+		const kind = dir === -1 ? 'up' : 'down';
+		await refocus(
+			`[data-move="${kind}"][data-idx="${to}"]`,
+			`[data-move="${dir === -1 ? 'down' : 'up'}"][data-idx="${to}"]`,
+		);
+	}
+
+	function dropLifted() {
+		liftedIndex = null;
+		liftOrigin = null;
+		void store.flush();
+	}
+
+	function handleHandleKeydown(e: KeyboardEvent, index: number) {
+		// Stop these from bubbling into svelte-dnd-action's own keyboard drag.
+		if (e.key === ' ' || e.key === 'Enter') {
+			e.preventDefault();
+			e.stopPropagation();
+			if (liftedIndex === null) {
+				liftedIndex = index;
+				liftOrigin = index;
+			} else {
+				dropLifted();
+			}
+		} else if (liftedIndex !== null && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+			e.preventDefault();
+			e.stopPropagation();
+			const from = liftedIndex;
+			const to = from + (e.key === 'ArrowUp' ? -1 : 1);
+			if (store.move(from, to)) {
+				liftedIndex = to;
+				refocus(`[data-handle][data-idx="${to}"]`);
+			}
+		} else if (e.key === 'Escape' && liftedIndex !== null) {
+			e.preventDefault();
+			e.stopPropagation();
+			// Walk it back where it was picked up from.
+			if (liftOrigin !== null) store.move(liftedIndex, liftOrigin);
+			liftedIndex = null;
+			liftOrigin = null;
+			void store.flush();
 		}
+	}
+
+	function handleHandleBlur() {
+		if (refocusing || liftedIndex === null) return;
+		dropLifted();
 	}
 
 	async function handleRemoveTrack(trackId: number) {
 		if (removeInFlight !== null) return;
 		removeInFlight = trackId;
 		try {
-			await removeTrackFromSet(setId, trackId);
-			onTracksChanged?.();
-		} catch (err) {
-			console.error('Failed to remove track:', err);
+			await store.remove(trackId);
 		} finally {
 			removeInFlight = null;
 		}
@@ -178,14 +247,11 @@
 		dropActive = false;
 		const raw = e.dataTransfer?.getData('application/x-kiku-track');
 		if (!raw) return;
+		const { id } = JSON.parse(raw) as { id: number };
+		if (items.some((i) => i.track_id === id)) return; // already in set
+		dropAdding = true;
 		try {
-			const { id } = JSON.parse(raw) as { id: number };
-			if (items.some((i) => i.track_id === id)) return; // already in set
-			dropAdding = true;
-			await addTrackToSet(setId, id);
-			onTracksChanged?.();
-		} catch (err) {
-			console.error('Failed to add track to set:', err);
+			await store.add(id);
 		} finally {
 			dropAdding = false;
 		}
@@ -201,6 +267,13 @@
 	role="region"
 	aria-label="Set timeline"
 >
+	{#if store.error}
+		<div class="action-error" role="alert">
+			<span>{store.error}</span>
+			<button class="dismiss" onclick={() => store.clearError()} aria-label="Dismiss">×</button>
+		</div>
+	{/if}
+
 	{#if items.length === 0}
 		<div class="empty">
 			{#if dropActive}
@@ -217,25 +290,71 @@
 			<!-- Track list with DnD -->
 			<div
 				class="track-list"
+				class:dense
+				bind:this={listEl}
 				use:dndzone={{ items, flipDurationMs: 200, dropTargetStyle: { outline: '1px dashed var(--accent)', 'outline-offset': '-1px' } }}
 				onconsider={handleConsider}
 				onfinalize={handleFinalize}
 			>
 				{#each items as item, i (item.id)}
-					{#if runStartIndices.has(i)}
-						<div class="run-banner">The story here is energy, not key</div>
-					{/if}
+					<!-- Everything for one track stays INSIDE its slot. svelte-dnd-action
+					     maps the zone's children to `items` by position, so an extra
+					     sibling here (the run banner used to be one) shifts every index
+					     and drag-to-reorder silently stops working. -->
 					<div class="track-slot">
-						<div class="card-row">
-							<div class="drag-handle" aria-label="Drag to reorder">
-								<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
-									<circle cx="3" cy="3" r="1.5" /><circle cx="9" cy="3" r="1.5" />
-									<circle cx="3" cy="9" r="1.5" /><circle cx="9" cy="9" r="1.5" />
-									<circle cx="3" cy="15" r="1.5" /><circle cx="9" cy="15" r="1.5" />
-								</svg>
+						{#if runStartIndices.has(i)}
+							<div class="run-banner">The story here is energy, not key</div>
+						{/if}
+						<div class="card-row" class:lifted={liftedIndex === i}>
+							<div class="reorder-controls" class:active={liftedIndex === i}>
+								<button
+									class="drag-handle"
+									data-handle
+									data-idx={i}
+									onkeydown={(e) => handleHandleKeydown(e, i)}
+									onblur={handleHandleBlur}
+									title={liftedIndex === i ? 'Moving — ↑/↓ to move, Space to drop, Esc to cancel' : 'Drag to reorder, or Space to move with ↑/↓'}
+									aria-label={liftedIndex === i ? 'Moving track — arrow keys to move, space to drop, escape to cancel' : 'Reorder track — drag, or press space to move with arrow keys'}
+									aria-pressed={liftedIndex === i}
+								>
+									<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
+										<circle cx="3" cy="3" r="1.5" /><circle cx="9" cy="3" r="1.5" />
+										<circle cx="3" cy="9" r="1.5" /><circle cx="9" cy="9" r="1.5" />
+										<circle cx="3" cy="15" r="1.5" /><circle cx="9" cy="15" r="1.5" />
+									</svg>
+								</button>
+								<div class="nudge-col">
+									<button
+										class="move-btn"
+										data-move="up"
+										data-idx={i}
+										onclick={() => nudge(i, -1)}
+										disabled={i === 0 || liftedIndex !== null || removeInFlight !== null}
+										title="Move up"
+										aria-label="Move up one slot"
+									>
+										<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6">
+											<path d="M1.5 6.5 5 3l3.5 3.5" />
+										</svg>
+									</button>
+									<button
+										class="move-btn"
+										data-move="down"
+										data-idx={i}
+										onclick={() => nudge(i, 1)}
+										disabled={i === items.length - 1 || liftedIndex !== null || removeInFlight !== null}
+										title="Move down"
+										aria-label="Move down one slot"
+									>
+										<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6">
+											<path d="M1.5 3.5 5 7l3.5-3.5" />
+										</svg>
+									</button>
+								</div>
 							</div>
 							<div class="card-wrapper">
 								<SetTrackCard
+									{dense}
 									track={{
 										position: item.position,
 										track_id: item.track_id,
@@ -294,6 +413,7 @@
 						{#if i < items.length - 1}
 							<div class="transition-slot">
 								<TransitionIndicator
+									{dense}
 									fromTrackId={item.track_id}
 									toTrackId={items[i + 1].track_id}
 									score={items[i + 1].transition_score ?? undefined}
@@ -377,6 +497,34 @@
 		padding: 8px 0;
 	}
 
+	.action-error {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 0 12px 6px;
+		padding: 6px 10px;
+		font-size: 12px;
+		color: var(--text-primary);
+		background: color-mix(in srgb, var(--score-poor) 14%, transparent);
+		border-left: 2px solid var(--score-poor);
+		border-radius: 3px;
+	}
+
+	.action-error .dismiss {
+		margin-left: auto;
+		border: none;
+		background: none;
+		color: var(--text-dim);
+		font-size: 14px;
+		line-height: 1;
+		cursor: pointer;
+		padding: 0 2px;
+	}
+
+	.action-error .dismiss:hover {
+		color: var(--text-primary);
+	}
+
 	.empty {
 		display: flex;
 		align-items: center;
@@ -438,20 +586,98 @@
 		gap: 4px;
 	}
 
+	/* Reorder cluster: ↑ / grab handle / ↓. The nudges are the reliable path on a
+	   long set — no pointer held down, so the list scrolls normally between moves. */
+	/* Handle and nudges sit side by side so the cluster is never taller than the
+	   row it steers — stacking all three set a 48px floor on row height. */
+	.reorder-controls {
+		display: flex;
+		align-items: center;
+		gap: 1px;
+		flex-shrink: 0;
+	}
+
+	.nudge-col {
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+	}
+
 	.drag-handle {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		width: 18px;
 		flex-shrink: 0;
+		border: none;
+		background: none;
+		padding: 0;
 		color: var(--text-dim);
 		cursor: grab;
 		opacity: 0.4;
-		transition: opacity 0.1s;
+		border-radius: 3px;
+		transition: opacity 0.1s, color 0.1s, background 0.1s;
 	}
 
 	.card-row:hover .drag-handle {
 		opacity: 0.8;
+	}
+
+	.move-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 12px;
+		flex-shrink: 0;
+		border: none;
+		background: none;
+		padding: 0;
+		color: var(--text-dim);
+		cursor: pointer;
+		border-radius: 3px;
+		opacity: 0;
+		transition: opacity 0.1s, color 0.1s, background 0.1s;
+	}
+
+	.card-row:hover .move-btn,
+	.reorder-controls:focus-within .move-btn {
+		opacity: 0.8;
+	}
+
+	.move-btn:hover:not(:disabled) {
+		background: var(--bg-tertiary);
+		color: var(--accent);
+	}
+
+	.move-btn:disabled {
+		cursor: default;
+		opacity: 0.15;
+	}
+
+	.drag-handle:focus-visible,
+	.move-btn:focus-visible {
+		outline: 1px solid var(--accent);
+		outline-offset: 1px;
+		opacity: 1;
+	}
+
+	/* Lifted: the track is following the arrow keys until it's dropped. */
+	.reorder-controls.active .drag-handle,
+	.reorder-controls.active .move-btn {
+		opacity: 1;
+		color: var(--accent);
+	}
+
+	.reorder-controls.active .drag-handle {
+		background: color-mix(in srgb, var(--accent) 18%, transparent);
+		cursor: grabbing;
+	}
+
+	.card-row.lifted .card-wrapper {
+		outline: 1px dashed var(--accent);
+		outline-offset: 1px;
+		border-radius: 4px;
 	}
 
 	.card-wrapper {
@@ -499,6 +725,41 @@
 
 	.transition-slot {
 		padding: 2px 22px 2px 22px;
+	}
+
+	/* ── Compact list ── */
+
+	.track-list.dense .transition-slot {
+		padding: 1px 22px;
+	}
+
+	.track-list.dense .run-banner {
+		margin: 2px 0 3px;
+		padding: 2px 8px;
+		font-size: 10px;
+	}
+
+	.track-list.dense .card-row {
+		gap: 2px;
+	}
+
+	.track-list.dense .drag-handle {
+		width: 12px;
+	}
+
+	.track-list.dense .drag-handle svg {
+		width: 9px;
+		height: 14px;
+	}
+
+	.track-list.dense .move-btn {
+		width: 14px;
+		height: 11px;
+	}
+
+	.track-list.dense .action-btn {
+		width: 20px;
+		height: 20px;
 	}
 
 	/* ── Spinner ── */

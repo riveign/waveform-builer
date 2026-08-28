@@ -6,7 +6,7 @@
  * this list; so does the 1–6 keyboard shortcut map.
  */
 
-import { replaceState } from '$app/navigation';
+import { goto } from '$app/navigation';
 
 export type Tab = 'track' | 'set' | 'dna' | 'tinder' | 'hunt' | 'albums';
 
@@ -53,7 +53,12 @@ export function setHref(setId: number, opts?: { trackId?: number | null }): stri
  *
  * Selecting a row inside a set, or flipping list/grid, should survive a refresh
  * and a share — but pressing Back should leave the *set*, not step through every
- * row you clicked on the way. Hence replaceState rather than goto.
+ * row you clicked on the way. Hence `replaceState: true`.
+ *
+ * This goes through `goto` rather than `$app/navigation`'s `replaceState`: that
+ * one is shallow routing, so it rewrites the address bar without republishing
+ * `page.url`. Anything derived from a query param — the view toggle, the focused
+ * row — then only caught up on a manual refresh.
  *
  * Pass null to drop the parameter.
  */
@@ -61,7 +66,10 @@ export function setQueryParam(url: URL, key: string, value: string | number | nu
 	const next = new URL(url);
 	if (value === null) next.searchParams.delete(key);
 	else next.searchParams.set(key, String(value));
-	if (next.href !== url.href) replaceState(next, {});
+	if (next.href === url.href) return;
+	// Keep the page where it is and the segment you just clicked focused —
+	// this is a state change within the view, not a trip to a new one.
+	void goto(next, { replaceState: true, noScroll: true, keepFocus: true });
 }
 
 /** Read a numeric query parameter, or null when absent or malformed. */

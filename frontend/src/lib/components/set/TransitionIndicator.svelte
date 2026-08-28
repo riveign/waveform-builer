@@ -13,6 +13,8 @@
 		setId: number;
 		transitionIndex: number;
 		active?: boolean;
+		/** Thin strip: score + move only, teaching note and breakdown folded away. */
+		dense?: boolean;
 		onclick?: (index: number) => void;
 		keyA?: string | null;
 		keyB?: string | null;
@@ -32,6 +34,7 @@
 		setId,
 		transitionIndex,
 		active = false,
+		dense = false,
 		onclick,
 		keyA = null,
 		keyB = null,
@@ -136,12 +139,13 @@
 	];
 </script>
 
-<div class="transition-indicator" class:active>
+<div class="transition-indicator" class:active class:dense>
 	<div class="strip-row">
 		<button
 			class="strip"
 			style="--score-color: {ctxScore != null ? scoreColor(ctxScore) : 'var(--border)'}"
 			onclick={handleClick}
+			title={dense ? (teachingMoment ?? undefined) : undefined}
 		>
 			<span class="score-fill"></span>
 			{#if ctxScore != null}
@@ -149,7 +153,7 @@
 					{scoreLabel(ctxScore)}
 				</span>
 				<span class="scores">
-					{#if dualCopy}{dualCopy}{:else}{ctxScore.toFixed(2)}{/if}
+					{#if dense}{ctxScore.toFixed(2)}{:else if dualCopy}{dualCopy}{:else}{ctxScore.toFixed(2)}{/if}
 				</span>
 			{:else if loading}
 				<span class="scores">...</span>
@@ -165,17 +169,19 @@
 				<span class="mech mech-energy">{energyArrow}</span>
 			</span>
 		</button>
-		<button
-			class="expand-btn"
-			onclick={toggleExpanded}
-			aria-expanded={expanded}
-			aria-label={expanded ? 'Hide the math' : 'Show the math'}
-		>
-			{expanded ? '▴' : '▾'}
-		</button>
+		{#if !dense}
+			<button
+				class="expand-btn"
+				onclick={toggleExpanded}
+				aria-expanded={expanded}
+				aria-label={expanded ? 'Hide the math' : 'Show the math'}
+			>
+				{expanded ? '▴' : '▾'}
+			</button>
+		{/if}
 	</div>
 
-	{#if showNote}
+	{#if showNote && !dense}
 		<div class="note">{teachingMoment}</div>
 	{/if}
 
@@ -323,6 +329,41 @@
 		line-height: 1.35;
 		color: var(--text-secondary);
 		padding: 2px 10px;
+	}
+
+	/* ── Dense: a 16px rule between two rows. The verdict lives in the fill colour,
+	   the teaching moment in the tooltip, the math one click away in the detail. ── */
+
+	.transition-indicator.dense {
+		padding: 0;
+		gap: 0;
+	}
+
+	.dense .strip {
+		height: 16px;
+		border-radius: 8px;
+		gap: 6px;
+		padding: 0 8px;
+	}
+
+	.dense .verdict {
+		display: none;
+	}
+
+	.dense .scores {
+		font-size: 10px;
+	}
+
+	.dense .mechanics {
+		gap: 6px;
+	}
+
+	.dense .mech {
+		font-size: 9px;
+	}
+
+	.dense .mech-energy {
+		font-size: 10px;
 	}
 
 	.breakdown {

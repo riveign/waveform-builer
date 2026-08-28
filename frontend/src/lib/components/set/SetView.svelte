@@ -5,6 +5,11 @@
 	import SetPicker from './SetPicker.svelte';
 	import SetGrid from './SetGrid.svelte';
 	import SetTimeline from './SetTimeline.svelte';
+	import SetRail from './SetRail.svelte';
+	import SetListLedger from './SetListLedger.svelte';
+	import SetListSpine from './SetListSpine.svelte';
+	import SetListInspector from './SetListInspector.svelte';
+	import { buildRows } from './rowModel';
 	import TransitionDetail from './TransitionDetail.svelte';
 	import EnergyFlowChart from './EnergyFlowChart.svelte';
 	import SetEnergyReview from './SetEnergyReview.svelte';
@@ -19,10 +24,18 @@
 	import SegmentedControl, { type SegmentOption } from '$lib/components/primitives/SegmentedControl.svelte';
 	import { goto } from '$app/navigation';
 	import { createResource } from '$lib/data/resource.svelte';
+	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { setHref, setQueryParam } from '$lib/nav';
 
-	export type SetViewMode = 'list' | 'grid';
+	/** `ledger` / `spine` / `inspector` are the three redesign candidates — each
+	 *  pairs a one-row-per-track list with the shared right rail. They sit beside
+	 *  the shipped modes rather than replacing them, so both can be compared. */
+	export type SetViewMode = 'list' | 'compact' | 'grid' | 'ledger' | 'spine' | 'inspector';
+
+	/** The candidates share a layout: list left, graph and KPIs right. */
+	export const SPLIT_MODES: SetViewMode[] = ['ledger', 'spine', 'inspector'];
+	import { getSetTracksStore } from '$lib/stores/setTracks.svelte';
 	import { getPlaybackStore } from '$lib/stores/playback.svelte';
 	import { getPlayerStore } from '$lib/stores/player.svelte';
 	import type { Track } from '$lib/types';
@@ -47,10 +60,35 @@
 		setQueryParam(page.url, 't', trackId);
 	}
 
+	/** Arc folded away? A layout preference, not selection state — it sticks
+	 *  across sets and reloads rather than riding in the URL. */
+	const ARC_KEY = 'kiku:set:arc-collapsed';
+	let arcCollapsed = $state(
+		typeof localStorage !== 'undefined' && localStorage.getItem(ARC_KEY) === '1',
+	);
+
+	function setArcCollapsed(v: boolean) {
+		arcCollapsed = v;
+		if (typeof localStorage !== 'undefined') localStorage.setItem(ARC_KEY, v ? '1' : '0');
+	}
+
 	const viewOptions: SegmentOption<SetViewMode>[] = [
 		{ value: 'list', label: 'List' },
+		{ value: 'compact', label: 'Compact' },
 		{ value: 'grid', label: 'Grid' },
+		{ value: 'ledger', label: 'Ledger' },
+		{ value: 'spine', label: 'Spine' },
+		{ value: 'inspector', label: 'Inspect' },
 	];
+
+	let isSplit = $derived(SPLIT_MODES.includes(viewMode));
+
+	/** SetTimeline only knows the shipped modes, and the split branch never reaches
+	 *  it — narrow here so the candidate names stay out of its prop type. */
+	let timelineMode = $derived<'list' | 'compact' | 'grid'>(
+		viewMode === 'compact' || viewMode === 'grid' ? viewMode : 'list',
+	);
+
 	const pb = getPlaybackStore();
 	const player = getPlayerStore();
 
@@ -109,7 +147,10 @@
 
 	let selectedSet = $state<DJSet | null>(null);
 	let setDetail = $state<SetDetailType | null>(null);
-	let waveformTracks = $state<SetWaveformTrack[]>([]);
+	/** The running order lives in the store; edits land there and stay there.
+	 *  This view reads it rather than keeping a second copy to reconcile. */
+	const setTracks = getSetTracksStore();
+	const waveformTracks = $derived(setTracks.tracks);
 	let transition = $state<TransitionData | null>(null);
 	let activeTransitionIndex = $state(-1);
 	const res = createResource(
@@ -142,6 +183,34 @@
 	const error = $derived(res.error ?? actionError);
 	let timelineContainerEl = $state<HTMLDivElement>(null!);
 	let analysis = $state<SetAnalysis | null>(null);
+
+	/** Rows for the candidate layouts — one derivation, three presentations. */
+	let rows = $derived(buildRows(waveformTracks, analysis));
+
+	/** Start indices of runs of 3+ consecutive tracks in one key. Same rule as
+	 *  SetTimeline's banner, kept here so the candidates can show it too. */
+	let runStarts = $derived.by(() => {
+		const starts = new Set<number>();
+		let start = 0;
+		for (let i = 1; i <= rows.length; i++) {
+			const a = rows[i - 1]?.camelot;
+			const b = i < rows.length ? rows[i].camelot : null;
+			if (!(a && b && a === b)) {
+				if (i - start >= 3) starts.add(start);
+				start = i;
+			}
+		}
+		return starts;
+	});
+
+	/** Which transition the Inspector rail is explaining. */
+	let inspectIndex = $state(-1);
+
+	/** Ledger and Spine open the full Transition Detail; Inspector fills the rail. */
+	function handleCandidateTransition(index: number) {
+		if (viewMode === 'inspector') inspectIndex = index;
+		else handleTransitionClick(index);
+	}
 	let analyzingSet = $state(false);
 	let comparison = $state<SetComparisonType | null>(null);
 	let comparing = $state(false);
@@ -232,7 +301,7 @@
 			await deleteSet(selectedSet.id);
 			selectedSet = null;
 			setDetail = null;
-			waveformTracks = [];
+			setTracks.load(null, []);
 			transition = null;
 			confirmDelete = false;
 			pickerRefresh++;
@@ -242,6 +311,30 @@
 			deleting = false;
 		}
 	}
+
+	/** A failed write leaves the store unsure of the truth; this is how it asks. */
+	$effect(() => {
+		setTracks.setResync(() => res.refresh());
+		return () => setTracks.setResync(null);
+	});
+
+	/** The arc is downstream of the running order, so it re-reads itself after an
+	 *  edit — quietly, in the background. The list never waits on it and never
+	 *  re-mounts for it. */
+	let orderKey = $derived(waveformTracks.map((t) => t.track_id).join(','));
+	let lastAnalyzedKey: string | null = null;
+
+	$effect(() => {
+		const key = orderKey;
+		const sid = selectedSet?.id ?? null;
+		if (sid === null || waveformTracks.length < 2) return;
+		if (untrack(() => lastAnalyzedKey) === key) return;
+		const t = setTimeout(() => {
+			lastAnalyzedKey = key;
+			void handleAnalyze();
+		}, 600);
+		return () => clearTimeout(t);
+	});
 
 	async function handleAnalyze() {
 		if (!selectedSet) return;
@@ -321,15 +414,25 @@
 		showLinkPicker = false;
 		actionError = null;
 		if (!data) {
+			// A refresh of the SAME set (after a reorder, a removal, an add) blanks
+			// `res.data` for a moment. Tearing the timeline down for that moment
+			// unmounts it mid-write: handlers that awaited come back to a null
+			// `setId` and throw, so the change silently never happens. Hold the
+			// view while the set we're already showing reloads; only a genuine
+			// change of subject clears it.
+			const showing = untrack(() => selectedSet);
+			if (res.loading && showing && showing.id === setId) return;
 			selectedSet = null;
 			setDetail = null;
-			waveformTracks = [];
+			setTracks.load(null, []);
 			return;
 		}
 
 		const { detail, waveforms } = data;
 		setDetail = detail;
-		waveformTracks = waveforms;
+		setTracks.load(detail.id, waveforms);
+		// This read IS the analysis's subject, so nothing is stale yet.
+		lastAnalyzedKey = waveforms.map((t) => t.track_id).join(',');
 		selectedSet = {
 			id: detail.id,
 			name: detail.name,
@@ -602,11 +705,55 @@
 			<div class="status">Building your timeline...</div>
 		{:else if error}
 			<div class="status error" role="alert">Couldn't build the timeline. Something tripped while reading the set — try again, or pick another set.</div>
+		{:else if waveformTracks.length > 0 && isSplit}
+			<!-- Candidate layouts: list left, reference material right. -->
+			<div class="split" bind:this={timelineContainerEl}>
+				<div class="split-list">
+					{#if showComparison && comparison}
+						<SetComparison {comparison} onback={() => { showComparison = false; }} />
+					{:else if loadingTransition}
+						<div class="status">Reading the transition...</div>
+					{:else if transition}
+						<TransitionDetail
+							{transition}
+							setId={selectedSet.id}
+							analysisTransition={analysis?.transitions.find(t => t.position === activeTransitionIndex) ?? null}
+							hasPrev={activeTransitionIndex > 0}
+							hasNext={activeTransitionIndex < waveformTracks.length - 2}
+							onPrev={() => handleTransitionClick(activeTransitionIndex - 1)}
+							onNext={() => handleTransitionClick(activeTransitionIndex + 1)}
+							onBack={() => { activeTransitionIndex = -1; transition = null; }}
+						/>
+					{:else if viewMode === 'ledger'}
+						<SetListLedger {rows} {runStarts} {focusedTrackId} onselect={focusTrack} ontransition={handleCandidateTransition} />
+					{:else if viewMode === 'spine'}
+						<SetListSpine {rows} {runStarts} {focusedTrackId} onselect={focusTrack} ontransition={handleCandidateTransition} />
+					{:else}
+						<SetListInspector {rows} {runStarts} {focusedTrackId} onselect={focusTrack} ontransition={handleCandidateTransition} />
+					{/if}
+				</div>
+
+				<SetRail
+					tracks={waveformTracks}
+					{rows}
+					{analysis}
+					energyProfile={setDetail?.energy_profile}
+					plannedCurve={showComparison && comparison ? comparison.arc.planned_curve : null}
+					selectedIndex={selectedChartIndex}
+					onTrackClick={handleChartTrackClick}
+					{inspectIndex}
+					showInspector={viewMode === 'inspector'}
+				/>
+			</div>
+
 		{:else if waveformTracks.length > 0}
 			<div class="timeline-container" bind:this={timelineContainerEl}>
 				<div class="top-panel">
 					<div class="energy-chart-wrapper">
 						<EnergyFlowChart
+							dense={viewMode === 'compact'}
+							collapsed={arcCollapsed}
+							oncollapse={setArcCollapsed}
 							tracks={waveformTracks}
 							energyProfile={setDetail?.energy_profile}
 							plannedCurve={showComparison && comparison ? comparison.arc.planned_curve : null}
@@ -617,7 +764,7 @@
 				</div>
 
 				{#if analysis}
-					<div class="analysis-bar">
+					<div class="analysis-bar" class:dense={viewMode === 'compact'}>
 						<span class="analysis-score" style="color: {analysis.overall_score >= 0.7 ? 'var(--score-excellent)' : analysis.overall_score >= 0.5 ? 'var(--score-fair)' : 'var(--score-poor)'}">
 							{analysis.overall_score.toFixed(3)}
 						</span>
@@ -666,7 +813,7 @@
 							onTracksChanged={handleTracksChanged}
 							onTrackPlay={handleTrackPlay}
 							{focusedTrackId}
-							{viewMode}
+							viewMode={timelineMode}
 							onFocusTrack={focusTrack}
 						/>
 					{/if}
@@ -757,6 +904,12 @@
 		background: var(--bg-primary);
 	}
 
+	/* Name and count hold their ground; the toolbar is what scrolls. */
+	.set-name,
+	.set-meta {
+		flex-shrink: 0;
+	}
+
 	.set-name {
 		font-weight: 600;
 		font-size: 14px;
@@ -806,11 +959,27 @@
 	/* Action toolbar — one horizontal row of intent groups. Even, token-based gaps;
 	   subtle vertical dividers carry the grouping alongside order + spacing (color is
 	   never the only signal). Wraps gracefully on narrow widths. */
+	/* The band is a fixed 44px so its divider lands on the shared baseline, so the
+	   toolbar must NOT wrap — a second line overflows the band and lands on top of
+	   the rows below. It scrolls instead, the same move the navbar tabs make. */
 	.toolbar {
 		display: flex;
 		align-items: center;
 		gap: var(--space-md);
-		flex-wrap: wrap;
+		flex-wrap: nowrap;
+		flex: 1;
+		min-width: 0;
+		overflow-x: auto;
+		overflow-y: hidden;
+		scrollbar-width: none;
+	}
+
+	.toolbar::-webkit-scrollbar {
+		display: none;
+	}
+
+	.toolbar > :global(*) {
+		flex-shrink: 0;
 	}
 
 	.tool-group {
@@ -857,6 +1026,30 @@
 		display: flex;
 		flex-direction: column;
 		border-bottom: 1px solid var(--border);
+	}
+
+	/* Candidate layouts. The rail is a fixed column so the list keeps the room it
+	   gains from losing the full-width chart; below 1200px it folds underneath so
+	   the list never starves. */
+	.split {
+		flex: 1;
+		min-height: 0;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 320px;
+		border-bottom: 1px solid var(--border);
+	}
+
+	.split-list {
+		min-width: 0;
+		min-height: 0;
+		overflow-y: auto;
+	}
+
+	@media (max-width: 1200px) {
+		.split {
+			grid-template-columns: minmax(0, 1fr);
+			grid-template-rows: minmax(0, 1fr) auto;
+		}
 	}
 
 	/* Pinned top region — energy chart. A `flex-shrink:0` sibling ABOVE the
@@ -925,6 +1118,23 @@
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
 		flex-wrap: wrap;
+	}
+
+	/* Compact: the read on the set stays, on one scrollable line. */
+	.analysis-bar.dense {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		padding: 3px 16px;
+		scrollbar-width: none;
+	}
+
+	.analysis-bar.dense > :global(*) {
+		white-space: nowrap;
+		flex-shrink: 0;
+	}
+
+	.analysis-bar.dense .analysis-score {
+		font-size: 14px;
 	}
 
 	.analysis-score {
