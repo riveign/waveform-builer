@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, nulls_last, or_
 from sqlalchemy.orm import Session
 
 from kiku.db.models import (
@@ -113,7 +113,8 @@ def search_tracks(
 
     Returns (tracks, total_count) to support pagination.
     genre/key/artist/label accept a single string or list of strings (OR-matched).
-    sort: "recent" | "plays" (desc) | "plays_asc" (asc).
+    sort: "recent" | "plays"/"plays_asc" | "rating"/"rating_asc" | "bpm"/"bpm_asc"
+        (bare name = descending, "_asc" suffix = ascending).
     search: free-text OR-match across title, artist, and label.
     plays_min/plays_max: filter by combined play count (Rekordbox + Kiku).
     """
@@ -160,9 +161,15 @@ def search_tracks(
         conditions.append(Track.energy_predicted == energy_zone.lower())
         q = q.filter(or_(*conditions))
     if key:
+        # The library stores both notations ("Am" and "8A"), so one wheel position
+        # is matched by every spelling of it. Exact match, not substring — "1A"
+        # must never drag in "11A", and "A" must never match half the library.
+        from kiku.setbuilder.camelot import key_spellings
+
         keys = [key] if isinstance(key, str) else key
-        key_conditions = [Track.key.ilike(f"%{k}%") for k in keys]
-        q = q.filter(or_(*key_conditions))
+        wanted = {s.upper() for k in keys for s in key_spellings(k)}
+        if wanted:
+            q = q.filter(func.upper(Track.key).in_(sorted(wanted)))
     if rating_min is not None:
         q = q.filter(Track.rating >= rating_min)
     if set_role:
@@ -177,14 +184,23 @@ def search_tracks(
     if plays_max is not None:
         combined = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
         q = q.filter(combined <= plays_max)
-    if sort == "recent":
-        q = q.order_by(func.coalesce(Track.date_added, Track.last_synced).desc())
-    elif sort == "plays":
-        combined = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
-        q = q.order_by(combined.desc())
-    elif sort == "plays_asc":
-        combined = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
-        q = q.order_by(combined.asc())
+    # Unrated reads as 0 stars, but a track without a BPM is not a 0-BPM track —
+    # it simply hasn't been analyzed, so it sorts to the end either way.
+    plays = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
+    rating = func.coalesce(Track.rating, 0)
+    orderings = {
+        "recent": func.coalesce(Track.date_added, Track.last_synced).desc(),
+        "plays": plays.desc(),
+        "plays_asc": plays.asc(),
+        "rating": rating.desc(),
+        "rating_asc": rating.asc(),
+        "bpm": nulls_last(Track.bpm.desc()),
+        "bpm_asc": nulls_last(Track.bpm.asc()),
+    }
+    if sort in orderings:
+        # Every ordering ends on id: without a unique tiebreak, ties can shuffle
+        # between pages and the same track shows twice — or never.
+        q = q.order_by(orderings[sort], Track.id.asc())
     total = q.count()
     tracks = q.offset(offset).limit(limit).all()
     return tracks, total

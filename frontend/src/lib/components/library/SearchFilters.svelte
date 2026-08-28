@@ -2,9 +2,10 @@
 	import type { SearchParams } from '$lib/api/tracks';
 	import { autocompleteArtists, autocompleteLabels } from '$lib/api/tracks';
 	import { fetchJson } from '$lib/api/client';
-	import { CAMELOT_COLORS } from '$lib/utils/camelot';
+	import { CAMELOT_COLORS, formatKey } from '$lib/utils/camelot';
 	import Typeahead from './Typeahead.svelte';
 	import Button from '../primitives/Button.svelte';
+	import SegmentedControl from '../primitives/SegmentedControl.svelte';
 	import Chip from '../primitives/Chip.svelte';
 	import SetRoleIcon from './SetRoleIcon.svelte';
 
@@ -29,8 +30,21 @@
 	let ratingMin = $state('');
 	let setRoles = $state<Set<string>>(new Set());
 	let playsFilter = $state('');
-	let sortRecent = $state(false);
-	let sortPlays = $state<'' | 'plays' | 'plays_asc'>('');
+
+	// One sort at a time — the list has a single order, so the controls are
+	// mutually exclusive rather than four independent toggles.
+	type SortMode = '' | 'recent' | 'plays' | 'plays_asc' | 'rating' | 'rating_asc' | 'bpm' | 'bpm_asc';
+	let sort = $state<SortMode>('');
+
+	const SORT_LABELS: Record<Exclude<SortMode, ''>, string> = {
+		recent: 'Recent',
+		plays: 'Most played',
+		plays_asc: 'Least played',
+		rating: 'Highest rated',
+		rating_asc: 'Lowest rated',
+		bpm: 'Fastest first',
+		bpm_asc: 'Slowest first',
+	};
 
 	// ── UI state ──
 	let showAdvanced = $state(false);
@@ -50,8 +64,31 @@
 		}
 	}
 
-	// ── Camelot key grid data ──
+	// ── Key grid data ──
+	// The grid is always the 12x2 Camelot wheel — the toggle only changes how each
+	// position is *named* (8A or Am). Selection stays in Camelot codes either way,
+	// and the backend matches every spelling of a position (kiku.setbuilder.camelot).
 	const camelotKeys = Array.from({ length: 12 }, (_, i) => i + 1);
+
+	type KeyNotation = 'camelot' | 'musical';
+	const NOTATION_STORAGE_KEY = 'kiku:key-notation';
+
+	function storedNotation(): KeyNotation {
+		if (typeof localStorage === 'undefined') return 'camelot';
+		return localStorage.getItem(NOTATION_STORAGE_KEY) === 'musical' ? 'musical' : 'camelot';
+	}
+
+	let keyNotation = $state<KeyNotation>(storedNotation());
+
+	function setNotation(n: KeyNotation) {
+		keyNotation = n;
+		if (typeof localStorage !== 'undefined') localStorage.setItem(NOTATION_STORAGE_KEY, n);
+	}
+
+	/** Label a Camelot position in the notation the DJ is reading in. */
+	function keyLabel(k: string): string {
+		return keyNotation === 'musical' ? formatKey(k) : k;
+	}
 
 	// ── Build params from state ──
 	function buildParams(): SearchParams {
@@ -71,8 +108,7 @@
 		if (setRoles.size > 0) params.set_role = [...setRoles];
 		if (playsFilter === 'unplayed') params.plays_max = 0;
 		else if (playsFilter === 'played') params.plays_min = 1;
-		if (sortRecent) params.sort = 'recent';
-		else if (sortPlays) params.sort = sortPlays;
+		if (sort) params.sort = sort;
 		return params;
 	}
 
@@ -141,8 +177,7 @@
 		ratingMin !== '' ||
 		setRoles.size > 0 ||
 		playsFilter !== '' ||
-		sortRecent ||
-		sortPlays !== ''
+		sort !== ''
 	);
 
 	function removeGenre(g: string) {
@@ -178,22 +213,26 @@
 		ratingMin = '';
 		setRoles = new Set();
 		playsFilter = '';
-		sortRecent = false;
-		sortPlays = '';
+		sort = '';
 		onsearch({});
 	}
 
 	function toggleRecent() {
-		sortRecent = !sortRecent;
-		if (sortRecent) sortPlays = '';
+		sort = sort === 'recent' ? '' : 'recent';
 		searchNow();
 	}
 
-	function togglePlaysSort() {
-		if (sortPlays === '') { sortPlays = 'plays'; sortRecent = false; }
-		else if (sortPlays === 'plays') { sortPlays = 'plays_asc'; }
-		else { sortPlays = ''; }
+	/** One button, both directions: high-to-low → low-to-high → off. */
+	function cycleSort(desc: SortMode, asc: SortMode) {
+		sort = sort === desc ? asc : sort === asc ? '' : desc;
 		searchNow();
+	}
+
+	/** Arrow showing which way the active sort runs (nothing when it's off). */
+	function sortArrow(desc: SortMode, asc: SortMode): string {
+		if (sort === desc) return '▼';
+		if (sort === asc) return '▲';
+		return '';
 	}
 
 	function togglePlaysFilter(mode: '' | 'unplayed' | 'played') {
@@ -281,7 +320,7 @@
 
 	<!-- Quick filters -->
 	<div class="quick-filters">
-		<Button size="sm" variant="ghost" pressed={sortRecent} onclick={toggleRecent}>
+		<Button size="sm" variant="ghost" pressed={sort === 'recent'} onclick={toggleRecent}>
 			<span class="quick-glyph" aria-hidden="true">
 				<svg width="12" height="12" viewBox="0 0 16 16" fill="none">
 					<circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" fill="none"/>
@@ -293,12 +332,32 @@
 		<Button
 			size="sm"
 			variant="ghost"
-			pressed={sortPlays !== ''}
-			onclick={togglePlaysSort}
+			pressed={sort === 'plays' || sort === 'plays_asc'}
+			onclick={() => cycleSort('plays', 'plays_asc')}
 			title="Click to cycle: Most played → Least played → Off"
 		>
-			<span class="quick-glyph" aria-hidden="true">{#if sortPlays === 'plays'}&#x25BC;{:else if sortPlays === 'plays_asc'}&#x25B2;{:else}&#x266B;{/if}</span>
+			<span class="quick-glyph" aria-hidden="true">{sortArrow('plays', 'plays_asc') || '♫'}</span>
 			Plays
+		</Button>
+		<Button
+			size="sm"
+			variant="ghost"
+			pressed={sort === 'rating' || sort === 'rating_asc'}
+			onclick={() => cycleSort('rating', 'rating_asc')}
+			title="Click to cycle: Highest rated → Lowest rated → Off"
+		>
+			<span class="quick-glyph" aria-hidden="true">{sortArrow('rating', 'rating_asc') || '★'}</span>
+			Rating
+		</Button>
+		<Button
+			size="sm"
+			variant="ghost"
+			pressed={sort === 'bpm' || sort === 'bpm_asc'}
+			onclick={() => cycleSort('bpm', 'bpm_asc')}
+			title="Click to cycle: Fastest → Slowest → Off"
+		>
+			<span class="quick-glyph" aria-hidden="true">{sortArrow('bpm', 'bpm_asc') || '♩'}</span>
+			BPM
 		</Button>
 		<Button size="sm" variant="ghost" pressed={playsFilter === 'unplayed'} onclick={() => togglePlaysFilter('unplayed')}>
 			Unplayed
@@ -345,12 +404,12 @@
 			{#each [...selectedKeys] as k}
 				<Chip
 					variant="key"
-					value={k}
+					value={keyLabel(k)}
 					color={CAMELOT_COLORS[k]}
 					size="sm"
-					title="Camelot key {k}"
+					title="Key {k} · {formatKey(k)}"
 					removable
-					removeLabel="Remove key {k}"
+					removeLabel="Remove key {keyLabel(k)}"
 					onremove={() => removeKey(k)}
 				/>
 			{/each}
@@ -384,16 +443,13 @@
 					onremove={() => { playsFilter = ''; searchNow(); }}
 				/>
 			{/if}
-			{#if sortRecent}
-				<Chip value="Recent" size="sm" removable removeLabel="Clear recent sort" onremove={() => { sortRecent = false; searchNow(); }} />
-			{/if}
-			{#if sortPlays}
+			{#if sort}
 				<Chip
-					value={sortPlays === 'plays' ? 'Most played' : 'Least played'}
+					value={SORT_LABELS[sort]}
 					size="sm"
 					removable
-					removeLabel="Clear plays sort"
-					onremove={() => { sortPlays = ''; searchNow(); }}
+					removeLabel="Clear {SORT_LABELS[sort]} sort"
+					onremove={() => { sort = ''; searchNow(); }}
 				/>
 			{/if}
 			<Button variant="ghost" size="sm" onclick={clearAllFilters}>Clear all</Button>
@@ -468,13 +524,25 @@
 				{/if}
 			</div>
 
-			<!-- Camelot key grid -->
+			<!-- Key grid — same wheel, your choice of notation -->
 			<div class="section">
 				<div class="section-header">
-					<span class="section-label">Key (Camelot)</span>
-					{#if selectedKeys.size > 0}
-						<Button variant="ghost" size="sm" onclick={() => { selectedKeys = new Set(); searchNow(); }}>Clear</Button>
-					{/if}
+					<span class="section-label">Key</span>
+					<div class="key-header-actions">
+						<SegmentedControl
+							dense
+							ariaLabel="Key notation"
+							value={keyNotation}
+							onchange={setNotation}
+							options={[
+								{ value: 'camelot', label: 'Camelot' },
+								{ value: 'musical', label: 'Keys' },
+							]}
+						/>
+						{#if selectedKeys.size > 0}
+							<Button variant="ghost" size="sm" onclick={() => { selectedKeys = new Set(); searchNow(); }}>Clear</Button>
+						{/if}
+					</div>
 				</div>
 				<div class="key-grid">
 					<div class="key-row">
@@ -486,7 +554,8 @@
 								type="button"
 								onclick={() => toggleKey(k)}
 								style="--key-color: {CAMELOT_COLORS[k]}"
-							>{k}</button>
+								title="{k} · {formatKey(k)}"
+							>{keyLabel(k)}</button>
 						{/each}
 					</div>
 					<div class="key-row">
@@ -498,7 +567,8 @@
 								type="button"
 								onclick={() => toggleKey(k)}
 								style="--key-color: {CAMELOT_COLORS[k]}"
-							>{k}</button>
+								title="{k} · {formatKey(k)}"
+							>{keyLabel(k)}</button>
 						{/each}
 					</div>
 				</div>
@@ -659,6 +729,19 @@
 		height: var(--band-secondary-h);
 		align-items: center;
 		border-bottom: 1px solid var(--border);
+		/* Six controls outgrow a narrow sidebar — scroll them rather than squeeze
+		   the labels, keeping the band on its shared 44px baseline (spec 023). */
+		overflow-x: auto;
+		overflow-y: hidden;
+		scrollbar-width: none;
+	}
+
+	.quick-filters::-webkit-scrollbar {
+		display: none;
+	}
+
+	.quick-filters > :global(*) {
+		flex-shrink: 0;
 	}
 
 	/* Leading glyph inside a quick-filter Button label. */
@@ -809,7 +892,13 @@
 		color: var(--on-accent);
 	}
 
-	/* ── Camelot key grid ── */
+	/* ── Key grid ── */
+	.key-header-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-xs);
+	}
+
 	.key-grid {
 		display: flex;
 		flex-direction: column;

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kiku.db.models import AudioFeatures
+from kiku.db.models import AudioFeatures, Track
 
 
 def test_track_features_includes_vibe(client, db_session):
@@ -225,3 +225,75 @@ def test_search_filter_set_roles_multi_or(client):
     ids = {t["id"] for t in resp.json()["items"]}
     assert 3 in ids and 4 in ids  # union of both roles
     assert 5 not in ids  # break not selected
+
+
+def test_search_key_matches_both_notations(client, db_session):
+    """A library holding both "Am" and "8A" must answer one key filter with both
+    (regression: the filter substring-matched the raw column, so picking 8A
+    hid every track stored musically)."""
+    db_session.add(Track(id=101, title="Musical", artist="X", key="Am"))
+    db_session.commit()
+
+    for asked in ("8A", "Am"):
+        resp = client.get("/api/tracks/search", params={"key": asked})
+        assert resp.status_code == 200
+        keys = {t["key"] for t in resp.json()["items"]}
+        assert keys == {"8A", "Am"}
+
+
+def test_search_key_does_not_overmatch_neighbours(client, db_session):
+    """"1A" must never drag in "11A" — exact spellings, not substrings."""
+    db_session.add(Track(id=102, title="Eleven", artist="X", key="11A"))
+    db_session.add(Track(id=103, title="One", artist="X", key="1A"))
+    db_session.commit()
+
+    resp = client.get("/api/tracks/search", params={"key": "1A"})
+    assert resp.status_code == 200
+    assert {t["key"] for t in resp.json()["items"]} == {"1A"}
+
+
+def test_search_sort_by_rating(client, db_session):
+    """Highest rated first, and unrated sorts as 0 stars rather than vanishing."""
+    db_session.add(Track(id=201, title="Five", artist="X", rating=5))
+    db_session.add(Track(id=202, title="Unrated", artist="X", rating=None))
+    db_session.commit()
+
+    desc = client.get("/api/tracks/search", params={"sort": "rating", "limit": 100})
+    assert desc.status_code == 200
+    items = desc.json()["items"]
+    assert items[0]["id"] == 201
+    assert items[-1]["id"] == 202
+
+    asc = client.get("/api/tracks/search", params={"sort": "rating_asc", "limit": 100})
+    assert asc.json()["items"][0]["id"] == 202
+
+
+def test_search_sort_by_bpm(client, db_session):
+    """Fastest first — and a track with no BPM is unanalyzed, not 0 BPM, so it
+    sorts to the end in BOTH directions."""
+    db_session.add(Track(id=203, title="Fast", artist="X", bpm=175.0))
+    db_session.add(Track(id=204, title="No BPM", artist="X", bpm=None))
+    db_session.commit()
+
+    desc = client.get("/api/tracks/search", params={"sort": "bpm", "limit": 100})
+    assert desc.status_code == 200
+    items = desc.json()["items"]
+    assert items[0]["id"] == 203
+    assert items[-1]["id"] == 204
+
+    asc = client.get("/api/tracks/search", params={"sort": "bpm_asc", "limit": 100})
+    asc_items = asc.json()["items"]
+    assert asc_items[-1]["id"] == 204
+    assert asc_items[0]["bpm"] == 121.0
+
+
+def test_search_sort_pages_are_stable(client, db_session):
+    """Ties must not shuffle between pages — every ordering ends on a unique id,
+    so paging can't show one track twice and skip another."""
+    seen = []
+    for offset in (0, 10):
+        resp = client.get(
+            "/api/tracks/search", params={"sort": "rating", "limit": 10, "offset": offset}
+        )
+        seen.extend(t["id"] for t in resp.json()["items"])
+    assert len(seen) == len(set(seen))

@@ -51,6 +51,12 @@ _KEY_TO_CAMELOT = {
 }
 
 
+# Reverse index: Camelot code -> every musical spelling that lands on it.
+_CAMELOT_TO_KEYS: dict[str, list[str]] = {}
+for _name, _code in _KEY_TO_CAMELOT.items():
+    _CAMELOT_TO_KEYS.setdefault(_code, []).append(_name)
+
+
 def parse_camelot(key: str | None) -> tuple[int, str] | None:
     """Parse Camelot or standard key notation into (number, letter)."""
     if not key:
@@ -74,6 +80,61 @@ def parse_camelot(key: str | None) -> tuple[int, str] | None:
             return (int(m.group(1)), m.group(2).upper())
 
     return None
+
+
+def key_spellings(key: str | None) -> set[str]:
+    """Every spelling the library might store for the same wheel position.
+
+    ``"8A" -> {"8A", "Am"}`` and ``"Am"`` returns the same set — a library that
+    holds both notations still answers one filter. An unplaceable key comes back
+    as itself alone, so nothing silently vanishes.
+    """
+    parsed = parse_camelot(key)
+    if parsed is None:
+        return {key.strip()} if key and key.strip() else set()
+    code = camelot_str(parsed)
+    return {code, *_CAMELOT_TO_KEYS.get(code, [])}
+
+
+# Canonical musical name per wheel position. Spellings match how keys are already
+# stored in the library, so a converted Camelot key looks identical to one that was
+# stored musically. Mirrors CAMELOT_TO_MUSICAL in frontend/src/lib/utils/camelot.ts.
+_CAMELOT_TO_MUSICAL = {
+    "1A": "Abm", "1B": "B",
+    "2A": "Ebm", "2B": "F#",
+    "3A": "Bbm", "3B": "Db",
+    "4A": "Fm", "4B": "Ab",
+    "5A": "Cm", "5B": "Eb",
+    "6A": "Gm", "6B": "Bb",
+    "7A": "Dm", "7B": "F",
+    "8A": "Am", "8B": "C",
+    "9A": "Em", "9B": "G",
+    "10A": "Bm", "10B": "D",
+    "11A": "F#m", "11B": "A",
+    "12A": "Dbm", "12B": "E",
+}  # fmt: skip
+
+
+def format_key(key: str | None) -> str:
+    """Format any key as its musical name, matching how the UI labels tracks.
+
+    ``"4A" -> "Fm"``, ``"Fm" -> "Fm"``. The library stores both notations, so
+    without this a sentence can name one key twice and look like two
+    (``"from 4A to Fm"`` is the same key said two ways). Unparseable keys come
+    back unchanged rather than disappearing.
+    """
+    if not key:
+        return ""
+    parsed = parse_camelot(key)
+    if parsed is None:
+        return key.strip()
+    return _CAMELOT_TO_MUSICAL.get(camelot_str(parsed), key.strip())
+
+
+def same_key(key_a: str | None, key_b: str | None) -> bool:
+    """True when both keys are the same wheel position, whatever notation each uses."""
+    ca, cb = parse_camelot(key_a), parse_camelot(key_b)
+    return ca is not None and ca == cb
 
 
 def harmonic_score(key_a: str | None, key_b: str | None) -> float:

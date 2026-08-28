@@ -5,6 +5,7 @@
 	import { getTrackStore } from '$lib/stores/tracks.svelte';
 	import SearchFilters from './SearchFilters.svelte';
 	import TrackTable from './TrackTable.svelte';
+	import Pagination from './Pagination.svelte';
 	import Spinner from '../Spinner.svelte';
 
 	let { onselect }: { onselect: (track: Track) => void } = $props();
@@ -37,8 +38,16 @@
 		{#if store.fuzzy}
 			<div class="fuzzy-note">No exact match — showing similar names</div>
 		{/if}
-		<div class="track-count">{store.tracks.length} of {store.total} tracks</div>
 		<TrackTable tracks={store.tracks} {selectedId} onselect={handleSelect} />
+		<Pagination
+			page={store.page}
+			pageCount={store.pageCount}
+			total={store.total}
+			pageSize={store.pageSize}
+			offset={store.offset}
+			onpage={store.goToPage}
+			onpagesize={store.setPageSize}
+		/>
 	{/if}
 </div>
 
@@ -59,13 +68,6 @@
 
 	.status.error {
 		color: var(--energy-high);
-	}
-
-	.track-count {
-		padding: var(--space-sm) var(--space-lg);
-		font-size: var(--text-xs);
-		color: var(--text-dim);
-		border-bottom: 1px solid var(--border);
 	}
 
 	.fuzzy-note {
