@@ -531,9 +531,14 @@ def add_track(set_id: int, body: SetAddTrackRequest, db: Session = Depends(get_d
     return [_set_track_response(st) for st in tracks]
 
 
-@router.delete("/{set_id}/tracks/{track_id}", status_code=204)
+@router.delete("/{set_id}/tracks/{track_id}", response_model=list[SetTrackResponse])
 def remove_track(set_id: int, track_id: int, db: Session = Depends(get_db)):
-    """Remove a track from a set."""
+    """Remove a track from a set, returning the set's tracks as they now stand.
+
+    Like add and reorder, this hands back the whole new list: the removal shifts
+    every later position and rescores the transition that closed over the gap, so
+    the caller would otherwise have to re-read the set to learn what it now is.
+    """
     try:
         removed = remove_track_from_set(db, set_id, track_id)
     except ValueError as exc:
@@ -559,7 +564,8 @@ def remove_track(set_id: int, track_id: int, db: Session = Depends(get_db)):
                 st.transition_score = None
         sets_service.invalidate_analysis(db, set_)
         db.commit()
-    return Response(status_code=204)
+        return [_set_track_response(st) for st in sorted_tracks]
+    return []
 
 
 @router.put("/{set_id}/tracks/reorder", response_model=list[SetTrackResponse])

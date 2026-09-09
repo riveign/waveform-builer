@@ -36,7 +36,7 @@ def test_strong_transition_no_suggestion():
 
 
 def test_strong_same_key():
-    """Same key should mention the key in the teaching moment."""
+    """Same key should name the key, using the musical name the track rows show."""
     scores = {
         "harmonic": 1.0,
         "energy_fit": 0.8,
@@ -46,7 +46,44 @@ def test_strong_same_key():
         "total": 0.88,
     }
     moment, _ = transition_teaching_moment(scores, "8A", "8A", 128.0, 130.0, "Techno", "Techno")
-    assert "8A" in moment
+    assert "Am" in moment
+    assert "perfect harmonic match" in moment
+
+
+def test_same_key_in_mixed_notation_is_not_called_a_shift():
+    """ "4A" and "Fm" are one key said two ways. The library stores both, so a
+    transition that never leaves Fm must not be described as a key shift
+    (regression: it read "The key shift from 4A to Fm keeps it moving")."""
+    scores = {
+        "harmonic": 1.0,
+        "energy_fit": 0.6,
+        "bpm_compat": 0.9,
+        "genre_coherence": 0.4,
+        "track_quality": 0.6,
+        "total": 0.7,
+    }
+    moment, _ = transition_teaching_moment(scores, "4A", "Fm", 135.0, 135.0, "Techno", "House")
+    assert "shift from" not in moment
+    assert "holds steady" in moment
+    assert "4A" not in moment
+
+
+def test_key_journey_counts_positions_not_spellings():
+    """A set that never leaves Fm is not adventurous just because one track is
+    tagged in Camelot instead."""
+    from kiku.analysis.teaching import detect_set_patterns
+
+    transitions = [
+        {"harmonic": 1.0, "energy_fit": 0.7, "bpm_compat": 0.9, "genre_coherence": 0.8}
+    ] * 4
+    patterns = detect_set_patterns(
+        transitions,
+        [0.5, 0.5, 0.5, 0.5, 0.5],
+        ["Fm", "4A", "Fm", "4A", "Fm"],
+        [130.0] * 5,
+    )
+    assert not any("explore the Camelot wheel widely" in p for p in patterns)
+    assert any("close to home key" in p for p in patterns)
 
 
 def test_good_transition_may_suggest():

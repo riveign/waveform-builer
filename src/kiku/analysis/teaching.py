@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kiku.setbuilder.camelot import parse_camelot
+from kiku.setbuilder.camelot import format_key, parse_camelot, same_key
 from kiku.setbuilder.scoring import genre_to_family
 
 # ── Per-Transition Teaching ─────────────────────────────────────────────
@@ -56,11 +56,10 @@ def _explain_strength(
     e = scores.get("energy_fit", 0)
 
     if h >= 0.85 and key_a and key_b:
-        ca, cb = parse_camelot(key_a), parse_camelot(key_b)
-        if ca and cb and ca == cb:
-            base = f"Both tracks in {key_a} — perfect harmonic match."
+        if same_key(key_a, key_b):
+            base = f"Both tracks in {format_key(key_a)} — perfect harmonic match."
         else:
-            base = f"Clean key movement from {key_a} to {key_b}."
+            base = f"Clean key movement from {format_key(key_a)} to {format_key(key_b)}."
     elif e >= 0.8:
         base = "Energy flows naturally here."
     else:
@@ -84,7 +83,14 @@ def _explain_good(
 
     parts = []
     if h >= 0.8 and key_a and key_b:
-        parts.append(f"The key shift from {key_a} to {key_b} keeps it moving.")
+        # Staying put is not a shift. The library stores both notations, so the
+        # two keys can look different ("4A", "Fm") and be the same position.
+        if same_key(key_a, key_b):
+            parts.append(f"Both tracks sit in {format_key(key_a)} — the key holds steady.")
+        else:
+            parts.append(
+                f"The key shift from {format_key(key_a)} to {format_key(key_b)} keeps it moving."
+            )
     elif b >= 0.8 and bpm_a and bpm_b:
         parts.append(f"Tempo stays locked at {bpm_a:.0f}\u2013{bpm_b:.0f} BPM.")
     else:
@@ -109,7 +115,10 @@ def _explain_weakness(
     weakest = _weakest_dimension(scores)
 
     if weakest == "harmonic" and key_a and key_b:
-        return f"Key clash between {key_a} and {key_b} \u2014 this creates tension on the floor."
+        return (
+            f"Key clash between {format_key(key_a)} and {format_key(key_b)} "
+            "\u2014 this creates tension on the floor."
+        )
     if weakest == "bpm_compat" and bpm_a and bpm_b:
         diff_pct = abs(bpm_b - bpm_a) / bpm_a * 100 if bpm_a > 0 else 0
         return f"The BPM jump is {diff_pct:.0f}% \u2014 that's a noticeable shift."
@@ -145,9 +154,9 @@ def _suggest_improvement(
         if key_a:
             ca = parse_camelot(key_a)
             if ca:
-                adj_up = (ca[0] % 12) + 1
-                adj_dn = ((ca[0] - 2) % 12) + 1
-                return f"Try a track in {adj_up}{ca[1]} or {adj_dn}{ca[1]} for a smoother key transition."
+                up = format_key(f"{(ca[0] % 12) + 1}{ca[1]}")
+                dn = format_key(f"{((ca[0] - 2) % 12) + 1}{ca[1]}")
+                return f"Try a track in {up} or {dn} for a smoother key transition."
         return "Look for a track with a compatible key."
     if weakest == "bpm_compat" and bpm_a and bpm_b:
         mid_bpm = (bpm_a + bpm_b) / 2
@@ -207,10 +216,12 @@ def detect_set_patterns(
         elif max(energy_curve) - min(energy_curve) < 0.2:
             patterns.append("You keep energy steady \u2014 hypnotic, consistent vibe.")
 
-    # Key adventure
+    # Key adventure. Count wheel POSITIONS, not spellings — the library stores
+    # both notations, so raw strings would score a set that never leaves Fm as
+    # widely adventurous the moment one track is tagged "4A".
     valid_keys = [k for k in key_journey if k]
     if len(valid_keys) >= 3:
-        unique_keys = len(set(valid_keys))
+        unique_keys = len({parse_camelot(k) or k for k in valid_keys})
         ratio = unique_keys / len(valid_keys)
         if ratio < 0.3:
             patterns.append("You stay close to home key \u2014 that's deep harmonic focus.")

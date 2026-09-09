@@ -6,6 +6,7 @@ from kiku.setbuilder.camelot import (
     harmonic_score,
     intent_allowed_keys,
     intent_energy_delta,
+    key_spellings,
     move_targets,
     parse_camelot,
     step_wheel,
@@ -102,3 +103,17 @@ def test_intent_energy_delta():
     assert intent_energy_delta("brighten") == 0.05
     assert intent_energy_delta("cool_down") == -0.15
     assert intent_energy_delta("hold") == 0.0
+
+
+def test_key_spellings_bridges_notations():
+    """One wheel position, every spelling the library might have stored."""
+    assert key_spellings("8A") == {"8A", "Am"}
+    assert key_spellings("Am") == {"8A", "Am"}
+    assert key_spellings("1A") == {"1A", "Abm", "G#m"}
+    assert key_spellings("A") == {"11B", "A"}
+
+
+def test_key_spellings_keeps_unplaceable_keys():
+    assert key_spellings("weird") == {"weird"}
+    assert key_spellings(None) == set()
+    assert key_spellings("  ") == set()

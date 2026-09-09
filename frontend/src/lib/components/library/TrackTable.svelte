@@ -35,6 +35,14 @@
 		onselect: (track: Track) => void;
 	} = $props();
 
+	/** A new page (or a new search) is a new list — start it at the top rather
+	 *  than dropping the DJ into the middle of it. */
+	let wrapperEl = $state<HTMLDivElement | null>(null);
+	$effect(() => {
+		void tracks;
+		wrapperEl?.scrollTo({ top: 0 });
+	});
+
 	let contextMenuTrack = $state<Track | null>(null);
 	let contextMenuX = $state(0);
 	let contextMenuY = $state(0);
@@ -60,7 +68,7 @@
 	}
 </script>
 
-<div class="track-table-wrapper">
+<div class="track-table-wrapper" bind:this={wrapperEl}>
 	<table class="track-table">
 		<thead>
 			<tr>

@@ -1,10 +1,13 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { dndzone } from 'svelte-dnd-action';
 	import type { SetTrack, SetWaveformTrack, SetAnalysis } from '$lib/types';
 	import { getUiStore } from '$lib/stores/ui.svelte';
 	import { parseCamelot } from '$lib/utils/camelot';
-	import { reorderSetTracks, removeTrackFromSet, addTrackToSet } from '$lib/api/sets';
+	import { getSetTracksStore } from '$lib/stores/setTracks.svelte';
 	import SetTrackCard from './SetTrackCard.svelte';
+	import ReorderControls from './ReorderControls.svelte';
+	import { createReorder } from './reorder.svelte';
 	import TransitionIndicator from './TransitionIndicator.svelte';
 	import SetCardGrid from './SetCardGrid.svelte';
 	import ReplaceTrackModal from './ReplaceTrackModal.svelte';
@@ -32,26 +35,40 @@
 		onTracksChanged?: () => void;
 		onTrackPlay?: (trackId: number) => void;
 		focusedTrackId?: number | null;
-		viewMode?: 'list' | 'grid';
+		viewMode?: 'list' | 'compact' | 'grid';
 		onFocusTrack?: (trackId: number) => void;
 	} = $props();
 
 	const ui = getUiStore();
+	const store = getSetTracksStore();
 
-	// DnD items — need `id` field for svelte-dnd-action
-	let items = $state<(SetWaveformTrack & { id: number })[]>([]);
-	let reordering = $state(false);
+	/** Compact = the same list, thinned down so a whole set fits on one screen. */
+	let dense = $derived(viewMode === 'compact');
+
+	/**
+	 * What the rows render from. Normally this is just the store's list with the
+	 * `id` svelte-dnd-action needs. While a drag is in progress the library owns
+	 * the order — it hands us intermediate arrays on every hover — so we let it
+	 * drive from `dragItems` and hand the result to the store on drop.
+	 */
+	let dragItems = $state<(SetWaveformTrack & { id: number })[] | null>(null);
+	// Position (not track_id) as id — a track can appear twice in one set.
+	let items = $derived(
+		dragItems ?? tracks.map((t, i) => ({ ...t, id: t.position ?? i })),
+	);
+
 	let removeInFlight = $state<number | null>(null);
 	let dropActive = $state(false);
 	let dropAdding = $state(false);
 	let replacePosition = $state<number | null>(null);
 
-	// Sync items when tracks prop changes (but not during drag)
-	// Use position (not track_id) as id — a track can appear multiple times in a set
-	$effect(() => {
-		if (!reordering) {
-			items = tracks.map((t, i) => ({ ...t, id: t.position ?? i }));
-		}
+	let listEl = $state<HTMLElement | undefined>();
+
+	// Nudge + keyboard move mode. Shared with the Ledger — see `reorder.svelte.ts`.
+	const reorder = createReorder({
+		store,
+		getListEl: () => listEl,
+		isBusy: () => removeInFlight !== null,
 	});
 
 	/** Parse energy profile string like "warmup(0.3)->build(0.6)->peak(0.9)->cooldown(0.4)"
@@ -119,34 +136,21 @@
 
 	// DnD event handlers
 	function handleConsider(e: CustomEvent<{ items: (SetWaveformTrack & { id: number })[] }>) {
-		reordering = true;
-		items = e.detail.items;
+		dragItems = e.detail.items;
 	}
 
-	async function handleFinalize(e: CustomEvent<{ items: (SetWaveformTrack & { id: number })[] }>) {
-		items = e.detail.items;
-		reordering = false;
-
-		// Persist the new order
-		const trackIds = items.map((i) => i.track_id);
-		try {
-			await reorderSetTracks(setId, trackIds);
-			onTracksChanged?.();
-		} catch (err) {
-			// Revert on failure — re-sync from props
-			items = tracks.map((t, i) => ({ ...t, id: t.position ?? i }));
-			console.error('Failed to reorder tracks:', err);
-		}
+	function handleFinalize(e: CustomEvent<{ items: (SetWaveformTrack & { id: number })[] }>) {
+		// The store takes it from here: the new order is already on screen, and the
+		// write follows it. Releasing `dragItems` hands rendering back to the store.
+		store.setOrder(e.detail.items);
+		dragItems = null;
 	}
 
 	async function handleRemoveTrack(trackId: number) {
 		if (removeInFlight !== null) return;
 		removeInFlight = trackId;
 		try {
-			await removeTrackFromSet(setId, trackId);
-			onTracksChanged?.();
-		} catch (err) {
-			console.error('Failed to remove track:', err);
+			await store.remove(trackId);
 		} finally {
 			removeInFlight = null;
 		}
@@ -178,14 +182,11 @@
 		dropActive = false;
 		const raw = e.dataTransfer?.getData('application/x-kiku-track');
 		if (!raw) return;
+		const { id } = JSON.parse(raw) as { id: number };
+		if (items.some((i) => i.track_id === id)) return; // already in set
+		dropAdding = true;
 		try {
-			const { id } = JSON.parse(raw) as { id: number };
-			if (items.some((i) => i.track_id === id)) return; // already in set
-			dropAdding = true;
-			await addTrackToSet(setId, id);
-			onTracksChanged?.();
-		} catch (err) {
-			console.error('Failed to add track to set:', err);
+			await store.add(id);
 		} finally {
 			dropAdding = false;
 		}
@@ -201,6 +202,13 @@
 	role="region"
 	aria-label="Set timeline"
 >
+	{#if store.error}
+		<div class="action-error" role="alert">
+			<span>{store.error}</span>
+			<button class="dismiss" onclick={() => store.clearError()} aria-label="Dismiss">×</button>
+		</div>
+	{/if}
+
 	{#if items.length === 0}
 		<div class="empty">
 			{#if dropActive}
@@ -217,25 +225,35 @@
 			<!-- Track list with DnD -->
 			<div
 				class="track-list"
+				class:dense
+				bind:this={listEl}
 				use:dndzone={{ items, flipDurationMs: 200, dropTargetStyle: { outline: '1px dashed var(--accent)', 'outline-offset': '-1px' } }}
 				onconsider={handleConsider}
 				onfinalize={handleFinalize}
 			>
 				{#each items as item, i (item.id)}
-					{#if runStartIndices.has(i)}
-						<div class="run-banner">The story here is energy, not key</div>
-					{/if}
+					<!-- Everything for one track stays INSIDE its slot. svelte-dnd-action
+					     maps the zone's children to `items` by position, so an extra
+					     sibling here (the run banner used to be one) shifts every index
+					     and drag-to-reorder silently stops working. -->
 					<div class="track-slot">
-						<div class="card-row">
-							<div class="drag-handle" aria-label="Drag to reorder">
-								<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
-									<circle cx="3" cy="3" r="1.5" /><circle cx="9" cy="3" r="1.5" />
-									<circle cx="3" cy="9" r="1.5" /><circle cx="9" cy="9" r="1.5" />
-									<circle cx="3" cy="15" r="1.5" /><circle cx="9" cy="15" r="1.5" />
-								</svg>
-							</div>
+						{#if runStartIndices.has(i)}
+							<div class="run-banner">The story here is energy, not key</div>
+						{/if}
+						<div class="card-row" class:lifted={reorder.liftedIndex === i}>
+							<ReorderControls
+								index={i}
+								count={items.length}
+								{dense}
+								lifted={reorder.liftedIndex === i}
+								disabled={removeInFlight !== null}
+								onnudge={(dir) => reorder.nudge(i, dir)}
+								onkeydown={(e) => reorder.keydown(e, i)}
+								onblur={() => reorder.blur()}
+							/>
 							<div class="card-wrapper">
 								<SetTrackCard
+									{dense}
 									track={{
 										position: item.position,
 										track_id: item.track_id,
@@ -294,6 +312,7 @@
 						{#if i < items.length - 1}
 							<div class="transition-slot">
 								<TransitionIndicator
+									{dense}
 									fromTrackId={item.track_id}
 									toTrackId={items[i + 1].track_id}
 									score={items[i + 1].transition_score ?? undefined}
@@ -377,6 +396,34 @@
 		padding: 8px 0;
 	}
 
+	.action-error {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		margin: 0 12px 6px;
+		padding: 6px 10px;
+		font-size: 12px;
+		color: var(--text-primary);
+		background: color-mix(in srgb, var(--score-poor) 14%, transparent);
+		border-left: 2px solid var(--score-poor);
+		border-radius: 3px;
+	}
+
+	.action-error .dismiss {
+		margin-left: auto;
+		border: none;
+		background: none;
+		color: var(--text-dim);
+		font-size: 14px;
+		line-height: 1;
+		cursor: pointer;
+		padding: 0 2px;
+	}
+
+	.action-error .dismiss:hover {
+		color: var(--text-primary);
+	}
+
 	.empty {
 		display: flex;
 		align-items: center;
@@ -438,20 +485,18 @@
 		gap: 4px;
 	}
 
-	.drag-handle {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 18px;
-		flex-shrink: 0;
-		color: var(--text-dim);
-		cursor: grab;
-		opacity: 0.4;
-		transition: opacity 0.1s;
+	/* The reorder cluster lives in `ReorderControls`; these two inherited
+	   properties are how the row tells it to fade in. */
+	.card-row:hover,
+	.card-row:focus-within {
+		--reorder-handle-op: 0.8;
+		--reorder-nudge-op: 0.8;
 	}
 
-	.card-row:hover .drag-handle {
-		opacity: 0.8;
+	.card-row.lifted .card-wrapper {
+		outline: 1px dashed var(--accent);
+		outline-offset: 1px;
+		border-radius: 4px;
 	}
 
 	.card-wrapper {
@@ -499,6 +544,27 @@
 
 	.transition-slot {
 		padding: 2px 22px 2px 22px;
+	}
+
+	/* ── Compact list ── */
+
+	.track-list.dense .transition-slot {
+		padding: 1px 22px;
+	}
+
+	.track-list.dense .run-banner {
+		margin: 2px 0 3px;
+		padding: 2px 8px;
+		font-size: 10px;
+	}
+
+	.track-list.dense .card-row {
+		gap: 2px;
+	}
+
+	.track-list.dense .action-btn {
+		width: 20px;
+		height: 20px;
 	}
 
 	/* ── Spinner ── */

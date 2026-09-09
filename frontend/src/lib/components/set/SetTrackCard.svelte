@@ -15,6 +15,7 @@
 		isPlaying = false,
 		energyTarget,
 		energyConflict = null,
+		dense = false,
 		onplay,
 		onselect,
 	}: {
@@ -24,6 +25,8 @@
 		isPlaying?: boolean;
 		energyTarget?: number;
 		energyConflict?: EnergyConflict | null;
+		/** One-line row — fits ~3x more of the set on screen for reordering and scanning. */
+		dense?: boolean;
 		onplay?: (trackId: number) => void;
 		onselect?: (trackId: number) => void;
 	} = $props();
@@ -79,6 +82,7 @@
 
 <div
 	class="set-track-card"
+	class:dense
 	class:selected={isSelected}
 	class:playing={isPlaying}
 	data-track-id={track.track_id}
@@ -111,14 +115,20 @@
 	<div class="track-info">
 		<div class="title-row">
 			<span class="title" title={track.title ?? ''}>{track.title ?? 'Untitled'}</span>
-			{#if track.genre}
+			{#if dense}
+				<!-- One line: the artist rides beside the title instead of under it. -->
+				<span class="artist inline" title={track.artist ?? ''}>{track.artist ?? 'Unknown'}</span>
+			{/if}
+			{#if track.genre && !dense}
 				<Chip variant="genre" value={track.genre} size="sm" title={track.genre} />
 			{/if}
 			{#if energyConflict}
 				<EnergyConflictBadge conflict={energyConflict} />
 			{/if}
 		</div>
-		<span class="artist" title={track.artist ?? ''}>{track.artist ?? 'Unknown'}</span>
+		{#if !dense}
+			<span class="artist" title={track.artist ?? ''}>{track.artist ?? 'Unknown'}</span>
+		{/if}
 	</div>
 
 	<div class="meta">
@@ -326,5 +336,50 @@
 		height: 6px;
 		border-radius: 50%;
 		flex-shrink: 0;
+	}
+
+	/* ── Dense: one line per track, ~24px tall. Same information hierarchy,
+	   three times as much of the set on screen. ── */
+
+	.set-track-card.dense {
+		gap: 6px;
+		padding: 2px 8px;
+		border-radius: 3px;
+	}
+
+	.dense .play-btn {
+		width: 16px;
+		height: 16px;
+	}
+
+	.dense .position {
+		width: 18px;
+		font-size: 10px;
+	}
+
+	.dense .title-row {
+		gap: 6px;
+		align-items: baseline;
+	}
+
+	.dense .artist.inline {
+		flex-shrink: 1;
+		min-width: 0;
+		font-size: 11px;
+		color: var(--text-dim);
+	}
+
+	/* The title keeps the room; the artist gives it up first when space runs out. */
+	.dense .title {
+		flex-shrink: 0;
+		max-width: 55%;
+	}
+
+	.dense .meta {
+		gap: 6px;
+	}
+
+	.dense .energy-cell {
+		width: 44px;
 	}
 </style>
