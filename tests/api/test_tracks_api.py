@@ -242,7 +242,7 @@ def test_search_key_matches_both_notations(client, db_session):
 
 
 def test_search_key_does_not_overmatch_neighbours(client, db_session):
-    """"1A" must never drag in "11A" — exact spellings, not substrings."""
+    """ "1A" must never drag in "11A" — exact spellings, not substrings."""
     db_session.add(Track(id=102, title="Eleven", artist="X", key="11A"))
     db_session.add(Track(id=103, title="One", artist="X", key="1A"))
     db_session.commit()

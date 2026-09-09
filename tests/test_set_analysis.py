@@ -51,7 +51,7 @@ def test_strong_same_key():
 
 
 def test_same_key_in_mixed_notation_is_not_called_a_shift():
-    """"4A" and "Fm" are one key said two ways. The library stores both, so a
+    """ "4A" and "Fm" are one key said two ways. The library stores both, so a
     transition that never leaves Fm must not be described as a key shift
     (regression: it read "The key shift from 4A to Fm keeps it moving")."""
     scores = {
@@ -73,7 +73,9 @@ def test_key_journey_counts_positions_not_spellings():
     tagged in Camelot instead."""
     from kiku.analysis.teaching import detect_set_patterns
 
-    transitions = [{"harmonic": 1.0, "energy_fit": 0.7, "bpm_compat": 0.9, "genre_coherence": 0.8}] * 4
+    transitions = [
+        {"harmonic": 1.0, "energy_fit": 0.7, "bpm_compat": 0.9, "genre_coherence": 0.8}
+    ] * 4
     patterns = detect_set_patterns(
         transitions,
         [0.5, 0.5, 0.5, 0.5, 0.5],

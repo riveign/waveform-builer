@@ -295,7 +295,10 @@ def test_reorder_set_with_repeated_track(client, db_session):
     db_session.add(SetTrack(set_id=1, position=5, track_id=1, transition_score=0.5))
     db_session.commit()
 
-    current = [t["track_id"] for t in sorted(client.get("/api/sets/1").json()["tracks"], key=lambda t: t["position"])]
+    current = [
+        t["track_id"]
+        for t in sorted(client.get("/api/sets/1").json()["tracks"], key=lambda t: t["position"])
+    ]
     assert current.count(1) == 2
 
     resp = client.put("/api/sets/1/tracks/reorder", json={"track_ids": current[::-1]})
