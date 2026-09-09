@@ -6,6 +6,8 @@
 	import { parseCamelot } from '$lib/utils/camelot';
 	import { getSetTracksStore } from '$lib/stores/setTracks.svelte';
 	import SetTrackCard from './SetTrackCard.svelte';
+	import ReorderControls from './ReorderControls.svelte';
+	import { createReorder } from './reorder.svelte';
 	import TransitionIndicator from './TransitionIndicator.svelte';
 	import SetCardGrid from './SetCardGrid.svelte';
 	import ReplaceTrackModal from './ReplaceTrackModal.svelte';
@@ -60,11 +62,14 @@
 	let dropAdding = $state(false);
 	let replacePosition = $state<number | null>(null);
 
-	// Keyboard move mode: a lifted track follows ↑/↓ until you drop it.
-	let liftedIndex = $state<number | null>(null);
-	let liftOrigin: number | null = null;
-	let refocusing = false;
 	let listEl = $state<HTMLElement | undefined>();
+
+	// Nudge + keyboard move mode. Shared with the Ledger — see `reorder.svelte.ts`.
+	const reorder = createReorder({
+		store,
+		getListEl: () => listEl,
+		isBusy: () => removeInFlight !== null,
+	});
 
 	/** Parse energy profile string like "warmup(0.3)->build(0.6)->peak(0.9)->cooldown(0.4)"
 	 *  into interpolated target values per track position. */
@@ -139,76 +144,6 @@
 		// write follows it. Releasing `dragItems` hands rendering back to the store.
 		store.setOrder(e.detail.items);
 		dragItems = null;
-	}
-
-	// ── Nudge + keyboard reorder ──
-	// Drag-and-drop is fine for a neighbouring swap; for anything further down a
-	// long set it fights the scroller. These move a track without holding it, and
-	// the move shows up immediately — the store coalesces the writes behind it.
-
-	/** Keep the keyboard on the control the DJ just used, now at its new index. */
-	async function refocus(selector: string, fallback?: string) {
-		refocusing = true;
-		await tick();
-		const pick = (sel: string) => {
-			const el = listEl?.querySelector<HTMLButtonElement>(sel);
-			return el && !el.disabled ? el : null;
-		};
-		(pick(selector) ?? (fallback ? pick(fallback) : null))?.focus();
-		refocusing = false;
-	}
-
-	async function nudge(index: number, dir: -1 | 1) {
-		if (liftedIndex !== null || removeInFlight !== null) return;
-		if (!store.move(index, index + dir)) return;
-		const to = index + dir;
-		const kind = dir === -1 ? 'up' : 'down';
-		await refocus(
-			`[data-move="${kind}"][data-idx="${to}"]`,
-			`[data-move="${dir === -1 ? 'down' : 'up'}"][data-idx="${to}"]`,
-		);
-	}
-
-	function dropLifted() {
-		liftedIndex = null;
-		liftOrigin = null;
-		void store.flush();
-	}
-
-	function handleHandleKeydown(e: KeyboardEvent, index: number) {
-		// Stop these from bubbling into svelte-dnd-action's own keyboard drag.
-		if (e.key === ' ' || e.key === 'Enter') {
-			e.preventDefault();
-			e.stopPropagation();
-			if (liftedIndex === null) {
-				liftedIndex = index;
-				liftOrigin = index;
-			} else {
-				dropLifted();
-			}
-		} else if (liftedIndex !== null && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
-			e.preventDefault();
-			e.stopPropagation();
-			const from = liftedIndex;
-			const to = from + (e.key === 'ArrowUp' ? -1 : 1);
-			if (store.move(from, to)) {
-				liftedIndex = to;
-				refocus(`[data-handle][data-idx="${to}"]`);
-			}
-		} else if (e.key === 'Escape' && liftedIndex !== null) {
-			e.preventDefault();
-			e.stopPropagation();
-			// Walk it back where it was picked up from.
-			if (liftOrigin !== null) store.move(liftedIndex, liftOrigin);
-			liftedIndex = null;
-			liftOrigin = null;
-			void store.flush();
-		}
-	}
-
-	function handleHandleBlur() {
-		if (refocusing || liftedIndex === null) return;
-		dropLifted();
 	}
 
 	async function handleRemoveTrack(trackId: number) {
@@ -305,53 +240,17 @@
 						{#if runStartIndices.has(i)}
 							<div class="run-banner">The story here is energy, not key</div>
 						{/if}
-						<div class="card-row" class:lifted={liftedIndex === i}>
-							<div class="reorder-controls" class:active={liftedIndex === i}>
-								<button
-									class="drag-handle"
-									data-handle
-									data-idx={i}
-									onkeydown={(e) => handleHandleKeydown(e, i)}
-									onblur={handleHandleBlur}
-									title={liftedIndex === i ? 'Moving — ↑/↓ to move, Space to drop, Esc to cancel' : 'Drag to reorder, or Space to move with ↑/↓'}
-									aria-label={liftedIndex === i ? 'Moving track — arrow keys to move, space to drop, escape to cancel' : 'Reorder track — drag, or press space to move with arrow keys'}
-									aria-pressed={liftedIndex === i}
-								>
-									<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
-										<circle cx="3" cy="3" r="1.5" /><circle cx="9" cy="3" r="1.5" />
-										<circle cx="3" cy="9" r="1.5" /><circle cx="9" cy="9" r="1.5" />
-										<circle cx="3" cy="15" r="1.5" /><circle cx="9" cy="15" r="1.5" />
-									</svg>
-								</button>
-								<div class="nudge-col">
-									<button
-										class="move-btn"
-										data-move="up"
-										data-idx={i}
-										onclick={() => nudge(i, -1)}
-										disabled={i === 0 || liftedIndex !== null || removeInFlight !== null}
-										title="Move up"
-										aria-label="Move up one slot"
-									>
-										<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6">
-											<path d="M1.5 6.5 5 3l3.5 3.5" />
-										</svg>
-									</button>
-									<button
-										class="move-btn"
-										data-move="down"
-										data-idx={i}
-										onclick={() => nudge(i, 1)}
-										disabled={i === items.length - 1 || liftedIndex !== null || removeInFlight !== null}
-										title="Move down"
-										aria-label="Move down one slot"
-									>
-										<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6">
-											<path d="M1.5 3.5 5 7l3.5-3.5" />
-										</svg>
-									</button>
-								</div>
-							</div>
+						<div class="card-row" class:lifted={reorder.liftedIndex === i}>
+							<ReorderControls
+								index={i}
+								count={items.length}
+								{dense}
+								lifted={reorder.liftedIndex === i}
+								disabled={removeInFlight !== null}
+								onnudge={(dir) => reorder.nudge(i, dir)}
+								onkeydown={(e) => reorder.keydown(e, i)}
+								onblur={() => reorder.blur()}
+							/>
 							<div class="card-wrapper">
 								<SetTrackCard
 									{dense}
@@ -586,92 +485,12 @@
 		gap: 4px;
 	}
 
-	/* Reorder cluster: ↑ / grab handle / ↓. The nudges are the reliable path on a
-	   long set — no pointer held down, so the list scrolls normally between moves. */
-	/* Handle and nudges sit side by side so the cluster is never taller than the
-	   row it steers — stacking all three set a 48px floor on row height. */
-	.reorder-controls {
-		display: flex;
-		align-items: center;
-		gap: 1px;
-		flex-shrink: 0;
-	}
-
-	.nudge-col {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-	}
-
-	.drag-handle {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 18px;
-		flex-shrink: 0;
-		border: none;
-		background: none;
-		padding: 0;
-		color: var(--text-dim);
-		cursor: grab;
-		opacity: 0.4;
-		border-radius: 3px;
-		transition: opacity 0.1s, color 0.1s, background 0.1s;
-	}
-
-	.card-row:hover .drag-handle {
-		opacity: 0.8;
-	}
-
-	.move-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 16px;
-		height: 12px;
-		flex-shrink: 0;
-		border: none;
-		background: none;
-		padding: 0;
-		color: var(--text-dim);
-		cursor: pointer;
-		border-radius: 3px;
-		opacity: 0;
-		transition: opacity 0.1s, color 0.1s, background 0.1s;
-	}
-
-	.card-row:hover .move-btn,
-	.reorder-controls:focus-within .move-btn {
-		opacity: 0.8;
-	}
-
-	.move-btn:hover:not(:disabled) {
-		background: var(--bg-tertiary);
-		color: var(--accent);
-	}
-
-	.move-btn:disabled {
-		cursor: default;
-		opacity: 0.15;
-	}
-
-	.drag-handle:focus-visible,
-	.move-btn:focus-visible {
-		outline: 1px solid var(--accent);
-		outline-offset: 1px;
-		opacity: 1;
-	}
-
-	/* Lifted: the track is following the arrow keys until it's dropped. */
-	.reorder-controls.active .drag-handle,
-	.reorder-controls.active .move-btn {
-		opacity: 1;
-		color: var(--accent);
-	}
-
-	.reorder-controls.active .drag-handle {
-		background: color-mix(in srgb, var(--accent) 18%, transparent);
-		cursor: grabbing;
+	/* The reorder cluster lives in `ReorderControls`; these two inherited
+	   properties are how the row tells it to fade in. */
+	.card-row:hover,
+	.card-row:focus-within {
+		--reorder-handle-op: 0.8;
+		--reorder-nudge-op: 0.8;
 	}
 
 	.card-row.lifted .card-wrapper {
@@ -741,20 +560,6 @@
 
 	.track-list.dense .card-row {
 		gap: 2px;
-	}
-
-	.track-list.dense .drag-handle {
-		width: 12px;
-	}
-
-	.track-list.dense .drag-handle svg {
-		width: 9px;
-		height: 14px;
-	}
-
-	.track-list.dense .move-btn {
-		width: 14px;
-		height: 11px;
 	}
 
 	.track-list.dense .action-btn {

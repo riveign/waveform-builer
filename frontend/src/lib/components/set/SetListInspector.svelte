@@ -4,9 +4,9 @@
 	 * explanation moves to the rail's inspector, so the row pays nothing for it.
 	 */
 	import type { SetRow } from './rowModel';
-	import { formatBpmDelta, scoreColor } from './rowModel';
 	import SetCover from './SetCover.svelte';
-	import { energyColor } from '$lib/utils/energy';
+	import EnergyBar from './EnergyBar.svelte';
+	import MoveBadge from './MoveBadge.svelte';
 
 	let {
 		rows,
@@ -48,16 +48,10 @@
 			</span>
 			<span class="key" style="color:{row.keyColor}">{row.keyName}</span>
 			<span class="bpm">{row.track.bpm ? Math.round(row.track.bpm) : '—'}</span>
-			<span class="ebar">
-				{#if row.energy != null}
-					<i style="width:{Math.round(row.energy * 100)}%;background:{energyColor(row.energy)}"></i>
-				{/if}
-			</span>
+			<EnergyBar energy={row.energy} zone={row.track.resolved_energy} />
 			<span class="movecell">
 				{#if row.moveOut}
-					<span class="mv {row.moveOut.kind}" style="border-color:{scoreColor(row.moveOut.score)}">
-						{row.moveOut.label} {formatBpmDelta(row.moveOut.bpmDelta)}
-					</span>
+					<MoveBadge move={row.moveOut} onclick={() => ontransition?.(i)} />
 				{/if}
 			</span>
 		</div>
@@ -128,26 +122,7 @@
 		text-align: right;
 	}
 
-	.ebar { height: 3px; border-radius: 2px; background: var(--surface-3); position: relative; overflow: hidden; }
-	.ebar i { position: absolute; inset: 0 auto 0 0; display: block; border-radius: 2px; }
-
 	.movecell { display: flex; justify-content: flex-end; }
-	.mv {
-		font-family: var(--font-mono, ui-monospace, monospace);
-		font-size: var(--text-2xs);
-		font-weight: var(--font-weight-semibold);
-		letter-spacing: 0.04em;
-		padding: 1px 6px;
-		border-radius: 2px;
-		border-left: 2px solid transparent;
-		background: var(--surface-3);
-		white-space: nowrap;
-	}
-	.mv.hold { color: var(--score-excellent); }
-	.mv.lift { color: var(--energy-high); }
-	.mv.switch { color: var(--role); }
-	.mv.clash { color: var(--score-poor); }
-
 	.run {
 		font-size: var(--text-2xs);
 		color: var(--role);

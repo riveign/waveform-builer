@@ -9,7 +9,8 @@
 	import { formatBpmDelta, scoreColor } from './rowModel';
 	import SetCover from './SetCover.svelte';
 	import NextKeys from './NextKeys.svelte';
-	import { energyColor } from '$lib/utils/energy';
+	import EnergyBar from './EnergyBar.svelte';
+	import MoveBadge from './MoveBadge.svelte';
 
 	let {
 		rows,
@@ -73,24 +74,25 @@
 					</span>
 					<span class="tempo">
 						<span class="bpm">{row.track.bpm ? Math.round(row.track.bpm) : '—'}</span>
-						{#if row.energy != null}
-							<span class="zone" style="color:{energyColor(row.energy)}">{row.track.resolved_energy ?? ''}</span>
-						{/if}
+						<EnergyBar energy={row.energy} zone={row.track.resolved_energy} />
 					</span>
 				</div>
 
 				{#if row.moveOut}
-					<button
-						class="move"
-						onclick={() => ontransition?.(i)}
-						title="Open this transition"
-					>
-						<span class="mv {row.moveOut.kind}">{row.moveOut.label}</span>
+					<div class="move">
+						<!-- The rail beside this row is already coloured by the score, so
+						     the badge's own score dot would say it twice. -->
+						<MoveBadge
+							move={row.moveOut}
+							showDot={false}
+							showDelta={false}
+							onclick={() => ontransition?.(i)}
+						/>
 						<span class="phrase">{movePhrase(row)}</span>
 						{#if row.moveOut.teaching}
 							<span class="teach">— {row.moveOut.teaching}</span>
 						{/if}
-					</button>
+					</div>
 				{/if}
 			</div>
 		</div>
@@ -163,14 +165,15 @@
 		font-variant-numeric: tabular-nums;
 	}
 
-	.tempo { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+	/* Fixed width so the energy bar reads as a length, the way it does in the
+	   Ledger and the Inspector — an `auto` column would rescale it per row. */
+	.tempo { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; width: 46px; }
 	.bpm {
 		font-family: var(--font-mono, ui-monospace, monospace);
 		font-size: var(--text-xs);
 		color: var(--text-2);
 		font-variant-numeric: tabular-nums;
 	}
-	.zone { font-size: var(--text-2xs); }
 
 	.move {
 		display: flex;
@@ -178,28 +181,10 @@
 		gap: var(--space-md);
 		margin-top: var(--space-sm);
 		padding: 2px 0 2px 40px;
-		background: none;
-		border: none;
-		cursor: pointer;
 		text-align: left;
 		width: 100%;
 		min-width: 0;
 	}
-	.move:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring); outline-offset: 2px; }
-
-	.mv {
-		font-family: var(--font-mono, ui-monospace, monospace);
-		font-size: var(--text-2xs);
-		font-weight: var(--font-weight-semibold);
-		letter-spacing: 0.04em;
-		padding: 2px 6px;
-		border-radius: 2px;
-		flex-shrink: 0;
-	}
-	.mv.hold { background: color-mix(in srgb, var(--score-excellent) 16%, transparent); color: var(--score-excellent); }
-	.mv.lift { background: color-mix(in srgb, var(--energy-high) 16%, transparent); color: var(--energy-high); }
-	.mv.switch { background: color-mix(in srgb, var(--role) 16%, transparent); color: var(--role); }
-	.mv.clash { background: color-mix(in srgb, var(--score-poor) 16%, transparent); color: var(--score-poor); }
 
 	.phrase { font-size: var(--text-xs); color: var(--text-3); white-space: nowrap; }
 	.teach {
