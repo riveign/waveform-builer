@@ -237,6 +237,55 @@ an existing digital build.
   `tests/test_planner.py` *(one added test)*
 
 
+### Live Discogs verification (2026-09-10) — token now configured
+
+Research R3 left the Discogs path unmeasured because no token existed. One is now
+set (`~/.kiku/config.toml`, `DiscogsSource().available()` is True), so the wire
+shape every diff below assumes was checked against the real API rather than
+inferred. **Every field the plan reads exists**, on four of the DJ's own records
+(Alarico — Klockworks 38 / Boya / Crea EP / 049.2):
+
+| Field | Result |
+|---|---|
+| `tracklist[].position` | **4/4 records, 17/17 tracks** — clean `A1 A2 B1 B2`. Discogs' claimed strength, confirmed. |
+| `labels[0].catno` | present (`KW 38`) |
+| `country`, `year`, `uri`, `title`, `artists` | present |
+| `formats[0]` | present — `{"name": "Vinyl", "descriptions": ["12\""]}` |
+| `images[0].uri` | present |
+| `tracklist[].duration` | **5/17 (29%)** — and it is `""`, not absent |
+
+Two findings change the plan. Both are folded in below.
+
+**F1 — the primary search misses when the DJ names a track, not the release.**
+`DiscogsSource.search` sends `release_title` + `artist`. Measured:
+
+| Query | `release_title`+`artist` | free-text `q` |
+|---|---|---|
+| Klockworks 38 / Alarico | 2 | 2 |
+| Boya / Alarico | 4 | 5 |
+| Crea EP / Alarico | 1 | 1 |
+| **AF 97 / Alarico** | **0** | **2** |
+
+"AF 97" is the A1 *on* Klockworks 38. DJs know records by the track on them —
+this is the normal case for vinyl, not an edge one, and today it returns nothing.
+Fix: fall back to `q` when the structured search comes back empty. Strictly
+additive (it only fires on zero results), so `kiku fix-album` gains a rescue and
+loses nothing. → **Task 4d**.
+
+**F2 — `duration_sec` will be NULL for most vinyl rows.** 71% of the sampled
+sides carry no duration. This is *not* a blocker: the builder already degrades
+(`planner.py:233,339` fall back to `avg_track_min`; `filler.py:81,98` to 360s),
+so nothing crashes and the time budget gets an estimate rather than a wrong
+number. But a DJ planning a 90-minute set off estimated lengths deserves to know.
+Fix: no new prompt in the fill pass (three questions per side is friction on the
+one path that must stay fast), but `kiku vinyl bpm` gains `--length` and
+`kiku vinyl list` counts the sides with no length. → **Task 6 amendments**.
+
+This also answers, for slice 1, the Human Section's L48 question about pressed
+vs played length: the pressed length is frequently not even available, so the
+pitched-duration correction stays slice-2 work with an honest estimate underneath
+it in the meantime.
+
 ### Tasks
 
 #### Task 1 — Alembic migration: vinyl_releases + medium columns
@@ -730,6 +779,47 @@ Verification:
   in the diff preview. Call it out in the commit message.
 
 
+4d — `src/kiku/metadata/sources/discogs.py`, the F1 search fallback. A DJ looking
+for a record types the track they know it by; the structured search returns zero
+for that. Free-text finds it. This only fires when the structured search found
+nothing, so no existing `fix-album` result changes.
+````diff
+--- a/src/kiku/metadata/sources/discogs.py
++++ b/src/kiku/metadata/sources/discogs.py
+@@
+     def search(self, album: str, artist: str, *, limit: int = 3) -> list[ReleaseCandidate]:
+         self._require_token()
+         data = self._get(
+             "/database/search",
+             params={
+                 "release_title": album,
+                 "artist": artist,
+                 "type": "release",
+                 "per_page": limit,
+             },
+         )
+         results = (data or {}).get("results", []) or []
++        if not results:
++            # The structured search matches on release title. A DJ naming a
++            # record by the track on it ("AF 97" for Klockworks 38) gets zero
++            # hits — measured, not guessed. Free-text finds it.
++            data = self._get(
++                "/database/search",
++                params={
++                    "q": " ".join(x for x in (artist, album) if x).strip(),
++                    "type": "release",
++                    "per_page": limit,
++                },
++            )
++            results = (data or {}).get("results", []) or []
+         candidates: list[ReleaseCandidate] = []
+````
+
+Verification:
+- `source .venv/bin/activate && python -m pytest tests/test_metadata_sources.py -x -q`
+- Live: `kiku vinyl add "AF 97" -a Alarico --dry-run` must now find Klockworks 38.
+
+
 #### Task 5 — src/kiku/vinyl/importer.py: search → preview → apply
 Tools: editor
 
@@ -945,6 +1035,7 @@ Create `src/kiku/vinyl/importer.py` with EXACTLY this content:
 +    *,
 +    bpm: float | None = None,
 +    key: str | None = None,
++    duration_sec: float | None = None,
 +) -> Track:
 +    """The DJ types the number. That marker is the top of the provenance ladder.
 +
@@ -963,6 +1054,13 @@ Create `src/kiku/vinyl/importer.py` with EXACTLY this content:
 +    if key is not None and key.strip():
 +        track.key = key.strip()
 +        track.key_source = "manual"
++    if duration_sec is not None:
++        # Discogs leaves the duration blank on most 12"s (Plan F2), and the
++        # builder estimates past a blank rather than failing — so a typed length
++        # is the difference between an estimated set time and a real one.
++        if duration_sec <= 0:
++            raise ValueError(f"{duration_sec} isn't a length")
++        track.duration_sec = float(duration_sec)
 +    if track.bpm:
 +        track.enrichment_status = "manual"
 +    session.commit()
@@ -1240,14 +1338,27 @@ Append this to the END of `src/kiku/cli.py` (after `fix_album`'s final line,
 +@click.argument("track_id", type=int)
 +@click.argument("bpm", type=float)
 +@click.option("--key", "-k", default=None, help="Musical or Camelot key")
-+def vinyl_bpm(track_id, bpm, key):
++@click.option(
++    "--length",
++    default=None,
++    help="Track length as m:ss — Discogs leaves this blank on most 12\"s (F2)",
++)
++def vinyl_bpm(track_id, bpm, key, length):
 +    """Set one side's BPM by hand."""
 +    from kiku.db.models import get_session
 +    from kiku.vinyl.importer import set_manual_bpm_key
 +
 +    session = get_session()
++    duration = None
++    if length:
++        try:
++            mins, _, secs = length.partition(":")
++            duration = int(mins) * 60 + int(secs or 0)
++        except ValueError:
++            console.print(f"[red]'{length}' doesn't look like a length — try 6:12.[/]")
++            return
 +    try:
-+        tr = set_manual_bpm_key(session, track_id, bpm=bpm, key=key)
++        tr = set_manual_bpm_key(session, track_id, bpm=bpm, key=key, duration_sec=duration)
 +    except ValueError as e:
 +        console.print(f"[red]{e}[/]")
 +        return
@@ -1280,10 +1391,12 @@ Append this to the END of `src/kiku/cli.py` (after `fix_album`'s final line,
 +    table.add_column("Plannable", justify="right")
 +
 +    unplannable = 0
++    no_length = 0
 +    for r in releases:
 +        tracks = session.query(Track).filter(Track.vinyl_release_id == r.id).all()
 +        with_bpm = sum(1 for t in tracks if t.bpm)
 +        unplannable += len(tracks) - with_bpm
++        no_length += sum(1 for t in tracks if not t.duration_sec)
 +        table.add_row(
 +            str(r.id),
 +            r.title or "—",
@@ -1298,6 +1411,14 @@ Append this to the END of `src/kiku/cli.py` (after `fix_album`'s final line,
 +        console.print(
 +            f"[dim]{unplannable} side(s) have no BPM yet, so the builder can't reach them. "
 +            "`kiku vinyl fill` fixes that.[/]"
++        )
++    if no_length:
++        # F2: Discogs carried a duration for 5 of 17 sampled sides. The builder
++        # estimates past a blank, so a set still plans — its running time is just
++        # a guess, and the DJ should hear that from us rather than from the clock.
++        console.print(
++            f"[dim]{no_length} side(s) have no length, so set times are estimated. "
++            "`kiku vinyl bpm <id> <bpm> --length 6:12` when you want them exact.[/]"
 +        )
 ````
 
