@@ -18,6 +18,7 @@ from kiku.api.routes import (
     stats,
     tinder,
     tracks,
+    vinyl,
     waveforms,
 )
 from kiku.db.models import _init_schema
@@ -61,5 +62,6 @@ def create_app() -> FastAPI:
     app.include_router(hunt.router)
     app.include_router(soundcloud.router)
     app.include_router(albums.router)
+    app.include_router(vinyl.router)
 
     return app
