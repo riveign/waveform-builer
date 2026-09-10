@@ -143,3 +143,100 @@ def test_a_vinyl_row_with_a_bpm_is_a_normal_track(session):
     digital = Track(title="A file", bpm=137.0, key="9A", medium="digital")
     assert harmonic_score(track.key, digital.key) > 0
     assert bpm_compatibility(track.bpm, digital.bpm) > 0
+
+
+def _digital_edition() -> ReleaseCandidate:
+    """Discogs files the WAV edition of a record as its own release.
+
+    Same title, same catalogue number, but positions 1,2,3,4 — no sides. It is
+    not a thing you can pull off a shelf.
+    """
+    return ReleaseCandidate(
+        source="discogs",
+        source_id="4243",
+        album="Klockworks 38",
+        artist="Alarico",
+        label="Klockworks",
+        catalog_number="KW 38",
+        year=2023,
+        format="File, WAV",
+        recordings=[
+            RecordingCandidate(title="AF 97", position=1, disc=1, position_raw="1"),
+            RecordingCandidate(title="Chromo", position=2, disc=1, position_raw="2"),
+        ],
+    )
+
+
+def test_the_digital_edition_never_reaches_the_shelf(session):
+    """The bug this closes: the WAV edition imported as a second copy.
+
+    Idempotency is per release id, and Discogs gives the digital edition its
+    own — so nothing downstream would ever have caught it. The DJ ends up owning
+    one record twice, with one copy carrying positions that aren't sides.
+    """
+    from kiku.vinyl.importer import NotAPressing
+
+    with pytest.raises(NotAPressing):
+        apply_import(session, _digital_edition())
+
+    assert session.query(VinylRelease).count() == 0
+    assert session.query(Track).count() == 0
+
+
+def test_force_still_lets_a_deliberate_one_through(session):
+    apply_import(session, _digital_edition(), force=True)
+    assert session.query(VinylRelease).count() == 1
+
+
+@pytest.mark.parametrize(
+    "fmt,expected",
+    [
+        ('Vinyl, 12", 33 1/3 RPM, EP', True),
+        ('Vinyl, 7", 45 RPM', True),
+        ("Vinyl, LP, Album", True),
+        ("File, WAV", False),
+        ("File, MP3, 320 kbps", False),
+        ("File, FLAC, Album", False),
+        ("CD, Album", True),  # not vinyl, but a physical object you own
+        (None, True),  # unknown: the shelf is the DJ's call
+        ('Shellac, 10"', True),
+    ],
+)
+def test_is_a_pressing(fmt, expected):
+    from kiku.vinyl.importer import is_a_pressing
+
+    assert is_a_pressing(fmt) is expected
+
+
+def test_remove_takes_the_record_and_only_its_sides(session):
+    """Cleanup has to be surgical — a digital track sharing the album stays."""
+    from kiku.vinyl.importer import remove_release
+
+    release = apply_import(session, _twelve_inch())
+    session.add(
+        Track(
+            title="AF 97",
+            artist="Alarico",
+            album="Klockworks 38",
+            medium="digital",
+            file_path="/run/media/mantis/SSD/Musica/af97.aiff",
+            bpm=136.0,
+        )
+    )
+    session.commit()
+
+    title, removed = remove_release(session, release.id)
+
+    assert title == "Klockworks 38"
+    assert removed == 3
+    assert session.query(VinylRelease).count() == 0
+    assert session.query(Track).filter_by(medium="vinyl").count() == 0
+    # The file you actually own is untouched.
+    assert session.query(Track).filter_by(medium="digital").count() == 1
+
+
+def test_remove_says_so_when_there_is_nothing_there(session):
+    from kiku.vinyl.importer import remove_release
+
+    with pytest.raises(ValueError):
+        remove_release(session, 999)

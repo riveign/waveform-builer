@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import click
 from rich.console import Console
 from rich.table import Table
@@ -1853,8 +1855,13 @@ def vinyl_group():
     is_flag=True,
     help="Skip the BPM/key pass — the record lands unplannable until you come back",
 )
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Add it even if it isn't a physical pressing (a digital edition, say)",
+)
 def vinyl_add(
-    query, url, source_name, artist, candidate_index, acquired, notes, dry_run, yes, no_fill
+    query, url, source_name, artist, candidate_index, acquired, notes, dry_run, yes, no_fill, force
 ):
     """Add a record from your shelf.
 
@@ -1867,10 +1874,12 @@ def vinyl_add(
     from kiku.db.models import get_session
     from kiku.metadata.sources.base import LookupUnsupported, SourceUnavailable
     from kiku.vinyl.importer import (
+        NotAPressing,
         NoVinylSource,
         apply_import,
         build_preview,
         fetch_release_url,
+        is_a_pressing,
         search_releases,
     )
 
@@ -1910,17 +1919,24 @@ def vinyl_add(
         table.add_column("Format")
         table.add_column("Sides", justify="right")
         for i, c in enumerate(candidates):
+            pressing = is_a_pressing(c.format)
             table.add_row(
                 str(i),
                 c.album or "—",
                 c.artist or "—",
                 " · ".join(x for x in (c.label, c.catalog_number) if x) or "—",
                 str(c.year or "—"),
-                c.format or "—",
+                c.format or "—" if pressing else f"[yellow]{c.format}[/] [dim](not vinyl)[/]",
                 str(c.track_count),
             )
         console.print(table)
-        candidate_index = click.prompt("Pick one", type=int, default=0)
+        console.print(
+            "[dim]Discogs files the digital edition as its own release. "
+            "Pick the vinyl one — it's the one with sides.[/]"
+        )
+        # Default to the first actual pressing, not blindly to 0.
+        first_pressing = next((i for i, c in enumerate(candidates) if is_a_pressing(c.format)), 0)
+        candidate_index = click.prompt("Pick one", type=int, default=first_pressing)
 
     idx = candidate_index or 0
     if idx < 0 or idx >= len(candidates):
@@ -1968,7 +1984,11 @@ def vinyl_add(
         console.print("[dim]Left your library untouched.[/]")
         return
 
-    release = apply_import(session, candidate, acquired_on=acquired, notes=notes)
+    try:
+        release = apply_import(session, candidate, acquired_on=acquired, notes=notes, force=force)
+    except NotAPressing as e:
+        console.print(f"[yellow]{e}[/]")
+        return
     console.print(
         f"[bold green]{candidate.album or 'That record'} is on the shelf.[/] "
         f"[dim]release #{release.id}[/]"
@@ -2008,16 +2028,29 @@ def _vinyl_fill(session, release_id: int | None) -> None:
         console.print("[green]Every side has a BPM — they're all plannable.[/]")
         return
 
+    if not sys.stdin.isatty():
+        # Without a terminal every prompt takes its empty default and the whole
+        # walk finishes having asked nothing — which looks like it worked.
+        console.print(
+            f"[yellow]{len(rows)} side(s) need a BPM, but there's no terminal to type into.[/]\n"
+            "[dim]Run this from an interactive shell, or set them one at a time:\n"
+            f"  kiku vinyl bpm {rows[0].id} 136 -k 8A[/]"
+        )
+        return
+
     console.print(
         f"\n[bold]{len(rows)} side(s) still need a BPM.[/] "
-        "[dim]Press Enter to skip one; Ctrl-C to stop.[/]"
+        "[dim]Type the number and hit Enter. Enter alone skips a side; Ctrl-C stops.[/]"
     )
     filled = 0
-    for tr in rows:
+    skipped = 0
+    for i, tr in enumerate(rows, 1):
         label = f"{tr.vinyl_position or '—'}  {tr.artist or '?'} — {tr.title or '?'}"
         try:
-            bpm = click.prompt(f"  {label}\n    BPM", default="", show_default=False)
+            console.print(f"\n[dim]({i}/{len(rows)})[/] [bold]{label}[/]")
+            bpm = click.prompt("    BPM", default="", show_default=False)
             if not bpm.strip():
+                skipped += 1
                 continue
             key = click.prompt(
                 "    Key (Camelot or musical, Enter to skip)", default="", show_default=False
@@ -2025,12 +2058,22 @@ def _vinyl_fill(session, release_id: int | None) -> None:
             set_manual_bpm_key(session, tr.id, bpm=float(bpm), key=key.strip() or None)
             filled += 1
         except (ValueError, TypeError):
+            skipped += 1
             console.print("    [yellow]That doesn't look like a BPM — skipping this one.[/]")
         except (KeyboardInterrupt, click.Abort):
             console.print("\n[dim]Stopped. What you typed is saved.[/]")
             break
 
-    console.print(f"\n[bold green]{filled} side(s) can now be planned into a set.[/]")
+    if filled:
+        console.print(f"\n[bold green]{filled} side(s) can now be planned into a set.[/]")
+    else:
+        console.print(
+            "\n[yellow]Nothing filled — every side was skipped.[/]\n"
+            "[dim]Type a BPM at the prompt to make a side plannable; "
+            "`kiku vinyl fill` picks up where you left off.[/]"
+        )
+    if filled and skipped:
+        console.print(f"[dim]{skipped} still waiting — rerun `kiku vinyl fill` for those.[/]")
 
 
 @vinyl_group.command("bpm")
@@ -2065,6 +2108,40 @@ def vinyl_bpm(track_id, bpm, key, length):
         f"[green]{tr.vinyl_position or '—'} {tr.artist or '?'} — {tr.title or '?'}[/] "
         f"is {tr.bpm:g} BPM{f' in {tr.key}' if tr.key else ''}."
     )
+
+
+@vinyl_group.command("remove")
+@click.argument("release_id", type=int)
+@click.option("--yes", "-y", is_flag=True, help="Skip the confirmation")
+def vinyl_remove(release_id, yes):
+    """Take a record off the shelf, with the sides that came in with it."""
+    from kiku.db.models import Track, VinylRelease, get_session
+    from kiku.vinyl.importer import remove_release
+
+    session = get_session()
+    release = session.get(VinylRelease, release_id)
+    if release is None:
+        console.print(f"[yellow]There's no record #{release_id} on the shelf.[/]")
+        return
+
+    rows = session.query(Track).filter_by(vinyl_release_id=release_id, medium="vinyl").all()
+    console.print(
+        f"\n[bold]{release.title or '—'}[/] · {release.artist or '—'}"
+        f" · {release.format or 'format unknown'}  [dim]({len(rows)} side(s))[/]"
+    )
+    for r in rows:
+        console.print(f"  [dim]{r.vinyl_position or '—'}[/]  {r.title or '?'}")
+
+    played = [r for r in rows if (r.kiku_play_count or 0) or (r.play_count or 0)]
+    if played:
+        console.print(f"[yellow]{len(played)} of these have plays on them.[/]")
+
+    if not yes and not click.confirm("Take it off the shelf?", default=False):
+        console.print("[dim]Left it where it was.[/]")
+        return
+
+    title, removed = remove_release(session, release_id)
+    console.print(f"[green]{title or 'That record'} is off the shelf.[/] [dim]{removed} side(s)[/]")
 
 
 @vinyl_group.command("list")

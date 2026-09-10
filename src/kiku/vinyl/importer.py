@@ -57,6 +57,31 @@ class NoVinylSource(RuntimeError):
     """No configured source can look a record up right now."""
 
 
+class NotAPressing(RuntimeError):
+    """The chosen release isn't a physical record."""
+
+
+# Discogs lists the digital edition of a record alongside the pressing, with the
+# same title and catalogue number. Its positions are 1,2,3,4 — no sides — so it
+# lands on the shelf looking almost right and reads as a second copy forever.
+_PHYSICAL_FORMATS = ("vinyl", "lp", '7"', '10"', '12"', "shellac", "acetate", "flexi")
+
+
+def is_a_pressing(format_text: str | None) -> bool:
+    """True when this release is something you can physically pull off a shelf.
+
+    Unknown formats pass: the shelf is the DJ's call, and refusing a record we
+    simply can't classify would be worse than letting an odd one through.
+    """
+    if not format_text:
+        return True
+    low = format_text.lower()
+    if any(f in low for f in _PHYSICAL_FORMATS):
+        return True
+    # Named digital formats are the ones worth stopping.
+    return not any(f in low for f in ("file", "wav", "mp3", "flac", "aac", "streaming"))
+
+
 def _source_or_raise(source_name: str):
     from kiku.metadata.sources import get_source
 
@@ -125,13 +150,25 @@ def apply_import(
     *,
     acquired_on: str | None = None,
     notes: str | None = None,
+    force: bool = False,
 ) -> VinylRelease:
     """Write the pressing and one track row per side position.
 
     Idempotent by `discogs_release_id`: adding the same record twice updates the
     sides you already have rather than growing a second copy of the shelf.
+
+    Idempotency is per *release*, though, and Discogs files the digital edition
+    as its own release — so the format guard is what actually stops the shelf
+    growing a second copy of a record you own once.
     """
     from kiku.metadata.sources.discogs import rpm_from_format
+
+    if not force and not is_a_pressing(candidate.format):
+        raise NotAPressing(
+            f"That's the {candidate.format} edition of {candidate.album or 'it'}, "
+            "not the pressing — its tracks have no sides. "
+            "Pick the vinyl release, or --force if you meant this one."
+        )
 
     release = _find_existing_release(session, candidate)
     if release is None:
@@ -232,6 +269,29 @@ def set_manual_bpm_key(
         track.enrichment_status = "manual"
     session.commit()
     return track
+
+
+def remove_release(session: Session, release_id: int) -> tuple[str | None, int]:
+    """Take a record off the shelf, with the sides that came in with it.
+
+    Returns (title, sides removed). Only ever deletes vinyl rows belonging to
+    this release — a digital track that happens to share the album never moves.
+    """
+    release = session.get(VinylRelease, release_id)
+    if release is None:
+        raise ValueError(f"No record #{release_id} on the shelf")
+
+    rows = (
+        session.query(Track)
+        .filter(Track.vinyl_release_id == release_id, Track.medium == "vinyl")
+        .all()
+    )
+    title = release.title
+    for row in rows:
+        session.delete(row)
+    session.delete(release)
+    session.commit()
+    return title, len(rows)
 
 
 def _find_existing_release(session: Session, candidate: ReleaseCandidate) -> VinylRelease | None:
