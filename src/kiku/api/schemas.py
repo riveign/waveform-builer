@@ -63,6 +63,12 @@ class TrackResponse(BaseModel):
     playlist_tags: list[str] = []
     set_roles: list[str] = []
     genre_family: str | None = None
+    # Vinyl (spec 030). `medium` is always present; the rest are NULL for digital.
+    medium: str = "digital"
+    vinyl_position: str | None = None
+    vinyl_release_id: int | None = None
+    bpm_source: str | None = None
+    key_source: str | None = None
 
     model_config = {"from_attributes": True}
 

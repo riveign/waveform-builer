@@ -26,15 +26,16 @@ def export_m3u8(
 
     from kiku.export.m3u8 import export_set_to_m3u8
 
-    output_path = export_set_to_m3u8(
+    result = export_set_to_m3u8(
         s,
         target_platform=platform,
         with_metadata=with_metadata,
     )
     return FileResponse(
-        path=output_path,
+        path=result.path,
         media_type="audio/x-mpegurl",
         filename=f"{s.name or 'set'}.m3u8",
+        headers=_skip_headers(result),
     )
 
 
@@ -65,9 +66,27 @@ def export_rekordbox(set_id: int, db: Session = Depends(get_db)):
                 }
             )
 
-    output_path = export_set_to_xml(s, transition_cues=transition_cues)
+    result = export_set_to_xml(s, transition_cues=transition_cues)
     return FileResponse(
-        path=str(output_path),
+        path=result.path,
         media_type="application/xml",
         filename=f"{s.name or 'set'}.xml",
+        headers=_skip_headers(result),
     )
+
+
+def _skip_headers(result) -> dict[str, str]:
+    """Tracks with no file can't be in the playlist — say so in the response.
+
+    A downloaded file has nowhere to carry a message, so the count and the list
+    ride along as headers and the UI surfaces them next to the download.
+    """
+    if not result.skipped:
+        return {}
+    listing = "; ".join(f"{s.artist or '?'} - {s.title} ({s.reason})" for s in result.skipped)
+    return {
+        "X-Kiku-Skipped-Count": str(len(result.skipped)),
+        # Header values must be latin-1; a title with an em dash would 500 the
+        # response otherwise.
+        "X-Kiku-Skipped": listing.encode("ascii", "replace").decode("ascii"),
+    }

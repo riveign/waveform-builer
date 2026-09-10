@@ -724,14 +724,15 @@ def export(
     if fmt == "m3u8":
         from kiku.export.m3u8 import export_set_to_m3u8
 
-        output_path = export_set_to_m3u8(
+        result = export_set_to_m3u8(
             set_,
             output,
             target_platform=platform,
             with_metadata=with_metadata,
         )
-        track_count = len(set_.tracks)
-        console.print(f"[green]Exported {track_count} tracks to {output_path}[/]")
+        _report_export_skips(result)
+        track_count = len(set_.tracks) - len(result.skipped)
+        console.print(f"[green]Exported {track_count} tracks to {result.path}[/]")
         console.print("[dim]Import into Rekordbox: File > Import > Import Playlist[/]")
 
     elif fmt == "rekordbox":
@@ -763,8 +764,26 @@ def export(
             else:
                 console.print("[dim]No cue points found for this set.[/]")
 
-        output_path = export_set_to_xml(set_, output, transition_cues=transition_cues)
-        console.print(f"[green]Exported to {output_path}[/]")
+        result = export_set_to_xml(set_, output, transition_cues=transition_cues)
+        _report_export_skips(result)
+        console.print(f"[green]Exported to {result.path}[/]")
+
+
+def _report_export_skips(result) -> None:
+    """Say what didn't make it into the playlist, and why.
+
+    A record on the shelf has no file to point at. Silence here would mean
+    finding out in the booth.
+    """
+    if not result.skipped:
+        return
+    console.print(
+        f"\n[yellow]{len(result.skipped)} track(s) aren't in the playlist — "
+        "they have no file to point at:[/]"
+    )
+    for s in result.skipped:
+        console.print(f"  [dim]-[/] {s.artist or '?'} - {s.title}  [dim]({s.reason})[/]")
+    console.print("[dim]Pull those by hand — the playlist covers the rest.[/]")
 
 
 @cli.command("import-playlist")
@@ -1800,3 +1819,303 @@ def fix_album(
         album_key=album_key,
     )
     console.print(f"[bold green]Fixed {touched} track(s).[/] {candidate.album or ''}")
+
+
+@cli.group("vinyl")
+def vinyl_group():
+    """Records you own on the shelf — the half of your library with no files."""
+
+
+@vinyl_group.command("add")
+@click.argument("query", required=False)
+@click.option("--url", default=None, help="Discogs release URL, if you have it")
+@click.option(
+    "--source",
+    "source_name",
+    default="discogs",
+    type=click.Choice(["discogs", "musicbrainz"]),
+    help="Where to read the tracklist from (Discogs knows the side positions)",
+)
+@click.option("--artist", "-a", default=None, help="Artist, to sharpen the search")
+@click.option(
+    "--candidate",
+    "candidate_index",
+    default=None,
+    type=int,
+    help="Pick the Nth pressing (0-based) instead of being asked",
+)
+@click.option("--acquired", default=None, help="When it joined the shelf (YYYY-MM-DD)")
+@click.option("--notes", default=None, help="Anything worth remembering about this copy")
+@click.option("--dry-run", is_flag=True, help="Show the record without writing anything")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation and add it")
+@click.option(
+    "--no-fill",
+    is_flag=True,
+    help="Skip the BPM/key pass — the record lands unplannable until you come back",
+)
+def vinyl_add(
+    query, url, source_name, artist, candidate_index, acquired, notes, dry_run, yes, no_fill
+):
+    """Add a record from your shelf.
+
+    \b
+    Examples:
+      kiku vinyl add "Klockworks 38" -a Alarico
+      kiku vinyl add --url https://www.discogs.com/release/28715971
+      kiku vinyl add "AF 97" -a Alarico --candidate 0 -y
+    """
+    from kiku.db.models import get_session
+    from kiku.metadata.sources.base import LookupUnsupported, SourceUnavailable
+    from kiku.vinyl.importer import (
+        NoVinylSource,
+        apply_import,
+        build_preview,
+        fetch_release_url,
+        search_releases,
+    )
+
+    if not query and not url:
+        console.print("[yellow]Which record?[/] Pass an album name or a --url.")
+        return
+
+    session = get_session()
+    try:
+        if url:
+            console.print(f"[cyan]Reading that pressing off {source_name}…[/]")
+            candidates = [c for c in [fetch_release_url(url, source_name=source_name)] if c]
+        else:
+            console.print(f"[cyan]Looking for '{query}' on {source_name}…[/]")
+            candidates = search_releases(query, artist or "", source_name=source_name, limit=5)
+    except (NoVinylSource, SourceUnavailable) as e:
+        console.print(f"[red]{e}[/]")
+        return
+    except LookupUnsupported as e:
+        console.print(f"[yellow]{e}[/]")
+        return
+
+    if not candidates:
+        console.print(
+            "[yellow]Nothing came back for that.[/] Try the catalogue number, "
+            "or paste the Discogs URL with --url."
+        )
+        return
+
+    if candidate_index is None and len(candidates) > 1:
+        table = Table(title="Which pressing?")
+        table.add_column("#", justify="right", style="dim")
+        table.add_column("Release")
+        table.add_column("Artist")
+        table.add_column("Label / cat#")
+        table.add_column("Year", justify="right")
+        table.add_column("Format")
+        table.add_column("Sides", justify="right")
+        for i, c in enumerate(candidates):
+            table.add_row(
+                str(i),
+                c.album or "—",
+                c.artist or "—",
+                " · ".join(x for x in (c.label, c.catalog_number) if x) or "—",
+                str(c.year or "—"),
+                c.format or "—",
+                str(c.track_count),
+            )
+        console.print(table)
+        candidate_index = click.prompt("Pick one", type=int, default=0)
+
+    idx = candidate_index or 0
+    if idx < 0 or idx >= len(candidates):
+        console.print(f"[red]There's no #{idx} in that list.[/]")
+        return
+    candidate = candidates[idx]
+
+    preview = build_preview(session, candidate)
+    console.print(
+        f"\n[bold]{candidate.album or '—'}[/] · {candidate.artist or '—'}"
+        f" · {candidate.label or '—'} {candidate.catalog_number or ''}"
+        f" · {candidate.year or '—'}  [dim]({candidate.format or 'format unknown'})[/]"
+    )
+
+    table = Table(
+        title="Re-import — sides you already have are marked" if preview.is_reimport else "Sides"
+    )
+    table.add_column("Side", style="bold")
+    table.add_column("Title")
+    table.add_column("Artist", style="dim")
+    table.add_column("Length", justify="right")
+    table.add_column("", style="dim")
+    for row in preview.rows:
+        length = (
+            f"{int(row.duration_sec // 60)}:{int(row.duration_sec % 60):02d}"
+            if row.duration_sec
+            else "—"
+        )
+        table.add_row(
+            row.position_raw or "—",
+            row.title,
+            row.artist or "—",
+            length,
+            "already on the shelf" if row.existing_track_id else "",
+        )
+    console.print(table)
+
+    if dry_run:
+        console.print("[dim]Dry run — nothing written.[/]")
+        return
+
+    if not yes and not click.confirm(
+        f"Add {preview.new_count} side(s) to your library?", default=True
+    ):
+        console.print("[dim]Left your library untouched.[/]")
+        return
+
+    release = apply_import(session, candidate, acquired_on=acquired, notes=notes)
+    console.print(
+        f"[bold green]{candidate.album or 'That record'} is on the shelf.[/] "
+        f"[dim]release #{release.id}[/]"
+    )
+
+    # The spike found a BPM for 1 recording in 54 (spec Research R1). Nobody is
+    # going to enrich these — so the fill pass is the import, not an afterthought.
+    if no_fill:
+        console.print(
+            "[dim]No BPMs yet, so it can't be planned into a set. "
+            f"`kiku vinyl fill {release.id}` when you're ready.[/]"
+        )
+        return
+    _vinyl_fill(session, release.id)
+
+
+@vinyl_group.command("fill")
+@click.argument("release_id", type=int, required=False)
+def vinyl_fill(release_id):
+    """Type the BPM and key for sides that don't have them yet."""
+    from kiku.db.models import get_session
+
+    _vinyl_fill(get_session(), release_id)
+
+
+def _vinyl_fill(session, release_id: int | None) -> None:
+    """Walk the unplannable vinyl rows and ask for a BPM. Enter skips one."""
+    from kiku.db.models import Track
+    from kiku.vinyl.importer import set_manual_bpm_key
+
+    q = session.query(Track).filter(Track.medium == "vinyl")
+    if release_id is not None:
+        q = q.filter(Track.vinyl_release_id == release_id)
+    rows = [t for t in q.order_by(Track.disc_number, Track.track_number, Track.id) if not t.bpm]
+
+    if not rows:
+        console.print("[green]Every side has a BPM — they're all plannable.[/]")
+        return
+
+    console.print(
+        f"\n[bold]{len(rows)} side(s) still need a BPM.[/] "
+        "[dim]Press Enter to skip one; Ctrl-C to stop.[/]"
+    )
+    filled = 0
+    for tr in rows:
+        label = f"{tr.vinyl_position or '—'}  {tr.artist or '?'} — {tr.title or '?'}"
+        try:
+            bpm = click.prompt(f"  {label}\n    BPM", default="", show_default=False)
+            if not bpm.strip():
+                continue
+            key = click.prompt(
+                "    Key (Camelot or musical, Enter to skip)", default="", show_default=False
+            )
+            set_manual_bpm_key(session, tr.id, bpm=float(bpm), key=key.strip() or None)
+            filled += 1
+        except (ValueError, TypeError):
+            console.print("    [yellow]That doesn't look like a BPM — skipping this one.[/]")
+        except (KeyboardInterrupt, click.Abort):
+            console.print("\n[dim]Stopped. What you typed is saved.[/]")
+            break
+
+    console.print(f"\n[bold green]{filled} side(s) can now be planned into a set.[/]")
+
+
+@vinyl_group.command("bpm")
+@click.argument("track_id", type=int)
+@click.argument("bpm", type=float)
+@click.option("--key", "-k", default=None, help="Musical or Camelot key")
+@click.option(
+    "--length",
+    default=None,
+    help='Track length as m:ss — Discogs leaves this blank on most 12"s',
+)
+def vinyl_bpm(track_id, bpm, key, length):
+    """Set one side's BPM by hand."""
+    from kiku.db.models import get_session
+    from kiku.vinyl.importer import set_manual_bpm_key
+
+    session = get_session()
+    duration = None
+    if length:
+        try:
+            mins, _, secs = length.partition(":")
+            duration = int(mins) * 60 + int(secs or 0)
+        except ValueError:
+            console.print(f"[red]'{length}' doesn't look like a length — try 6:12.[/]")
+            return
+    try:
+        tr = set_manual_bpm_key(session, track_id, bpm=bpm, key=key, duration_sec=duration)
+    except ValueError as e:
+        console.print(f"[red]{e}[/]")
+        return
+    console.print(
+        f"[green]{tr.vinyl_position or '—'} {tr.artist or '?'} — {tr.title or '?'}[/] "
+        f"is {tr.bpm:g} BPM{f' in {tr.key}' if tr.key else ''}."
+    )
+
+
+@vinyl_group.command("list")
+def vinyl_list():
+    """The shelf, and how much of it Kiku can actually plan with."""
+    from kiku.db.models import Track, VinylRelease, get_session
+
+    session = get_session()
+    releases = session.query(VinylRelease).order_by(VinylRelease.artist, VinylRelease.title).all()
+    if not releases:
+        console.print(
+            '[dim]No records yet. `kiku vinyl add "<album>"` puts the first one on the shelf.[/]'
+        )
+        return
+
+    table = Table(title=f"{len(releases)} record(s) on the shelf")
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Release")
+    table.add_column("Artist")
+    table.add_column("Label / cat#")
+    table.add_column("Year", justify="right")
+    table.add_column("Sides", justify="right")
+    table.add_column("Plannable", justify="right")
+
+    unplannable = 0
+    no_length = 0
+    for r in releases:
+        tracks = session.query(Track).filter(Track.vinyl_release_id == r.id).all()
+        with_bpm = sum(1 for t in tracks if t.bpm)
+        unplannable += len(tracks) - with_bpm
+        no_length += sum(1 for t in tracks if not t.duration_sec)
+        table.add_row(
+            str(r.id),
+            r.title or "—",
+            r.artist or "—",
+            " · ".join(x for x in (r.label, r.catalog_number) if x) or "—",
+            str(r.year or "—"),
+            str(len(tracks)),
+            f"{with_bpm}/{len(tracks)}",
+        )
+    console.print(table)
+    if unplannable:
+        console.print(
+            f"[dim]{unplannable} side(s) have no BPM yet, so the builder can't reach them. "
+            "`kiku vinyl fill` fixes that.[/]"
+        )
+    if no_length:
+        # Discogs carried a duration for 5 of 17 sampled sides. The builder
+        # estimates past a blank, so a set still plans — its running time is just
+        # a guess, and the DJ should hear that from us rather than from the clock.
+        console.print(
+            f"[dim]{no_length} side(s) have no length, so set times are estimated. "
+            "`kiku vinyl bpm <id> <bpm> --length 6:12` when you want them exact.[/]"
+        )

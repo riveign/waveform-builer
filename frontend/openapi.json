@@ -4612,6 +4612,17 @@
             ],
             "title": "Bpm"
           },
+          "bpm_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm Source"
+          },
           "comment": {
             "anyOf": [
               {
@@ -4768,6 +4779,17 @@
             ],
             "title": "Key"
           },
+          "key_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Source"
+          },
           "kiku_play_count": {
             "anyOf": [
               {
@@ -4789,6 +4811,11 @@
               }
             ],
             "title": "Label"
+          },
+          "medium": {
+            "default": "digital",
+            "title": "Medium",
+            "type": "string"
           },
           "play_count": {
             "anyOf": [
@@ -4871,6 +4898,28 @@
               }
             ],
             "title": "Track Number"
+          },
+          "vinyl_position": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vinyl Position"
+          },
+          "vinyl_release_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vinyl Release Id"
           }
         },
         "required": [
@@ -8959,6 +9008,22 @@
                 }
               ],
               "title": "Set Role"
+            }
+          },
+          {
+            "in": "query",
+            "name": "medium",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Medium"
             }
           },
           {

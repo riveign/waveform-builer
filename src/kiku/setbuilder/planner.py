@@ -87,9 +87,21 @@ def _get_candidate_pool(
     session: Session,
     genres: list[str] | None = None,
     bpm_range: tuple[float, float] | None = None,
+    include_vinyl: bool = False,
 ) -> list[Track]:
-    """Get filtered candidate pool."""
+    """Get filtered candidate pool.
+
+    Vinyl is excluded by default (spec 030, Risk 3). A record with a BPM is a
+    perfectly good candidate — that is the whole finding — but until the vinyl
+    ratio and the deck-change penalty exist, dropping records into an ordinary
+    digital build would be a surprise, not a feature. Slice 2 turns this on.
+    """
     q = session.query(Track).filter(Track.bpm.isnot(None), Track.bpm > 0)
+
+    if not include_vinyl:
+        # coalesce, not `!= "vinyl"` — in SQL a NULL medium would fail that
+        # comparison and the row would vanish from the pool.
+        q = q.filter(func.coalesce(Track.medium, "digital") != "vinyl")
 
     if genres:
         conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genres]

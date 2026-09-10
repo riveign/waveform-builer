@@ -3063,6 +3063,8 @@ export interface components {
             artist?: string | null;
             /** Bpm */
             bpm?: number | null;
+            /** Bpm Source */
+            bpm_source?: string | null;
             /** Comment */
             comment?: string | null;
             /** Date Added */
@@ -3100,10 +3102,17 @@ export interface components {
             id: number;
             /** Key */
             key?: string | null;
+            /** Key Source */
+            key_source?: string | null;
             /** Kiku Play Count */
             kiku_play_count?: number | null;
             /** Label */
             label?: string | null;
+            /**
+             * Medium
+             * @default digital
+             */
+            medium: string;
             /** Play Count */
             play_count?: number | null;
             /**
@@ -3126,6 +3135,10 @@ export interface components {
             title?: string | null;
             /** Track Number */
             track_number?: number | null;
+            /** Vinyl Position */
+            vinyl_position?: string | null;
+            /** Vinyl Release Id */
+            vinyl_release_id?: number | null;
         };
         /** TrackSetAppearance */
         TrackSetAppearance: {
@@ -5430,6 +5443,7 @@ export interface operations {
                 plays_min?: number | null;
                 plays_max?: number | null;
                 set_role?: string[] | null;
+                medium?: string | null;
                 sort?: string | null;
                 limit?: number;
                 offset?: number;

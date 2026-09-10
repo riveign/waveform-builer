@@ -104,6 +104,7 @@ def search_tracks(
     plays_min: int | None = None,
     plays_max: int | None = None,
     set_role: str | list[str] | None = None,
+    medium: str | None = None,
     sort: str | None = None,
     search: str | None = None,
     limit: int = 50,
@@ -117,6 +118,7 @@ def search_tracks(
         (bare name = descending, "_asc" suffix = ascending).
     search: free-text OR-match across title, artist, and label.
     plays_min/plays_max: filter by combined play count (Rekordbox + Kiku).
+    medium: "digital" | "vinyl" — omit to see the whole library, both formats.
     """
     q = session.query(Track)
     if search:
@@ -178,6 +180,10 @@ def search_tracks(
         # A list OR-matches — a track with ANY selected role qualifies (spec 028).
         roles = [set_role] if isinstance(set_role, str) else set_role
         q = q.filter(or_(*[Track.set_roles.ilike(f'%"{r}"%') for r in roles]))
+    if medium:
+        # coalesce: rows written before spec 030's backfill would otherwise
+        # disappear from a "digital" filter for having a NULL medium.
+        q = q.filter(func.coalesce(Track.medium, "digital") == medium)
     if plays_min is not None:
         combined = func.coalesce(Track.play_count, 0) + func.coalesce(Track.kiku_play_count, 0)
         q = q.filter(combined >= plays_min)

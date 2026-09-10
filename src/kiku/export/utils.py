@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # Path aliases: (macOS prefix, Linux prefix).
@@ -10,6 +11,39 @@ from pathlib import Path
 _PATH_ALIASES: list[tuple[str, str]] = [
     ("/Volumes/", "/run/media/mantis/"),
 ]
+
+
+@dataclass
+class SkippedTrack:
+    """A track that couldn't go in the playlist, and why."""
+
+    track_id: int
+    title: str
+    artist: str | None
+    reason: str  # human-readable: "on vinyl — side B2"
+
+
+@dataclass
+class ExportResult:
+    """Where the file went, and what didn't make it in.
+
+    Rekordbox reads a missing Location as a corrupt entry, not a placeholder, so
+    a fileless track is left out of the playlist and reported here instead —
+    the DJ finds out at export time rather than on the booth screen.
+    """
+
+    path: str
+    skipped: list[SkippedTrack] = field(default_factory=list)
+
+
+def skip_reason(track) -> str | None:
+    """Why this track can't be exported to a file-based playlist, or None."""
+    if track.file_path:
+        return None
+    if track.medium == "vinyl":
+        side = f" — side {track.vinyl_position}" if track.vinyl_position else ""
+        return f"on vinyl{side}"
+    return "no file on disk"
 
 
 def export_path(file_path: str, target_platform: str = "macos") -> str:

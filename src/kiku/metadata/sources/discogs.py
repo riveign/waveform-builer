@@ -60,6 +60,19 @@ class DiscogsSource:
             },
         )
         results = (data or {}).get("results", []) or []
+        if not results:
+            # The structured search matches on release title. A DJ naming a
+            # record by the track on it ("AF 97" for Klockworks 38) gets zero
+            # hits — measured, not guessed. Free-text finds it.
+            data = self._get(
+                "/database/search",
+                params={
+                    "q": " ".join(x for x in (artist, album) if x).strip(),
+                    "type": "release",
+                    "per_page": limit,
+                },
+            )
+            results = (data or {}).get("results", []) or []
         candidates: list[ReleaseCandidate] = []
         for r in results[:limit]:
             rid = r.get("id")
@@ -90,28 +103,40 @@ class DiscogsSource:
         return self._to_candidate(full, release_id)
 
     def _to_candidate(self, full: dict, release_id: int) -> ReleaseCandidate:
+        from kiku.vinyl.position import parse_position
+
         recordings: list[RecordingCandidate] = []
-        pos = 0
+        seq = 0
         for tr in full.get("tracklist", []) or []:
             if (tr.get("type_") or "track") != "track":
                 continue  # skip headings / index tracks
             title = (tr.get("title") or "").strip()
             if not title:
                 continue
-            pos += 1
+            seq += 1
+            raw = (tr.get("position") or "").strip() or None
+            side, index = parse_position(raw)
+            # A pressing without a readable position still needs a stable order,
+            # so fall back to the sequence we walked the tracklist in.
             recordings.append(
                 RecordingCandidate(
                     title=title,
-                    position=pos,
-                    disc=1,
+                    position=index if index is not None else seq,
+                    disc=side if side is not None else 1,
                     length_ms=_duration_to_ms(tr.get("duration")),
+                    position_raw=raw,
                 )
             )
 
         labels = full.get("labels") or []
         label = labels[0].get("name") if labels and labels[0].get("name") else None
+        catno = labels[0].get("catno") if labels and labels[0].get("catno") else None
         artists = full.get("artists") or []
         artist = _join_artists(artists)
+        formats = full.get("formats") or []
+        fmt = _format_text(formats[0]) if formats else None
+        images = full.get("images") or []
+        cover = images[0].get("uri") if images and images[0].get("uri") else None
 
         return ReleaseCandidate(
             source=self.name,
@@ -121,6 +146,10 @@ class DiscogsSource:
             artist=artist,
             label=label,
             year=full.get("year") or None,
+            catalog_number=catno,
+            country=full.get("country") or None,
+            format=fmt,
+            cover_url=cover,
             recordings=recordings,
         )
 
@@ -168,3 +197,31 @@ def _duration_to_ms(text: str | None) -> int | None:
     if not m:
         return None
     return (int(m.group(1)) * 60 + int(m.group(2))) * 1000
+
+
+def _format_text(fmt: dict) -> str | None:
+    """Flatten Discogs' format object into the string printed on a sleeve.
+
+    {"name": "Vinyl", "descriptions": ["12\"", "33 1/3 RPM", "EP"]}
+        -> 'Vinyl, 12", 33 1/3 RPM, EP'
+    """
+    parts = [(fmt.get("name") or "").strip()]
+    parts += [d.strip() for d in (fmt.get("descriptions") or []) if d and d.strip()]
+    out = ", ".join(p for p in parts if p)
+    return out or None
+
+
+def rpm_from_format(fmt_text: str | None) -> int | None:
+    """Pull the RPM out of a Discogs format string, when it says one.
+
+    Often it doesn't — three of four sampled 12"s carried no RPM description.
+    """
+    if not fmt_text:
+        return None
+    if "45 RPM" in fmt_text:
+        return 45
+    if "33" in fmt_text and "RPM" in fmt_text:
+        return 33
+    if "78 RPM" in fmt_text:
+        return 78
+    return None

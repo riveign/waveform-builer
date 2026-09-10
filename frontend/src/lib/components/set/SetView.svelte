@@ -99,6 +99,9 @@
 			title: swt.title,
 			artist: swt.artist,
 			album: null,
+			// The set-waveform payload carries no medium; anything with a waveform
+			// came off a file, so digital is the truthful default here.
+			medium: 'digital',
 			bpm: swt.bpm,
 			key: swt.key,
 			rating: null,

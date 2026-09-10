@@ -588,11 +588,11 @@ def register_callbacks(app):
             from kiku.export.rekordbox_xml import export_set_to_xml
 
             cues = _get_all_set_cues(session, set_id)
-            output_path = export_set_to_xml(set_, transition_cues=cues)
+            result = export_set_to_xml(set_, transition_cues=cues)
             return html.Div(
                 [
                     html.Span("Exported: ", style={"color": "#2ecc71", "fontWeight": "600"}),
-                    html.Code(output_path, style={"color": "#00d2ff"}),
+                    html.Code(result.path, style={"color": "#00d2ff"}),
                 ]
             )
         except Exception as e:
