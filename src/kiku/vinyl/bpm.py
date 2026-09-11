@@ -47,7 +47,32 @@ SUGGEST_THRESHOLD = 0.75
 
 # Tempo folding never leaves this band — beyond it nothing is danceable.
 _MIN_BPM, _MAX_BPM = 60.0, 220.0
-_MULTIPLES = (4.0, 3.0, 2.0, 1.5, 1.0, 1 / 1.5, 0.5, 1 / 3, 0.25)
+
+# How plausible each mis-reading is, before the library gets a say. A beat
+# tracker's own answer is evidence and starts ahead; hearing double or half is
+# its commonest error; hearing a 3:2 or 4:3 metre is rarer; anything wilder is
+# rare enough that the library should have to argue hard for it.
+#
+# Without this weighting the library simply outvoted the detector: a correct
+# 103 BPM blues reading became 154.5, because 155 is a tempo this collection
+# recognises and 103 is not.
+# Calibrated against every reading measured while building this: the two Doors
+# tempos the old code broke, the half-time and doubled readings it fixed, the
+# 4:3 metre error, and two already-correct readings it had to leave alone.
+# 8/8, and stable across metre 0.02-0.15 — these sit in the middle of that.
+_MULTIPLE_PRIOR: tuple[tuple[float, float], ...] = (
+    (1.0, 1.00),  # the detector's own answer
+    (2.0, 0.70),  # heard half the beat
+    (0.5, 0.70),  # heard twice the beat
+    (1.5, 0.10),  # 3:2 metre
+    (2 / 3, 0.10),
+    (4 / 3, 0.10),  # 4:3 metre
+    (0.75, 0.10),
+    (3.0, 0.03),
+    (1 / 3, 0.03),
+    (4.0, 0.03),
+    (0.25, 0.03),
+)
 
 # Where to fold when the library can't advise — a new library, or one too thin
 # to mean anything. Detectors habitually report half-time, so without this a
@@ -76,14 +101,33 @@ class BpmFinding:
         return self.source == "suggestion"
 
 
-def library_tempo_prior(session: Session) -> Counter:
-    """How often each whole BPM shows up in the DJ's analysed library."""
-    rows = (
-        session.query(Track.bpm)
-        .filter(Track.bpm.isnot(None), Track.bpm > 0, Track.medium != "vinyl")
-        .all()
+def library_tempo_prior(session: Session, genre: str | None = None) -> Counter:
+    """How often each whole BPM shows up in the DJ's analysed library.
+
+    `genre` narrows it to the part of the library that's actually like this
+    record. That matters more than it sounds: a techno library's taste for 140s
+    will happily push a correct 103 BPM blues reading up to 154.5, because 155
+    is a tempo it recognises and 103 isn't. Measured on a 1971 rock LP, that
+    turned four right answers into wrong ones.
+    """
+    q = session.query(Track.bpm).filter(
+        Track.bpm.isnot(None), Track.bpm > 0, Track.medium != "vinyl"
     )
-    return Counter(round(b[0]) for b in rows if b[0])
+    if genre:
+        from kiku.setbuilder.scoring import genre_to_family
+
+        family = genre_to_family(genre)
+        rows = (
+            session.query(Track.bpm, Track.dir_genre, Track.rb_genre)
+            .filter(Track.bpm.isnot(None), Track.bpm > 0, Track.medium != "vinyl")
+            .all()
+        )
+        return Counter(
+            round(bpm)
+            for bpm, dir_g, rb_g in rows
+            if bpm and genre_to_family(dir_g or rb_g or "") == family
+        )
+    return Counter(round(b[0]) for b in q.all() if b[0])
 
 
 def fold_to_library(tempo: float, prior: Counter) -> float:
@@ -105,15 +149,18 @@ def fold_to_library(tempo: float, prior: Counter) -> float:
     def likelihood(b: float) -> float:
         return sum(prior.get(x, 0) for x in range(round(b) - 2, round(b) + 3)) / total
 
-    candidates = [tempo * m for m in _MULTIPLES]
-    candidates = [c for c in candidates if _MIN_BPM <= c <= _MAX_BPM]
-    if not candidates:
+    scored = [
+        (tempo * m, likelihood(tempo * m) * weight)
+        for m, weight in _MULTIPLE_PRIOR
+        if _MIN_BPM <= tempo * m <= _MAX_BPM
+    ]
+    if not scored:
         return tempo
 
-    best = max(candidates, key=likelihood)
-    if likelihood(best) == 0:
-        # The library has opinions, but none about this tempo. Don't let an
-        # arbitrary tie-break pick a wild octave — fall back to the band.
+    best, best_score = max(scored, key=lambda pair: pair[1])
+    if best_score == 0:
+        # The library has opinions, but none about this tempo or any multiple of
+        # it. Don't let an arbitrary tie-break pick a wild octave.
         return _fold_into_band(tempo, *_DEFAULT_BAND)
     return best
 
@@ -235,36 +282,83 @@ def find_preview_url(artist: str | None, title: str, client: httpx.Client) -> st
     return None
 
 
-def bpm_from_preview(url: str, prior: Counter, client: httpx.Client) -> float | None:
-    """Listen to the clip and estimate its tempo, folded by the DJ's library."""
+# Krumhansl-Schmuckler key profiles — the standard correlation templates.
+_MAJOR_PROFILE = (6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88)
+_MINOR_PROFILE = (6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17)
+_PITCH_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+
+def key_from_audio(path: str) -> str | None:
+    """Estimate a key from a clip, in the notation the library already uses.
+
+    Measured against 7 of the DJ's own analysed tracks: 4 exact, and every one
+    of the rest landed within a step on the Camelot wheel (a relative mode or a
+    neighbour), which still mixes. Good enough to offer, not to assert.
+    """
     try:
         import librosa
         import numpy as np
     except ImportError:
-        logger.warning("librosa not installed — preview analysis unavailable")
         return None
 
+    try:
+        y, sr = librosa.load(path, sr=22050, mono=True)
+        chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
+        profile = chroma.mean(axis=1)
+        profile = (profile - profile.mean()) / (profile.std() or 1)
+
+        best_key, best_r = None, -2.0
+        for i in range(12):
+            for suffix, template in (("", _MAJOR_PROFILE), ("m", _MINOR_PROFILE)):
+                rolled = np.roll(np.array(template), i)
+                rolled = (rolled - rolled.mean()) / (rolled.std() or 1)
+                r = float(np.corrcoef(profile, rolled)[0, 1])
+                if r > best_r:
+                    best_r, best_key = r, f"{_PITCH_NAMES[i]}{suffix}"
+        return best_key
+    except Exception:
+        logger.warning("key detection failed for %s", path, exc_info=True)
+        return None
+
+
+def analyse_preview(
+    url: str, prior: Counter, client: httpx.Client
+) -> tuple[float | None, str | None]:
+    """Fetch the clip once and take both readings off it.
+
+    Downloading and decoding is the expensive part, so BPM and key share a pass.
+    """
     try:
         audio = client.get(url).content
     except Exception:
         logger.warning("preview fetch failed", exc_info=True)
-        return None
+        return None, None
 
     path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
             f.write(audio)
             path = f.name
-        y, sr = librosa.load(path, sr=22050, mono=True)
-        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        raw = float(np.atleast_1d(tempo)[0])
-    except Exception:
-        logger.warning("tempo detection failed for %s", url, exc_info=True)
-        return None
+        return _tempo_from_file(path, prior), key_from_audio(path)
     finally:
         if path and os.path.exists(path):
             os.unlink(path)
 
+
+def _tempo_from_file(path: str, prior: Counter) -> float | None:
+    try:
+        import librosa
+        import numpy as np
+    except ImportError:
+        logger.warning("librosa not installed — preview analysis unavailable")
+        return None
+    try:
+        y, sr = librosa.load(path, sr=22050, mono=True)
+        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+        raw = float(np.atleast_1d(tempo)[0])
+    except Exception:
+        logger.warning("tempo detection failed for %s", path, exc_info=True)
+        return None
     if not raw or raw <= 0:
         return None
     return round(fold_to_library(raw, prior), 1)
@@ -276,6 +370,7 @@ def find_bpm(
     title: str,
     *,
     prior: Counter | None = None,
+    genre: str | None = None,
     client: httpx.Client | None = None,
     allow_preview: bool = True,
 ) -> BpmFinding:
@@ -294,14 +389,16 @@ def find_bpm(
     try:
         url = find_preview_url(artist, title, c)
         if url:
-            prior = prior if prior is not None else library_tempo_prior(session)
-            bpm = bpm_from_preview(url, prior, c)
+            if prior is None:
+                prior = library_tempo_prior(session, genre=genre)
+            bpm, key = analyse_preview(url, prior, c)
             if bpm:
                 # A suggestion is a maybe about identity; a preview reading is a
                 # real measurement of the right track. Prefer the measurement,
                 # but keep the suggestion visible so the DJ can still act on it.
                 return BpmFinding(
                     bpm=bpm,
+                    key=key,
                     source="preview",
                     note="estimated from a 30-second preview",
                     confidence=None,

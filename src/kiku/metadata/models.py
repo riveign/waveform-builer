@@ -55,6 +55,7 @@ class ReleaseCandidate:
     country: str | None = None
     format: str | None = None  # 'Vinyl, 12", 33 1/3 RPM, EP'
     cover_url: str | None = None
+    genre: str | None = None  # what kind of record this is — steers the tempo prior
     recordings: list[RecordingCandidate] = field(default_factory=list)
 
     @property

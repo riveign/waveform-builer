@@ -240,11 +240,15 @@ def set_manual_bpm_key(
     bpm: float | None = None,
     key: str | None = None,
     duration_sec: float | None = None,
+    source: str = "manual",
 ) -> Track:
-    """The DJ types the number. That marker is the top of the provenance ladder.
+    """Record a BPM/key together with where it actually came from.
 
-    `manual` outranks essentia, rekordbox and acousticbrainz, so a later
-    enrichment pass can read this and know to leave it alone.
+    `manual` is the top of the ladder: a number the DJ typed or confirmed
+    outranks essentia, rekordbox and acousticbrainz, so a later enrichment pass
+    knows to leave it alone. An estimate must NOT be stamped `manual` — doing so
+    freezes a guess as though it were a decision, and nothing can ever improve
+    it. Callers pass the rung the number came off.
     """
     track = session.get(Track, track_id)
     if track is None:
@@ -254,10 +258,10 @@ def set_manual_bpm_key(
         if bpm <= 0 or bpm > 300:
             raise ValueError(f"{bpm} doesn't look like a BPM — expected 1-300")
         track.bpm = float(bpm)
-        track.bpm_source = "manual"
+        track.bpm_source = source
     if key is not None and key.strip():
         track.key = key.strip()
-        track.key_source = "manual"
+        track.key_source = source
     if duration_sec is not None:
         # Discogs leaves the duration blank on most 12"s, and the builder
         # estimates past a blank rather than failing — so a typed length is the
@@ -266,7 +270,7 @@ def set_manual_bpm_key(
             raise ValueError(f"{duration_sec} isn't a length")
         track.duration_sec = float(duration_sec)
     if track.bpm:
-        track.enrichment_status = "manual"
+        track.enrichment_status = "manual" if source == "manual" else "enriched"
     session.commit()
     return track
 

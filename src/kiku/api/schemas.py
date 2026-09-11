@@ -1045,6 +1045,7 @@ class VinylPreviewResponse(BaseModel):
     country: str | None = None
     format: str | None = None
     cover_url: str | None = None
+    genre: str | None = None
     is_pressing: bool = True
     already_owned: bool = False
     rows: list[VinylPreviewRow] = []
@@ -1054,6 +1055,9 @@ class VinylSideInput(BaseModel):
     position: str
     bpm: float | None = None
     key: str | None = None
+    # Where this number came from. "manual" means the DJ typed or confirmed it
+    # and it outranks every later pass; an estimate must say so instead.
+    source: str = "manual"
 
 
 class VinylImportRequest(BaseModel):

@@ -32,8 +32,12 @@
 	let preview = $state<VinylPreview | null>(null);
 	let loadingPreview = $state(false);
 	let importing = $state(false);
-	/** Side position -> the number the DJ typed or accepted. */
+	/** Side position -> the number currently in the box. */
 	let edits = $state<Record<string, string>>({});
+	/** Sides the DJ typed in or accepted by hand. Only these are `manual`, which
+	 *  is the top of the provenance ladder — stamping an estimate `manual` would
+	 *  freeze a guess as a decision and stop anything ever improving it. */
+	let touched = $state<Record<string, true>>({});
 
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 	let searchCtl: AbortController | undefined;
@@ -57,6 +61,7 @@
 		linkUrl = '';
 		preview = null;
 		edits = {};
+		touched = {};
 	}
 
 	function close() {
@@ -106,6 +111,7 @@
 		try {
 			preview = await previewRelease(target);
 			edits = {};
+			touched = {};
 			for (const row of preview.rows) {
 				// Everything Kiku found starts filled in. A suggestion does not —
 				// it names a different track, so accepting it has to be a choice.
@@ -122,7 +128,9 @@
 	}
 
 	function acceptSuggestion(position: string, bpm: number) {
+		// Taking a suggestion is a judgement call, so it counts as the DJ's own.
 		edits = { ...edits, [position]: String(bpm) };
+		touched = { ...touched, [position]: true };
 	}
 
 	function rejectSuggestion(position: string) {
@@ -149,11 +157,17 @@
 		try {
 			const sides = preview.rows
 				.filter((r) => r.position && edits[r.position]?.trim())
-				.map((r) => ({
-					position: r.position as string,
-					bpm: Number(edits[r.position as string]),
-					key: r.key ?? null,
-				}))
+				.map((r) => {
+					const pos = r.position as string;
+					const typed = touched[pos] || String(r.bpm ?? '') !== edits[pos].trim();
+					return {
+						position: pos,
+						bpm: Number(edits[pos]),
+						key: r.key ?? null,
+						// A number Kiku worked out stays labelled as what it is.
+						source: typed ? 'manual' : (r.bpm_source ?? 'manual'),
+					};
+				})
 				.filter((s) => Number.isFinite(s.bpm) && s.bpm > 0);
 
 			const res = await importRelease({
@@ -322,7 +336,9 @@
 										/>
 									{/if}
 								</td>
-								<td class="right key">{row.key ?? '—'}</td>
+								<td class="right key" class:est={row.bpm_source === 'preview' && row.key}>
+									{row.key ?? '—'}
+								</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -330,7 +346,7 @@
 
 				<p class="legend">
 					<span class="k lib"></span> from your files ·
-					<span class="k prev"></span> estimated from a preview ·
+					<span class="k prev"></span> estimated from a preview — BPM and key both ·
 					<span class="k sus"></span> needs a look
 				</p>
 			{/if}
@@ -453,6 +469,9 @@
 	.src--library { color: var(--accent-text); }
 	.src--suggestion { color: var(--zone-drive); }
 	.key { color: var(--text-2); font-size: var(--text-sm); width: 4rem; }
+	/* An estimated key reads dimmer than one off your own file — harmonic fit is
+	   the heaviest dimension in scoring, so a guess must not look like a fact. */
+	.key.est { color: var(--text-4); font-style: italic; }
 
 	.bpm {
 		width: 5.5rem; text-align: right; font-variant-numeric: tabular-nums;

@@ -117,7 +117,7 @@ def vinyl_preview(
     ]
 
     if fill_bpm:
-        _fill_bpms(db, candidate.artist, rows)
+        _fill_bpms(db, candidate.artist, rows, genre=candidate.genre)
 
     return VinylPreviewResponse(
         source=candidate.source,
@@ -130,25 +130,43 @@ def vinyl_preview(
         country=candidate.country,
         format=candidate.format,
         cover_url=candidate.cover_url,
+        genre=candidate.genre,
         is_pressing=is_a_pressing(candidate.format),
         already_owned=preview.is_reimport,
         rows=rows,
     )
 
 
-def _fill_bpms(db: Session, album_artist: str | None, rows: list[VinylPreviewRow]) -> None:
-    """Walk the provenance ladder for each side, sharing one HTTP client."""
+def _fill_bpms(
+    db: Session,
+    album_artist: str | None,
+    rows: list[VinylPreviewRow],
+    *,
+    genre: str | None = None,
+) -> None:
+    """Walk the provenance ladder for each side, sharing one HTTP client.
+
+    The tempo prior is drawn from the part of the library that resembles this
+    record. Using the whole library pushed a 1971 rock LP's correct 103 BPM up
+    to 154.5, because a techno collection recognises 155 and does not recognise
+    103.
+    """
     import httpx
 
     from kiku.vinyl.bpm import USER_AGENT, find_bpm, library_tempo_prior
 
-    prior = library_tempo_prior(db)
+    prior = library_tempo_prior(db, genre=genre)
     with httpx.Client(
         timeout=30.0, headers={"User-Agent": USER_AGENT}, follow_redirects=True
     ) as client:
         for row in rows:
             finding = find_bpm(
-                db, row.artist or album_artist, row.title, prior=prior, client=client
+                db,
+                row.artist or album_artist,
+                row.title,
+                prior=prior,
+                genre=genre,
+                client=client,
             )
             row.bpm = finding.bpm
             row.key = finding.key
@@ -179,8 +197,9 @@ def vinyl_import(req: VinylImportRequest, db: Session = Depends(get_db)):
     except NotAPressing as e:
         raise HTTPException(status_code=409, detail=str(e)) from None
 
-    # Numbers the DJ accepted or typed. `manual` is the top of the ladder, so a
-    # later enrichment pass can never overwrite them.
+    # Numbers the DJ kept, each stamped with the rung it came off. Only what was
+    # typed or confirmed is `manual`; an estimate stays an estimate, so a better
+    # source later is still allowed to improve it.
     applied = 0
     for side in req.sides or []:
         if side.bpm is None and not side.key:
@@ -193,7 +212,9 @@ def vinyl_import(req: VinylImportRequest, db: Session = Depends(get_db)):
         if track is None:
             continue
         try:
-            set_manual_bpm_key(db, track.id, bpm=side.bpm, key=side.key)
+            set_manual_bpm_key(
+                db, track.id, bpm=side.bpm, key=side.key, source=side.source or "manual"
+            )
             applied += 1
         except ValueError:
             logger.warning("Rejected BPM %s for side %s", side.bpm, side.position)

@@ -5498,6 +5498,17 @@
             ],
             "title": "Format"
           },
+          "genre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genre"
+          },
           "is_pressing": {
             "default": true,
             "title": "Is Pressing",
@@ -5974,6 +5985,11 @@
           },
           "position": {
             "title": "Position",
+            "type": "string"
+          },
+          "source": {
+            "default": "manual",
+            "title": "Source",
             "type": "string"
           }
         },

@@ -183,3 +183,52 @@ def test_a_tempo_the_library_has_never_seen_falls_back_to_the_band():
     """A confident library that has no opinion here must not tie-break wildly."""
     out = fold_to_library(200.0, Counter({142: 500, 143: 400}))
     assert 90.0 <= out <= 180.0
+
+
+# ── the detector's own answer is evidence too ─────────────────────────────
+
+TECHNO = Counter({142: 900, 143: 700, 145: 600, 155: 120, 117: 40})
+ROCK = Counter({128: 73, 126: 52, 130: 51, 125: 48, 124: 45, 145: 40, 103: 8, 110: 9})
+
+
+def test_a_correct_reading_survives_a_library_that_plays_something_else():
+    """The bug a Doors LP found: 103 BPM is right, but a techno collection has
+    never seen 103 and loves 155, so the fold "corrected" it to 154.5. Four
+    right answers on that record became wrong ones."""
+    assert fold_to_library(103.0, ROCK) == pytest.approx(103.0, abs=0.5)
+    assert fold_to_library(110.0, ROCK) == pytest.approx(110.0, abs=0.5)
+    assert fold_to_library(131.0, ROCK) == pytest.approx(131.0, abs=0.5)
+
+
+def test_a_genuine_octave_error_is_still_caught():
+    """Weighting the detector up must not stop the fold doing its job."""
+    assert fold_to_library(71.8, TECHNO) == pytest.approx(143.6, abs=0.5)
+    assert fold_to_library(234.9, TECHNO) == pytest.approx(117.45, abs=0.5)
+
+
+def test_an_octave_beats_a_metre_change_when_both_would_fit():
+    """Hearing double is a common error; hearing 3:2 is not. 234.9 must halve to
+    117, not become 156 because the library likes 156."""
+    assert fold_to_library(234.9, TECHNO) < 130.0
+
+
+def test_a_genre_narrows_the_prior_to_the_right_part_of_the_library(session, library):
+    """A rock record should not be judged by what a techno collection expects."""
+    from kiku.db.models import Track
+
+    for i in range(60):
+        session.add(
+            Track(
+                artist="R",
+                title=f"r{i}",
+                bpm=104.0,
+                dir_genre="rock",
+                medium="digital",
+                file_path=f"/music/r{i}.aiff",
+            )
+        )
+    session.commit()
+
+    rock = library_tempo_prior(session, genre="rock")
+    assert sum(rock.values()) >= 60
+    assert 104 in rock

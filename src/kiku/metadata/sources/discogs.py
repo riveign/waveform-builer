@@ -137,6 +137,9 @@ class DiscogsSource:
         fmt = _format_text(formats[0]) if formats else None
         images = full.get("images") or []
         cover = images[0].get("uri") if images and images[0].get("uri") else None
+        # Styles are more specific than genres ("Techno" beats "Electronic").
+        styles = full.get("styles") or full.get("genres") or []
+        genre = ", ".join(s for s in styles if s) or None
 
         return ReleaseCandidate(
             source=self.name,
@@ -150,6 +153,7 @@ class DiscogsSource:
             country=full.get("country") or None,
             format=fmt,
             cover_url=cover,
+            genre=genre,
             recordings=recordings,
         )
 

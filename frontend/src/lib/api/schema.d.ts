@@ -3406,6 +3406,8 @@ export interface components {
             cover_url?: string | null;
             /** Format */
             format?: string | null;
+            /** Genre */
+            genre?: string | null;
             /**
              * Is Pressing
              * @default true
@@ -3556,6 +3558,11 @@ export interface components {
             key?: string | null;
             /** Position */
             position: string;
+            /**
+             * Source
+             * @default manual
+             */
+            source: string;
         };
         /** WaveformBandsResponse */
         WaveformBandsResponse: {

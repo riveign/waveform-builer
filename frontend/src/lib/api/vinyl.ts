@@ -38,7 +38,7 @@ export async function importRelease(body: {
 	acquired_on?: string;
 	notes?: string;
 	force?: boolean;
-	sides?: { position: string; bpm?: number | null; key?: string | null }[];
+	sides?: { position: string; bpm?: number | null; key?: string | null; source?: string }[];
 }): Promise<VinylImportResponse> {
 	return fetchJson<VinylImportResponse>('/api/vinyl/import', {
 		method: 'POST',
