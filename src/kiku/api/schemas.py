@@ -1084,6 +1084,36 @@ class VinylReleaseSummary(BaseModel):
     without_length: int = 0
 
 
+class VinylSide(BaseModel):
+    """One side of a record as it sits in the library."""
+
+    track_id: int
+    position: str | None = None
+    side: int | None = None
+    index: int | None = None
+    title: str | None = None
+    artist: str | None = None
+    bpm: float | None = None
+    key: str | None = None
+    duration_sec: float | None = None
+    bpm_source: str | None = None
+    key_source: str | None = None
+    enrichment_status: str | None = None
+
+
+class VinylReleaseDetail(BaseModel):
+    release: VinylReleaseSummary
+    sides: list[VinylSide] = []
+
+
+class VinylSidePatch(BaseModel):
+    """A number the DJ typed. Always lands as `manual`, the top of the ladder."""
+
+    bpm: float | None = None
+    key: str | None = None
+    length: str | None = None  # "6:12"
+
+
 class VinylImportResponse(BaseModel):
     release: VinylReleaseSummary
     sides_written: int

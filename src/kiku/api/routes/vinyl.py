@@ -19,9 +19,12 @@ from kiku.api.schemas import (
     VinylImportResponse,
     VinylPreviewResponse,
     VinylPreviewRow,
+    VinylReleaseDetail,
     VinylReleaseSummary,
     VinylSearchResponse,
     VinylSearchResult,
+    VinylSide,
+    VinylSidePatch,
 )
 from kiku.db.models import Track, VinylRelease
 
@@ -233,6 +236,87 @@ def vinyl_releases(db: Session = Depends(get_db)):
     """The shelf."""
     rows = db.query(VinylRelease).order_by(VinylRelease.artist, VinylRelease.title).all()
     return [_summary(db, r) for r in rows]
+
+
+@router.get("/releases/{release_id}", response_model=VinylReleaseDetail)
+def vinyl_release_detail(release_id: int, db: Session = Depends(get_db)):
+    """One record, and the sides on it in pressing order."""
+    release = db.get(VinylRelease, release_id)
+    if release is None:
+        raise HTTPException(status_code=404, detail=f"No record #{release_id} on the shelf.")
+
+    rows = (
+        db.query(Track)
+        .filter(Track.vinyl_release_id == release_id)
+        .order_by(Track.disc_number, Track.track_number, Track.id)
+        .all()
+    )
+    return VinylReleaseDetail(
+        release=_summary(db, release),
+        sides=[
+            VinylSide(
+                track_id=t.id,
+                position=t.vinyl_position,
+                side=t.disc_number,
+                index=t.track_number,
+                title=t.title,
+                artist=t.artist,
+                bpm=t.bpm,
+                key=t.key,
+                duration_sec=t.duration_sec,
+                bpm_source=t.bpm_source,
+                key_source=t.key_source,
+                enrichment_status=t.enrichment_status,
+            )
+            for t in rows
+        ],
+    )
+
+
+@router.patch("/sides/{track_id}", response_model=VinylSide)
+def vinyl_side_patch(track_id: int, patch: VinylSidePatch, db: Session = Depends(get_db)):
+    """Correct a side by hand.
+
+    Anything set here is `manual` — it outranks every automatic source, so a
+    wrong estimate stays corrected.
+    """
+    from kiku.vinyl.importer import set_manual_bpm_key
+
+    track = db.get(Track, track_id)
+    if track is None or track.medium != "vinyl":
+        raise HTTPException(status_code=404, detail="That side isn't on the shelf.")
+
+    duration = None
+    if patch.length:
+        try:
+            mins, _, secs = patch.length.partition(":")
+            duration = int(mins) * 60 + int(secs or 0)
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail=f"'{patch.length}' doesn't look like a length — try 6:12."
+            ) from None
+
+    try:
+        track = set_manual_bpm_key(
+            db, track_id, bpm=patch.bpm, key=patch.key, duration_sec=duration, source="manual"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
+    return VinylSide(
+        track_id=track.id,
+        position=track.vinyl_position,
+        side=track.disc_number,
+        index=track.track_number,
+        title=track.title,
+        artist=track.artist,
+        bpm=track.bpm,
+        key=track.key,
+        duration_sec=track.duration_sec,
+        bpm_source=track.bpm_source,
+        key_source=track.key_source,
+        enrichment_status=track.enrichment_status,
+    )
 
 
 @router.delete("/releases/{release_id}", status_code=204)

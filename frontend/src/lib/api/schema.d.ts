@@ -1623,7 +1623,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Vinyl Release Detail
+         * @description One record, and the sides on it in pressing order.
+         */
+        get: operations["vinyl_release_detail_api_vinyl_releases__release_id__get"];
         put?: never;
         post?: never;
         /**
@@ -1654,6 +1658,29 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/sides/{track_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Vinyl Side Patch
+         * @description Correct a side by hand.
+         *
+         *     Anything set here is `manual` — it outranks every automatic source, so a
+         *     wrong estimate stays corrected.
+         */
+        patch: operations["vinyl_side_patch_api_vinyl_sides__track_id__patch"];
         trace?: never;
     };
     "/api/waveforms/{track_id}/bands": {
@@ -3463,6 +3490,15 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** VinylReleaseDetail */
+        VinylReleaseDetail: {
+            release: components["schemas"]["VinylReleaseSummary"];
+            /**
+             * Sides
+             * @default []
+             */
+            sides: components["schemas"]["VinylSide"][];
+        };
         /** VinylReleaseSummary */
         VinylReleaseSummary: {
             /** Artist */
@@ -3550,6 +3586,36 @@ export interface components {
             /** Year */
             year?: number | null;
         };
+        /**
+         * VinylSide
+         * @description One side of a record as it sits in the library.
+         */
+        VinylSide: {
+            /** Artist */
+            artist?: string | null;
+            /** Bpm */
+            bpm?: number | null;
+            /** Bpm Source */
+            bpm_source?: string | null;
+            /** Duration Sec */
+            duration_sec?: number | null;
+            /** Enrichment Status */
+            enrichment_status?: string | null;
+            /** Index */
+            index?: number | null;
+            /** Key */
+            key?: string | null;
+            /** Key Source */
+            key_source?: string | null;
+            /** Position */
+            position?: string | null;
+            /** Side */
+            side?: number | null;
+            /** Title */
+            title?: string | null;
+            /** Track Id */
+            track_id: number;
+        };
         /** VinylSideInput */
         VinylSideInput: {
             /** Bpm */
@@ -3563,6 +3629,18 @@ export interface components {
              * @default manual
              */
             source: string;
+        };
+        /**
+         * VinylSidePatch
+         * @description A number the DJ typed. Always lands as `manual`, the top of the ladder.
+         */
+        VinylSidePatch: {
+            /** Bpm */
+            bpm?: number | null;
+            /** Key */
+            key?: string | null;
+            /** Length */
+            length?: string | null;
         };
         /** WaveformBandsResponse */
         WaveformBandsResponse: {
@@ -6243,6 +6321,37 @@ export interface operations {
             };
         };
     };
+    vinyl_release_detail_api_vinyl_releases__release_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylReleaseDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     vinyl_release_delete_api_vinyl_releases__release_id__delete: {
         parameters: {
             query?: never;
@@ -6293,6 +6402,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VinylSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_side_patch_api_vinyl_sides__track_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VinylSidePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylSide"];
                 };
             };
             /** @description Validation Error */

@@ -8,7 +8,7 @@
 
 import { goto } from '$app/navigation';
 
-export type Tab = 'track' | 'set' | 'dna' | 'tinder' | 'hunt' | 'albums';
+export type Tab = 'track' | 'set' | 'dna' | 'tinder' | 'hunt' | 'albums' | 'vinyl';
 
 export interface TabDef {
 	value: Tab;
@@ -25,6 +25,7 @@ export const TABS: TabDef[] = [
 	{ value: 'tinder', label: 'Energy tinder', shortcut: '4', path: '/tinder' },
 	{ value: 'hunt', label: 'Track hunter', shortcut: '5', path: '/hunt' },
 	{ value: 'albums', label: 'Albums', shortcut: '6', path: '/albums' },
+	{ value: 'vinyl', label: 'Shelf', shortcut: '7', path: '/vinyl' },
 ];
 
 /** Which tab a pathname belongs to, for highlighting the active segment. */

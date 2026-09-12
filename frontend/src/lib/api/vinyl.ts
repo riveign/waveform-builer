@@ -8,6 +8,8 @@ export type VinylPreview = S['VinylPreviewResponse'];
 export type VinylPreviewRow = S['VinylPreviewRow'];
 export type VinylImportResponse = S['VinylImportResponse'];
 export type VinylReleaseSummary = S['VinylReleaseSummary'];
+export type VinylReleaseDetail = S['VinylReleaseDetail'];
+export type VinylSide = S['VinylSide'];
 
 export async function searchPressings(
 	q: string,
@@ -49,6 +51,23 @@ export async function importRelease(body: {
 
 export async function listReleases(signal?: AbortSignal): Promise<VinylReleaseSummary[]> {
 	return fetchJson<VinylReleaseSummary[]>('/api/vinyl/releases', { signal });
+}
+
+export async function getRelease(id: number, signal?: AbortSignal): Promise<VinylReleaseDetail> {
+	return fetchJson<VinylReleaseDetail>(`/api/vinyl/releases/${id}`, { signal });
+}
+
+/** Correct a side by hand. Whatever is set here becomes `manual`, which outranks
+ *  every automatic source — so a wrong estimate stays corrected. */
+export async function patchSide(
+	trackId: number,
+	patch: { bpm?: number | null; key?: string | null; length?: string | null },
+): Promise<VinylSide> {
+	return fetchJson<VinylSide>(`/api/vinyl/sides/${trackId}`, {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(patch),
+	});
 }
 
 export async function removeRelease(id: number): Promise<void> {

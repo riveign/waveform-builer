@@ -5683,6 +5683,26 @@
         "title": "VinylPreviewRow",
         "type": "object"
       },
+      "VinylReleaseDetail": {
+        "properties": {
+          "release": {
+            "$ref": "#/components/schemas/VinylReleaseSummary"
+          },
+          "sides": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VinylSide"
+            },
+            "title": "Sides",
+            "type": "array"
+          }
+        },
+        "required": [
+          "release"
+        ],
+        "title": "VinylReleaseDetail",
+        "type": "object"
+      },
       "VinylReleaseSummary": {
         "properties": {
           "artist": {
@@ -5959,6 +5979,141 @@
         "title": "VinylSearchResult",
         "type": "object"
       },
+      "VinylSide": {
+        "description": "One side of a record as it sits in the library.",
+        "properties": {
+          "artist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist"
+          },
+          "bpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm"
+          },
+          "bpm_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm Source"
+          },
+          "duration_sec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Sec"
+          },
+          "enrichment_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrichment Status"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "key_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Source"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "track_id": {
+            "title": "Track Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "track_id"
+        ],
+        "title": "VinylSide",
+        "type": "object"
+      },
       "VinylSideInput": {
         "properties": {
           "bpm": {
@@ -5997,6 +6152,46 @@
           "position"
         ],
         "title": "VinylSideInput",
+        "type": "object"
+      },
+      "VinylSidePatch": {
+        "description": "A number the DJ typed. Always lands as `manual`, the top of the ladder.",
+        "properties": {
+          "bpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpm"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length"
+          }
+        },
+        "title": "VinylSidePatch",
         "type": "object"
       },
       "WaveformBandsResponse": {
@@ -10619,6 +10814,47 @@
         "tags": [
           "vinyl"
         ]
+      },
+      "get": {
+        "description": "One record, and the sides on it in pressing order.",
+        "operationId": "vinyl_release_detail_api_vinyl_releases__release_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "title": "Release Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VinylReleaseDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Vinyl Release Detail",
+        "tags": [
+          "vinyl"
+        ]
       }
     },
     "/api/vinyl/search": {
@@ -10682,6 +10918,59 @@
           }
         },
         "summary": "Vinyl Search",
+        "tags": [
+          "vinyl"
+        ]
+      }
+    },
+    "/api/vinyl/sides/{track_id}": {
+      "patch": {
+        "description": "Correct a side by hand.\n\nAnything set here is `manual` \u2014 it outranks every automatic source, so a\nwrong estimate stays corrected.",
+        "operationId": "vinyl_side_patch_api_vinyl_sides__track_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "track_id",
+            "required": true,
+            "schema": {
+              "title": "Track Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VinylSidePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VinylSide"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Vinyl Side Patch",
         "tags": [
           "vinyl"
         ]

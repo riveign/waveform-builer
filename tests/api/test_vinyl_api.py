@@ -267,3 +267,95 @@ def test_removing_a_record_takes_its_sides_with_it(client, db_session, discogs, 
 
 def test_removing_a_record_that_isnt_there(client, discogs):
     assert client.delete("/api/vinyl/releases/999").status_code == 404
+
+
+# ── the shelf tab ─────────────────────────────────────────────────────────
+
+
+def test_a_record_lists_its_sides_in_pressing_order(client, discogs, no_preview):
+    rid = client.post("/api/vinyl/import", json={"release_id": "28715971"}).json()["release"]["id"]
+
+    d = client.get(f"/api/vinyl/releases/{rid}").json()
+
+    assert [s["position"] for s in d["sides"]] == ["A1", "A2", "B1"]
+    assert d["release"]["catalog_number"] == "KW 38"
+    assert all(s["track_id"] for s in d["sides"])
+
+
+def test_a_side_reports_where_its_number_came_from(client, db_session, discogs, no_preview):
+    """The shelf's job is to show what's trustworthy, so provenance rides along."""
+    rid = client.post(
+        "/api/vinyl/import",
+        json={
+            "release_id": "28715971",
+            "sides": [
+                {"position": "A1", "bpm": 143.0, "source": "preview"},
+                {"position": "A2", "bpm": 144.0, "source": "manual"},
+            ],
+        },
+    ).json()["release"]["id"]
+
+    sides = {s["position"]: s for s in client.get(f"/api/vinyl/releases/{rid}").json()["sides"]}
+
+    assert sides["A1"]["bpm_source"] == "preview"
+    assert sides["A2"]["bpm_source"] == "manual"
+    assert sides["B1"]["bpm"] is None
+
+
+def test_a_record_that_isnt_on_the_shelf(client, discogs):
+    assert client.get("/api/vinyl/releases/999").status_code == 404
+
+
+def test_correcting_a_side_makes_it_yours(client, db_session, discogs, no_preview):
+    """A wrong estimate has to be correctable, and the correction has to stick —
+    `manual` outranks every automatic source, so nothing later overwrites it."""
+    rid = client.post(
+        "/api/vinyl/import",
+        json={
+            "release_id": "28715971",
+            "sides": [{"position": "A1", "bpm": 161.5, "source": "preview"}],
+        },
+    ).json()["release"]["id"]
+    side = next(
+        s for s in client.get(f"/api/vinyl/releases/{rid}").json()["sides"] if s["position"] == "A1"
+    )
+
+    res = client.patch(f"/api/vinyl/sides/{side['track_id']}", json={"bpm": 110.0, "key": "Em"})
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["bpm"] == 110.0
+    assert body["key"] == "Em"
+    assert body["bpm_source"] == "manual"
+    assert body["enrichment_status"] == "manual"
+
+
+def test_correcting_a_side_can_supply_the_length(client, discogs, no_preview):
+    """Discogs leaves most 12" durations blank, so set times are estimated."""
+    rid = client.post("/api/vinyl/import", json={"release_id": "28715971"}).json()["release"]["id"]
+    side = next(
+        s for s in client.get(f"/api/vinyl/releases/{rid}").json()["sides"] if s["position"] == "A1"
+    )
+
+    body = client.patch(
+        f"/api/vinyl/sides/{side['track_id']}", json={"bpm": 140.0, "length": "6:12"}
+    ).json()
+
+    assert body["duration_sec"] == 372
+
+
+def test_a_length_that_isnt_one_is_refused(client, discogs, no_preview):
+    rid = client.post("/api/vinyl/import", json={"release_id": "28715971"}).json()["release"]["id"]
+    side = client.get(f"/api/vinyl/releases/{rid}").json()["sides"][0]
+
+    res = client.patch(f"/api/vinyl/sides/{side['track_id']}", json={"length": "six minutes"})
+    assert res.status_code == 400
+    assert "6:12" in res.json()["detail"]
+
+
+def test_only_a_side_on_the_shelf_can_be_patched(client, db_session, discogs):
+    """A digital track is not yours to overwrite through the vinyl endpoint."""
+    from kiku.db.models import Track
+
+    digital = db_session.query(Track).filter(Track.medium != "vinyl").first()
+    assert client.patch(f"/api/vinyl/sides/{digital.id}", json={"bpm": 100.0}).status_code == 404
