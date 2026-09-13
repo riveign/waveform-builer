@@ -246,9 +246,12 @@ def album_tracks(album_key: str, db: Session = Depends(get_db)) -> AlbumTracksRe
         match_status=md.match_status if md else None,
         cover_source=md.cover_source if md else None,
     )
+    from kiku.vinyl.twins import vinyl_twins_of
+
+    twins = vinyl_twins_of(db, [t.id for t in tracks if t.medium != "vinyl"])
     return AlbumTracksResponse(
         album=album,
-        tracks=[_track_to_response(t) for t in tracks],
+        tracks=[_track_to_response(t, twins.get(t.id)) for t in tracks],
     )
 
 

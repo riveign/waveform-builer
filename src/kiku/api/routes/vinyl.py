@@ -18,6 +18,10 @@ from kiku.api.schemas import (
     TrackResponse,
     VinylImportRequest,
     VinylImportResponse,
+    VinylLinksRequest,
+    VinylPairing,
+    VinylPairingRequest,
+    VinylPairingResponse,
     VinylPreviewResponse,
     VinylPreviewRow,
     VinylReleaseDetail,
@@ -278,6 +282,42 @@ def vinyl_release_digital(release_id: int, db: Session = Depends(get_db)):
         for t in rows
         if t.duplicate_of_track_id in digital
     ]
+
+
+@router.post("/releases/{release_id}/pairing", response_model=VinylPairingResponse)
+def vinyl_release_pairing(release_id: int, req: VinylPairingRequest, db: Session = Depends(get_db)):
+    """Which file is which side, for an album the DJ says is this record. Writes nothing."""
+    from kiku.vinyl.twins import pair_with_album
+
+    release = _release_or_404(db, release_id)
+    sides = {t.id: t for t in _sides_of(db, release_id)}
+    return VinylPairingResponse(
+        pairs=[
+            VinylPairing(
+                vinyl_track_id=p.vinyl_track_id,
+                position=sides[p.vinyl_track_id].vinyl_position,
+                title=sides[p.vinyl_track_id].title,
+                digital_track_id=p.digital_track_id,
+                reason=p.reason,
+            )
+            for p in pair_with_album(db, release, req.digital_track_ids)
+        ]
+    )
+
+
+@router.put("/releases/{release_id}/links", response_model=VinylReleaseDetail)
+def vinyl_release_links(release_id: int, req: VinylLinksRequest, db: Session = Depends(get_db)):
+    """Save the pairing the DJ confirmed. A replaced or cleared link counts as "not it"."""
+    from kiku.vinyl.twins import apply_pairings
+
+    release = _release_or_404(db, release_id)
+    try:
+        apply_pairings(db, release, {p.vinyl_track_id: p.digital_track_id for p in req.pairs})
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    db.commit()
+    return vinyl_release_detail(release_id, db)
 
 
 @router.patch("/sides/{track_id}", response_model=VinylSide)

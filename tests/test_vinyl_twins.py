@@ -10,7 +10,16 @@ from sqlalchemy.pool import NullPool
 from kiku.db.models import Base, Track, VinylRelease, VinylTwinRejection
 from kiku.setbuilder.planner import _get_candidate_pool
 from kiku.vinyl.importer import remove_release
-from kiku.vinyl.twins import link, link_release, link_shelf, match_release, reject, title_score
+from kiku.vinyl.twins import (
+    apply_pairings,
+    link,
+    link_release,
+    link_shelf,
+    match_release,
+    pair_with_album,
+    reject,
+    title_score,
+)
 
 
 @pytest.fixture()
@@ -170,3 +179,64 @@ def test_a_linked_pair_is_one_track_to_the_builder(session):
     session.commit()
 
     assert [t.id for t in _get_candidate_pool(session, include_vinyl=True)] == [f.id]
+
+
+# ── pairing with an album the DJ picked ───────────────────────────────────
+
+
+def test_a_misnamed_album_pairs_by_title_then_by_order(session):
+    """The album is tagged wrong and one title is garbage — the DJ still knows it's the record."""
+    rel, (a1, a2, b1) = _record(
+        session, "Sonora", "Alarico", [("A1", "Iruka"), ("A2", "Boiler"), ("B1", "Chlorid")]
+    )
+    f1 = _file(session, "Boiler", "Alarico", "Unknown Album", track_number=2)
+    f2 = _file(session, "Iruka", "Alarico", "Unknown Album", track_number=1)
+    f3 = _file(session, "01 Track 3", "?", "Unknown Album", track_number=3)
+
+    pairs = {
+        p.vinyl_track_id: (p.digital_track_id, p.reason)
+        for p in pair_with_album(session, rel, [f1.id, f2.id, f3.id])
+    }
+    assert pairs == {a1.id: (f2.id, "title"), a2.id: (f1.id, "title"), b1.id: (f3.id, "order")}
+    assert a1.duplicate_of_track_id is None  # a proposal writes nothing
+
+
+def test_order_is_not_guessed_when_the_counts_differ(session):
+    rel, (a1, a2) = _record(session, "Sonora", "Alarico", [("A1", "Iruka"), ("A2", "Boiler")])
+    f = _file(session, "01 Track 1", "?", "x")
+    pairs = pair_with_album(session, rel, [f.id])
+    # two sides, one file: order can't say which side it is
+    assert all(p.digital_track_id is None for p in pairs)
+
+
+def test_applying_a_pairing_replaces_a_wrong_link_and_remembers_it(session):
+    rel, (a1, a2) = _record(session, "Sonora", "Alarico", [("A1", "Iruka"), ("A2", "Boiler")])
+    wrong = _file(session, "Iruka", "Someone", "Other")
+    right = _file(session, "Iruka (tagged wrong)", "?", "x")
+    link(session, a1, wrong)
+    session.commit()
+
+    apply_pairings(session, rel, {a1.id: right.id, a2.id: None})
+    session.commit()
+    assert a1.duplicate_of_track_id == right.id
+    assert (
+        session.query(VinylTwinRejection)
+        .filter_by(vinyl_track_id=a1.id, digital_track_id=wrong.id)
+        .count()
+        == 1
+    )
+
+
+def test_one_file_cannot_be_two_sides(session):
+    rel, (a1, a2) = _record(session, "Sonora", "Alarico", [("A1", "Iruka"), ("A2", "Boiler")])
+    f = _file(session, "Iruka", "Alarico")
+    with pytest.raises(ValueError):
+        apply_pairings(session, rel, {a1.id: f.id, a2.id: f.id})
+
+
+def test_a_side_from_another_record_is_refused(session):
+    rel, _ = _record(session, "Sonora", "Alarico", [("A1", "Iruka")])
+    _, (other,) = _record(session, "Other", "X", [("A1", "Y")])
+    f = _file(session, "Y", "X")
+    with pytest.raises(ValueError):
+        apply_pairings(session, rel, {other.id: f.id})

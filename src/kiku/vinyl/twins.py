@@ -344,3 +344,107 @@ def vinyl_twins_of(session: Session, digital_ids: list[int]) -> dict[int, Track]
     for r in rows:
         out.setdefault(r.duplicate_of_track_id, r)
     return out
+
+
+@dataclass
+class Pairing:
+    vinyl_track_id: int
+    digital_track_id: int | None
+    reason: str | None  # linked | title | order | None
+
+
+def pair_with_album(
+    session: Session, release: VinylRelease, digital_ids: list[int]
+) -> list[Pairing]:
+    """Propose which file is which side, when the DJ has said which album it is.
+
+    The DJ chose the album, so the album-name test is skipped — that's the whole
+    point, the names in the library can be wrong. Titles still pair what they
+    can; if titles fail but the counts line up, pressing order pairs the rest
+    and says so, because a tagging mistake usually keeps the running order.
+    Nothing is written.
+    """
+    sides = (
+        session.query(Track)
+        .filter(Track.vinyl_release_id == release.id, Track.medium == "vinyl")
+        .order_by(Track.disc_number, Track.track_number, Track.id)
+        .all()
+    )
+    files = (
+        session.query(Track)
+        .filter(Track.id.in_(digital_ids), func.coalesce(Track.medium, "digital") != "vinyl")
+        .order_by(Track.disc_number, Track.track_number, Track.file_path, Track.id)
+        .all()
+        if digital_ids
+        else []
+    )
+    file_ids = {f.id for f in files}
+    chosen: dict[int, tuple[int, str]] = {}
+    used: set[int] = set()
+
+    for s in sides:
+        if s.duplicate_of_track_id in file_ids:
+            chosen[s.id] = (s.duplicate_of_track_id, "linked")
+            used.add(s.duplicate_of_track_id)
+
+    rejected = _rejected(session, [s.id for s in sides])
+    pairs = sorted(
+        (
+            (title_score(s.title, f.title), s.id, f.id)
+            for s in sides
+            if s.id not in chosen
+            for f in files
+            if f.id not in used and (s.id, f.id) not in rejected
+        ),
+        reverse=True,
+    )
+    for score, sid, fid in pairs:
+        if score < TITLE_MATCH:
+            break
+        if sid in chosen or fid in used:
+            continue
+        chosen[sid] = (fid, "title")
+        used.add(fid)
+
+    open_sides = [s for s in sides if s.id not in chosen]
+    open_files = [f for f in files if f.id not in used]
+    if open_sides and len(open_sides) == len(open_files):
+        for s, f in zip(open_sides, open_files):
+            chosen[s.id] = (f.id, "order")
+
+    return [
+        Pairing(s.id, *chosen[s.id]) if s.id in chosen else Pairing(s.id, None, None) for s in sides
+    ]
+
+
+def apply_pairings(session: Session, release: VinylRelease, pairs: dict[int, int | None]) -> None:
+    """Set each side's file as the DJ confirmed it. The caller commits.
+
+    Replacing or clearing a link counts as "not it" for the old file, so no
+    later automatic pass puts the wrong one back.
+    """
+    sides = {
+        s.id: s
+        for s in session.query(Track).filter(
+            Track.vinyl_release_id == release.id, Track.medium == "vinyl"
+        )
+    }
+    unknown = set(pairs) - set(sides)
+    if unknown:
+        raise ValueError("Some of those tracks aren't on this record.")
+    wanted = [d for d in pairs.values() if d]
+    if len(wanted) != len(set(wanted)):
+        raise ValueError("One file is paired with two sides — each file can only be one side.")
+
+    for sid, digital_id in pairs.items():
+        side = sides[sid]
+        current = side.duplicate_of_track_id
+        if current == digital_id:
+            continue
+        if current:
+            reject(session, side, current)
+        if digital_id:
+            digital = session.get(Track, digital_id)
+            if digital is None:
+                raise ValueError("One of those files isn't in your library any more.")
+            link(session, side, digital)

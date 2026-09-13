@@ -6,6 +6,8 @@
 	import Button from '../primitives/Button.svelte';
 	import MusicBrainzMatchModal from './MusicBrainzMatchModal.svelte';
 	import FixMetadataModal from './FixMetadataModal.svelte';
+	import LinkRecordModal from './LinkRecordModal.svelte';
+	import VinylPip from './VinylPip.svelte';
 
 	let {
 		albumKey,
@@ -31,6 +33,15 @@
 
 	let mbModalOpen = $state(false);
 	let fixModalOpen = $state(false);
+	let linkModalOpen = $state(false);
+
+	/** The record this album is on, if any of its files are linked to one. */
+	const shelf = $derived.by(() => {
+		const linked = tracks.filter((t) => t.medium !== 'vinyl' && t.vinyl_twin);
+		const ref = linked[0]?.vinyl_twin;
+		return ref ? { ...ref, linked: linked.length } : null;
+	});
+	const fileCount = $derived(tracks.filter((t) => t.medium !== 'vinyl').length);
 
 	function hashKey(key: string): number {
 		let h = 0;
@@ -119,7 +130,17 @@
 					<Button variant="secondary" size="sm" onclick={() => (fixModalOpen = true)}>
 						Check &amp; fix metadata
 					</Button>
+					<Button variant="secondary" size="sm" onclick={() => (linkModalOpen = true)} disabled={fileCount === 0}>
+						{shelf ? 'Edit record links' : 'Link to a record'}
+					</Button>
 				</div>
+
+				{#if shelf}
+					<a class="shelf-note" href="/vinyl?open={shelf.release_id}">
+						<VinylPip record={shelf.release_title} />
+						On your shelf as <b>{shelf.release_title}</b> · {shelf.linked} of {fileCount} tracks linked
+					</a>
+				{/if}
 
 				{#if album.match_status === 'applied' && album.mb_release_id}
 					<div class="mb-note">Matched on MusicBrainz</div>
@@ -140,7 +161,7 @@
 					>▶</button>
 					<span class="position">{positionLabel(t)}</span>
 					<button class="title-cell" onclick={() => onselect(t)}>
-						<span class="title">{t.title ?? '—'}</span>
+						<span class="title">{#if t.vinyl_twin}<VinylPip position={t.vinyl_twin.position} record={t.vinyl_twin.release_title} />{/if}{t.title ?? '—'}</span>
 						{#if album.is_compilation && t.artist}
 							<span class="row-artist">{t.artist}</span>
 						{/if}
@@ -157,6 +178,15 @@
 	{albumKey}
 	kikuTracks={tracks}
 	onapply={onMBApplied}
+/>
+
+<LinkRecordModal
+	open={linkModalOpen}
+	albumTitle={album?.album ?? ''}
+	albumArtist={album?.artist ?? null}
+	{tracks}
+	onclose={() => (linkModalOpen = false)}
+	onlinked={() => res.refresh()}
 />
 
 <FixMetadataModal
@@ -241,6 +271,20 @@
 		gap: var(--space-md);
 		margin-top: 14px;
 	}
+
+	.shelf-note {
+		display: inline-flex;
+		align-items: center;
+		align-self: flex-start;
+		gap: var(--space-2xs);
+		margin-top: 10px;
+		font-size: 12px;
+		color: var(--text-secondary);
+		text-decoration: none;
+	}
+	.shelf-note b { color: var(--text-primary); font-weight: 600; }
+	.shelf-note:hover { color: var(--text-primary); text-decoration: underline; }
+	.shelf-note :global(.vinyl-pip) { color: var(--zone-build); }
 
 	.mb-note {
 		font-size: 11px;

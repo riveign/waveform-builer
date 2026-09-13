@@ -1110,6 +1110,35 @@ class VinylTwinRequest(BaseModel):
     digital_track_id: int
 
 
+class VinylPairingRequest(BaseModel):
+    """The files of the digital album the DJ says this record is."""
+
+    digital_track_ids: list[int]
+
+
+class VinylPairing(BaseModel):
+    vinyl_track_id: int
+    position: str | None = None
+    title: str | None = None
+    digital_track_id: int | None = None
+    # linked: already paired · title: titles agree · order: titles didn't help,
+    # so pressing order paired it — worth a look · None: no file proposed
+    reason: str | None = None
+
+
+class VinylPairingResponse(BaseModel):
+    pairs: list[VinylPairing] = []
+
+
+class VinylLinkPair(BaseModel):
+    vinyl_track_id: int
+    digital_track_id: int | None = None  # None clears the link
+
+
+class VinylLinksRequest(BaseModel):
+    pairs: list[VinylLinkPair]
+
+
 class VinylSide(BaseModel):
     """One side of a record as it sits in the library."""
 

@@ -1663,6 +1663,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/vinyl/releases/{release_id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Vinyl Release Links
+         * @description Save the pairing the DJ confirmed. A replaced or cleared link counts as "not it".
+         */
+        put: operations["vinyl_release_links_api_vinyl_releases__release_id__links_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/releases/{release_id}/pairing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Vinyl Release Pairing
+         * @description Which file is which side, for an album the DJ says is this record. Writes nothing.
+         */
+        post: operations["vinyl_release_pairing_api_vinyl_releases__release_id__pairing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/vinyl/search": {
         parameters: {
             query?: never;
@@ -3479,6 +3519,47 @@ export interface components {
             sides_written: number;
             /** Unplannable */
             unplannable: number;
+        };
+        /** VinylLinkPair */
+        VinylLinkPair: {
+            /** Digital Track Id */
+            digital_track_id?: number | null;
+            /** Vinyl Track Id */
+            vinyl_track_id: number;
+        };
+        /** VinylLinksRequest */
+        VinylLinksRequest: {
+            /** Pairs */
+            pairs: components["schemas"]["VinylLinkPair"][];
+        };
+        /** VinylPairing */
+        VinylPairing: {
+            /** Digital Track Id */
+            digital_track_id?: number | null;
+            /** Position */
+            position?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Vinyl Track Id */
+            vinyl_track_id: number;
+        };
+        /**
+         * VinylPairingRequest
+         * @description The files of the digital album the DJ says this record is.
+         */
+        VinylPairingRequest: {
+            /** Digital Track Ids */
+            digital_track_ids: number[];
+        };
+        /** VinylPairingResponse */
+        VinylPairingResponse: {
+            /**
+             * Pairs
+             * @default []
+             */
+            pairs: components["schemas"]["VinylPairing"][];
         };
         /** VinylPreviewResponse */
         VinylPreviewResponse: {
@@ -6503,6 +6584,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrackResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_release_links_api_vinyl_releases__release_id__links_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VinylLinksRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylReleaseDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_release_pairing_api_vinyl_releases__release_id__pairing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VinylPairingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylPairingResponse"];
                 };
             };
             /** @description Validation Error */

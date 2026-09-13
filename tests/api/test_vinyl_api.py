@@ -449,3 +449,39 @@ def test_library_marks_files_you_own_on_vinyl_and_filters_to_them(client, sonora
 
     one = client.get(f"/api/tracks/{files[2].id}").json()
     assert one["vinyl_twin"] is None
+
+
+def test_link_a_record_to_an_album_by_hand(client, db_session, sonora):
+    rel, sides, files = sonora
+    misnamed = Track(medium="digital", title="Track 03", artist=None, album="Unknown", bpm=140.0)
+    db_session.add(misnamed)
+    db_session.commit()
+
+    res = client.post(
+        f"/api/vinyl/releases/{rel.id}/pairing",
+        json={"digital_track_ids": [files[0].id, files[1].id, misnamed.id]},
+    )
+    reasons = {p["position"]: (p["digital_track_id"], p["reason"]) for p in res.json()["pairs"]}
+    assert reasons == {
+        "A1": (files[0].id, "linked"),
+        "A2": (files[1].id, "linked"),
+        "B1": (misnamed.id, "order"),
+    }
+
+    res = client.put(
+        f"/api/vinyl/releases/{rel.id}/links",
+        json={"pairs": [{"vinyl_track_id": sides[2].id, "digital_track_id": misnamed.id}]},
+    )
+    assert res.status_code == 200
+    assert res.json()["release"]["digital"] == 3
+
+    res = client.put(
+        f"/api/vinyl/releases/{rel.id}/links",
+        json={
+            "pairs": [
+                {"vinyl_track_id": sides[0].id, "digital_track_id": misnamed.id},
+                {"vinyl_track_id": sides[2].id, "digital_track_id": misnamed.id},
+            ]
+        },
+    )
+    assert res.status_code == 400

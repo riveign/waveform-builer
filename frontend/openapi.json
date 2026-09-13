@@ -5446,6 +5446,134 @@
         "title": "VinylImportResponse",
         "type": "object"
       },
+      "VinylLinkPair": {
+        "properties": {
+          "digital_track_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digital Track Id"
+          },
+          "vinyl_track_id": {
+            "title": "Vinyl Track Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "vinyl_track_id"
+        ],
+        "title": "VinylLinkPair",
+        "type": "object"
+      },
+      "VinylLinksRequest": {
+        "properties": {
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/VinylLinkPair"
+            },
+            "title": "Pairs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pairs"
+        ],
+        "title": "VinylLinksRequest",
+        "type": "object"
+      },
+      "VinylPairing": {
+        "properties": {
+          "digital_track_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digital Track Id"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "vinyl_track_id": {
+            "title": "Vinyl Track Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "vinyl_track_id"
+        ],
+        "title": "VinylPairing",
+        "type": "object"
+      },
+      "VinylPairingRequest": {
+        "description": "The files of the digital album the DJ says this record is.",
+        "properties": {
+          "digital_track_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Digital Track Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "digital_track_ids"
+        ],
+        "title": "VinylPairingRequest",
+        "type": "object"
+      },
+      "VinylPairingResponse": {
+        "properties": {
+          "pairs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VinylPairing"
+            },
+            "title": "Pairs",
+            "type": "array"
+          }
+        },
+        "title": "VinylPairingResponse",
+        "type": "object"
+      },
       "VinylPreviewResponse": {
         "properties": {
           "album": {
@@ -11041,6 +11169,112 @@
           }
         },
         "summary": "Vinyl Release Digital",
+        "tags": [
+          "vinyl"
+        ]
+      }
+    },
+    "/api/vinyl/releases/{release_id}/links": {
+      "put": {
+        "description": "Save the pairing the DJ confirmed. A replaced or cleared link counts as \"not it\".",
+        "operationId": "vinyl_release_links_api_vinyl_releases__release_id__links_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "title": "Release Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VinylLinksRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VinylReleaseDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Vinyl Release Links",
+        "tags": [
+          "vinyl"
+        ]
+      }
+    },
+    "/api/vinyl/releases/{release_id}/pairing": {
+      "post": {
+        "description": "Which file is which side, for an album the DJ says is this record. Writes nothing.",
+        "operationId": "vinyl_release_pairing_api_vinyl_releases__release_id__pairing_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "title": "Release Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VinylPairingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VinylPairingResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Vinyl Release Pairing",
         "tags": [
           "vinyl"
         ]

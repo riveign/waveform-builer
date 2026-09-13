@@ -12,6 +12,7 @@ export type VinylReleaseSummary = S['VinylReleaseSummary'];
 export type VinylReleaseDetail = S['VinylReleaseDetail'];
 export type VinylSide = S['VinylSide'];
 export type VinylTwinRef = S['VinylTwinRef'];
+export type VinylPairing = S['VinylPairing'];
 
 export async function searchPressings(
 	q: string,
@@ -90,6 +91,28 @@ export async function linkSide(trackId: number, digitalTrackId: number): Promise
 export async function unlinkSide(trackId: number, digitalTrackId: number): Promise<VinylSide> {
 	return fetchJson<VinylSide>(`/api/vinyl/sides/${trackId}/twin/${digitalTrackId}`, {
 		method: 'DELETE',
+	});
+}
+
+/** Which file is which side, for an album you say is this record. Writes nothing. */
+export async function proposePairing(releaseId: number, digitalTrackIds: number[]): Promise<VinylPairing[]> {
+	const res = await fetchJson<S['VinylPairingResponse']>(`/api/vinyl/releases/${releaseId}/pairing`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ digital_track_ids: digitalTrackIds }),
+	});
+	return res.pairs;
+}
+
+/** Save the pairing you confirmed. `null` clears a side's link. */
+export async function saveLinks(
+	releaseId: number,
+	pairs: { vinyl_track_id: number; digital_track_id: number | null }[],
+): Promise<VinylReleaseDetail> {
+	return fetchJson<VinylReleaseDetail>(`/api/vinyl/releases/${releaseId}/links`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ pairs }),
 	});
 }
 
