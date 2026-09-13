@@ -8,6 +8,8 @@
 	import SegmentedControl from '../primitives/SegmentedControl.svelte';
 	import Chip from '../primitives/Chip.svelte';
 	import SetRoleIcon from './SetRoleIcon.svelte';
+	import { getUiStore } from '$lib/stores/ui.svelte';
+	import { focusAfterFold, RAIL_TOGGLE } from './sidebarFocus';
 
 	interface GenreFamily {
 		family_name: string;
@@ -16,6 +18,23 @@
 	}
 
 	let { onsearch }: { onsearch: (params: SearchParams) => void } = $props();
+
+	const ui = getUiStore();
+
+	// `/` (or the rail's search button) asks for the search box.
+	let searchInput = $state<HTMLInputElement>(null!);
+	$effect(() => {
+		if (ui.searchFocusRequested === 0) return;
+		searchInput.focus();
+		searchInput.select();
+	});
+
+	/** Folding from the library's own button: in a peek it just closes the peek. */
+	function hideLibrary() {
+		if (ui.sidebarPeeking) ui.closePeek();
+		else ui.setSidebarCollapsed(true);
+		focusAfterFold(RAIL_TOGGLE);
+	}
 
 	// ── Filter state ──
 	let searchText = $state('');
@@ -293,6 +312,8 @@
 				type="text"
 				placeholder="Search tracks..."
 				class="search-input"
+				aria-label="Search tracks"
+				bind:this={searchInput}
 				bind:value={searchText}
 				oninput={onTextInput}
 			/>
@@ -303,6 +324,8 @@
 					onclick={() => { searchText = ''; searchNow(); }}
 					aria-label="Clear search"
 				>&times;</button>
+			{:else}
+				<kbd class="search-kbd" aria-hidden="true">/</kbd>
 			{/if}
 		</div>
 		<Button
@@ -320,6 +343,25 @@
 				</svg>
 			{/snippet}
 		</Button>
+		<span class="band-divider" aria-hidden="true"></span>
+		<span class="sidebar-toggle" data-sidebar-toggle>
+			<Button
+				iconOnly
+				size="sm"
+				variant="ghost"
+				ariaLabel={ui.sidebarPeeking ? 'Close library' : 'Hide library'}
+				title={ui.sidebarPeeking ? 'Close library  Esc' : 'Hide library  ['}
+				onclick={hideLibrary}
+			>
+				{#snippet icon()}
+					<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+						<rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.3" />
+						<path d="M5.75 3v10" stroke="currentColor" stroke-width="1.3" />
+						<path d="M10.5 6l-2 2 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" />
+					</svg>
+				{/snippet}
+			</Button>
+		</span>
 	</div>
 
 	<!-- Quick filters -->
@@ -731,6 +773,33 @@
 
 	.search-clear:hover {
 		color: var(--text-primary);
+	}
+
+	/* Teaches the shortcut where you'd reach for search; gone once you're in it. */
+	.search-kbd {
+		flex-shrink: 0;
+		font-family: inherit;
+		font-size: var(--text-2xs);
+		line-height: 16px;
+		padding: 0 var(--space-xs);
+		color: var(--text-dim);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-sm);
+	}
+
+	.search-box:focus-within .search-kbd {
+		display: none;
+	}
+
+	.band-divider {
+		width: 1px;
+		height: var(--space-2xl);
+		background: var(--border);
+		flex-shrink: 0;
+	}
+
+	.sidebar-toggle {
+		display: contents;
 	}
 
 	/* ── Quick filters (secondary band) ── */

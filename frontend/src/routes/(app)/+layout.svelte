@@ -3,6 +3,8 @@
 	import { page } from '$app/state';
 	import type { Track, SetBuildParams, SetBuildComplete, SetAnalysis } from '$lib/types';
 	import LibraryBrowser from '$lib/components/library/LibraryBrowser.svelte';
+	import SidebarRail from '$lib/components/library/SidebarRail.svelte';
+	import { focusAfterFold, LIBRARY_TOGGLE, RAIL_SEARCH, RAIL_TOGGLE } from '$lib/components/library/sidebarFocus';
 	import BuildSetDialog from '$lib/components/set/BuildSetDialog.svelte';
 	import BuildProgress from '$lib/components/set/BuildProgress.svelte';
 	import SetPlaybackBar from '$lib/components/set/SetPlaybackBar.svelte';
@@ -48,6 +50,28 @@
 	function handleTrackSelect(track: Track) {
 		// Clicking a track anywhere lands on its own URL, so it can be shared.
 		goto(trackHref(track.id));
+		// A peek is a quick visit: picking the track is the end of it.
+		if (ui.sidebarPeeking) closePeek();
+	}
+
+	// ── Library sidebar ──
+	let libraryFrame = $state<HTMLElement>(null!);
+
+	/** Fold or unfold from the keyboard, handing focus across so it's never left
+	 *  inside the half that just went inert. */
+	function toggleSidebarFromKeys() {
+		const active = document.activeElement;
+		const inLibrary = !!active && libraryFrame.contains(active);
+		const inRail = !!active && !inLibrary && !!active.closest('[data-rail]');
+		ui.toggleSidebar();
+		if (inLibrary) focusAfterFold(RAIL_TOGGLE);
+		else if (inRail) focusAfterFold(LIBRARY_TOGGLE);
+	}
+
+	function closePeek() {
+		const inLibrary = libraryFrame.contains(document.activeElement);
+		ui.closePeek();
+		if (inLibrary) focusAfterFold(RAIL_SEARCH);
 	}
 
 	// Open the build dialog when something (e.g. the Build button in the set toolbar)
@@ -114,8 +138,20 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
+		// Esc closes a peek even from inside the search box.
+		if (e.key === 'Escape' && ui.sidebarPeeking) {
+			closePeek();
+			e.preventDefault();
+			return;
+		}
+
 		const target = e.target as HTMLElement;
 		if (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA') return;
+
+		if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+			if (e.key === '[') { toggleSidebarFromKeys(); e.preventDefault(); return; }
+			if (e.key === '/') { ui.focusSearch(); e.preventDefault(); return; }
+		}
 
 		// Playback shortcuts take precedence while a set is playing.
 		if (pb.isActive) {
@@ -136,7 +172,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="app-shell">
+<div class="app-shell" class:collapsed={ui.sidebarCollapsed} class:peeking={ui.sidebarPeeking}>
 	<header class="app-header" bind:clientWidth={headerWidth}>
 		<div class="app-logo">
 			<span class="app-kanji">聴</span>
@@ -158,10 +194,16 @@
 
 	<div class="app-body" class:has-player={player.hasTrack}>
 		<div class="two-panel">
-			<aside class="panel-left">
-				<LibraryBrowser onselect={handleTrackSelect} />
+			<aside class="panel-left" id="library-sidebar" aria-label="Library">
+				<SidebarRail />
+				<div class="library-frame" inert={!ui.libraryOpen} bind:this={libraryFrame}>
+					<LibraryBrowser onselect={handleTrackSelect} />
+				</div>
 			</aside>
 			<main class="panel-right">
+				<!-- Pointer-only dismiss; Esc is the keyboard path (handleKeydown). -->
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<div class="scrim" role="presentation" onclick={closePeek}></div>
 				{#if buildState !== 'idle'}
 					<div class="build-overlay" role="region" aria-label="Build progress">
 						<BuildProgress
@@ -208,11 +250,18 @@
 {/if}
 
 <style>
+	/* One width drives both the navbar and the body grids, so the logo|tabs line
+	   follows the sidebar edge as it folds to the rail and back. */
 	.app-shell {
+		--sidebar-w: var(--panel-width);
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
 		overflow: hidden;
+	}
+
+	.app-shell.collapsed {
+		--sidebar-w: var(--rail-width);
 	}
 
 	/* Navbar shares the body's split: first column is exactly --panel-width (over
@@ -222,7 +271,8 @@
 	.app-header {
 		height: var(--band-h);
 		display: grid;
-		grid-template-columns: var(--panel-width) 1fr;
+		grid-template-columns: var(--sidebar-w) 1fr;
+		transition: grid-template-columns var(--dur-base) var(--ease-standard);
 		align-items: stretch;
 		background: var(--bg-secondary);
 		border-bottom: 1px solid var(--border);
@@ -236,10 +286,13 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-sm);
-		padding-left: var(--space-lg);
+		/* Centers the 1em-wide kanji inside the rail, and keeps it put when unfolded. */
+		padding-left: calc((var(--rail-width) - var(--text-xl)) / 2);
 		color: var(--accent);
 		border-right: 1px solid var(--border);
 		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
 	}
 
 	.app-nav {
@@ -304,6 +357,11 @@
 		font-weight: var(--font-weight-semibold);
 		letter-spacing: 0.5px;
 		color: var(--accent);
+		transition: opacity var(--dur-base) var(--ease-standard);
+	}
+
+	.collapsed .app-title {
+		opacity: 0;
 	}
 
 	.app-body {
@@ -319,14 +377,73 @@
 
 	.two-panel {
 		display: grid;
-		grid-template-columns: var(--panel-width) 1fr;
+		grid-template-columns: var(--sidebar-w) 1fr;
+		transition: grid-template-columns var(--dur-base) var(--ease-standard);
 		height: 100%;
 		overflow: hidden;
 	}
 
 	.panel-left {
+		position: relative;
+		min-width: 0;
+	}
+
+	.peeking .panel-left {
+		z-index: 20; /* above the scrim (15) and the build overlay (10) */
+	}
+
+	/* The library keeps its full width while the column narrows, and is clipped
+	   rather than squeezed — so the track table never re-lays its columns mid-fold.
+	   It stays mounted when collapsed: search, filters, page and scroll survive. */
+	.library-frame {
+		position: absolute;
+		inset: 0 auto 0 0;
+		width: var(--panel-width);
+		background: var(--bg-primary);
 		border-right: 1px solid var(--border);
-		overflow: hidden;
+		z-index: 2;
+		clip-path: inset(0 0 0 0);
+		transition:
+			clip-path var(--dur-base) var(--ease-standard),
+			visibility 0s linear 0s;
+	}
+
+	.collapsed .library-frame {
+		visibility: hidden;
+		clip-path: inset(0 calc(100% - var(--rail-width)) 0 0);
+		transition:
+			clip-path var(--dur-base) var(--ease-standard),
+			visibility 0s linear var(--dur-base);
+	}
+
+	.collapsed.peeking .library-frame {
+		visibility: visible;
+		clip-path: none;
+		transition: none;
+		box-shadow: 12px 0 32px rgba(0, 0, 0, 0.55);
+		animation: peek-in var(--dur-base) var(--ease-decelerate);
+	}
+
+	@keyframes peek-in {
+		from {
+			transform: translateX(calc(-1 * var(--space-xl)));
+			opacity: 0;
+		}
+	}
+
+	.scrim {
+		position: absolute;
+		inset: 0;
+		z-index: 15;
+		background: rgba(0, 0, 0, 0.45);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity var(--dur-base) var(--ease-standard);
+	}
+
+	.peeking .scrim {
+		opacity: 1;
+		pointer-events: auto;
 	}
 
 	.panel-right {

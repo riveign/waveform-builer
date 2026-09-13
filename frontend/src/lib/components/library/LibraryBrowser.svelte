@@ -3,6 +3,7 @@
 	import type { Track } from '$lib/types';
 	import type { SearchParams } from '$lib/api/tracks';
 	import { getTrackStore } from '$lib/stores/tracks.svelte';
+	import { getUiStore } from '$lib/stores/ui.svelte';
 	import SearchFilters from './SearchFilters.svelte';
 	import AddRecordModal from './AddRecordModal.svelte';
 	import TrackTable from './TrackTable.svelte';
@@ -12,6 +13,7 @@
 	let { onselect }: { onselect: (track: Track) => void } = $props();
 
 	const store = getTrackStore();
+	const ui = getUiStore();
 	let selectedId = $state<number | null>(null);
 
 	// Records live in the same library as files — so they're added from here,
@@ -27,6 +29,8 @@
 
 	function handleSearch(params: SearchParams) {
 		lastParams = params;
+		// Sort only reorders; anything else hides tracks — worth a dot on the rail.
+		ui.libraryFiltered = Object.keys(params).some((k) => k !== 'sort');
 		store.search(params);
 	}
 
