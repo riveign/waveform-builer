@@ -128,16 +128,18 @@
 			{/if}
 		</p>
 	{:else}
-		<div class="grid">
-			{#each shown as r (r.id)}
-				<ShelfRecord
-					release={r}
-					open={openId === r.id}
-					ontoggle={() => (openId = openId === r.id ? null : r.id)}
-					onremove={() => handleRemove(r)}
-					onchanged={load}
-				/>
-			{/each}
+		<div class="scroll">
+			<div class="grid">
+				{#each shown as r (r.id)}
+					<ShelfRecord
+						release={r}
+						open={openId === r.id}
+						ontoggle={() => (openId = openId === r.id ? null : r.id)}
+						onremove={() => handleRemove(r)}
+						onchanged={load}
+					/>
+				{/each}
+			</div>
 		</div>
 	{/if}
 </div>
@@ -225,12 +227,20 @@
 
 	.status { padding: var(--space-6xl) 0; text-align: center; }
 
+	/* The scroller and the grid are separate boxes on purpose. Making one element
+	   do both put the grid's auto rows under a constrained flex height, and the
+	   cards' aspect-ratio sleeves collapsed to slivers. */
+	.scroll {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow-y: auto;
+	}
+
 	.grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-		gap: var(--space-2xl);
+		grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+		gap: var(--space-xl);
 		padding: var(--space-2xl);
-		overflow-y: auto;
 		align-content: start;
 	}
 </style>

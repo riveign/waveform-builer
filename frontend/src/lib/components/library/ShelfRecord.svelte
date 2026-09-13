@@ -20,6 +20,11 @@
 		[release.label, release.catalog_number, release.year].filter(Boolean).join(' · '),
 	);
 	const complete = $derived(release.sides > 0 && release.plannable === release.sides);
+	/** 'Vinyl, LP, Album, Reissue, Remastered, Stereo' is a catalogue entry, not a
+	 *  label. The format and the size are what you'd say out loud. */
+	const shortFormat = $derived(
+		(release.format ?? '').split(',').slice(0, 2).map((s) => s.trim()).filter(Boolean).join(' '),
+	);
 
 	$effect(() => {
 		if (open && !sides.length && !loading) void loadSides();
@@ -89,7 +94,7 @@
 			<span class="artist">{release.artist ?? '—'}</span>
 			{#if catalogue}<span class="cat">{catalogue}</span>{/if}
 			<span class="tags">
-				{#if release.format}<span class="tag">{release.format}</span>{/if}
+				{#if shortFormat}<span class="tag" title={release.format ?? ''}>{shortFormat}</span>{/if}
 				<span class="tag" class:ready={complete} class:short={!complete}>
 					{release.plannable}/{release.sides} ready
 				</span>
@@ -144,7 +149,16 @@
 		display: flex;
 		flex-direction: column;
 	}
-	.record.open { border-color: var(--accent); }
+	/* An open record stops being a tile and becomes a row: a 168px column can't
+	   hold a tracklist, and squeezing one in wrapped every title to a word a line. */
+	.record.open {
+		border-color: var(--accent);
+		grid-column: 1 / -1;
+	}
+	.record.open .face { flex-direction: row; align-items: stretch; }
+	.record.open .sleeve { width: 132px; }
+	.record.open .meta { justify-content: center; padding: var(--space-lg); }
+	.record.open .title { font-size: var(--text-lg); }
 
 	.face {
 		display: flex;
@@ -161,11 +175,16 @@
 	.face:hover { background: var(--surface-hover); }
 	.face:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
+	/* An aspect-ratio box is a flex item here, so it must be told not to shrink —
+	   otherwise the column's height wins and the sleeve flattens to a strip. */
 	.sleeve {
-		aspect-ratio: 1;
+		flex: none;
+		width: 100%;
+		aspect-ratio: 1 / 1;
 		background: var(--surface-3);
 		display: block;
 		position: relative;
+		overflow: hidden;
 	}
 	.sleeve img { width: 100%; height: 100%; object-fit: cover; display: block; }
 	.no-art {
@@ -176,18 +195,37 @@
 		color: var(--text-4);
 	}
 
-	.meta { display: flex; flex-direction: column; gap: 2px; padding: var(--space-lg); }
+	.meta {
+		flex: none;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: var(--space-md) var(--space-lg) var(--space-lg);
+		min-width: 0;
+	}
 	.title {
 		font-size: var(--text-md);
 		font-weight: var(--font-weight-semibold);
 		line-height: 1.25;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
-	.artist { font-size: var(--text-sm); color: var(--text-2); }
+	.artist {
+		font-size: var(--text-sm);
+		color: var(--text-2);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.cat {
 		font-size: var(--text-xs);
 		color: var(--text-4);
 		font-variant-numeric: tabular-nums;
 		margin-top: 2px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.tags { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-md); }
 	.tag {
@@ -196,29 +234,51 @@
 		border-radius: var(--radius-xs);
 		border: 1px solid var(--border-default);
 		color: var(--text-3);
+		white-space: nowrap;
 	}
 	.tag.ready { border-color: var(--accent); color: var(--accent-text); }
 	.tag.short { border-style: dashed; }
 
-	.sides { border-top: 1px solid var(--border-subtle); padding: var(--space-md) 0; }
+	/* Sides flow into as many columns as fit — a 2xLP is 21 of them, and one
+	   long list would push the next record off the screen. */
+	.sides {
+		border-top: 1px solid var(--border-subtle);
+		padding: var(--space-md) var(--space-sm);
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+		gap: 0 var(--space-lg);
+		align-items: start;
+	}
+	.loading, .err, .actions { grid-column: 1 / -1; }
 	.loading, .err { margin: 0; padding: var(--space-md) var(--space-lg); font-size: var(--text-sm); color: var(--text-3); }
 	.err { color: var(--zone-drive); }
 
 	.side {
 		display: grid;
-		grid-template-columns: 2.6rem 1fr 4.6rem 2.6rem;
+		grid-template-columns: 2.4rem minmax(0, 1fr) 4.8rem 2.8rem;
 		gap: var(--space-md);
 		align-items: center;
-		padding: var(--space-sm) var(--space-lg);
+		padding: var(--space-sm) var(--space-md);
+		border-radius: var(--radius-sm);
 	}
+	.side:hover { background: var(--surface-3); }
 	.pos { font-size: var(--text-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
-	.name { font-size: var(--text-sm); min-width: 0; }
+	.name {
+		font-size: var(--text-sm);
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
 	.src {
 		display: block;
 		font-size: var(--text-2xs);
 		font-style: normal;
 		color: var(--text-4);
 		margin-top: 1px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.src.warn { color: var(--zone-drive); }
 
@@ -237,7 +297,7 @@
 	.bpm:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
 	.key { font-size: var(--text-xs); text-align: right; font-variant-numeric: tabular-nums; }
 
-	.actions { padding: var(--space-md) var(--space-lg) var(--space-xs); }
+	.actions { padding: var(--space-lg) var(--space-md) var(--space-xs); }
 	.remove {
 		background: none;
 		border: 0;
