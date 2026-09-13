@@ -78,6 +78,8 @@ class Track(Base):
     bpm_source = Column(String)  # "rekordbox" | "essentia" | "acousticbrainz" | "manual"
     key_source = Column(String)  # same ladder — "manual" outranks everything
     enrichment_status = Column(String)  # "pending" | "enriched" | "no_match" | "manual"
+    # The digital file of this same recording, when the DJ owns both. Set on
+    # vinyl rows only; the digital row never points back.
     duplicate_of_track_id = Column(Integer, ForeignKey("tracks.id"))
 
     __table_args__ = (
@@ -350,6 +352,23 @@ class VinylRelease(Base):
     created_at = Column(String, default=lambda: datetime.now().isoformat())
 
     __table_args__ = (UniqueConstraint("discogs_release_id", name="uq_vinyl_release_discogs_id"),)
+
+
+class VinylTwinRejection(Base):
+    """A pairing the DJ said "not it" to — a vinyl side and a digital file that
+    only look alike. Remembered so the same wrong guess is never offered twice,
+    and so an automatic relink never undoes an unlink."""
+
+    __tablename__ = "vinyl_twin_rejections"
+
+    id = Column(Integer, primary_key=True)
+    vinyl_track_id = Column(Integer, ForeignKey("tracks.id"), nullable=False)
+    digital_track_id = Column(Integer, ForeignKey("tracks.id"), nullable=False)
+    created_at = Column(String, default=lambda: datetime.now().isoformat())
+
+    __table_args__ = (
+        UniqueConstraint("vinyl_track_id", "digital_track_id", name="uq_vinyl_twin_rejection"),
+    )
 
 
 def _set_wal_mode(dbapi_conn, connection_record):

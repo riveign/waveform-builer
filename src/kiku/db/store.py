@@ -118,7 +118,7 @@ def search_tracks(
         (bare name = descending, "_asc" suffix = ascending).
     search: free-text OR-match across title, artist, and label.
     plays_min/plays_max: filter by combined play count (Rekordbox + Kiku).
-    medium: "digital" | "vinyl" — omit to see the whole library, both formats.
+    medium: "digital" | "vinyl" | "both" (files you also own on vinyl) — omit to see the whole library, both formats.
     """
     q = session.query(Track)
     if search:
@@ -180,7 +180,13 @@ def search_tracks(
         # A list OR-matches — a track with ANY selected role qualifies (spec 028).
         roles = [set_role] if isinstance(set_role, str) else set_role
         q = q.filter(or_(*[Track.set_roles.ilike(f'%"{r}"%') for r in roles]))
-    if medium:
+    if medium == "both":
+        # Files you also own on a record: a digital row some vinyl side points at.
+        linked = session.query(Track.duplicate_of_track_id).filter(
+            Track.medium == "vinyl", Track.duplicate_of_track_id.isnot(None)
+        )
+        q = q.filter(func.coalesce(Track.medium, "digital") != "vinyl", Track.id.in_(linked))
+    elif medium:
         # coalesce: rows written before spec 030's backfill would otherwise
         # disappear from a "digital" filter for having a NULL medium.
         q = q.filter(func.coalesce(Track.medium, "digital") == medium)

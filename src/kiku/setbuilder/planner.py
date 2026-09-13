@@ -102,6 +102,9 @@ def _get_candidate_pool(
         # coalesce, not `!= "vinyl"` — in SQL a NULL medium would fail that
         # comparison and the row would vanish from the pool.
         q = q.filter(func.coalesce(Track.medium, "digital") != "vinyl")
+    else:
+        # A side you also own as a file is one track, not two — the file stands in.
+        q = q.filter(Track.duplicate_of_track_id.is_(None))
 
     if genres:
         conditions = [Track.dir_genre.ilike(f"%{g}%") for g in genres]

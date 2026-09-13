@@ -359,3 +359,93 @@ def test_only_a_side_on_the_shelf_can_be_patched(client, db_session, discogs):
 
     digital = db_session.query(Track).filter(Track.medium != "vinyl").first()
     assert client.patch(f"/api/vinyl/sides/{digital.id}", json={"bpm": 100.0}).status_code == 404
+
+
+# ── digital twins ─────────────────────────────────────────────────────────
+
+
+@pytest.fixture()
+def sonora(db_session):
+    """A record, two of its sides on the drive under the same album, one elsewhere."""
+    rel = VinylRelease(title="Sonora", artist="Alarico")
+    db_session.add(rel)
+    db_session.flush()
+    sides = [
+        Track(
+            medium="vinyl",
+            vinyl_release_id=rel.id,
+            vinyl_position=p,
+            title=t,
+            artist="Alarico",
+            album="Sonora",
+            disc_number=d,
+            track_number=i,
+        )
+        for p, t, d, i in [("A1", "Iruka", 1, 1), ("A2", "Boiler", 1, 2), ("B1", "Stingray", 2, 1)]
+    ]
+    files = [
+        Track(medium="digital", title="Iruka", artist="Alarico", album="Sonora", bpm=141.0),
+        Track(medium="digital", title="Boiler", artist="Alarico", album="Sonora", bpm=143.0),
+        Track(medium="digital", title="Stingray", artist=None, album=None, bpm=143.6),
+    ]
+    db_session.add_all(sides + files)
+    db_session.commit()
+    from kiku.vinyl.twins import link_release
+
+    link_release(db_session, rel)
+    db_session.commit()
+    return rel, sides, files
+
+
+def test_record_detail_shows_linked_files_and_asks_about_the_guess(client, sonora):
+    rel, sides, files = sonora
+    body = client.get(f"/api/vinyl/releases/{rel.id}").json()
+
+    assert body["release"]["digital"] == 2
+    by_pos = {s["position"]: s for s in body["sides"]}
+    assert by_pos["A1"]["digital"]["track_id"] == files[0].id
+    assert by_pos["A1"]["suggestion"] is None
+    assert by_pos["B1"]["digital"] is None
+    assert by_pos["B1"]["suggestion"]["track_id"] == files[2].id
+
+
+def test_play_the_record_returns_its_files_in_pressing_order(client, sonora):
+    rel, _, files = sonora
+    body = client.get(f"/api/vinyl/releases/{rel.id}/digital").json()
+    assert [t["id"] for t in body] == [files[0].id, files[1].id]
+    assert body[0]["vinyl_twin"] == {
+        "release_id": rel.id,
+        "release_title": "Sonora",
+        "position": "A1",
+    }
+
+
+def test_confirm_a_guess_then_say_not_it(client, sonora):
+    rel, sides, files = sonora
+    b1, stingray = sides[2], files[2]
+
+    res = client.put(f"/api/vinyl/sides/{b1.id}/twin", json={"digital_track_id": stingray.id})
+    assert res.status_code == 200
+    assert res.json()["digital"]["track_id"] == stingray.id
+    assert res.json()["bpm_source"] == "library"
+
+    res = client.delete(f"/api/vinyl/sides/{b1.id}/twin/{stingray.id}")
+    assert res.json()["digital"] is None
+    detail = client.get(f"/api/vinyl/releases/{rel.id}").json()
+    assert {s["position"]: s for s in detail["sides"]}["B1"]["suggestion"] is None
+
+
+def test_linking_a_record_to_a_record_is_refused(client, sonora):
+    _, sides, _ = sonora
+    res = client.put(f"/api/vinyl/sides/{sides[0].id}/twin", json={"digital_track_id": sides[1].id})
+    assert res.status_code == 400
+
+
+def test_library_marks_files_you_own_on_vinyl_and_filters_to_them(client, sonora):
+    rel, _, files = sonora
+    body = client.get("/api/tracks/search", params={"medium": "both", "limit": 100}).json()
+    assert {t["id"] for t in body["items"]} == {files[0].id, files[1].id}
+    assert all(t["vinyl_twin"]["release_id"] == rel.id for t in body["items"])
+
+    one = client.get(f"/api/tracks/{files[2].id}").json()
+    assert one["vinyl_twin"] is None

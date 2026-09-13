@@ -28,7 +28,19 @@ from kiku.db.store import autocomplete_artists, autocomplete_labels, search_trac
 router = APIRouter(prefix="/api/tracks", tags=["tracks"])
 
 
-def _track_to_response(t: Track) -> TrackResponse:
+def _shelf_ref(side: Track | None):
+    if side is None or side.vinyl_release_id is None:
+        return None
+    from kiku.api.schemas import VinylShelfRef
+
+    return VinylShelfRef(
+        release_id=side.vinyl_release_id,
+        release_title=side.album,
+        position=side.vinyl_position,
+    )
+
+
+def _track_to_response(t: Track, vinyl_twin: Track | None = None) -> TrackResponse:
     import json as _json
 
     from kiku.energy import get_track_energy
@@ -97,6 +109,8 @@ def _track_to_response(t: Track) -> TrackResponse:
         vinyl_release_id=t.vinyl_release_id,
         bpm_source=t.bpm_source,
         key_source=t.key_source,
+        vinyl_twin=_shelf_ref(vinyl_twin),
+        digital_twin_id=t.duplicate_of_track_id if t.medium == "vinyl" else None,
     )
 
 
@@ -173,8 +187,11 @@ def track_search(
         tracks, total = fuzzy_search_tracks(db, search, limit=limit)
         fuzzy = bool(tracks)
 
+    from kiku.vinyl.twins import vinyl_twins_of
+
+    twins = vinyl_twins_of(db, [t.id for t in tracks if t.medium != "vinyl"])
     return PaginatedTracksResponse(
-        items=[_track_to_response(t) for t in tracks],
+        items=[_track_to_response(t, twins.get(t.id)) for t in tracks],
         total=total,
         offset=offset,
         limit=limit,
@@ -205,7 +222,9 @@ def track_detail(track_id: int, db: Session = Depends(get_db)):
     track = db.get(Track, track_id)
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
-    return _track_to_response(track)
+    from kiku.vinyl.twins import vinyl_twins_of
+
+    return _track_to_response(track, vinyl_twins_of(db, [track.id]).get(track.id))
 
 
 @router.patch("/{track_id}/rating", response_model=TrackResponse)

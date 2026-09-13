@@ -15,7 +15,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from kiku.db.models import Track, VinylRelease
+from kiku.db.models import Track, VinylRelease, VinylTwinRejection
 from kiku.metadata.models import ReleaseCandidate
 from kiku.vinyl.position import parse_position
 
@@ -291,6 +291,10 @@ def remove_release(session: Session, release_id: int) -> tuple[str | None, int]:
         .all()
     )
     title = release.title
+    if rows:
+        session.query(VinylTwinRejection).filter(
+            VinylTwinRejection.vinyl_track_id.in_([r.id for r in rows])
+        ).delete(synchronize_session=False)
     for row in rows:
         session.delete(row)
     session.delete(release)

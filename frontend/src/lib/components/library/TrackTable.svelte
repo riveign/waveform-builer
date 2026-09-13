@@ -125,7 +125,7 @@
 						</span>
 					</td>
 					<td class="col-title" title={track.title ?? ''}>
-						{#if track.medium === 'vinyl'}<VinylPip position={track.vinyl_position} />{/if}{track.title ?? '?'}
+						{#if track.medium === 'vinyl'}<VinylPip position={track.vinyl_position} />{:else if track.vinyl_twin}<VinylPip position={track.vinyl_twin.position} record={track.vinyl_twin.release_title} href="/vinyl?open={track.vinyl_twin.release_id}" />{/if}{track.title ?? '?'}
 					</td>
 					<td class="col-artist" title={track.artist ?? ''}>
 						{track.artist ?? '?'}

@@ -1993,6 +1993,7 @@ def vinyl_add(
         f"[bold green]{candidate.album or 'That record'} is on the shelf.[/] "
         f"[dim]release #{release.id}[/]"
     )
+    _report_twins(session, release)
 
     # The spike found a BPM for 1 recording in 54 (spec Research R1). Nobody is
     # going to enrich these — so the fill pass is the import, not an afterthought.
@@ -2003,6 +2004,60 @@ def vinyl_add(
         )
         return
     _vinyl_fill(session, release.id)
+
+
+def _report_twins(session, release) -> None:
+    """Link the sides you already own as files, and say which."""
+    from kiku.vinyl.twins import link_release
+
+    found = link_release(session, release)
+    session.commit()
+    if found.linked:
+        console.print(
+            f"[cyan]{len(found.linked)} side(s) are already on your drive[/] "
+            "[dim]— linked, with BPM and key from your own files.[/]"
+        )
+    if found.suggestions:
+        console.print(
+            f"[dim]{len(found.suggestions)} more look like files you own — "
+            "confirm them on the Shelf.[/]"
+        )
+
+
+@vinyl_group.command("link")
+@click.option("--dry-run", is_flag=True, help="Show what would be linked, write nothing")
+def vinyl_link(dry_run):
+    """Link records to the digital copies you already own."""
+    from kiku.db.models import Track, VinylRelease, get_session
+    from kiku.vinyl.twins import link_shelf
+
+    session = get_session()
+    results = link_shelf(session, apply=not dry_run)
+    linked = {rid: r for rid, r in results.items() if r.linked}
+    suggested = sum(len(r.suggestions) for r in results.values())
+    if not linked and not suggested:
+        console.print("[dim]No new matches — every record you own digitally is already linked.[/]")
+        return
+
+    table = Table(title="Records you also own digitally")
+    table.add_column("Record")
+    table.add_column("Artist")
+    table.add_column("Linked", justify="right")
+    for rid, r in linked.items():
+        rel = session.get(VinylRelease, rid)
+        total = session.query(Track).filter(Track.vinyl_release_id == rid).count()
+        table.add_row(rel.title or "—", rel.artist or "—", f"{len(r.linked)}/{total}")
+    if linked:
+        console.print(table)
+    sides = sum(len(r.linked) for r in linked.values())
+    verb = "would link" if dry_run else "linked"
+    console.print(f"[bold]{sides} side(s) on {len(linked)} record(s) {verb}.[/]")
+    if suggested:
+        console.print(
+            f"[dim]{suggested} more only match on title — confirm or dismiss them on the Shelf.[/]"
+        )
+    if dry_run:
+        console.print("[dim]Dry run — nothing written.[/]")
 
 
 @vinyl_group.command("fill")

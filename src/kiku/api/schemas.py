@@ -33,6 +33,14 @@ class EnergyConflictResponse(BaseModel):
     message: str
 
 
+class VinylShelfRef(BaseModel):
+    """Where on the shelf a digital track's record lives."""
+
+    release_id: int
+    release_title: str | None = None
+    position: str | None = None
+
+
 class TrackResponse(BaseModel):
     id: int
     title: str | None = None
@@ -69,6 +77,10 @@ class TrackResponse(BaseModel):
     vinyl_release_id: int | None = None
     bpm_source: str | None = None
     key_source: str | None = None
+    # The same recording in the other format. A digital track names the record
+    # side it's on; a vinyl side names its file.
+    vinyl_twin: VinylShelfRef | None = None
+    digital_twin_id: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -1082,6 +1094,20 @@ class VinylReleaseSummary(BaseModel):
     sides: int = 0
     plannable: int = 0
     without_length: int = 0
+    digital: int = 0  # sides linked to a file you own
+
+
+class VinylTwinRef(BaseModel):
+    """A digital track that is — or might be — the same recording as a side."""
+
+    track_id: int
+    title: str | None = None
+    artist: str | None = None
+    album: str | None = None
+
+
+class VinylTwinRequest(BaseModel):
+    digital_track_id: int
 
 
 class VinylSide(BaseModel):
@@ -1099,6 +1125,8 @@ class VinylSide(BaseModel):
     bpm_source: str | None = None
     key_source: str | None = None
     enrichment_status: str | None = None
+    digital: VinylTwinRef | None = None  # linked: plays your file
+    suggestion: VinylTwinRef | None = None  # only a title match — the DJ decides
 
 
 class VinylReleaseDetail(BaseModel):
