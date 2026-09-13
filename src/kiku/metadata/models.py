@@ -30,6 +30,12 @@ class RecordingCandidate:
     disc: int | None = None
     artist: str | None = None  # per-track artist (compilations / remixers)
     length_ms: int | None = None
+    # MusicBrainz recording id. Present in the MB response and previously thrown
+    # away; it is the only key AcousticBrainz accepts (slice 2).
+    mbid: str | None = None
+    # The pressing's own position string — "A1", "B2", "Digi 1". Display truth
+    # for vinyl; `position`/`disc` above are the sortable derivation of it.
+    position_raw: str | None = None
 
 
 @dataclass
@@ -43,6 +49,13 @@ class ReleaseCandidate:
     label: str | None = None
     year: int | None = None
     url: str | None = None
+    # Catalog facts about a physical object. Discogs knows these; nobody else
+    # reliably does. They are what a `vinyl_releases` row is made of.
+    catalog_number: str | None = None
+    country: str | None = None
+    format: str | None = None  # 'Vinyl, 12", 33 1/3 RPM, EP'
+    cover_url: str | None = None
+    genre: str | None = None  # what kind of record this is — steers the tempo prior
     recordings: list[RecordingCandidate] = field(default_factory=list)
 
     @property

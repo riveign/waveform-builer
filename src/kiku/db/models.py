@@ -68,9 +68,33 @@ class Track(Base):
     energy_confidence = Column(Float)  # Prediction confidence 0-1
     energy_source = Column(String)  # "manual", "auto", or "approved"
 
+    # --- Vinyl (spec 030) ---------------------------------------------------
+    # A record on the shelf is a track row with no file. Everything below is
+    # NULL for a digital row except `medium`, which is backfilled to "digital".
+    medium = Column(String, default="digital")  # "digital" | "vinyl"
+    vinyl_release_id = Column(Integer, ForeignKey("vinyl_releases.id"))
+    vinyl_position = Column(String)  # raw side string: "A1", "B2", "Digi 1"
+    mb_recording_id = Column(String)  # the AcousticBrainz key, for slice 2
+    bpm_source = Column(String)  # "rekordbox" | "essentia" | "acousticbrainz" | "manual"
+    key_source = Column(String)  # same ladder — "manual" outranks everything
+    enrichment_status = Column(String)  # "pending" | "enriched" | "no_match" | "manual"
+    duplicate_of_track_id = Column(Integer, ForeignKey("tracks.id"))
+
+    __table_args__ = (
+        # One side position per pressing. Digital rows leave both NULL and SQLite
+        # counts NULLs as distinct, so this only ever constrains vinyl.
+        Index("uq_track_vinyl_side", "vinyl_release_id", "vinyl_position", unique=True),
+        Index("ix_tracks_medium", "medium"),
+    )
+
     audio_features = relationship(
         "AudioFeatures", back_populates="track", uselist=False, cascade="all, delete-orphan"
     )
+
+    @property
+    def is_vinyl(self) -> bool:
+        """True when this track lives on the shelf, not on disk."""
+        return self.medium == "vinyl"
 
     @property
     def resolved_energy_zone(self) -> tuple[str | None, str, float]:
@@ -112,6 +136,9 @@ class AudioFeatures(Base):
     verified_bpm = Column(Float)
     verified_key = Column(String)
     analyzed_at = Column(String)
+    # What produced these numbers. The table recorded *when* but never *what*,
+    # which is the only thing that can later prove the two pipelines share a scale.
+    source = Column(String)  # "essentia" | "acousticbrainz"
     # Waveform data for visualization
     waveform_overview = Column(LargeBinary)  # ~1000 float32 peak-downsampled RMS
     waveform_detail = Column(LargeBinary)  # ~10K float32 full RMS envelope
@@ -293,6 +320,36 @@ class AlbumMetadata(Base):
     match_status = Column(String)  # "applied", "skipped"
     cover_source = Column(String)  # "embedded" | "caa" | "itunes" | "deezer"
     cover_fetched_at = Column(DateTime)
+
+
+class VinylRelease(Base):
+    """One physical pressing the DJ owns.
+
+    Kiku has no albums table — `album_key()` groups on the fly. That works for
+    browsing but cannot hold catalog number, RPM, country or acquisition date,
+    because those are facts about an object you own once, not about a track.
+    """
+
+    __tablename__ = "vinyl_releases"
+
+    id = Column(Integer, primary_key=True)
+    discogs_release_id = Column(String)
+    mb_release_id = Column(String)
+    title = Column(String)
+    artist = Column(String)
+    label = Column(String)
+    catalog_number = Column(String)
+    year = Column(Integer)
+    country = Column(String)
+    format = Column(String)  # e.g. 'Vinyl, 12", 33 1/3 RPM, EP'
+    rpm = Column(Integer)
+    side_count = Column(Integer)
+    cover_url = Column(String)
+    acquired_on = Column(String)  # ISO date the record joined the shelf
+    notes = Column(Text)
+    created_at = Column(String, default=lambda: datetime.now().isoformat())
+
+    __table_args__ = (UniqueConstraint("discogs_release_id", name="uq_vinyl_release_discogs_id"),)
 
 
 def _set_wal_mode(dbapi_conn, connection_record):

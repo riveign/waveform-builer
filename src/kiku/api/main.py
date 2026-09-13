@@ -18,6 +18,7 @@ from kiku.api.routes import (
     stats,
     tinder,
     tracks,
+    vinyl,
     waveforms,
 )
 from kiku.db.models import _init_schema
@@ -41,7 +42,13 @@ def create_app() -> FastAPI:
         allow_origins=["http://localhost:5173", "http://localhost:4173"],
         allow_methods=["*"],
         allow_headers=["*"],
-        expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
+        expose_headers=[
+            "Content-Range",
+            "Accept-Ranges",
+            "Content-Length",
+            "X-Kiku-Skipped-Count",
+            "X-Kiku-Skipped",
+        ],
     )
 
     app.include_router(tracks.router)
@@ -55,5 +62,6 @@ def create_app() -> FastAPI:
     app.include_router(hunt.router)
     app.include_router(soundcloud.router)
     app.include_router(albums.router)
+    app.include_router(vinyl.router)
 
     return app

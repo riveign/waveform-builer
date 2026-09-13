@@ -29,6 +29,7 @@
 	let energyZone = $state('');
 	let ratingMin = $state('');
 	let setRoles = $state<Set<string>>(new Set());
+	let medium = $state('');
 	let playsFilter = $state('');
 
 	// One sort at a time — the list has a single order, so the controls are
@@ -106,6 +107,7 @@
 		if (energyZone) params.energy_zone = energyZone;
 		if (ratingMin) params.rating_min = Number(ratingMin);
 		if (setRoles.size > 0) params.set_role = [...setRoles];
+		if (medium) params.medium = medium;
 		if (playsFilter === 'unplayed') params.plays_max = 0;
 		else if (playsFilter === 'played') params.plays_min = 1;
 		if (sort) params.sort = sort;
@@ -176,6 +178,7 @@
 		energyZone !== '' ||
 		ratingMin !== '' ||
 		setRoles.size > 0 ||
+		medium !== '' ||
 		playsFilter !== '' ||
 		sort !== ''
 	);
@@ -212,6 +215,7 @@
 		energyZone = '';
 		ratingMin = '';
 		setRoles = new Set();
+		medium = '';
 		playsFilter = '';
 		sort = '';
 		onsearch({});
@@ -434,6 +438,9 @@
 			{#each [...setRoles] as role (role)}
 				<Chip value={SET_ROLE_LABELS[role]} size="sm" removable removeLabel="Clear {SET_ROLE_LABELS[role]} filter" onremove={() => toggleSetRole(role)} />
 			{/each}
+			{#if medium}
+				<Chip value={medium === 'vinyl' ? 'On vinyl' : 'Digital'} size="sm" removable removeLabel="Clear format filter" onremove={() => { medium = ''; searchNow(); }} />
+			{/if}
 			{#if playsFilter}
 				<Chip
 					value={playsFilter === 'unplayed' ? 'Unplayed' : 'Played'}
@@ -635,6 +642,14 @@
 						<option value="3">3+</option>
 						<option value="4">4+</option>
 						<option value="5">5</option>
+					</select>
+				</div>
+				<div class="field-group">
+					<span class="section-label">Format</span>
+					<select class="small-select" bind:value={medium} onchange={() => searchNow()} title="Files, records, or the whole library">
+						<option value="">Everything</option>
+						<option value="digital">Digital</option>
+						<option value="vinyl">On vinyl</option>
 					</select>
 				</div>
 				<div class="field-group field-group--role">

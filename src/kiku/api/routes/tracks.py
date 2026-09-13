@@ -92,6 +92,11 @@ def _track_to_response(t: Track) -> TrackResponse:
         playlist_tags=tags,
         set_roles=roles,
         genre_family=family,
+        medium=t.medium or "digital",
+        vinyl_position=t.vinyl_position,
+        vinyl_release_id=t.vinyl_release_id,
+        bpm_source=t.bpm_source,
+        key_source=t.key_source,
     )
 
 
@@ -111,6 +116,7 @@ def track_search(
     plays_min: int | None = None,
     plays_max: int | None = None,
     set_role: list[str] | None = Query(None),
+    medium: str | None = None,
     sort: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -132,6 +138,7 @@ def track_search(
         plays_min=plays_min,
         plays_max=plays_max,
         set_role=set_role,
+        medium=medium,
         sort=sort,
         limit=limit,
         offset=offset,
@@ -157,6 +164,7 @@ def track_search(
             plays_min,
             plays_max,
             set_role,
+            medium,
         )
     )
     if search and total == 0 and not other_filters:

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from kiku.config import DATA_DIR
 from kiku.db.models import Set
-from kiku.export.utils import export_path
+from kiku.export.utils import ExportResult, SkippedTrack, export_path, skip_reason
 
 # File extension -> Rekordbox Kind string
 _KIND_MAP: dict[str, str] = {
@@ -36,7 +36,7 @@ def export_set_to_xml(
     set_: Set,
     output_path: str | None = None,
     transition_cues: dict[int, list[dict]] | None = None,
-) -> str:
+) -> ExportResult:
     """Export a Set as Rekordbox XML, optionally with cue points.
 
     Parameters
@@ -51,8 +51,10 @@ def export_set_to_xml(
 
     Returns
     -------
-    str
-        Path to the written XML file.
+    ExportResult
+        The written file's path, plus any tracks left out for having no file.
+        Rekordbox treats an empty Location as a corrupt entry, so they are
+        omitted rather than written blank.
     """
     # pyrekordbox is the optional `rekordbox` extra. Imported here rather than at
     # module scope so that installing only `[api]` — which the API routes import —
@@ -63,18 +65,33 @@ def export_set_to_xml(
 
     tracks_in_set = sorted(set_.tracks, key=lambda st: st.position)
     playlist = xml.add_playlist(set_.name or "DJ Set")
+    skipped: list[SkippedTrack] = []
 
     for st in tracks_in_set:
         track = st.track
 
+        # An empty Location is a corrupt playlist row, not a degraded one. A
+        # record on the shelf is reported back to the caller instead (spec 030).
+        reason = skip_reason(track)
+        if reason:
+            skipped.append(
+                SkippedTrack(
+                    track_id=track.id,
+                    title=track.title or "Unknown Title",
+                    artist=track.artist,
+                    reason=reason,
+                )
+            )
+            continue
+
         # --- Gap 2: reverse path alias for macOS ---
-        location = export_path(track.file_path, "macos") if track.file_path else ""
+        location = export_path(track.file_path, "macos")
 
         # --- Gap 1: use rb_id when available ---
         track_id = int(track.rb_id) if track.rb_id else track.id
 
         # --- Gap 3: detect file format ---
-        kind = _detect_kind(track.file_path) if track.file_path else "MP3 File"
+        kind = _detect_kind(track.file_path)
 
         # Build kwargs — only include non-None values to avoid serialisation
         # errors from pyrekordbox (None values crash xml.etree).
@@ -134,4 +151,4 @@ def export_set_to_xml(
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     xml.save(output_path)
 
-    return output_path
+    return ExportResult(path=output_path, skipped=skipped)

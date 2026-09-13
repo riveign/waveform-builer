@@ -57,6 +57,8 @@ class MusicBrainzSource:
                         position=int(pos),
                         disc=disc_no,
                         length_ms=int(length) if length else None,
+                        mbid=(tr.get("recording") or {}).get("id"),
+                        position_raw=str(pos),
                     )
                 )
 

@@ -1553,6 +1553,136 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/vinyl/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Vinyl Import
+         * @description Write the pressing and its sides, with whatever numbers the DJ confirmed.
+         */
+        post: operations["vinyl_import_api_vinyl_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vinyl Preview
+         * @description The tracklist, with every BPM Kiku can work out before you type one.
+         *
+         *     `url` accepts a Discogs or Bandcamp release link, for records the search
+         *     can't find — which is most white labels.
+         */
+        get: operations["vinyl_preview_api_vinyl_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vinyl Releases
+         * @description The shelf.
+         */
+        get: operations["vinyl_releases_api_vinyl_releases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/releases/{release_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vinyl Release Detail
+         * @description One record, and the sides on it in pressing order.
+         */
+        get: operations["vinyl_release_detail_api_vinyl_releases__release_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Vinyl Release Delete
+         * @description Take a record off the shelf, with the sides that came in with it.
+         */
+        delete: operations["vinyl_release_delete_api_vinyl_releases__release_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vinyl Search
+         * @description Find a pressing. One Discogs call, everything the picker needs.
+         */
+        get: operations["vinyl_search_api_vinyl_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/sides/{track_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Vinyl Side Patch
+         * @description Correct a side by hand.
+         *
+         *     Anything set here is `manual` — it outranks every automatic source, so a
+         *     wrong estimate stays corrected.
+         */
+        patch: operations["vinyl_side_patch_api_vinyl_sides__track_id__patch"];
+        trace?: never;
+    };
     "/api/waveforms/{track_id}/bands": {
         parameters: {
             query?: never;
@@ -3063,6 +3193,8 @@ export interface components {
             artist?: string | null;
             /** Bpm */
             bpm?: number | null;
+            /** Bpm Source */
+            bpm_source?: string | null;
             /** Comment */
             comment?: string | null;
             /** Date Added */
@@ -3100,10 +3232,17 @@ export interface components {
             id: number;
             /** Key */
             key?: string | null;
+            /** Key Source */
+            key_source?: string | null;
             /** Kiku Play Count */
             kiku_play_count?: number | null;
             /** Label */
             label?: string | null;
+            /**
+             * Medium
+             * @default digital
+             */
+            medium: string;
             /** Play Count */
             play_count?: number | null;
             /**
@@ -3126,6 +3265,10 @@ export interface components {
             title?: string | null;
             /** Track Number */
             track_number?: number | null;
+            /** Vinyl Position */
+            vinyl_position?: string | null;
+            /** Vinyl Release Id */
+            vinyl_release_id?: number | null;
         };
         /** TrackSetAppearance */
         TrackSetAppearance: {
@@ -3239,6 +3382,265 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VinylImportRequest */
+        VinylImportRequest: {
+            /** Acquired On */
+            acquired_on?: string | null;
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /** Notes */
+            notes?: string | null;
+            /** Release Id */
+            release_id?: string | null;
+            /**
+             * Sides
+             * @default []
+             */
+            sides: components["schemas"]["VinylSideInput"][];
+            /** Url */
+            url?: string | null;
+        };
+        /** VinylImportResponse */
+        VinylImportResponse: {
+            /** Bpms Applied */
+            bpms_applied: number;
+            release: components["schemas"]["VinylReleaseSummary"];
+            /** Sides Written */
+            sides_written: number;
+            /** Unplannable */
+            unplannable: number;
+        };
+        /** VinylPreviewResponse */
+        VinylPreviewResponse: {
+            /** Album */
+            album?: string | null;
+            /**
+             * Already Owned
+             * @default false
+             */
+            already_owned: boolean;
+            /** Artist */
+            artist?: string | null;
+            /** Catalog Number */
+            catalog_number?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Format */
+            format?: string | null;
+            /** Genre */
+            genre?: string | null;
+            /**
+             * Is Pressing
+             * @default true
+             */
+            is_pressing: boolean;
+            /** Label */
+            label?: string | null;
+            /**
+             * Rows
+             * @default []
+             */
+            rows: components["schemas"]["VinylPreviewRow"][];
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id: string;
+            /** Year */
+            year?: number | null;
+        };
+        /**
+         * VinylPreviewRow
+         * @description One side, with whatever Kiku could work out about it.
+         */
+        VinylPreviewRow: {
+            /**
+             * Already On Shelf
+             * @default false
+             */
+            already_on_shelf: boolean;
+            /** Artist */
+            artist?: string | null;
+            /** Bpm */
+            bpm?: number | null;
+            /** Bpm Note */
+            bpm_note?: string | null;
+            /**
+             * Bpm Source
+             * @default none
+             */
+            bpm_source: string;
+            /** Duration Sec */
+            duration_sec?: number | null;
+            /** Index */
+            index?: number | null;
+            /** Key */
+            key?: string | null;
+            /** Matched Track Id */
+            matched_track_id?: number | null;
+            /** Position */
+            position?: string | null;
+            /** Side */
+            side?: number | null;
+            /** Title */
+            title: string;
+        };
+        /** VinylReleaseDetail */
+        VinylReleaseDetail: {
+            release: components["schemas"]["VinylReleaseSummary"];
+            /**
+             * Sides
+             * @default []
+             */
+            sides: components["schemas"]["VinylSide"][];
+        };
+        /** VinylReleaseSummary */
+        VinylReleaseSummary: {
+            /** Artist */
+            artist?: string | null;
+            /** Catalog Number */
+            catalog_number?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Format */
+            format?: string | null;
+            /** Id */
+            id: number;
+            /** Label */
+            label?: string | null;
+            /**
+             * Plannable
+             * @default 0
+             */
+            plannable: number;
+            /** Side Count */
+            side_count?: number | null;
+            /**
+             * Sides
+             * @default 0
+             */
+            sides: number;
+            /** Title */
+            title?: string | null;
+            /**
+             * Without Length
+             * @default 0
+             */
+            without_length: number;
+            /** Year */
+            year?: number | null;
+        };
+        /** VinylSearchResponse */
+        VinylSearchResponse: {
+            /** Kind */
+            kind: string;
+            /** Query */
+            query: string;
+            /**
+             * Results
+             * @default []
+             */
+            results: components["schemas"]["VinylSearchResult"][];
+        };
+        /**
+         * VinylSearchResult
+         * @description One pressing, as the picker shows it. All of this comes from the search
+         *     response itself — no per-result fetch, so the grid appears in one call.
+         */
+        VinylSearchResult: {
+            /**
+             * Already Owned
+             * @default false
+             */
+            already_owned: boolean;
+            /** Artist */
+            artist?: string | null;
+            /** Catno */
+            catno?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Cover Url */
+            cover_url?: string | null;
+            /** Format */
+            format?: string | null;
+            /** Genre */
+            genre?: string | null;
+            /** Have */
+            have?: number | null;
+            /** Id */
+            id: string;
+            /** Label */
+            label?: string | null;
+            /**
+             * Pressings
+             * @default 1
+             */
+            pressings: number;
+            /** Title */
+            title?: string | null;
+            /** Year */
+            year?: number | null;
+        };
+        /**
+         * VinylSide
+         * @description One side of a record as it sits in the library.
+         */
+        VinylSide: {
+            /** Artist */
+            artist?: string | null;
+            /** Bpm */
+            bpm?: number | null;
+            /** Bpm Source */
+            bpm_source?: string | null;
+            /** Duration Sec */
+            duration_sec?: number | null;
+            /** Enrichment Status */
+            enrichment_status?: string | null;
+            /** Index */
+            index?: number | null;
+            /** Key */
+            key?: string | null;
+            /** Key Source */
+            key_source?: string | null;
+            /** Position */
+            position?: string | null;
+            /** Side */
+            side?: number | null;
+            /** Title */
+            title?: string | null;
+            /** Track Id */
+            track_id: number;
+        };
+        /** VinylSideInput */
+        VinylSideInput: {
+            /** Bpm */
+            bpm?: number | null;
+            /** Key */
+            key?: string | null;
+            /** Position */
+            position: string;
+            /**
+             * Source
+             * @default manual
+             */
+            source: string;
+        };
+        /**
+         * VinylSidePatch
+         * @description A number the DJ typed. Always lands as `manual`, the top of the ladder.
+         */
+        VinylSidePatch: {
+            /** Bpm */
+            bpm?: number | null;
+            /** Key */
+            key?: string | null;
+            /** Length */
+            length?: string | null;
         };
         /** WaveformBandsResponse */
         WaveformBandsResponse: {
@@ -5430,6 +5832,7 @@ export interface operations {
                 plays_min?: number | null;
                 plays_max?: number | null;
                 set_role?: string[] | null;
+                medium?: string | null;
                 sort?: string | null;
                 limit?: number;
                 offset?: number;
@@ -5819,6 +6222,221 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SuggestNextResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_import_api_vinyl_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VinylImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_preview_api_vinyl_preview_get: {
+        parameters: {
+            query?: {
+                release_id?: string | null;
+                url?: string | null;
+                fill_bpm?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_releases_api_vinyl_releases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylReleaseSummary"][];
+                };
+            };
+        };
+    };
+    vinyl_release_detail_api_vinyl_releases__release_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylReleaseDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_release_delete_api_vinyl_releases__release_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_search_api_vinyl_search_get: {
+        parameters: {
+            query: {
+                /** @description Catalogue number, barcode, artist, or title */
+                q: string;
+                vinyl_only?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_side_patch_api_vinyl_sides__track_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VinylSidePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylSide"];
                 };
             };
             /** @description Validation Error */

@@ -1,15 +1,24 @@
-"""Audio streaming endpoint with Range request support and on-the-fly transcoding."""
+"""Audio streaming endpoint with Range request support.
+
+Browsers can't play AIFF, so AIFF (and anything else non-native) is converted
+once to a 16-bit WAV in a small on-disk cache and served from there. A cached
+file supports Range requests, so seeking works; a live transcode pipe doesn't.
+"""
 
 from __future__ import annotations
 
+import hashlib
+import os
 import subprocess
+import threading
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from kiku.api.deps import get_db
+from kiku.config import CONFIG_DIR
 from kiku.db.models import Track
 from kiku.db.sync import _normalize_path
 
@@ -18,19 +27,21 @@ router = APIRouter(prefix="/api/audio", tags=["audio"])
 MIME_TYPES = {
     ".mp3": "audio/mpeg",
     ".flac": "audio/flac",
-    ".aiff": "audio/aiff",
-    ".aif": "audio/aiff",
     ".m4a": "audio/mp4",
     ".wav": "audio/wav",
     ".ogg": "audio/ogg",
 }
 
 # Formats browsers can play natively
-BROWSER_NATIVE = {".mp3", ".wav", ".ogg", ".m4a"}
+BROWSER_NATIVE = set(MIME_TYPES)
+
+AUDIO_CACHE_DIR = CONFIG_DIR / "cache" / "audio"
+AUDIO_CACHE_MAX_BYTES = 4 * 1024**3  # ~80 tracks of 16-bit WAV
+_prune_lock = threading.Lock()
 
 
 @router.get("/{track_id}")
-def stream_audio(track_id: int, request: Request, db: Session = Depends(get_db)):
+def stream_audio(track_id: int, db: Session = Depends(get_db)):
     track = db.get(Track, track_id)
     if not track or not track.file_path:
         raise HTTPException(status_code=404, detail="Track not found")
@@ -40,86 +51,64 @@ def stream_audio(track_id: int, request: Request, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Audio file not found on disk")
 
     suffix = path.suffix.lower()
+    if suffix in BROWSER_NATIVE:
+        return FileResponse(path=str(path), media_type=MIME_TYPES[suffix])
 
-    # AIFF, FLAC, and other non-native formats: transcode to MP3 via FFmpeg
-    if suffix not in BROWSER_NATIVE:
-        return _transcode_stream(path)
-
-    # Native formats: serve directly with Range support
-    file_size = path.stat().st_size
-    content_type = MIME_TYPES.get(suffix, "application/octet-stream")
-
-    range_header = request.headers.get("range")
-    if range_header:
-        range_spec = range_header.replace("bytes=", "")
-        parts = range_spec.split("-")
-        start = int(parts[0]) if parts[0] else 0
-        end = int(parts[1]) if parts[1] else file_size - 1
-        end = min(end, file_size - 1)
-        content_length = end - start + 1
-
-        def iter_range():
-            with open(path, "rb") as f:
-                f.seek(start)
-                remaining = content_length
-                while remaining > 0:
-                    chunk = f.read(min(8192, remaining))
-                    if not chunk:
-                        break
-                    remaining -= len(chunk)
-                    yield chunk
-
-        return StreamingResponse(
-            iter_range(),
-            status_code=206,
-            media_type=content_type,
-            headers={
-                "Content-Range": f"bytes {start}-{end}/{file_size}",
-                "Content-Length": str(content_length),
-                "Accept-Ranges": "bytes",
-            },
-        )
-
-    return FileResponse(
-        path=str(path),
-        media_type=content_type,
-        headers={"Accept-Ranges": "bytes"},
-    )
+    return FileResponse(path=str(_cached_wav(path)), media_type="audio/wav")
 
 
-def _transcode_stream(path: Path) -> StreamingResponse:
-    """Transcode audio to MP3 on the fly via FFmpeg."""
-    proc = subprocess.Popen(
+def _cached_wav(path: Path) -> Path:
+    """Return a WAV copy of `path`, converting it on first request."""
+    st = path.stat()
+    key = hashlib.sha1(f"{path}|{st.st_size}|{st.st_mtime_ns}".encode()).hexdigest()
+    target = AUDIO_CACHE_DIR / f"{key}.wav"
+
+    if target.exists():
+        os.utime(target)  # mark as recently used for pruning
+        return target
+
+    AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(f".{os.getpid()}-{threading.get_ident()}.tmp")
+    result = subprocess.run(
         [
             "ffmpeg",
+            "-v",
+            "error",
+            "-y",
             "-i",
             str(path),
+            "-vn",
+            "-c:a",
+            "pcm_s16le",
             "-f",
-            "mp3",
-            "-ab",
-            "192k",
-            "-vn",  # no video
-            "-loglevel",
-            "error",
-            "pipe:1",
+            "wav",
+            str(tmp),
         ],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
+        text=True,
+        check=False,
     )
+    if result.returncode != 0:
+        tmp.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Couldn't convert {path.name} for playback: {result.stderr.strip()[-300:]}",
+        )
+    os.replace(tmp, target)
+    with _prune_lock:
+        _prune_cache(keep=target)
+    return target
 
-    def iter_chunks():
-        try:
-            while True:
-                chunk = proc.stdout.read(8192)
-                if not chunk:
-                    break
-                yield chunk
-        finally:
-            proc.stdout.close()
-            proc.wait()
 
-    return StreamingResponse(
-        iter_chunks(),
-        media_type="audio/mpeg",
-        headers={"Accept-Ranges": "none"},
+def _prune_cache(keep: Path) -> None:
+    """Drop least-recently-used WAVs until the cache fits its budget."""
+    files = sorted(
+        (f for f in AUDIO_CACHE_DIR.glob("*.wav") if f != keep),
+        key=lambda f: f.stat().st_mtime,
     )
+    total = keep.stat().st_size + sum(f.stat().st_size for f in files)
+    for f in files:
+        if total <= AUDIO_CACHE_MAX_BYTES:
+            break
+        total -= f.stat().st_size
+        f.unlink(missing_ok=True)

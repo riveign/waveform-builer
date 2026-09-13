@@ -78,11 +78,18 @@ DISCOGS_RELEASE = {
 }
 
 
-def test_discogs_unavailable_without_token():
+def test_discogs_unavailable_without_token(monkeypatch):
+    """`token=None` means "use whatever is configured" — so isolate the config.
+
+    Without this the test passes only on a machine that has never configured a
+    Discogs token, and starts failing the day the DJ adds one.
+    """
+    monkeypatch.delenv("KIKU_DISCOGS_TOKEN", raising=False)
+    monkeypatch.setattr("kiku.metadata.sources.discogs.get_discogs_token", lambda: None)
     assert DiscogsSource(token=None).available() is False
 
 
-def test_discogs_fetch_release_skips_headings_and_sequences_positions():
+def test_discogs_fetch_release_reads_the_side_off_the_pressing():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=DISCOGS_RELEASE)
 
@@ -92,12 +99,87 @@ def test_discogs_fetch_release_skips_headings_and_sequences_positions():
     assert cand.album == "Bite The Hand That Feeds You"
     assert cand.label == "Primal Instinct"
     assert cand.year == 2026
-    # Heading dropped; positions resequenced 1..2 regardless of A1/B1.
-    assert [(r.position, r.title) for r in cand.recordings] == [
-        (1, "Bite The Hand That Feeds You"),
-        (2, "Sit In Their Seat"),
+    # Heading dropped. A1/B1 are real side positions, not a sequence to flatten
+    # (spec 030): the side becomes disc, the index within it becomes position,
+    # and the raw string is kept because it is what is printed on the label.
+    assert [(r.disc, r.position, r.position_raw, r.title) for r in cand.recordings] == [
+        (1, 1, "A1", "Bite The Hand That Feeds You"),
+        (2, 1, "B1", "Sit In Their Seat"),
     ]
     assert cand.recordings[0].length_ms == 289000
+
+
+def test_discogs_falls_back_to_free_text_when_the_title_is_a_track_name():
+    """A DJ names a record by the track on it. The structured search returns 0.
+
+    Measured against the live API: `release_title=AF 97&artist=Alarico` finds
+    nothing; free-text finds Klockworks 38, whose A1 it is.
+    """
+    seen: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        params = dict(request.url.params)
+        if request.url.path == "/database/search":
+            seen.append(params)
+            if "release_title" in params:
+                return httpx.Response(200, json={"results": []})
+            return httpx.Response(200, json={"results": [{"id": 12345}]})
+        return httpx.Response(200, json=DISCOGS_RELEASE)
+
+    src = DiscogsSource(token="fake", transport=httpx.MockTransport(handler))
+    cands = src.search("AF 97", "Alarico", limit=3)
+
+    assert [p.get("release_title") or p.get("q") for p in seen] == ["AF 97", "Alarico AF 97"]
+    assert len(cands) == 1
+
+
+def test_discogs_search_does_not_fall_back_when_it_already_found_something():
+    """The fallback is a rescue, not a second opinion — it must not fire."""
+    calls: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/database/search":
+            calls.append(dict(request.url.params))
+            return httpx.Response(200, json={"results": [{"id": 12345}]})
+        return httpx.Response(200, json=DISCOGS_RELEASE)
+
+    src = DiscogsSource(token="fake", transport=httpx.MockTransport(handler))
+    src.search("Bite The Hand That Feeds You", "Hadone", limit=3)
+
+    assert len(calls) == 1
+    assert "release_title" in calls[0]
+
+
+def test_discogs_carries_the_catalog_facts_a_pressing_is_made_of():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                **DISCOGS_RELEASE,
+                "country": "Germany",
+                "labels": [{"name": "Klockworks", "catno": "KW 38"}],
+                "formats": [{"name": "Vinyl", "descriptions": ['12"', "33 1/3 RPM", "EP"]}],
+                "images": [{"uri": "https://i.discogs.com/x.jpg"}],
+            },
+        )
+
+    src = DiscogsSource(token="fake", transport=httpx.MockTransport(handler))
+    cand = src.fetch_url("https://www.discogs.com/release/12345-x")
+    assert cand is not None
+    assert cand.catalog_number == "KW 38"
+    assert cand.country == "Germany"
+    assert cand.format == 'Vinyl, 12", 33 1/3 RPM, EP'
+    assert cand.cover_url == "https://i.discogs.com/x.jpg"
+
+
+def test_rpm_is_none_when_the_pressing_does_not_say():
+    """Three of four sampled 12"s carried no RPM description. NULL, not a guess."""
+    from kiku.metadata.sources.discogs import rpm_from_format
+
+    assert rpm_from_format('Vinyl, 12", 33 1/3 RPM, EP') == 33
+    assert rpm_from_format('Vinyl, 7", 45 RPM') == 45
+    assert rpm_from_format('Vinyl, 12"') is None
+    assert rpm_from_format(None) is None
 
 
 def test_discogs_join_artists_strips_dupe_suffix():

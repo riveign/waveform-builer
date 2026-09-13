@@ -11,7 +11,13 @@ from pathlib import Path
 
 from kiku.config import DATA_DIR
 from kiku.db.models import Set
-from kiku.export.utils import export_path, sanitize_filename
+from kiku.export.utils import (
+    ExportResult,
+    SkippedTrack,
+    export_path,
+    sanitize_filename,
+    skip_reason,
+)
 
 
 def export_set_to_m3u8(
@@ -20,7 +26,7 @@ def export_set_to_m3u8(
     *,
     target_platform: str = "macos",
     with_metadata: bool = False,
-) -> str:
+) -> ExportResult:
     """Export a Set as an M3U8 playlist file.
 
     Parameters
@@ -38,16 +44,37 @@ def export_set_to_m3u8(
 
     Returns
     -------
-    str
-        Path to the written M3U8 file.
+    ExportResult
+        The written file's path, plus any tracks left out because they have no
+        file — records on the shelf get a comment line naming the side instead.
     """
     tracks_in_set = sorted(set_.tracks, key=lambda st: st.position)
     set_name = set_.name or "set"
 
     lines: list[str] = ["#EXTM3U"]
+    skipped: list[SkippedTrack] = []
 
     for st in tracks_in_set:
         track = st.track
+
+        # A fileless track can't carry a path, and an #EXTINF without one
+        # corrupts the playlist. M3U8 has comments, so leave a note instead —
+        # Rekordbox ignores it, the DJ reading the file sees what to pull.
+        reason = skip_reason(track)
+        if reason:
+            skipped.append(
+                SkippedTrack(
+                    track_id=track.id,
+                    title=track.title or "Unknown Title",
+                    artist=track.artist,
+                    reason=reason,
+                )
+            )
+            lines.append(
+                f"# kiku:vinyl {track.artist or 'Unknown Artist'} - "
+                f"{track.title or 'Unknown Title'} ({reason})"
+            )
+            continue
 
         # Duration: integer seconds, -1 if unknown
         duration = int(track.duration_sec) if track.duration_sec else -1
@@ -78,8 +105,7 @@ def export_set_to_m3u8(
                 lines.append(f"# kiku:{' '.join(meta_parts)}")
 
         # File path: absolute, forward slashes, platform-aliased
-        file_path = track.file_path or ""
-        file_path = export_path(file_path, target_platform)
+        file_path = export_path(track.file_path, target_platform)
         file_path = file_path.replace("\\", "/")
         lines.append(file_path)
 
@@ -91,4 +117,4 @@ def export_set_to_m3u8(
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    return str(out)
+    return ExportResult(path=str(out), skipped=skipped)

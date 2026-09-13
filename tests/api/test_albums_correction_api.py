@@ -56,13 +56,21 @@ def _solar_key(db):
     return album_key("Solar EP", "Various Artists")
 
 
-def test_list_sources_reports_modes_and_availability(client):
+def test_list_sources_reports_modes_and_availability(client, monkeypatch):
+    """Availability must be asserted against a known config, not the machine's.
+
+    This read `available is False` as "no token in test env", which held only
+    until someone configured one — then it failed for a reason that had nothing
+    to do with the endpoint.
+    """
+    monkeypatch.delenv("KIKU_DISCOGS_TOKEN", raising=False)
+    monkeypatch.setattr("kiku.metadata.sources.discogs.get_discogs_token", lambda: None)
     res = client.get("/api/albums/sources")
     assert res.status_code == 200
     rows = {s["name"]: s for s in res.json()["sources"]}
     assert set(rows) == {"bandcamp", "musicbrainz", "discogs", "tags"}
     assert rows["bandcamp"]["lookup_mode"] == "url"
-    assert rows["discogs"]["available"] is False  # no token in test env
+    assert rows["discogs"]["available"] is False  # token stubbed out above
 
 
 def test_match_source_returns_full_field_diff(client, db):

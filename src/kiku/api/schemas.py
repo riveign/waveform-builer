@@ -63,6 +63,12 @@ class TrackResponse(BaseModel):
     playlist_tags: list[str] = []
     set_roles: list[str] = []
     genre_family: str | None = None
+    # Vinyl (spec 030). `medium` is always present; the rest are NULL for digital.
+    medium: str = "digital"
+    vinyl_position: str | None = None
+    vinyl_release_id: int | None = None
+    bpm_source: str | None = None
+    key_source: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -981,3 +987,135 @@ class ApplyCorrectionRequest(BaseModel):
 class ApplyCorrectionResponse(BaseModel):
     updated_count: int
     album_key: str
+
+
+# ── Vinyl (spec 031) ──────────────────────────────────────────────────────
+
+
+class VinylSearchResult(BaseModel):
+    """One pressing, as the picker shows it. All of this comes from the search
+    response itself — no per-result fetch, so the grid appears in one call."""
+
+    id: str
+    title: str | None = None
+    artist: str | None = None
+    label: str | None = None
+    catno: str | None = None
+    year: int | None = None
+    country: str | None = None
+    format: str | None = None
+    cover_url: str | None = None
+    genre: str | None = None
+    have: int | None = None  # how many people own it — breaks ties between repressings
+    pressings: int = 1
+    already_owned: bool = False
+
+
+class VinylSearchResponse(BaseModel):
+    query: str
+    kind: str  # catno | barcode | artist_title | text | url
+    results: list[VinylSearchResult] = []
+
+
+class VinylPreviewRow(BaseModel):
+    """One side, with whatever Kiku could work out about it."""
+
+    position: str | None = None  # the raw side string: "A1", "B2"
+    side: int | None = None
+    index: int | None = None
+    title: str
+    artist: str | None = None
+    duration_sec: float | None = None
+    already_on_shelf: bool = False
+    bpm: float | None = None
+    key: str | None = None
+    bpm_source: str = "none"  # library | preview | suggestion | none
+    bpm_note: str | None = None
+    matched_track_id: int | None = None
+
+
+class VinylPreviewResponse(BaseModel):
+    source: str
+    source_id: str
+    album: str | None = None
+    artist: str | None = None
+    label: str | None = None
+    catalog_number: str | None = None
+    year: int | None = None
+    country: str | None = None
+    format: str | None = None
+    cover_url: str | None = None
+    genre: str | None = None
+    is_pressing: bool = True
+    already_owned: bool = False
+    rows: list[VinylPreviewRow] = []
+
+
+class VinylSideInput(BaseModel):
+    position: str
+    bpm: float | None = None
+    key: str | None = None
+    # Where this number came from. "manual" means the DJ typed or confirmed it
+    # and it outranks every later pass; an estimate must say so instead.
+    source: str = "manual"
+
+
+class VinylImportRequest(BaseModel):
+    release_id: str | None = None
+    url: str | None = None
+    acquired_on: str | None = None
+    notes: str | None = None
+    force: bool = False
+    sides: list[VinylSideInput] = []
+
+
+class VinylReleaseSummary(BaseModel):
+    id: int
+    title: str | None = None
+    artist: str | None = None
+    label: str | None = None
+    catalog_number: str | None = None
+    year: int | None = None
+    format: str | None = None
+    cover_url: str | None = None
+    side_count: int | None = None
+    sides: int = 0
+    plannable: int = 0
+    without_length: int = 0
+
+
+class VinylSide(BaseModel):
+    """One side of a record as it sits in the library."""
+
+    track_id: int
+    position: str | None = None
+    side: int | None = None
+    index: int | None = None
+    title: str | None = None
+    artist: str | None = None
+    bpm: float | None = None
+    key: str | None = None
+    duration_sec: float | None = None
+    bpm_source: str | None = None
+    key_source: str | None = None
+    enrichment_status: str | None = None
+
+
+class VinylReleaseDetail(BaseModel):
+    release: VinylReleaseSummary
+    sides: list[VinylSide] = []
+
+
+class VinylSidePatch(BaseModel):
+    """A number the DJ typed. Always lands as `manual`, the top of the ladder."""
+
+    bpm: float | None = None
+    key: str | None = None
+    length: str | None = None  # "6:12"
+
+
+class VinylImportResponse(BaseModel):
+    release: VinylReleaseSummary
+    sides_written: int
+    bpms_applied: int
+    unplannable: int

@@ -209,3 +209,46 @@ def test_library_smaller_than_the_target_still_produces_a_set(session):
     ids = [t.id for t in _seq(built)]
     assert len(ids) == len(set(ids)), "ran out of tracks and started repeating"
     assert len(ids) <= 3
+
+
+def test_vinyl_stays_out_of_an_ordinary_build(session, library):
+    """Risk 3: a record with a BPM is plannable the moment it exists.
+
+    That is the finding spec 030 rests on — and exactly why it must be opt-in
+    until the vinyl ratio and deck-change penalty ship. A routine build has to
+    return the same thing it returned before the migration.
+    """
+    from kiku.setbuilder.planner import _get_candidate_pool
+
+    session.add(
+        Track(
+            title="AF 97",
+            artist="Alarico",
+            bpm=136.0,
+            key="8A",
+            medium="vinyl",
+            vinyl_position="A1",
+            bpm_source="manual",
+        )
+    )
+    session.commit()
+
+    default_pool = _get_candidate_pool(session)
+    assert all(t.medium != "vinyl" for t in default_pool)
+
+    opted_in = _get_candidate_pool(session, include_vinyl=True)
+    assert any(t.medium == "vinyl" for t in opted_in)
+
+
+def test_a_null_medium_is_still_digital(session):
+    """Rows written before the backfill must not vanish from the pool.
+
+    `Track.medium != "vinyl"` would drop them: in SQL, NULL fails that
+    comparison. The pool coalesces instead.
+    """
+    from kiku.setbuilder.planner import _get_candidate_pool
+
+    session.add(Track(title="Old row", artist="X", bpm=130.0, key="8A", medium=None))
+    session.commit()
+
+    assert len(_get_candidate_pool(session)) == 1

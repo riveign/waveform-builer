@@ -10,6 +10,7 @@
 	import TrackContextMenu from './TrackContextMenu.svelte';
 	import StarRating from '../primitives/StarRating.svelte';
 	import SetRoleBadge from './SetRoleBadge.svelte';
+	import VinylPip from './VinylPip.svelte';
 
 	const player = getPlayerStore();
 
@@ -124,7 +125,7 @@
 						</span>
 					</td>
 					<td class="col-title" title={track.title ?? ''}>
-						{track.title ?? '?'}
+						{#if track.medium === 'vinyl'}<VinylPip position={track.vinyl_position} />{/if}{track.title ?? '?'}
 					</td>
 					<td class="col-artist" title={track.artist ?? ''}>
 						{track.artist ?? '?'}
