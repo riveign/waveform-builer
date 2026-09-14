@@ -20,6 +20,25 @@ let pendingAnalysis = $state<SetAnalysis | null>(null);
 /** Bumped to ask the shell to open the Build a Set dialog. */
 let buildRequested = $state(0);
 
+/** The library sidebar folds to a rail. A layout preference, not navigation —
+ *  so it's remembered per browser, never put in the URL. */
+const SIDEBAR_KEY = 'kiku:sidebar-collapsed';
+let sidebarCollapsed = $state(
+	typeof localStorage !== 'undefined' && localStorage.getItem(SIDEBAR_KEY) === '1',
+);
+/** A collapsed library floated over the content for a quick search. */
+let sidebarPeeking = $state(false);
+/** Whether the library is narrowed by anything but its sort — the rail shows a dot. */
+let libraryFiltered = $state(false);
+/** Bumped to ask the library to focus its search box. */
+let searchFocusRequested = $state(0);
+
+function setSidebarCollapsed(v: boolean) {
+	sidebarCollapsed = v;
+	sidebarPeeking = false;
+	if (typeof localStorage !== 'undefined') localStorage.setItem(SIDEBAR_KEY, v ? '1' : '0');
+}
+
 export function getUiStore() {
 	return {
 		get selectedTrack() { return selectedTrack; },
@@ -31,5 +50,22 @@ export function getUiStore() {
 		get buildRequested() { return buildRequested; },
 		/** Ask the shell to open the Build a Set dialog. */
 		requestBuild() { buildRequested += 1; },
+
+		get sidebarCollapsed() { return sidebarCollapsed; },
+		get sidebarPeeking() { return sidebarPeeking; },
+		/** The library is on screen — expanded, or peeking over the content. */
+		get libraryOpen() { return !sidebarCollapsed || sidebarPeeking; },
+		get libraryFiltered() { return libraryFiltered; },
+		set libraryFiltered(v: boolean) { libraryFiltered = v; },
+		get searchFocusRequested() { return searchFocusRequested; },
+		setSidebarCollapsed,
+		toggleSidebar() { setSidebarCollapsed(!sidebarCollapsed); },
+		/** Jump to search. A collapsed library peeks rather than unfolding, so the
+		 *  content pane never reflows for a quick look. */
+		focusSearch() {
+			if (sidebarCollapsed) sidebarPeeking = true;
+			searchFocusRequested += 1;
+		},
+		closePeek() { sidebarPeeking = false; },
 	};
 }
