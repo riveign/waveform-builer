@@ -15,8 +15,13 @@ from sqlalchemy.orm import Session
 
 from kiku.api.deps import get_db
 from kiku.api.schemas import (
+    TrackResponse,
     VinylImportRequest,
     VinylImportResponse,
+    VinylLinksRequest,
+    VinylPairing,
+    VinylPairingRequest,
+    VinylPairingResponse,
     VinylPreviewResponse,
     VinylPreviewRow,
     VinylReleaseDetail,
@@ -25,6 +30,8 @@ from kiku.api.schemas import (
     VinylSearchResult,
     VinylSide,
     VinylSidePatch,
+    VinylTwinRef,
+    VinylTwinRequest,
 )
 from kiku.db.models import Track, VinylRelease
 
@@ -222,6 +229,11 @@ def vinyl_import(req: VinylImportRequest, db: Session = Depends(get_db)):
         except ValueError:
             logger.warning("Rejected BPM %s for side %s", side.bpm, side.position)
 
+    from kiku.vinyl.twins import link_release
+
+    link_release(db, release)
+    db.commit()
+
     sides = db.query(Track).filter(Track.vinyl_release_id == release.id).all()
     return VinylImportResponse(
         release=_summary(db, release),
@@ -240,37 +252,72 @@ def vinyl_releases(db: Session = Depends(get_db)):
 
 @router.get("/releases/{release_id}", response_model=VinylReleaseDetail)
 def vinyl_release_detail(release_id: int, db: Session = Depends(get_db)):
-    """One record, and the sides on it in pressing order."""
-    release = db.get(VinylRelease, release_id)
-    if release is None:
-        raise HTTPException(status_code=404, detail=f"No record #{release_id} on the shelf.")
+    """One record, the sides on it in pressing order, and which you own as files.
 
-    rows = (
-        db.query(Track)
-        .filter(Track.vinyl_release_id == release_id)
-        .order_by(Track.disc_number, Track.track_number, Track.id)
-        .all()
-    )
+    Suggestions are worked out on read and never stored: a guess that goes stale
+    when the library changes is worse than one recomputed in a tenth of a second.
+    """
+    from kiku.vinyl.twins import match_release
+
+    release = _release_or_404(db, release_id)
+    rows = _sides_of(db, release_id)
+    digital = _tracks_by_id(db, [t.duplicate_of_track_id for t in rows])
+    suggestions = {g.vinyl_track_id: g.digital for g in match_release(db, release).suggestions}
     return VinylReleaseDetail(
         release=_summary(db, release),
-        sides=[
-            VinylSide(
-                track_id=t.id,
-                position=t.vinyl_position,
-                side=t.disc_number,
-                index=t.track_number,
-                title=t.title,
-                artist=t.artist,
-                bpm=t.bpm,
-                key=t.key,
-                duration_sec=t.duration_sec,
-                bpm_source=t.bpm_source,
-                key_source=t.key_source,
-                enrichment_status=t.enrichment_status,
-            )
-            for t in rows
-        ],
+        sides=[_side(t, digital.get(t.duplicate_of_track_id), suggestions.get(t.id)) for t in rows],
     )
+
+
+@router.get("/releases/{release_id}/digital", response_model=list[TrackResponse])
+def vinyl_release_digital(release_id: int, db: Session = Depends(get_db)):
+    """The files behind a record, in pressing order — what "play" plays."""
+    from kiku.api.routes.tracks import _track_to_response
+
+    _release_or_404(db, release_id)
+    rows = _sides_of(db, release_id)
+    digital = _tracks_by_id(db, [t.duplicate_of_track_id for t in rows])
+    return [
+        _track_to_response(digital[t.duplicate_of_track_id], t)
+        for t in rows
+        if t.duplicate_of_track_id in digital
+    ]
+
+
+@router.post("/releases/{release_id}/pairing", response_model=VinylPairingResponse)
+def vinyl_release_pairing(release_id: int, req: VinylPairingRequest, db: Session = Depends(get_db)):
+    """Which file is which side, for an album the DJ says is this record. Writes nothing."""
+    from kiku.vinyl.twins import pair_with_album
+
+    release = _release_or_404(db, release_id)
+    sides = {t.id: t for t in _sides_of(db, release_id)}
+    return VinylPairingResponse(
+        pairs=[
+            VinylPairing(
+                vinyl_track_id=p.vinyl_track_id,
+                position=sides[p.vinyl_track_id].vinyl_position,
+                title=sides[p.vinyl_track_id].title,
+                digital_track_id=p.digital_track_id,
+                reason=p.reason,
+            )
+            for p in pair_with_album(db, release, req.digital_track_ids)
+        ]
+    )
+
+
+@router.put("/releases/{release_id}/links", response_model=VinylReleaseDetail)
+def vinyl_release_links(release_id: int, req: VinylLinksRequest, db: Session = Depends(get_db)):
+    """Save the pairing the DJ confirmed. A replaced or cleared link counts as "not it"."""
+    from kiku.vinyl.twins import apply_pairings
+
+    release = _release_or_404(db, release_id)
+    try:
+        apply_pairings(db, release, {p.vinyl_track_id: p.digital_track_id for p in req.pairs})
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    db.commit()
+    return vinyl_release_detail(release_id, db)
 
 
 @router.patch("/sides/{track_id}", response_model=VinylSide)
@@ -282,10 +329,7 @@ def vinyl_side_patch(track_id: int, patch: VinylSidePatch, db: Session = Depends
     """
     from kiku.vinyl.importer import set_manual_bpm_key
 
-    track = db.get(Track, track_id)
-    if track is None or track.medium != "vinyl":
-        raise HTTPException(status_code=404, detail="That side isn't on the shelf.")
-
+    _vinyl_side_or_404(db, track_id)
     duration = None
     if patch.length:
         try:
@@ -303,20 +347,35 @@ def vinyl_side_patch(track_id: int, patch: VinylSidePatch, db: Session = Depends
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from None
 
-    return VinylSide(
-        track_id=track.id,
-        position=track.vinyl_position,
-        side=track.disc_number,
-        index=track.track_number,
-        title=track.title,
-        artist=track.artist,
-        bpm=track.bpm,
-        key=track.key,
-        duration_sec=track.duration_sec,
-        bpm_source=track.bpm_source,
-        key_source=track.key_source,
-        enrichment_status=track.enrichment_status,
-    )
+    return _side_with_twin(db, track)
+
+
+@router.put("/sides/{track_id}/twin", response_model=VinylSide)
+def vinyl_side_link(track_id: int, req: VinylTwinRequest, db: Session = Depends(get_db)):
+    """This side is that file. Its BPM and key come from your analysis unless you typed them."""
+    from kiku.vinyl.twins import link
+
+    side = _vinyl_side_or_404(db, track_id)
+    digital = db.get(Track, req.digital_track_id)
+    if digital is None:
+        raise HTTPException(status_code=404, detail="That file isn't in your library any more.")
+    try:
+        link(db, side, digital)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    db.commit()
+    return _side_with_twin(db, side)
+
+
+@router.delete("/sides/{track_id}/twin/{digital_track_id}", response_model=VinylSide)
+def vinyl_side_unlink(track_id: int, digital_track_id: int, db: Session = Depends(get_db)):
+    """ "Not it" — unlinks the file if it was linked, and never suggests it again."""
+    from kiku.vinyl.twins import reject
+
+    side = _vinyl_side_or_404(db, track_id)
+    reject(db, side, digital_track_id)
+    db.commit()
+    return _side_with_twin(db, side)
 
 
 @router.delete("/releases/{release_id}", status_code=204)
@@ -345,4 +404,76 @@ def _summary(db: Session, release: VinylRelease) -> VinylReleaseSummary:
         sides=len(sides),
         plannable=sum(1 for t in sides if t.bpm),
         without_length=sum(1 for t in sides if not t.duration_sec),
+        digital=sum(1 for t in sides if t.duplicate_of_track_id),
     )
+
+
+def _release_or_404(db: Session, release_id: int) -> VinylRelease:
+    release = db.get(VinylRelease, release_id)
+    if release is None:
+        raise HTTPException(status_code=404, detail=f"No record #{release_id} on the shelf.")
+    return release
+
+
+def _vinyl_side_or_404(db: Session, track_id: int) -> Track:
+    track = db.get(Track, track_id)
+    if track is None or track.medium != "vinyl":
+        raise HTTPException(status_code=404, detail="That side isn't on the shelf.")
+    return track
+
+
+def _sides_of(db: Session, release_id: int) -> list[Track]:
+    return (
+        db.query(Track)
+        .filter(Track.vinyl_release_id == release_id)
+        .order_by(Track.disc_number, Track.track_number, Track.id)
+        .all()
+    )
+
+
+def _tracks_by_id(db: Session, ids: list[int | None]) -> dict[int, Track]:
+    wanted = {i for i in ids if i}
+    if not wanted:
+        return {}
+    return {t.id: t for t in db.query(Track).filter(Track.id.in_(wanted))}
+
+
+def _twin_ref(t: Track | None) -> VinylTwinRef | None:
+    if t is None:
+        return None
+    return VinylTwinRef(track_id=t.id, title=t.title, artist=t.artist, album=t.album)
+
+
+def _side(t: Track, digital: Track | None = None, suggestion=None) -> VinylSide:
+    return VinylSide(
+        track_id=t.id,
+        position=t.vinyl_position,
+        side=t.disc_number,
+        index=t.track_number,
+        title=t.title,
+        artist=t.artist,
+        bpm=t.bpm,
+        key=t.key,
+        duration_sec=t.duration_sec,
+        bpm_source=t.bpm_source,
+        key_source=t.key_source,
+        enrichment_status=t.enrichment_status,
+        digital=_twin_ref(digital),
+        suggestion=(
+            VinylTwinRef(
+                track_id=suggestion.id,
+                title=suggestion.title,
+                artist=suggestion.artist,
+                album=suggestion.album,
+            )
+            if suggestion is not None and digital is None
+            else None
+        ),
+    )
+
+
+def _side_with_twin(db: Session, t: Track) -> VinylSide:
+    """A side after an edit. The suggestion isn't recomputed — the record view
+    refetches when it needs one."""
+    digital = db.get(Track, t.duplicate_of_track_id) if t.duplicate_of_track_id else None
+    return _side(t, digital)

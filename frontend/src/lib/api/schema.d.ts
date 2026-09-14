@@ -1625,7 +1625,10 @@ export interface paths {
         };
         /**
          * Vinyl Release Detail
-         * @description One record, and the sides on it in pressing order.
+         * @description One record, the sides on it in pressing order, and which you own as files.
+         *
+         *     Suggestions are worked out on read and never stored: a guess that goes stale
+         *     when the library changes is worse than one recomputed in a tenth of a second.
          */
         get: operations["vinyl_release_detail_api_vinyl_releases__release_id__get"];
         put?: never;
@@ -1635,6 +1638,66 @@ export interface paths {
          * @description Take a record off the shelf, with the sides that came in with it.
          */
         delete: operations["vinyl_release_delete_api_vinyl_releases__release_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/releases/{release_id}/digital": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Vinyl Release Digital
+         * @description The files behind a record, in pressing order — what "play" plays.
+         */
+        get: operations["vinyl_release_digital_api_vinyl_releases__release_id__digital_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/releases/{release_id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Vinyl Release Links
+         * @description Save the pairing the DJ confirmed. A replaced or cleared link counts as "not it".
+         */
+        put: operations["vinyl_release_links_api_vinyl_releases__release_id__links_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/releases/{release_id}/pairing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Vinyl Release Pairing
+         * @description Which file is which side, for an album the DJ says is this record. Writes nothing.
+         */
+        post: operations["vinyl_release_pairing_api_vinyl_releases__release_id__pairing_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1681,6 +1744,46 @@ export interface paths {
          *     wrong estimate stays corrected.
          */
         patch: operations["vinyl_side_patch_api_vinyl_sides__track_id__patch"];
+        trace?: never;
+    };
+    "/api/vinyl/sides/{track_id}/twin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Vinyl Side Link
+         * @description This side is that file. Its BPM and key come from your analysis unless you typed them.
+         */
+        put: operations["vinyl_side_link_api_vinyl_sides__track_id__twin_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vinyl/sides/{track_id}/twin/{digital_track_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Vinyl Side Unlink
+         * @description "Not it" — unlinks the file if it was linked, and never suggests it again.
+         */
+        delete: operations["vinyl_side_unlink_api_vinyl_sides__track_id__twin__digital_track_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/waveforms/{track_id}/bands": {
@@ -3199,6 +3302,8 @@ export interface components {
             comment?: string | null;
             /** Date Added */
             date_added?: string | null;
+            /** Digital Twin Id */
+            digital_twin_id?: number | null;
             /** Disc Number */
             disc_number?: number | null;
             /** Duration Sec */
@@ -3269,6 +3374,7 @@ export interface components {
             vinyl_position?: string | null;
             /** Vinyl Release Id */
             vinyl_release_id?: number | null;
+            vinyl_twin?: components["schemas"]["VinylShelfRef"] | null;
         };
         /** TrackSetAppearance */
         TrackSetAppearance: {
@@ -3414,6 +3520,47 @@ export interface components {
             /** Unplannable */
             unplannable: number;
         };
+        /** VinylLinkPair */
+        VinylLinkPair: {
+            /** Digital Track Id */
+            digital_track_id?: number | null;
+            /** Vinyl Track Id */
+            vinyl_track_id: number;
+        };
+        /** VinylLinksRequest */
+        VinylLinksRequest: {
+            /** Pairs */
+            pairs: components["schemas"]["VinylLinkPair"][];
+        };
+        /** VinylPairing */
+        VinylPairing: {
+            /** Digital Track Id */
+            digital_track_id?: number | null;
+            /** Position */
+            position?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Vinyl Track Id */
+            vinyl_track_id: number;
+        };
+        /**
+         * VinylPairingRequest
+         * @description The files of the digital album the DJ says this record is.
+         */
+        VinylPairingRequest: {
+            /** Digital Track Ids */
+            digital_track_ids: number[];
+        };
+        /** VinylPairingResponse */
+        VinylPairingResponse: {
+            /**
+             * Pairs
+             * @default []
+             */
+            pairs: components["schemas"]["VinylPairing"][];
+        };
         /** VinylPreviewResponse */
         VinylPreviewResponse: {
             /** Album */
@@ -3507,6 +3654,11 @@ export interface components {
             catalog_number?: string | null;
             /** Cover Url */
             cover_url?: string | null;
+            /**
+             * Digital
+             * @default 0
+             */
+            digital: number;
             /** Format */
             format?: string | null;
             /** Id */
@@ -3587,6 +3739,18 @@ export interface components {
             year?: number | null;
         };
         /**
+         * VinylShelfRef
+         * @description Where on the shelf a digital track's record lives.
+         */
+        VinylShelfRef: {
+            /** Position */
+            position?: string | null;
+            /** Release Id */
+            release_id: number;
+            /** Release Title */
+            release_title?: string | null;
+        };
+        /**
          * VinylSide
          * @description One side of a record as it sits in the library.
          */
@@ -3597,6 +3761,7 @@ export interface components {
             bpm?: number | null;
             /** Bpm Source */
             bpm_source?: string | null;
+            digital?: components["schemas"]["VinylTwinRef"] | null;
             /** Duration Sec */
             duration_sec?: number | null;
             /** Enrichment Status */
@@ -3611,6 +3776,7 @@ export interface components {
             position?: string | null;
             /** Side */
             side?: number | null;
+            suggestion?: components["schemas"]["VinylTwinRef"] | null;
             /** Title */
             title?: string | null;
             /** Track Id */
@@ -3641,6 +3807,25 @@ export interface components {
             key?: string | null;
             /** Length */
             length?: string | null;
+        };
+        /**
+         * VinylTwinRef
+         * @description A digital track that is — or might be — the same recording as a side.
+         */
+        VinylTwinRef: {
+            /** Album */
+            album?: string | null;
+            /** Artist */
+            artist?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Track Id */
+            track_id: number;
+        };
+        /** VinylTwinRequest */
+        VinylTwinRequest: {
+            /** Digital Track Id */
+            digital_track_id: number;
         };
         /** WaveformBandsResponse */
         WaveformBandsResponse: {
@@ -6381,6 +6566,107 @@ export interface operations {
             };
         };
     };
+    vinyl_release_digital_api_vinyl_releases__release_id__digital_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrackResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_release_links_api_vinyl_releases__release_id__links_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VinylLinksRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylReleaseDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_release_pairing_api_vinyl_releases__release_id__pairing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                release_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VinylPairingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylPairingResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     vinyl_search_api_vinyl_search_get: {
         parameters: {
             query: {
@@ -6429,6 +6715,73 @@ export interface operations {
                 "application/json": components["schemas"]["VinylSidePatch"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylSide"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_side_link_api_vinyl_sides__track_id__twin_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VinylTwinRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VinylSide"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vinyl_side_unlink_api_vinyl_sides__track_id__twin__digital_track_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                track_id: number;
+                digital_track_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

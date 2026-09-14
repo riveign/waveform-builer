@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
+	import { page } from '$app/state';
 	import Spinner from '../Spinner.svelte';
 	import Button from '../primitives/Button.svelte';
 	import EmptyState from '../primitives/EmptyState.svelte';
@@ -21,17 +22,20 @@
 	/** 86 records in, the useful question stopped being "what do I own?" and
 	 *  became "what can't the builder reach yet?" */
 	let onlyUnfinished = $state(false);
+	let onlyDigital = $state(false);
 
 	/** The shelf's own arithmetic: a record you can't plan with is a record Kiku
 	 *  can't reach, so the count that matters is sides with a BPM. */
 	const sides = $derived(releases.reduce((n, r) => n + r.sides, 0));
 	const plannable = $derived(releases.reduce((n, r) => n + r.plannable, 0));
 	const unfinished = $derived(releases.filter((r) => r.plannable < r.sides).length);
+	const withDigital = $derived(releases.filter((r) => r.digital > 0).length);
 
 	const shown = $derived.by(() => {
 		const q = filter.trim().toLowerCase();
 		return releases.filter((r) => {
 			if (onlyUnfinished && r.plannable >= r.sides) return false;
+			if (onlyDigital && !r.digital) return false;
 			if (!q) return true;
 			return [r.title, r.artist, r.label, r.catalog_number, r.year]
 				.filter(Boolean)
@@ -65,7 +69,22 @@
 		}
 	}
 
-	onMount(load);
+	/** "on vinyl · A1" in the library lands here with ?open=<record>. */
+	async function openFromLink() {
+		const id = Number(page.url.searchParams.get('open'));
+		if (!id || !releases.some((r) => r.id === id)) return;
+		filter = '';
+		onlyUnfinished = false;
+		onlyDigital = false;
+		openId = id;
+		await tick();
+		document.getElementById(`record-${id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+	}
+
+	onMount(async () => {
+		await load();
+		await openFromLink();
+	});
 </script>
 
 <div class="shelf">
@@ -100,6 +119,18 @@
 					{unfinished} need a BPM
 				</button>
 			{/if}
+			{#if withDigital}
+				<button
+					type="button"
+					class="needs"
+					class:on={onlyDigital}
+					aria-pressed={onlyDigital}
+					onclick={() => (onlyDigital = !onlyDigital)}
+					title="Records with tracks you also own as files"
+				>
+					{withDigital} also digital
+				</button>
+			{/if}
 		{/if}
 		<Button variant="secondary" size="sm" onclick={() => (adding = true)}>Add a record</Button>
 	</header>
@@ -121,7 +152,9 @@
 		</EmptyState>
 	{:else if !shown.length}
 		<p class="none">
-			{#if onlyUnfinished}
+			{#if onlyDigital && !filter.trim()}
+				None of these records are on your drive too.
+			{:else if onlyUnfinished}
 				Every record matching that has a BPM on every side.
 			{:else}
 				Nothing on the shelf matches “{filter}”.

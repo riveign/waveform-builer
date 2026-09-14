@@ -481,7 +481,7 @@
 				<Chip value={SET_ROLE_LABELS[role]} size="sm" removable removeLabel="Clear {SET_ROLE_LABELS[role]} filter" onremove={() => toggleSetRole(role)} />
 			{/each}
 			{#if medium}
-				<Chip value={medium === 'vinyl' ? 'On vinyl' : 'Digital'} size="sm" removable removeLabel="Clear format filter" onremove={() => { medium = ''; searchNow(); }} />
+				<Chip value={medium === 'vinyl' ? 'On vinyl' : medium === 'both' ? 'Digital and vinyl' : 'Digital'} size="sm" removable removeLabel="Clear format filter" onremove={() => { medium = ''; searchNow(); }} />
 			{/if}
 			{#if playsFilter}
 				<Chip
@@ -692,6 +692,7 @@
 						<option value="">Everything</option>
 						<option value="digital">Digital</option>
 						<option value="vinyl">On vinyl</option>
+						<option value="both">Both — files you own on vinyl</option>
 					</select>
 				</div>
 				<div class="field-group field-group--role">

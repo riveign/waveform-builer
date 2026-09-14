@@ -1,0 +1,683 @@
+<title>Kiku Library Rail</title>
+<style>
+	/* Single-theme on purpose: Kiku is a dark app (CERCETA tokens), so the prototype
+	   paints its own ground and never borrows the host theme. Values copied from
+	   frontend/src/lib/styles/tokens.*.css. */
+	:root {
+		--gray-950: #0D0D0D; --gray-900: #12121A; --gray-850: #1A1B23; --gray-800: #242631;
+		--gray-750: #2E3040; --gray-700: #383A4A; --gray-600: #3F414A; --gray-500: #555555;
+		--gray-400: #666666; --gray-300: #7A7B82; --gray-200: #A0A1A7; --gray-50: #F5F5F0;
+		--teal-400: #00B1B8; --teal-500: #44AAA2; --teal-600: #008A84; --teal-700: #00706C;
+		--amber-500: #FFC107; --zone-drive: #F39C12; --red-500: #F44336; --gold-400: #E4B34D;
+
+		--bg-primary: var(--gray-950); --bg-secondary: var(--gray-850); --bg-tertiary: var(--gray-800);
+		--bg-hover: var(--gray-750); --bg-active: var(--gray-700);
+		--border: var(--gray-600); --border-strong: var(--gray-500);
+		--text-1: var(--gray-50); --text-2: var(--gray-200); --text-3: var(--gray-300); --text-4: var(--gray-400);
+		--accent: var(--teal-600); --accent-hover: var(--teal-400); --accent-text: var(--teal-500);
+		--focus-ring: #5FD0A8;
+
+		--space-xs: 4px; --space-sm: 6px; --space-md: 8px; --space-lg: 12px; --space-xl: 16px; --space-3xl: 24px;
+		--text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-base: 13px; --text-md: 14px; --text-lg: 16px; --text-xl: 20px;
+		--radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px;
+
+		/* Shell tokens. --rail-width is the one new token this proposal adds. */
+		--panel-width: min(460px, calc(100vw - 120px));
+		--rail-width: 48px;
+		--band-h: 48px;
+		--band-secondary-h: 44px;
+		--btn-height: 36px;
+		--dur: 180ms;
+		--ease: cubic-bezier(0.2, 0, 0, 1);
+
+		--mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		color-scheme: dark;
+	}
+
+	* { box-sizing: border-box; }
+	html, body { height: 100%; }
+	body { margin: 0; background: var(--bg-primary); color: var(--text-1); font-size: var(--text-base); overflow: hidden; }
+	button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+	:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+	kbd {
+		font-family: var(--mono); font-size: var(--text-2xs); color: var(--text-2);
+		border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-sm);
+		padding: 0 4px; background: var(--bg-tertiary); line-height: 16px; display: inline-block;
+	}
+
+	/* ── Shell ── */
+	.app-shell {
+		--sidebar-w: var(--panel-width);
+		display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+	}
+	.app-shell.collapsed { --sidebar-w: var(--rail-width); }
+
+	.app-header, .two-panel {
+		display: grid;
+		grid-template-columns: var(--sidebar-w) 1fr;
+		transition: grid-template-columns var(--dur) var(--ease);
+	}
+
+	.app-header {
+		height: var(--band-h); flex-shrink: 0;
+		background: var(--bg-secondary); border-bottom: 1px solid var(--border);
+	}
+	.app-logo {
+		display: flex; align-items: center; gap: var(--space-sm);
+		padding-left: 14px; border-right: 1px solid var(--border);
+		min-width: 0; overflow: hidden; white-space: nowrap;
+	}
+	.app-kanji { font-size: var(--text-xl); font-weight: 600; line-height: 1; }
+	.app-title {
+		margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.5px; color: var(--accent-text);
+		transition: opacity var(--dur) var(--ease);
+	}
+	.collapsed .app-title { opacity: 0; }
+
+	.app-tabs {
+		display: flex; align-items: stretch; min-width: 0; overflow-x: auto; scrollbar-width: none;
+		-webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+		mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+	}
+	.tab {
+		display: flex; align-items: center; gap: var(--space-sm); padding: 0 var(--space-lg);
+		color: var(--text-3); white-space: nowrap; border-bottom: 2px solid transparent;
+	}
+	.tab:hover { color: var(--text-1); }
+	.tab[aria-current="page"] { color: var(--text-1); border-bottom-color: var(--accent-text); }
+	.tab .num { font-family: var(--mono); font-size: var(--text-2xs); color: var(--text-4); }
+
+	.app-body { flex: 1; min-height: 0; }
+	.two-panel { height: 100%; }
+
+	/* ── Sidebar column ── */
+	.panel-left { position: relative; min-width: 0; }
+	.peeking .panel-left { z-index: 40; }
+
+	/* The library keeps its FULL width and the column clips it, so the track table
+	   never reflows its columns mid-animation. It stays mounted when collapsed. */
+	.library {
+		position: absolute; inset: 0 auto 0 0; width: var(--panel-width);
+		display: flex; flex-direction: column;
+		background: var(--bg-primary); border-right: 1px solid var(--border);
+		z-index: 2; visibility: visible;
+		clip-path: inset(0 0 0 0);
+		transition: clip-path var(--dur) var(--ease), visibility 0s linear 0s;
+	}
+	.collapsed .library {
+		visibility: hidden;
+		clip-path: inset(0 calc(100% - var(--rail-width)) 0 0);
+		transition: clip-path var(--dur) var(--ease), visibility 0s linear var(--dur);
+	}
+	.collapsed.peeking .library {
+		visibility: visible; transition: none; clip-path: none;
+		box-shadow: 12px 0 32px rgba(0, 0, 0, 0.55);
+		animation: peek-in var(--dur) var(--ease);
+	}
+	@keyframes peek-in { from { transform: translateX(-16px); opacity: 0; } }
+
+	.rail {
+		position: absolute; inset: 0 auto 0 0; width: var(--rail-width);
+		display: flex; flex-direction: column; align-items: center;
+		background: var(--bg-primary); border-right: 1px solid var(--border);
+		z-index: 1; opacity: 0;
+	}
+	.collapsed .rail { opacity: 1; transition: opacity 120ms var(--ease) calc(var(--dur) * 0.5); }
+	.rail-band { width: 100%; display: grid; place-items: center; border-bottom: 1px solid var(--border); }
+	.rail-band.first { height: var(--band-h); }
+	.rail-band.second { height: var(--band-secondary-h); }
+	.rail-stack { display: flex; flex-direction: column; align-items: center; gap: var(--space-xs); padding-top: var(--space-md); }
+
+	.icon-btn {
+		position: relative; width: 32px; height: 32px; display: grid; place-items: center;
+		border-radius: var(--radius-md); color: var(--text-3);
+	}
+	.icon-btn:hover { background: var(--bg-hover); color: var(--text-1); }
+	.icon-btn[aria-pressed="true"] { background: var(--bg-active); color: var(--text-1); }
+	.icon-btn .dot {
+		position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%;
+		background: var(--accent-hover); box-shadow: 0 0 0 2px var(--bg-primary); display: none;
+	}
+	.icon-btn.has-dot .dot { display: block; }
+
+	/* Tooltips for icon-only controls, with their shortcut. */
+	[data-tip] { position: relative; }
+	[data-tip]:hover::after, [data-tip]:focus-visible::after {
+		content: attr(data-tip); position: absolute; z-index: 60; pointer-events: none;
+		white-space: nowrap; font-size: var(--text-xs); color: var(--text-1);
+		background: var(--gray-700); border: 1px solid var(--border-strong);
+		border-radius: var(--radius-sm); padding: 3px 8px;
+	}
+	.rail [data-tip]:hover::after, .rail [data-tip]:focus-visible::after { left: calc(100% + 10px); top: 50%; transform: translateY(-50%); }
+	.basic-row [data-tip]:hover::after, .basic-row [data-tip]:focus-visible::after { top: calc(100% + 6px); right: 0; }
+
+	/* ── Library bands ── */
+	.basic-row {
+		display: flex; gap: var(--space-sm); align-items: center;
+		height: var(--band-h); padding: 0 var(--space-md) 0 var(--space-lg);
+		border-bottom: 1px solid var(--border); flex-shrink: 0;
+	}
+	.search-box {
+		flex: 1; display: flex; align-items: center; gap: var(--space-sm);
+		height: 32px; padding: 0 var(--space-md);
+		background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-md);
+	}
+	.search-box:focus-within { border-color: var(--accent-text); }
+	.search-box svg { color: var(--text-4); flex-shrink: 0; }
+	.search-input {
+		flex: 1; min-width: 0; border: 0; background: none; outline: none;
+		color: var(--text-1); font: inherit; font-size: var(--text-base);
+	}
+	.search-input::placeholder { color: var(--text-4); }
+	.search-box kbd { flex-shrink: 0; }
+	.search-box:focus-within kbd { display: none; }
+	.clear { color: var(--text-4); font-size: 16px; line-height: 1; padding: 0 2px; }
+	.clear:hover { color: var(--text-1); }
+	.band-divider { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+
+	.quick-filters {
+		display: flex; gap: var(--space-xs); align-items: center; flex-shrink: 0;
+		height: var(--band-secondary-h); padding: 0 var(--space-lg);
+		border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none;
+	}
+	.chip {
+		height: 28px; padding: 0 var(--space-md); border-radius: var(--radius-sm);
+		color: var(--text-3); font-size: var(--text-sm); white-space: nowrap;
+	}
+	.chip:hover { background: var(--bg-hover); color: var(--text-1); }
+	.chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent-text) 16%, var(--bg-tertiary)); color: var(--text-1); }
+
+	.table-wrap { flex: 1; min-height: 0; overflow-y: auto; }
+	.track-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+	.track-table th {
+		position: sticky; top: 0; z-index: 1; background: var(--bg-primary);
+		text-align: left; font-weight: 500; font-size: var(--text-2xs); letter-spacing: 0.06em;
+		text-transform: uppercase; color: var(--text-4); padding: 8px 6px; border-bottom: 1px solid var(--border);
+	}
+	.track-table th:first-child, .track-table td:first-child { padding-left: var(--space-lg); }
+	.track-table td { padding: 7px 6px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); vertical-align: middle; }
+	.track-table tr { cursor: pointer; }
+	.track-table tbody tr:hover td { background: var(--bg-hover); }
+	.track-table tr[aria-selected="true"] td { background: color-mix(in srgb, var(--accent-text) 14%, var(--bg-primary)); }
+	.t-title { color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.t-artist { color: var(--text-3); font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--text-sm); color: var(--text-2); }
+	.energy { display: block; height: 4px; border-radius: 2px; background: var(--bg-tertiary); overflow: hidden; }
+	.energy i { display: block; height: 100%; border-radius: 2px; }
+	.stars { color: var(--amber-500); font-size: var(--text-xs); letter-spacing: -1px; white-space: nowrap; }
+	.stars .off { color: var(--gray-600); }
+	.empty { padding: var(--space-3xl) var(--space-lg); color: var(--text-3); }
+
+	.pagination {
+		display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+		height: 40px; padding: 0 var(--space-lg); border-top: 1px solid var(--border);
+		color: var(--text-4); font-size: var(--text-xs);
+	}
+
+	/* ── Content pane ── */
+	.panel-right { position: relative; min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
+	.scrim {
+		position: absolute; inset: 0; z-index: 30; background: rgba(0, 0, 0, 0.45);
+		opacity: 0; pointer-events: none; transition: opacity var(--dur) var(--ease);
+	}
+	.peeking .scrim { opacity: 1; pointer-events: auto; }
+
+	.pane-band {
+		display: flex; align-items: center; gap: var(--space-lg); flex-shrink: 0;
+		height: var(--band-h); padding: 0 var(--space-xl); border-bottom: 1px solid var(--border);
+		color: var(--text-3); font-size: var(--text-sm);
+	}
+	.pane-band .width { margin-left: auto; font-family: var(--mono); font-size: var(--text-xs); color: var(--text-4); font-variant-numeric: tabular-nums; }
+	.pane-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-xl); }
+	.track-head h2 { margin: 0; font-size: var(--text-xl); font-weight: 600; text-wrap: balance; }
+	.track-head p { margin: 4px 0 0; color: var(--text-2); }
+	.facts { display: flex; flex-wrap: wrap; gap: var(--space-md); }
+	.fact {
+		display: flex; flex-direction: column; gap: 2px; padding: var(--space-md) var(--space-lg);
+		background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); min-width: 88px;
+	}
+	.fact span { font-size: var(--text-2xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-4); }
+	.fact b { font-family: var(--mono); font-weight: 500; font-size: var(--text-md); font-variant-numeric: tabular-nums; }
+	.wave { height: 150px; background: var(--gray-900); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+	.wave canvas { display: block; width: 100%; height: 100%; }
+	.why { max-width: 62ch; color: var(--text-2); line-height: 1.55; margin: 0; }
+	.why em { color: var(--gold-400); font-style: normal; }
+
+	/* ── Prototype notes (not part of the proposal) ── */
+	.notes {
+		position: fixed; right: 16px; bottom: 16px; z-index: 80;
+		width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 88px);
+		display: flex; flex-direction: column;
+		background: color-mix(in srgb, var(--gray-850) 94%, transparent);
+		backdrop-filter: blur(8px);
+		border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+	}
+	.notes-head {
+		display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md) var(--space-md) var(--space-md) var(--space-lg);
+		border-bottom: 1px solid var(--border);
+	}
+	.notes-head strong { font-size: var(--text-sm); font-weight: 600; }
+	.notes-head .tag { font-size: var(--text-2xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold-400); }
+	.notes-head button { margin-left: auto; color: var(--text-3); font-size: var(--text-xs); padding: 4px 8px; border-radius: var(--radius-sm); }
+	.notes-head button:hover { background: var(--bg-hover); color: var(--text-1); }
+	.notes.closed .notes-body { display: none; }
+	.notes.closed .notes-head { border-bottom: 0; }
+	.notes-body { overflow-y: auto; padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-xl); }
+	.notes h3 { margin: 0 0 var(--space-md); font-size: var(--text-2xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-4); }
+	.notes ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-md); }
+	.notes li { color: var(--text-2); line-height: 1.5; font-size: var(--text-sm); }
+	.notes li b { color: var(--text-1); font-weight: 500; }
+	.keys li { display: grid; grid-template-columns: 56px 1fr; align-items: baseline; }
+	.state {
+		font-family: var(--mono); font-size: var(--text-xs); color: var(--text-3);
+		background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-sm) var(--space-md);
+	}
+	.state b { color: var(--accent-hover); font-weight: 500; }
+	.control { display: flex; flex-direction: column; gap: var(--space-xs); }
+	.control + .control { margin-top: var(--space-md); }
+	.control label, .control .lbl { font-size: var(--text-xs); color: var(--text-3); }
+	.seg { display: flex; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 2px; }
+	.seg button { flex: 1; height: 26px; border-radius: var(--radius-sm); font-size: var(--text-xs); color: var(--text-3); }
+	.seg button:hover { color: var(--text-1); }
+	.seg button[aria-pressed="true"] { background: var(--bg-active); color: var(--text-1); }
+	.link-btn { align-self: flex-start; color: var(--accent-text); font-size: var(--text-xs); }
+	.link-btn:hover { color: var(--accent-hover); text-decoration: underline; }
+
+	@media (prefers-reduced-motion: reduce) {
+		:root { --dur: 0ms; }
+	}
+	@media (max-width: 640px) {
+		.tab .label { display: none; }
+		.facts .fact { min-width: 0; flex: 1 1 40%; }
+		.notes { right: 16px; left: 16px; width: auto; }
+	}
+</style>
+
+<div class="app-shell" id="shell">
+	<header class="app-header">
+		<div class="app-logo">
+			<span class="app-kanji">聴</span>
+			<h1 class="app-title">Kiku</h1>
+		</div>
+		<nav class="app-tabs" aria-label="Workspace views">
+			<a class="tab" aria-current="page"><span class="label">Track view</span><span class="num">1</span></a>
+			<a class="tab"><span class="label">Set timeline</span><span class="num">2</span></a>
+			<a class="tab"><span class="label">Taste DNA</span><span class="num">3</span></a>
+			<a class="tab"><span class="label">Energy tinder</span><span class="num">4</span></a>
+			<a class="tab"><span class="label">Track hunter</span><span class="num">5</span></a>
+			<a class="tab"><span class="label">Albums</span><span class="num">6</span></a>
+			<a class="tab"><span class="label">Shelf</span><span class="num">7</span></a>
+		</nav>
+	</header>
+
+	<div class="app-body">
+		<div class="two-panel">
+			<aside class="panel-left" id="library-sidebar" aria-label="Library">
+				<div class="rail" id="rail">
+					<div class="rail-band first">
+						<button class="icon-btn" id="rail-toggle" aria-controls="library-sidebar" aria-expanded="false" data-tip="Show library  [">
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.75 3v10" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 6l2 2-2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						</button>
+					</div>
+					<div class="rail-band second">
+						<button class="icon-btn" id="rail-search" data-tip="Search tracks  /">
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+							<span class="dot"></span>
+						</button>
+					</div>
+					<div class="rail-stack">
+						<button class="icon-btn" id="rail-record" data-tip="Add a record">
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/></svg>
+						</button>
+					</div>
+				</div>
+
+				<div class="library" id="library">
+					<div class="basic-row">
+						<div class="search-box">
+							<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.75" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+							<input id="search" class="search-input" type="text" placeholder="Search tracks..." autocomplete="off" aria-label="Search tracks">
+							<button class="clear" id="clear" type="button" aria-label="Clear search" hidden>&times;</button>
+							<kbd>/</kbd>
+						</div>
+						<button class="icon-btn" id="advanced" aria-pressed="false" data-tip="Advanced filters">
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+						</button>
+						<span class="band-divider" aria-hidden="true"></span>
+						<button class="icon-btn" id="collapse" aria-controls="library-sidebar" aria-expanded="true" data-tip="Hide library  [">
+							<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.75 3v10" stroke="currentColor" stroke-width="1.3"/><path d="M10.5 6l-2 2 2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+						</button>
+					</div>
+					<div class="quick-filters" id="quick">
+						<button class="chip" aria-pressed="false">Recent</button>
+						<button class="chip" aria-pressed="false">Plays</button>
+						<button class="chip" aria-pressed="false">Unplayed</button>
+						<button class="chip" aria-pressed="false">Played</button>
+						<button class="chip" aria-pressed="false">Openers</button>
+						<button class="chip" aria-pressed="false">Vinyl</button>
+					</div>
+					<div class="table-wrap" id="table-wrap">
+						<table class="track-table">
+							<colgroup><col><col style="width:52px"><col style="width:44px"><col style="width:56px"><col style="width:70px"></colgroup>
+							<thead><tr><th>Track</th><th>BPM</th><th>Key</th><th>Energy</th><th>Rating</th></tr></thead>
+							<tbody id="rows"></tbody>
+						</table>
+						<div class="empty" id="empty" hidden>Nothing matched that search. Try loosening it?</div>
+					</div>
+					<div class="pagination"><span id="count"></span><span>sample rows · page 1</span></div>
+				</div>
+			</aside>
+
+			<main class="panel-right">
+				<div class="scrim" id="scrim"></div>
+				<div class="pane-band">
+					<span>Track view</span>
+					<span class="width" id="pane-width"></span>
+				</div>
+				<div class="pane-body">
+					<div class="track-head">
+						<h2 id="t-title"></h2>
+						<p id="t-artist"></p>
+					</div>
+					<div class="facts">
+						<div class="fact"><span>BPM</span><b id="f-bpm"></b></div>
+						<div class="fact"><span>Key</span><b id="f-key"></b></div>
+						<div class="fact"><span>Energy</span><b id="f-energy"></b></div>
+						<div class="fact"><span>Plays</span><b id="f-plays"></b></div>
+					</div>
+					<div class="wave" id="wave"><canvas id="canvas"></canvas></div>
+					<p class="why">Hide the library and this waveform gets the room back. The pane width in the band above updates as you go, so you can feel how much space the rail returns. <em>Sample tracks only</em> — this is a prototype, not your library.</p>
+				</div>
+			</main>
+		</div>
+	</div>
+</div>
+
+<section class="notes" id="notes" aria-label="Prototype notes">
+	<div class="notes-head">
+		<span class="tag">Prototype</span>
+		<strong>Collapsible library</strong>
+		<button id="notes-toggle" aria-expanded="true">Hide notes</button>
+	</div>
+	<div class="notes-body">
+		<div class="state" id="state"></div>
+
+		<div>
+			<h3>Keys</h3>
+			<ul class="keys">
+				<li><span><kbd>[</kbd></span><span>Hide or show the library. Your choice is remembered.</span></li>
+				<li><span><kbd>/</kbd></span><span>Jump to search from anywhere. Opens the library first if it's hidden.</span></li>
+				<li><span><kbd>Esc</kbd></span><span>Close a peek (Peek mode only).</span></li>
+			</ul>
+		</div>
+
+		<div>
+			<h3>How it works</h3>
+			<ul>
+				<li><b>Rail, not gone.</b> Collapsed, the library becomes a 48px rail: show-library, search, add a record.</li>
+				<li><b>Nothing resets.</b> The library stays mounted. Search "mills", pick a chip, scroll, then collapse and expand. It's all still there.</li>
+				<li><b>A hidden filter shows a dot.</b> While a search or chip is active, the rail's search icon carries a teal dot, so a filtered library never surprises you.</li>
+				<li><b>No column jumps.</b> The library keeps its full width and the column clips it, so the table doesn't reflow mid-animation.</li>
+				<li><b>The line holds.</b> The navbar's logo column shrinks with the sidebar (just 聴), so the logo|tabs edge stays on the sidebar edge.</li>
+			</ul>
+		</div>
+
+		<div>
+			<h3>Try the options</h3>
+			<div class="control">
+				<span class="lbl" id="lbl-mode">Rail search and <kbd>/</kbd> while collapsed</span>
+				<div class="seg" role="group" aria-labelledby="lbl-mode" id="mode">
+					<button data-v="pin" aria-pressed="true">Open the library</button>
+					<button data-v="peek" aria-pressed="false">Peek over content</button>
+				</div>
+			</div>
+			<div class="control">
+				<span class="lbl" id="lbl-motion">Motion</span>
+				<div class="seg" role="group" aria-labelledby="lbl-motion" id="motion">
+					<button data-v="0" aria-pressed="false">Off</button>
+					<button data-v="180" aria-pressed="true">180ms</button>
+					<button data-v="300" aria-pressed="false">300ms</button>
+				</div>
+			</div>
+			<div class="control">
+				<button class="link-btn" id="reset">Forget remembered state</button>
+			</div>
+		</div>
+
+		<div>
+			<h3>Still to decide</h3>
+			<ul>
+				<li>Should the rail search default to open or peek? In peek, picking a track closes the peek.</li>
+				<li>Is "Add a record" worth a rail slot, or should the rail hold only toggle and search?</li>
+			</ul>
+		</div>
+	</div>
+</section>
+
+<script>
+(() => {
+	const STORE_KEY = 'kiku:sidebar-collapsed';
+	const $ = (id) => document.getElementById(id);
+	const shell = $('shell'), library = $('library'), rail = $('rail');
+	const search = $('search'), clearBtn = $('clear');
+
+	// Sample rows only — a stand-in for the DJ's library.
+	const TRACKS = [
+		{ t: 'The Bells', a: 'Jeff Mills', bpm: 138, key: '8A', e: 0.86, r: 5, p: 41 },
+		{ t: 'Strings of Life', a: 'Rhythim Is Rhythim', bpm: 125, key: '4A', e: 0.72, r: 5, p: 33 },
+		{ t: 'Spastik', a: 'Plastikman', bpm: 131, key: '1A', e: 0.9, r: 4, p: 18 },
+		{ t: 'Energy Flash', a: 'Joey Beltram', bpm: 132, key: '10A', e: 0.83, r: 4, p: 22 },
+		{ t: 'Can You Feel It', a: 'Mr. Fingers', bpm: 120, key: '6A', e: 0.44, r: 5, p: 29 },
+		{ t: 'Changes', a: 'Jeff Mills', bpm: 134, key: '11A', e: 0.68, r: 3, p: 7 },
+		{ t: 'Plasticity', a: 'Robert Hood', bpm: 130, key: '2A', e: 0.61, r: 0, p: 0 },
+		{ t: 'Minus', a: 'Robert Hood', bpm: 129, key: '9A', e: 0.58, r: 4, p: 12 },
+		{ t: 'Lesbian Tractor', a: 'Surgeon', bpm: 140, key: '5A', e: 0.93, r: 3, p: 4 },
+		{ t: 'Pacific State', a: '808 State', bpm: 122, key: '7B', e: 0.39, r: 4, p: 15 },
+		{ t: 'Hi-Tech Jazz', a: 'Galaxy 2 Galaxy', bpm: 126, key: '3A', e: 0.66, r: 5, p: 26 },
+		{ t: 'Sonic Destroyer', a: 'X-101', bpm: 136, key: '12A', e: 0.88, r: 0, p: 1 },
+		{ t: 'Good Life', a: 'Inner City', bpm: 121, key: '5B', e: 0.35, r: 3, p: 9 },
+		{ t: 'Knights of the Jaguar', a: 'DJ Rolando', bpm: 128, key: '8A', e: 0.74, r: 5, p: 31 },
+		{ t: 'Sleepy Hollow', a: 'Mills & Hood', bpm: 133, key: '4A', e: 0.52, r: 0, p: 0 },
+		{ t: 'Domina', a: 'Maurizio', bpm: 124, key: '10B', e: 0.47, r: 4, p: 11 },
+	].map((x, i) => ({ ...x, id: i + 1 }));
+
+	const state = {
+		collapsed: read(),
+		peeking: false,
+		mode: 'pin',
+		selected: 1,
+	};
+
+	function read() { try { return localStorage.getItem(STORE_KEY) === '1'; } catch { return false; } }
+	function write(v) { try { localStorage.setItem(STORE_KEY, v ? '1' : '0'); } catch { /* per-viewer convenience only */ } }
+
+	function energyColor(e) { return e < 0.5 ? 'var(--teal-400)' : e < 0.8 ? 'var(--zone-drive)' : 'var(--red-500)'; }
+
+	// ── Library rows ──
+	function renderRows() {
+		const q = search.value.trim().toLowerCase();
+		const rows = TRACKS.filter((x) => !q || `${x.t} ${x.a}`.toLowerCase().includes(q));
+		$('rows').innerHTML = rows.map((x) => `
+			<tr data-id="${x.id}" aria-selected="${x.id === state.selected}">
+				<td><div class="t-title">${x.t}</div><div class="t-artist">${x.a}</div></td>
+				<td class="num">${x.bpm}</td>
+				<td class="num">${x.key}</td>
+				<td><span class="energy"><i style="width:${Math.round(x.e * 100)}%;background:${energyColor(x.e)}"></i></span></td>
+				<td class="stars">${'★'.repeat(x.r)}<span class="off">${'★'.repeat(5 - x.r)}</span></td>
+			</tr>`).join('');
+		$('empty').hidden = rows.length > 0;
+		$('count').textContent = `${rows.length} of ${TRACKS.length} tracks`;
+		clearBtn.hidden = !search.value;
+		renderDot();
+	}
+
+	function filtersActive() {
+		return !!search.value.trim() || !!document.querySelector('#quick [aria-pressed="true"]');
+	}
+	function renderDot() {
+		const on = filtersActive();
+		$('rail-search').classList.toggle('has-dot', on);
+		$('rail-search').dataset.tip = on ? `Search tracks · filtered  /` : 'Search tracks  /';
+	}
+
+	// ── Sidebar state ──
+	function apply() {
+		shell.classList.toggle('collapsed', state.collapsed);
+		shell.classList.toggle('peeking', state.collapsed && state.peeking);
+		const libraryLive = !state.collapsed || state.peeking;
+		library.inert = !libraryLive;
+		rail.inert = !state.collapsed;
+		$('collapse').setAttribute('aria-expanded', String(libraryLive));
+		$('collapse').dataset.tip = state.peeking ? 'Close peek  Esc' : 'Hide library  [';
+		$('rail-toggle').setAttribute('aria-expanded', String(libraryLive));
+		renderState();
+	}
+
+	function setCollapsed(v, { focus } = {}) {
+		const hadFocusInside = library.contains(document.activeElement);
+		state.collapsed = v;
+		state.peeking = false;
+		write(v);
+		apply();
+		// Never strand keyboard focus inside a region that just went inert.
+		if (v && hadFocusInside) $('rail-toggle').focus();
+		if (!v && focus) focus.focus();
+	}
+
+	function openSearch() {
+		if (state.collapsed) {
+			if (state.mode === 'peek') { state.peeking = true; apply(); }
+			else setCollapsed(false);
+		}
+		search.focus();
+		search.select();
+	}
+
+	function closePeek() {
+		if (!state.peeking) return;
+		state.peeking = false;
+		apply();
+		$('rail-search').focus();
+	}
+
+	$('collapse').addEventListener('click', () => state.peeking ? closePeek() : setCollapsed(true));
+	$('rail-toggle').addEventListener('click', () => setCollapsed(false, { focus: $('collapse') }));
+	$('rail-search').addEventListener('click', openSearch);
+	$('rail-record').addEventListener('click', () => setCollapsed(false, { focus: $('collapse') }));
+	$('scrim').addEventListener('click', closePeek);
+
+	search.addEventListener('input', renderRows);
+	clearBtn.addEventListener('click', () => { search.value = ''; renderRows(); search.focus(); });
+	$('advanced').addEventListener('click', (e) => {
+		const b = e.currentTarget;
+		b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+	});
+	$('quick').addEventListener('click', (e) => {
+		const b = e.target.closest('.chip');
+		if (!b) return;
+		b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+		renderDot();
+	});
+	$('rows').addEventListener('click', (e) => {
+		const tr = e.target.closest('tr[data-id]');
+		if (!tr) return;
+		state.selected = Number(tr.dataset.id);
+		renderRows();
+		renderTrack();
+		if (state.peeking) closePeek();
+	});
+
+	window.addEventListener('keydown', (e) => {
+		const tag = e.target.tagName;
+		if (e.key === 'Escape' && state.peeking) { e.preventDefault(); closePeek(); return; }
+		if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+			if (e.key === 'Escape') e.target.blur();
+			return;
+		}
+		if (e.metaKey || e.ctrlKey || e.altKey) return;
+		if (e.key === '[') { e.preventDefault(); setCollapsed(!state.collapsed); }
+		else if (e.key === '/') { e.preventDefault(); openSearch(); }
+	});
+
+	// ── Content pane ──
+	function renderTrack() {
+		const x = TRACKS.find((t) => t.id === state.selected);
+		$('t-title').textContent = x.t;
+		$('t-artist').textContent = x.a;
+		$('f-bpm').textContent = x.bpm;
+		$('f-key').textContent = x.key;
+		$('f-energy').textContent = x.e.toFixed(2);
+		$('f-plays').textContent = x.p;
+		drawWave();
+	}
+
+	function drawWave() {
+		const canvas = $('canvas');
+		const w = canvas.clientWidth, h = canvas.clientHeight;
+		const dpr = window.devicePixelRatio || 1;
+		canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+		const ctx = canvas.getContext('2d');
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		ctx.clearRect(0, 0, w, h);
+		const x = TRACKS.find((t) => t.id === state.selected);
+		let seed = x.id * 9301 + 49297;
+		const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+		const bar = 3, gap = 1, n = Math.floor(w / (bar + gap));
+		for (let i = 0; i < n; i++) {
+			const pos = i / n;
+			// Intro → build → drop → breakdown → drop → outro, scaled by the track's energy.
+			const arc = pos < 0.12 ? 0.35 : pos < 0.3 ? 0.55 : pos < 0.55 ? 0.95 : pos < 0.64 ? 0.4 : pos < 0.88 ? 1 : 0.45;
+			const e = Math.min(1, arc * (0.55 + x.e * 0.5));
+			const amp = e * (0.55 + rnd() * 0.45) * (h / 2 - 8);
+			ctx.fillStyle = e < 0.5 ? '#00B1B8' : e < 0.8 ? '#F39C12' : '#F44336';
+			ctx.globalAlpha = 0.85;
+			ctx.fillRect(i * (bar + gap), h / 2 - amp, bar, amp * 2);
+		}
+		ctx.globalAlpha = 1;
+		ctx.fillStyle = 'rgba(245,245,240,0.12)';
+		ctx.fillRect(0, h / 2, w, 1);
+	}
+
+	const pane = document.querySelector('.panel-right');
+	let raf = 0;
+	new ResizeObserver(() => {
+		$('pane-width').textContent = `pane ${Math.round(pane.clientWidth).toLocaleString()} px`;
+		cancelAnimationFrame(raf);
+		raf = requestAnimationFrame(drawWave);
+	}).observe(pane);
+
+	// ── Prototype controls ──
+	function renderState() {
+		const s = state.collapsed ? (state.peeking ? 'collapsed · peeking' : 'collapsed (rail)') : 'expanded';
+		$('state').innerHTML = `sidebar <b>${s}</b> · remembered <b>${read() ? 'collapsed' : 'expanded'}</b>`;
+	}
+	function seg(id, onPick) {
+		$(id).addEventListener('click', (e) => {
+			const b = e.target.closest('button');
+			if (!b) return;
+			$(id).querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+			onPick(b.dataset.v);
+		});
+	}
+	seg('mode', (v) => { state.mode = v; if (v === 'pin' && state.peeking) closePeek(); });
+	seg('motion', (v) => document.documentElement.style.setProperty('--dur', `${v}ms`));
+	$('reset').addEventListener('click', () => {
+		try { localStorage.removeItem(STORE_KEY); } catch { /* ignore */ }
+		renderState();
+	});
+	$('notes-toggle').addEventListener('click', (e) => {
+		const closed = $('notes').classList.toggle('closed');
+		e.currentTarget.textContent = closed ? 'Show notes' : 'Hide notes';
+		e.currentTarget.setAttribute('aria-expanded', String(!closed));
+	});
+
+	// Apply the remembered state without animating the first paint.
+	document.documentElement.style.setProperty('--dur', '0ms');
+	renderRows();
+	renderTrack();
+	apply();
+	requestAnimationFrame(() => requestAnimationFrame(() => document.documentElement.style.removeProperty('--dur')));
+})();
+</script>

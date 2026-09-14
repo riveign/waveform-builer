@@ -1,5 +1,6 @@
 import type { components } from './schema';
 import { fetchJson, fetchVoid } from './client';
+import type { Track } from '$lib/types';
 
 type S = components['schemas'];
 export type VinylSearchResponse = S['VinylSearchResponse'];
@@ -10,6 +11,8 @@ export type VinylImportResponse = S['VinylImportResponse'];
 export type VinylReleaseSummary = S['VinylReleaseSummary'];
 export type VinylReleaseDetail = S['VinylReleaseDetail'];
 export type VinylSide = S['VinylSide'];
+export type VinylTwinRef = S['VinylTwinRef'];
+export type VinylPairing = S['VinylPairing'];
 
 export async function searchPressings(
 	q: string,
@@ -67,6 +70,49 @@ export async function patchSide(
 		method: 'PATCH',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(patch),
+	});
+}
+
+/** The files behind a record, in pressing order — what "play" plays. */
+export async function getReleaseDigital(id: number, signal?: AbortSignal): Promise<Track[]> {
+	return fetchJson<Track[]>(`/api/vinyl/releases/${id}/digital`, { signal });
+}
+
+/** This side is that file. BPM and key come from your analysis unless you typed them. */
+export async function linkSide(trackId: number, digitalTrackId: number): Promise<VinylSide> {
+	return fetchJson<VinylSide>(`/api/vinyl/sides/${trackId}/twin`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ digital_track_id: digitalTrackId }),
+	});
+}
+
+/** "Not it" — unlinks it if linked, and Kiku never suggests that file for this side again. */
+export async function unlinkSide(trackId: number, digitalTrackId: number): Promise<VinylSide> {
+	return fetchJson<VinylSide>(`/api/vinyl/sides/${trackId}/twin/${digitalTrackId}`, {
+		method: 'DELETE',
+	});
+}
+
+/** Which file is which side, for an album you say is this record. Writes nothing. */
+export async function proposePairing(releaseId: number, digitalTrackIds: number[]): Promise<VinylPairing[]> {
+	const res = await fetchJson<S['VinylPairingResponse']>(`/api/vinyl/releases/${releaseId}/pairing`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ digital_track_ids: digitalTrackIds }),
+	});
+	return res.pairs;
+}
+
+/** Save the pairing you confirmed. `null` clears a side's link. */
+export async function saveLinks(
+	releaseId: number,
+	pairs: { vinyl_track_id: number; digital_track_id: number | null }[],
+): Promise<VinylReleaseDetail> {
+	return fetchJson<VinylReleaseDetail>(`/api/vinyl/releases/${releaseId}/links`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ pairs }),
 	});
 }
 
