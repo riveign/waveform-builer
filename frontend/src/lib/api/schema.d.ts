@@ -1505,7 +1505,7 @@ export interface paths {
         head?: never;
         /**
          * Update Track Set Roles
-         * @description Set a track's set-role tags (opener/closer/break). Empty list clears them.
+         * @description Set a track's set-role tags (opener/closer/break/highlight/tool). Empty list clears them.
          *
          *     Roles are a DJ curation signal, non-exclusive and non-restrictive — a track can
          *     hold several and a role never stops it being used elsewhere in a set (spec 027).
