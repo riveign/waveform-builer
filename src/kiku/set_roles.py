@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-SET_ROLES: tuple[str, ...] = ("opener", "closer", "break")
+SET_ROLES: tuple[str, ...] = ("opener", "closer", "break", "highlight", "tool")
 
 
 def normalize_roles(roles: list[str]) -> list[str]:
