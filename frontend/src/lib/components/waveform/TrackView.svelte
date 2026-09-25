@@ -305,7 +305,7 @@
 					<button
 						class="role-chip-btn"
 						onclick={() => showRolePicker = !showRolePicker}
-						title="Set role — mark this a great opener, closer or break"
+						title="Set role — mark this a great opener, closer, break, highlight, or tool"
 						aria-label="Set role: {localRoles.length ? localRoles.map((r) => ROLE_LABEL[r] ?? r).join(', ') : 'not set'}. Click to change."
 					>
 						{#if localRoles.length}

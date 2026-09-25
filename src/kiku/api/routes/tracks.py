@@ -250,7 +250,7 @@ def update_track_set_roles(
     body: TrackSetRolesRequest,
     db: Session = Depends(get_db),
 ) -> TrackResponse:
-    """Set a track's set-role tags (opener/closer/break). Empty list clears them.
+    """Set a track's set-role tags (opener/closer/break/highlight/tool). Empty list clears them.
 
     Roles are a DJ curation signal, non-exclusive and non-restrictive — a track can
     hold several and a role never stops it being used elsewhere in a set (spec 027).

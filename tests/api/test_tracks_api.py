@@ -227,6 +227,24 @@ def test_search_filter_set_roles_multi_or(client):
     assert 5 not in ids  # break not selected
 
 
+def test_update_set_roles_highlight_and_tool(client):
+    resp = client.patch("/api/tracks/1/set-roles", json={"roles": ["highlight", "tool"]})
+    assert resp.status_code == 200
+    assert set(resp.json()["set_roles"]) == {"highlight", "tool"}
+    resp2 = client.get("/api/tracks/1")
+    # Canonical order: opener, closer, break, highlight, tool
+    assert resp2.json()["set_roles"] == ["highlight", "tool"]
+
+
+def test_search_filter_set_role_highlight(client):
+    client.patch("/api/tracks/3/set-roles", json={"roles": ["highlight"]})
+    client.patch("/api/tracks/4/set-roles", json={"roles": ["tool"]})
+    resp = client.get("/api/tracks/search?set_role=highlight")
+    ids = {t["id"] for t in resp.json()["items"]}
+    assert 3 in ids
+    assert 4 not in ids
+
+
 def test_search_key_matches_both_notations(client, db_session):
     """A library holding both "Am" and "8A" must answer one key filter with both
     (regression: the filter substring-matched the raw column, so picking 8A
