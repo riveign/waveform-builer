@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	// Set-role tags — a DJ curation axis (spec 027). Shared metadata + inline SVG
 	// glyphs, drawn in currentColor so each call site controls the hue.
-	export const SET_ROLES = ['opener', 'closer', 'break', 'highlight', 'tool'] as const;
+	export const SET_ROLES = ['opener', 'closer', 'break', 'highlight', 'tool', 'carrier'] as const;
 	export type SetRole = (typeof SET_ROLES)[number];
 
 	export const ROLE_LABEL: Record<string, string> = {
@@ -10,6 +10,7 @@
 		break: 'Break',
 		highlight: 'Highlight',
 		tool: 'Tool',
+		carrier: 'Carrier',
 	};
 	export const ROLE_TIP: Record<string, string> = {
 		opener: 'A track you reach for to open — it sets the room, whatever its energy',
@@ -17,6 +18,7 @@
 		break: 'A breather mid-set — a moment to reset the room',
 		highlight: 'A peak moment mid-set — not the closer, but the one they remember',
 		tool: 'A reliable genre workhorse — great for blending, not necessarily a standout',
+		carrier: 'A full song that holds the floor — it carries the groove so the highlights can land',
 	};
 </script>
 
@@ -56,6 +58,9 @@
 	{:else if role === 'tool'}
 		<!-- wrench: the reliable workhorse -->
 		<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2 2.5-2.5z" />
+	{:else if role === 'carrier'}
+		<!-- sine wave: carries the groove -->
+		<path d="M2 12c2-5 4-5 6 0s4 5 6 0 4-5 6 0" />
 	{/if}
 </svg>
 

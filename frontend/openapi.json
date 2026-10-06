@@ -10577,7 +10577,7 @@
     },
     "/api/tracks/{track_id}/set-roles": {
       "patch": {
-        "description": "Set a track's set-role tags (opener/closer/break/highlight/tool). Empty list clears them.\n\nRoles are a DJ curation signal, non-exclusive and non-restrictive \u2014 a track can\nhold several and a role never stops it being used elsewhere in a set (spec 027).",
+        "description": "Set a track's set-role tags (opener/closer/break/highlight/tool/carrier). Empty list clears them.\n\nRoles are a DJ curation signal, non-exclusive and non-restrictive \u2014 a track can\nhold several and a role never stops it being used elsewhere in a set (spec 027).",
         "operationId": "update_track_set_roles_api_tracks__track_id__set_roles_patch",
         "parameters": [
           {
