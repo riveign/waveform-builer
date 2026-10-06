@@ -302,6 +302,7 @@
 		break: 'Break tracks',
 		highlight: 'Highlights',
 		tool: 'Tools',
+		carrier: 'Carriers',
 	};
 	function onBpmChange() {
 		clearTimeout(textTimer);
@@ -709,6 +710,7 @@
 						<button type="button" class="role-toggle" class:on={setRoles.has('break')} onclick={() => toggleSetRole('break')} title="Breather tracks for mid-set"><SetRoleIcon role="break" /> Break tracks</button>
 						<button type="button" class="role-toggle" class:on={setRoles.has('highlight')} onclick={() => toggleSetRole('highlight')} title="Peak moments mid-set, not closers"><SetRoleIcon role="highlight" /> Highlights</button>
 						<button type="button" class="role-toggle" class:on={setRoles.has('tool')} onclick={() => toggleSetRole('tool')} title="Reliable genre workhorses for blending"><SetRoleIcon role="tool" /> Tools</button>
+						<button type="button" class="role-toggle" class:on={setRoles.has('carrier')} onclick={() => toggleSetRole('carrier')} title="Full songs that hold the floor between highlights"><SetRoleIcon role="carrier" /> Carriers</button>
 					</div>
 				</div>
 			</div>

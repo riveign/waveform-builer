@@ -245,6 +245,15 @@ def test_search_filter_set_role_highlight(client):
     assert 4 not in ids
 
 
+def test_update_set_roles_carrier(client):
+    resp = client.patch("/api/tracks/1/set-roles", json={"roles": ["carrier", "opener"]})
+    assert resp.status_code == 200
+    # Canonical order: opener, closer, break, highlight, tool, carrier
+    assert resp.json()["set_roles"] == ["opener", "carrier"]
+    resp2 = client.get("/api/tracks/search?set_role=carrier")
+    assert {t["id"] for t in resp2.json()["items"]} == {1}
+
+
 def test_search_key_matches_both_notations(client, db_session):
     """A library holding both "Am" and "8A" must answer one key filter with both
     (regression: the filter substring-matched the raw column, so picking 8A
